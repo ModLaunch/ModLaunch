@@ -116,6 +116,13 @@ contextBridge.exposeInMainWorld('modhub', {
   overlay: {
     preview: (gameId) => invoke('overlay:preview', gameId),
   },
+  dxvk: {
+    list: () => invoke('dxvk:list'),
+    pick: () => invoke('dxvk:pick'),
+    inspect: (exe) => invoke('dxvk:inspect', exe),
+    install: (exe, api) => invoke('dxvk:install', { exe, api }),
+    remove: (exe, forget = false) => invoke('dxvk:remove', { exe, forget }),
+  },
   reshade: {
     status: (gameId) => invoke('reshade:status', gameId),
     install: (gameId) => invoke('reshade:install', gameId),

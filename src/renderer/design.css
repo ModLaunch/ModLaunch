@@ -4758,3 +4758,127 @@ body.is-maximized .wctl__restore {
     opacity: 0;
   }
 }
+
+/* --- «Графика»: DXVK для любой игры (3.1) ------------------------------ */
+
+.dxvk__intro {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-4);
+}
+.dxvk__intro > p {
+  margin: 0;
+  max-width: 68ch;
+  line-height: 1.55;
+}
+.dxvk__notes {
+  display: grid;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-1);
+  color: var(--muted);
+}
+.dxvk__notes li {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+.dxvk__notes svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+.dxvk__list {
+  display: grid;
+  gap: var(--sp-2);
+}
+.dxvk__row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-3);
+  background: var(--surface-2, rgba(255, 255, 255, 0.03));
+}
+.dxvk__dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--muted);
+  opacity: 0.5;
+}
+.dxvk__row.is-on .dxvk__dot {
+  background: #46c08a;
+  opacity: 1;
+  box-shadow: 0 0 0 4px rgba(70, 192, 138, 0.16);
+}
+.dxvk__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.dxvk__text strong {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.dxvk__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex: none;
+}
+.dxvk__busy {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-1);
+  color: var(--muted);
+}
+.dxvk__busy svg {
+  width: 16px;
+  height: 16px;
+  animation: spin 1.2s linear infinite;
+}
+.dxvk__path {
+  margin: 0;
+  word-break: break-all;
+}
+.dxvk__facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+.dxvk__choose {
+  display: grid;
+  gap: var(--sp-3);
+}
+.dxvk__choose .seg {
+  flex-wrap: wrap;
+}
+.dxvk__warn {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  margin: 0;
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-2);
+  background: rgba(224, 163, 62, 0.12);
+  color: #f0c46a;
+}
+.dxvk__warn svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+.dxvk__actions .btn--icon {
+  width: var(--h-s);
+  padding-inline: 0;
+  justify-content: center;
+}

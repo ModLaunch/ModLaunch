@@ -27,6 +27,7 @@ const { isNewer } = require('./core/updates');
 const { sectionOf } = require('./games/sections');
 const deps = require('./core/deps');
 const { ReShade } = require('./core/reshade');
+const { Dxvk, inspect: inspectExe } = require('./core/dxvk');
 const { FriendsClient, FriendsError, BEAT_MS } = require('./core/friends');
 const { Overlay } = require('./overlay');
 const { Updater } = require('./core/updater');
@@ -69,6 +70,7 @@ let playtime = null;
 let smapiIndex = null;
 /** ReShade и пресеты шейдеров (2.1). */
 let reshadeTool = null;
+let dxvkTool = null;
 /** Друзья, «в сети / в игре» и оверлей в игре (2.1). */
 let friends = null;
 let overlay = null;
@@ -306,6 +308,7 @@ function startReviews() {
   playtime = new PlayTime({ file: path.join(dataDir(), 'playtime.json') });
   smapiIndex = new deps.SmapiIndex({ file: path.join(dataDir(), 'smapi-index.json'), version: app.getVersion() });
   reshadeTool = new ReShade({ cacheDir: path.join(dataDir(), 'reshade') });
+  dxvkTool = new Dxvk({ cacheDir: path.join(dataDir(), 'dxvk') });
   friends = new FriendsClient({ config, account, dataDir: dataDir(), version: app.getVersion() });
   friends.setMode(settings.data.friendsStatus);
   updater = new Updater({
@@ -502,7 +505,7 @@ function savesDirFor(game, state) {
 
 /** Ошибки новых функций 1.10 — текстом из словаря, как всё остальное. */
 function explainCode(error) {
-  if (error?.code && /^(PROFILE|BACKUP|PACK)_/.test(error.code)) {
+  if (error?.code && /^(PROFILE|BACKUP|PACK|DXVK)_/.test(error.code)) {
     const explained = new Error(t('err.' + error.code));
     explained.alreadyExplained = true;
     return explained;
@@ -1028,6 +1031,67 @@ function registerIpc() {
     const dir = ReShade.dirOf(game, state.path);
     return reshadeTool.install(dir, game.reshade.api, (stage) => sendProgress({ scope: 'loader', gameId, ...stage }));
   });
+
+  /* --- DXVK для любой игры (3.1) --- */
+
+  /** Игры, куда ставили DXVK: список хранится в настройках, состояние — в папке игры. */
+  const dxvkList = () =>
+    (Array.isArray(settings.data.dxvkGames) ? settings.data.dxvkGames : [])
+      .filter((g) => g && typeof g.exe === 'string')
+      .map((g) => {
+        const exists = fs.existsSync(g.exe);
+        return { exe: g.exe, name: g.name ?? path.basename(g.exe), exists, ...(exists ? dxvkTool.status(path.dirname(g.exe)) : { installed: false }) };
+      });
+  const dxvkRemember = (exe, name) => {
+    const list = (settings.data.dxvkGames ?? []).filter((g) => g?.exe !== exe);
+    settings.data.dxvkGames = [{ exe, name }, ...list].slice(0, 50);
+    settings.save();
+  };
+
+  handle('dxvk:list', async () => dxvkList());
+
+  /** Выбрать exe и сразу сказать, что это за игра (разрядность, DirectX). */
+  handle('dxvk:pick', async () =>
+    coded(async () => {
+      const result = await dialog.showOpenDialog(mainWindow, {
+        title: t('dialog.pickExe'),
+        properties: ['openFile'],
+        filters: [{ name: t('dialog.exe'), extensions: ['exe'] }],
+      });
+      if (result.canceled || !result.filePaths[0]) return null;
+      const info = inspectExe(result.filePaths[0]);
+      return { ...info, ...dxvkTool.status(info.dir) };
+    })
+  );
+
+  handle('dxvk:inspect', async (exe) =>
+    coded(async () => {
+      if (typeof exe !== 'string' || !fs.existsSync(exe)) throw Object.assign(new Error('bad exe'), { code: 'DXVK_NOT_EXE' });
+      const info = inspectExe(exe);
+      return { ...info, ...dxvkTool.status(info.dir) };
+    })
+  );
+
+  handle('dxvk:install', async ({ exe, api } = {}) =>
+    coded(async () => {
+      if (typeof exe !== 'string' || !/\.exe$/i.test(exe)) throw Object.assign(new Error('bad exe'), { code: 'DXVK_NOT_EXE' });
+      const done = await dxvkTool.install(exe, { api }, (stage) => sendProgress({ scope: 'dxvk', detail: exe, ...stage }));
+      dxvkRemember(exe, done.name);
+      return done;
+    })
+  );
+
+  handle('dxvk:remove', async ({ exe, forget = false } = {}) =>
+    coded(async () => {
+      if (typeof exe !== 'string') return { removed: false };
+      const result = fs.existsSync(exe) ? dxvkTool.remove(path.dirname(exe)) : { removed: false };
+      if (forget) {
+        settings.data.dxvkGames = (settings.data.dxvkGames ?? []).filter((g) => g?.exe !== exe);
+        settings.save();
+      }
+      return result;
+    })
+  );
 
   handle('mods:installFromCatalog', async ({ gameId, modId }) => {
     const { game, state } = await stateFor(gameId, undefined, { scan: false });

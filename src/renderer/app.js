@@ -96,6 +96,10 @@ const state = {
   dlOpen: false,
   /** Раздел настроек. */
   settingsTab: 'look',
+  dxvkGames: null,
+  dxvkBusy: null,
+  dxvkProgress: null,
+  dxvkPicked: null,
   /** Установленные моды всех найденных игр: gameId -> mods[] (для «Установлен» и правой панели). */
   library: {},
   /** Каталог: порядок и категория (категории есть у ModLinks). */
@@ -4951,6 +4955,7 @@ function renderSettings() {
     ['accounts', 'key'],
     ['games', 'grid'],
     ['catalog', 'shop'],
+    ['graphics', 'sparkle'],
     ['launch', 'play'],
     ['backups', 'shield'],
     ['updates', 'refresh'],
@@ -4968,6 +4973,7 @@ function renderSettings() {
     accounts: settingsAccounts,
     games: settingsGames,
     catalog: settingsCatalog,
+    graphics: settingsGraphics,
     launch: settingsLaunch,
     backups: settingsBackups,
     updates: settingsUpdates,
@@ -5387,6 +5393,124 @@ function settingsBackups() {
           : '')
     ) + settingsCard(t('bak.games'), rows || `<p class="muted small">${esc(t('bak.summary.none'))}</p>`, t('bak.games.hint'))
   );
+}
+
+/* --- «Графика»: DXVK для любой игры (3.1) --- */
+
+const DXVK_APIS = ['dx8', 'dx9', 'dx10', 'dx11'];
+
+function dxvkApiName(api) {
+  return { dx8: 'DirectX 8', dx9: 'DirectX 9', dx10: 'DirectX 10', dx11: 'DirectX 11', dx12: 'DirectX 12', opengl: 'OpenGL', vulkan: 'Vulkan' }[api] ?? t('dxvk.api.unknown');
+}
+
+async function loadDxvk() {
+  try {
+    state.dxvkGames = (await call(api.dxvk.list(), { silent: true })) ?? [];
+  } catch {
+    state.dxvkGames = [];
+  }
+  if (state.view === 'settings' && state.settingsTab === 'graphics') render();
+}
+
+function dxvkProgressText() {
+  const p = state.dxvkProgress;
+  if (p?.stage === 'download' && typeof p.ratio === 'number') return t('dxvk.downloading', { n: Math.round(p.ratio * 100) });
+  if (p?.stage === 'install') return t('dxvk.installing');
+  return t('dxvk.working');
+}
+
+function dxvkRow(game) {
+  const busy = state.dxvkBusy === game.exe;
+  const status = !game.exists
+    ? t('dxvk.missing')
+    : game.installed
+      ? t('dxvk.on', { version: game.version || '', api: dxvkApiName(game.api), bits: game.arch === 'x64' ? '64' : '32' })
+      : t('dxvk.off');
+  const dir = game.exe.replace(/[\\/][^\\/]+$/, '');
+  const main = busy
+    ? `<span class="dxvk__busy">${icon('refresh')}<span>${esc(dxvkProgressText())}</span></span>`
+    : game.installed
+      ? `<button class="btn btn--ghost btn--sm" data-action="dxvk-remove" data-exe="${esc(game.exe)}">${icon('close')}<span>${esc(t('dxvk.remove'))}</span></button>`
+      : game.exists
+        ? `<button class="btn btn--primary btn--sm" data-action="dxvk-open" data-exe="${esc(game.exe)}">${icon('download')}<span>${esc(t('dxvk.install'))}</span></button>`
+        : '';
+  const extra = busy
+    ? ''
+    : `${game.exists ? `<button class="btn btn--ghost btn--sm btn--icon" data-action="open-folder" data-path="${esc(dir)}" title="${esc(t('common.open'))}" aria-label="${esc(t('common.open'))}">${icon('folder')}</button>` : ''}
+       <button class="btn btn--ghost btn--sm btn--icon" data-action="dxvk-forget" data-exe="${esc(game.exe)}" title="${esc(t('dxvk.forget'))}" aria-label="${esc(t('dxvk.forget'))}">${icon('trash')}</button>`;
+  return `
+    <div class="dxvk__row${game.installed ? ' is-on' : ''}">
+      <span class="dxvk__dot" aria-hidden="true"></span>
+      <div class="dxvk__text">
+        <strong>${esc(game.name)}</strong>
+        <span class="muted small">${esc(status)}</span>
+      </div>
+      <div class="dxvk__actions">${main}${extra}</div>
+    </div>`;
+}
+
+function settingsGraphics() {
+  if (state.dxvkGames === null && !state.dxvkLoading) {
+    state.dxvkLoading = true;
+    loadDxvk().finally(() => (state.dxvkLoading = false));
+  }
+  const list = state.dxvkGames;
+  const rows =
+    list === null
+      ? `<p class="muted small">${esc(t('common.loading'))}</p>`
+      : list.length
+        ? `<div class="dxvk__list">${list.map(dxvkRow).join('')}</div>`
+        : `<p class="muted small">${esc(t('dxvk.empty'))}</p>`;
+  return (
+    settingsCard(
+      t('dxvk.title'),
+      `<div class="dxvk__intro">
+        <p>${esc(t('dxvk.lead'))}</p>
+        <ul class="dxvk__notes">
+          <li>${icon('info')}<span>${esc(t('dxvk.note.vulkan'))}</span></li>
+          <li>${icon('warn')}<span>${esc(t('dxvk.note.online'))}</span></li>
+        </ul>
+        <button class="btn btn--primary" data-action="dxvk-pick"${state.dxvkBusy ? ' disabled' : ''}>${icon('plus')}<span>${esc(t('dxvk.add'))}</span></button>
+      </div>`
+    ) + settingsCard(t('dxvk.games'), rows)
+  );
+}
+
+/** Окно перед установкой: что за игра, какой DirectX, и одна кнопка. */
+function openDxvkModal() {
+  const p = state.dxvkPicked;
+  if (!p) return;
+  const chosen = p.chosen;
+  const unsupported = !p.supported && p.api && !DXVK_APIS.includes(p.api);
+  const facts = [
+    t(p.arch === 'x64' ? 'dxvk.bits64' : 'dxvk.bits32'),
+    p.api ? `${dxvkApiName(p.api)} · ${t('dxvk.detected')}` : t('dxvk.notDetected'),
+  ];
+  const choice = unsupported
+    ? `<p class="dxvk__warn">${icon('warn')}<span>${esc(t(p.api === 'dx12' ? 'dxvk.dx12' : 'dxvk.native', { api: dxvkApiName(p.api) }))}</span></p>`
+    : `<div class="dxvk__choose">
+        <span class="muted small">${esc(t(p.api ? 'dxvk.choose.change' : 'dxvk.choose'))}</span>
+        <div class="seg" role="radiogroup">
+          ${DXVK_APIS.map((id) => `<button class="seg__btn${chosen === id ? ' is-active' : ''}" role="radio" aria-checked="${chosen === id}" data-action="dxvk-choose" data-api="${id}">${esc(dxvkApiName(id))}</button>`).join('')}
+        </div>
+        ${p.api ? '' : `<p class="muted small">${esc(t('dxvk.choose.hint'))}</p>`}
+      </div>`;
+  openModal(`
+    <div class="modal__head"><h3>${esc(p.name)}</h3></div>
+    <p class="muted small dxvk__path">${esc(p.exe)}</p>
+    <div class="dxvk__facts">${facts.map((f) => `<span class="chip">${esc(f)}</span>`).join('')}</div>
+    ${p.installed ? `<p class="muted small">${esc(t('dxvk.reinstall', { version: p.version || '' }))}</p>` : ''}
+    ${choice}
+    <div class="modal__foot">
+      <button class="btn btn--ghost" data-close>${esc(t('common.cancel'))}</button>
+      ${unsupported ? '' : `<button class="btn btn--primary" data-action="dxvk-install" data-exe="${esc(p.exe)}"${chosen ? '' : ' disabled'}>${icon('download')}<span>${esc(t('dxvk.install'))}</span></button>`}
+    </div>`);
+}
+
+function showDxvkPicked(info) {
+  if (!info) return;
+  state.dxvkPicked = { ...info, chosen: DXVK_APIS.includes(info.api) ? info.api : null };
+  openDxvkModal();
 }
 
 /** «Обновления»: проверять ли моды при запуске и что нашлось. */
@@ -7054,6 +7178,76 @@ const ACTIONS = {
     state.catalogCategory = node.dataset.category || null;
     loadCatalog(state.catalogFor ?? state.activeGameId, state.catalogMeta.query);
   },
+  'dxvk-pick': async () => {
+    try {
+      showDxvkPicked(await call(api.dxvk.pick()));
+    } catch {
+      /* ошибка уже показана */
+    }
+  },
+  'dxvk-open': async (node) => {
+    try {
+      showDxvkPicked(await call(api.dxvk.inspect(node.dataset.exe)));
+    } catch {
+      /* ошибка уже показана */
+    }
+  },
+  'dxvk-choose': (node) => {
+    if (!state.dxvkPicked) return;
+    state.dxvkPicked.chosen = node.dataset.api;
+    // Меняем выбор на месте — без повторного появления окна.
+    node.parentElement.querySelectorAll('.seg__btn').forEach((btn) => {
+      const on = btn === node;
+      btn.classList.toggle('is-active', on);
+      btn.setAttribute('aria-checked', String(on));
+    });
+    const install = $('#modalPanel [data-action="dxvk-install"]');
+    if (install) install.disabled = false;
+  },
+  'dxvk-install': async (node) => {
+    const exe = node.dataset.exe;
+    const chosen = state.dxvkPicked?.chosen ?? undefined;
+    closeModal();
+    state.dxvkBusy = exe;
+    state.dxvkProgress = null;
+    if (!(state.dxvkGames ?? []).some((g) => g.exe === exe)) {
+      state.dxvkGames = [{ exe, name: state.dxvkPicked?.name ?? exe, exists: true, installed: false }, ...(state.dxvkGames ?? [])];
+    }
+    if (state.view !== 'settings' || state.settingsTab !== 'graphics') {
+      state.settingsTab = 'graphics';
+      go('settings');
+    } else render();
+    try {
+      const done = await call(api.dxvk.install(exe, chosen));
+      toast(t('dxvk.done', { name: done.name, version: done.version }));
+    } catch {
+      /* ошибка уже показана */
+    } finally {
+      state.dxvkBusy = null;
+      state.dxvkPicked = null;
+      await loadDxvk();
+    }
+  },
+  'dxvk-remove': async (node) => {
+    try {
+      await call(api.dxvk.remove(node.dataset.exe));
+      toast(t('dxvk.removed'));
+    } catch {
+      /* ошибка уже показана */
+    }
+    await loadDxvk();
+  },
+  'dxvk-forget': async (node) => {
+    const game = (state.dxvkGames ?? []).find((g) => g.exe === node.dataset.exe);
+    try {
+      // Убираем из списка — и DXVK из игры тоже, чтобы не осталось «забытого».
+      await call(api.dxvk.remove(node.dataset.exe, true));
+      if (game?.installed) toast(t('dxvk.removed'));
+    } catch {
+      /* ошибка уже показана */
+    }
+    await loadDxvk();
+  },
   'settings-tab': (node) => {
     state.settingsTab = node.dataset.tab;
     render();
@@ -7068,6 +7262,7 @@ const ACTIONS = {
         .catch(() => {});
     }
     if (node.dataset.tab === 'launch') loadPlaytime().then(() => state.settingsTab === 'launch' && render());
+    if (node.dataset.tab === 'graphics') loadDxvk();
   },
   'set-pref': async (node) => {
     const key = node.dataset.key;
@@ -7624,6 +7819,14 @@ api.onProgress((payload) => {
       item.progress = { code: payload.code, where: payload.where };
       if (state.view === 'home' || state.view === 'games') render();
     }
+    return;
+  }
+
+  // DXVK (3.1): ход установки показывает строка игры в «Графике».
+  if (payload.scope === 'dxvk') {
+    state.dxvkProgress = payload;
+    const node = document.querySelector('.dxvk__busy span:last-child');
+    if (node) node.textContent = dxvkProgressText();
     return;
   }
 

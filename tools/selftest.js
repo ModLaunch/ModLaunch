@@ -172,6 +172,26 @@ async function tour() {
   const time = await js(`window.modhub.playtime.all()`);
   check('игровое время посчитано', (time?.data?.subnautica?.sessions ?? 0) >= 1, JSON.stringify(time?.data?.subnautica ?? {}));
 
+  /* --- DXVK (3.1): настоящий DXVK с GitHub в ненастоящую старую игру --- */
+  const OLD = path.join(ROOT, 'Games', 'Old Game', 'bin');
+  fs.mkdirSync(OLD, { recursive: true });
+  const oldExe = path.join(OLD, 'oldgame.exe');
+  fs.copyFileSync(WIN ? path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'PING.EXE') : '/bin/sleep', oldExe);
+  fs.writeFileSync(path.join(OLD, 'dxgi.dll'), 'own dll of the game');
+  if (WIN) {
+    const looked = await js(`window.modhub.dxvk.inspect(${JSON.stringify(oldExe)})`);
+    check('DXVK: exe игры распознан', looked?.ok && looked.data.arch === 'x64' && looked.data.name === 'Old Game', JSON.stringify(looked?.data ?? looked));
+    const put = await js(`window.modhub.dxvk.install(${JSON.stringify(oldExe)}, 'dx11')`);
+    const files = fs.readdirSync(OLD);
+    check('DXVK: скачан с GitHub и поставлен', put?.ok && ['d3d11.dll', 'dxgi.dll', 'd3d10core.dll', 'dxvk.modlaunch.json'].every((f) => files.includes(f)), put?.ok ? `${put.data.version}: ${files.join(', ')}` : put?.error);
+    check('DXVK: своя DLL игры сохранена', files.includes('dxgi.dll.modlaunch-backup'));
+    await js(`state.settingsTab = 'graphics'; go('settings')`);
+    await shot('11-dxvk', 1500);
+    const off = await js(`window.modhub.dxvk.remove(${JSON.stringify(oldExe)})`);
+    const left = fs.readdirSync(OLD).sort();
+    check('DXVK: убран, всё как было', off?.ok && left.join(',') === 'dxgi.dll,oldgame.exe' && fs.readFileSync(path.join(OLD, 'dxgi.dll'), 'utf8') === 'own dll of the game', left.join(', '));
+  }
+
   // Закрыли окно — программа должна выйти, спрятанный оверлей её не держит.
   const quit = new Promise((resolve) => app.once('will-quit', () => resolve(true)));
   main.close();
