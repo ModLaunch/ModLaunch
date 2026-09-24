@@ -1673,6 +1673,64 @@ function registerIpc() {
     return true;
   });
 
+  /* --- статистика для владельца (3.0) --- */
+
+  /** Скачивания по выпускам — с GitHub Releases (данные публичные). */
+  handle('stats:releases', async () => {
+    if (!updater.configured) return { configured: false, releases: [] };
+    const url = `https://api.github.com/repos/${encodeURIComponent(updater.owner)}/${encodeURIComponent(updater.repo)}/releases?per_page=100`;
+    const list = await updater.request(url);
+    const releases = (Array.isArray(list) ? list : [])
+      .filter((r) => !r.draft)
+      .map((r) => {
+        const assets = r.assets ?? [];
+        const count = (re) => assets.filter((a) => re.test(a.name)).reduce((n, a) => n + (a.download_count || 0), 0);
+        return {
+          version: String(r.tag_name ?? '').replace(/^v/i, ''),
+          name: r.name ?? r.tag_name,
+          publishedAt: r.published_at,
+          setup: count(/setup.*\.exe$/i),
+          zip: count(/\.zip$/i),
+          total: assets.reduce((n, a) => n + (a.download_count || 0), 0),
+          page: r.html_url,
+        };
+      })
+      .sort((a, b) => String(a.publishedAt).localeCompare(String(b.publishedAt)));
+    return { configured: true, repo: `${updater.owner}/${updater.repo}`, releases };
+  });
+
+  /** Оценки и отзывы — из общей базы отзывов (копия на диске, свежее — с сервера). */
+  handle('stats:reviews', async () => {
+    await reviews.sync({ force: true }).catch(() => {});
+    const all = reviews.list();
+    const byMod = new Map();
+    for (const r of all) {
+      const key = `${r.game}|${r.mod}`;
+      const entry = byMod.get(key) ?? { game: r.game, mod: r.mod, name: r.modName || r.mod, count: 0, sum: 0 };
+      entry.count += 1;
+      entry.sum += r.stars;
+      byMod.set(key, entry);
+    }
+    const perGame = {};
+    for (const r of all) perGame[r.game] = (perGame[r.game] ?? 0) + 1;
+    const stars = [1, 2, 3, 4, 5].map((n) => all.filter((r) => r.stars === n).length);
+    const top = [...byMod.values()]
+      .map((m) => ({ ...m, avg: Math.round((m.sum / m.count) * 100) / 100 }))
+      .sort((a, b) => b.count - a.count || b.avg - a.avg)
+      .slice(0, 8);
+    return {
+      configured: reviews.configured,
+      total: all.length,
+      authors: new Set(all.map((r) => r.uid)).size,
+      avg: all.length ? Math.round((all.reduce((n, r) => n + r.stars, 0) / all.length) * 100) / 100 : 0,
+      stars,
+      perGame,
+      top,
+      latest: all.slice(0, 6).map((r) => ({ name: r.name, stars: r.stars, text: r.text, modName: r.modName || r.mod, game: r.game, updated: r.updated })),
+      error: reviews.status().error,
+    };
+  });
+
   /* --- окно без рамки (3.0) --- */
 
   handle('window:control', async (action) => {

@@ -20,6 +20,9 @@ const api = window.modhub;
 const t = (key, params) => window.I18N.t(key, params);
 
 const state = {
+  /** Статистика для владельца (3.0): скачивания с GitHub и оценки. */
+  stats: null,
+  statsBusy: false,
   /** Новая версия самой программы (3.0): ответ updater.status(). */
   appUpdate: null,
   appUpdateProgress: null,
@@ -166,6 +169,7 @@ const PREF_DEFAULTS = {
   gameDefaultTab: 'downloads', // downloads | market | profiles
   autoDeps: true, // ставить требования мода вместе с ним (2.1)
   autoUpdate: true, // скачивать новую версию ModLaunch заранее (3.0)
+  ownerStats: false, // кнопка «Статистика» в рельсе — для владельца (3.0)
   // 2.1 — друзья и оверлей в игре.
   friendsStatus: 'all', // all — во что играю | online — только «в сети» | hidden — невидимка
   overlay: true,
@@ -427,6 +431,7 @@ const ICONS = {
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 14.5c1.8 2.2 5.2 2.2 7 0M9 9.5h.01M15 9.5h.01" stroke-width="2"/></svg>',
   user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20c1.2-3.6 4-5.5 7.5-5.5s6.3 1.9 7.5 5.5"/></svg>',
   users: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8.5" r="3.3"/><path d="M3 19.5c.9-3.2 3.2-5 6-5s5.1 1.8 6 5"/><path d="M15.2 5.4a3.2 3.2 0 0 1 0 6.2"/><path d="M17.4 14.7c1.8.7 3 2.3 3.6 4.8"/></svg>',
+  stats: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4.5 19.5h15"/><path d="M7.5 16v-5M12 16V6.5M16.5 16v-8"/></svg>',
   plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
   copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="8.5" y="8.5" width="11" height="11" rx="2.5"/><path d="M15.5 8.5v-2a2 2 0 0 0-2-2h-7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2"/></svg>',
   overlay: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="13" rx="2.5"/><rect x="12.5" y="7.5" width="6" height="7" rx="1.5"/><path d="M8 20.5h8" stroke-linecap="round"/></svg>',
@@ -1904,6 +1909,9 @@ function renderCrumbs() {
     case 'friends':
       parts = [crumb(t('friends.title'))];
       break;
+    case 'stats':
+      parts = [crumb(t('stats.title'))];
+      break;
     default:
       parts = [crumb(t('nav.menu'))];
   }
@@ -1994,6 +2002,7 @@ function renderRail() {
   for (const [id, key] of [
     ['navHome', 'nav.menu'],
     ['navFriends', 'friends.title'],
+    ['navStats', 'stats.title'],
     ['navDonate', 'nav.donate'],
     ['navSettings', 'nav.settings'],
   ]) {
@@ -2005,6 +2014,11 @@ function renderRail() {
   $('#navDonate').classList.toggle('is-active', state.view === 'donate');
   $('#navSettings').classList.toggle('is-active', state.view === 'settings' && state.settingsTab !== 'accounts');
   renderFriendsRail();
+  const statsBtn = $('#navStats');
+  if (statsBtn) {
+    statsBtn.hidden = !(pref('ownerStats') || state.account?.admin);
+    statsBtn.classList.toggle('is-active', state.view === 'stats');
+  }
   renderAccountRail();
 
   // Иконки рисуются здесь, а не в разметке: так они переживают смену языка.
@@ -2127,6 +2141,7 @@ function render() {
     donate: renderDonate,
     settings: renderSettings,
     friends: renderFriends,
+    stats: renderStats,
   };
 
   const view = screens[state.view] ?? renderHome;
@@ -5479,7 +5494,7 @@ function settingsAbout() {
       t('settings.about'),
       `<div class="about">
          <span class="about__logo">${icon('logo')}</span>
-         <div><b class="about__name">Mod<span>Launch</span></b><span class="muted">${esc(t('settings.version'))} ${esc(info.version ?? '')}</span></div>
+         <div><b class="about__name">Mod<span>Launch</span></b><button class="about__ver muted" type="button" data-action="about-version">${esc(t('settings.version'))} ${esc(info.version ?? '')}</button></div>
        </div>
        <dl class="facts">
          <dt>${esc(t('settings.admin'))}</dt><dd>${esc(info.elevated ? t('settings.admin.yes') : t('settings.admin.no'))}</dd>
@@ -5882,6 +5897,190 @@ function renderAccountRail() {
   node.querySelector('.rail__tip').textContent = acc.signedIn
     ? `${acc.name ?? ''}${acc.admin ? ' · ' + t('acc.admin') : ''}`
     : t('acc.tab.signin');
+}
+
+/* ================================================================== *
+ *  Статистика для владельца (3.0)
+ *
+ *  Сколько раз скачали каждую версию (GitHub Releases), сколько отзывов,
+ *  средняя оценка, самые обсуждаемые моды и свежие отзывы. Кнопка в
+ *  рельсе видна администратору или после пяти щелчков по номеру версии
+ *  в «Настройки → О программе».
+ * ================================================================== */
+
+function openStats() {
+  go('stats');
+  loadStats();
+}
+
+async function loadStats({ force = false } = {}) {
+  if (!api.stats || state.statsBusy) return;
+  if (state.stats && !force && Date.now() - state.stats.at < 60 * 1000) return;
+  state.statsBusy = true;
+  softRender();
+  const [releases, reviews] = await Promise.all([
+    call(api.stats.releases(), { silent: true }).catch((error) => ({ error: error.message, releases: [] })),
+    call(api.stats.reviews(), { silent: true }).catch((error) => ({ error: error.message, total: 0, top: [], latest: [], stars: [0, 0, 0, 0, 0] })),
+  ]);
+  state.stats = { releases, reviews, at: Date.now() };
+  state.statsBusy = false;
+  if (state.view === 'stats') {
+    render();
+    countUp($('#main'));
+  }
+}
+
+/** Числа в плитках «набегают» от нуля — один раз, при показе. */
+function countUp(root) {
+  if (!motionOn()) return;
+  for (const node of root.querySelectorAll('[data-count-to]')) {
+    const to = Number(node.dataset.countTo) || 0;
+    const digits = Number(node.dataset.digits) || 0;
+    const start = performance.now();
+    const step = (now) => {
+      const k = Math.min(1, (now - start) / 900);
+      const eased = 1 - Math.pow(1 - k, 3);
+      node.textContent = digits ? (to * eased).toFixed(digits) : fullNumber(Math.round(to * eased));
+      if (k < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+}
+
+function statTile(label, value, { digits = 0, note = '', ico = 'stats' } = {}) {
+  const shown = digits ? Number(value || 0).toFixed(digits) : fullNumber(value || 0);
+  return `
+    <div class="kpi reveal">
+      <span class="kpi__icon">${icon(ico)}</span>
+      <b class="kpi__value" data-count-to="${Number(value) || 0}" data-digits="${digits}">${esc(shown)}</b>
+      <span class="kpi__label">${esc(label)}</span>
+      ${note ? `<span class="kpi__note">${esc(note)}</span>` : ''}
+    </div>`;
+}
+
+/** Скачивания по версиям: столбики от одной базовой линии, подсказка при наведении. */
+function downloadsChart(releases) {
+  const list = releases.slice(-12);
+  if (!list.length) return `<p class="muted">${esc(t('stats.noReleases'))}</p>`;
+  const max = Math.max(1, ...list.map((r) => r.total));
+  const stepRaw = max / 4;
+  const pow = Math.pow(10, Math.floor(Math.log10(stepRaw || 1)));
+  const step = [1, 2, 2.5, 5, 10].map((m) => m * pow).find((v) => v >= stepRaw) ?? stepRaw;
+  const top = step * 4;
+  const W = 640;
+  const H = 220;
+  const left = 44;
+  const bottom = 28;
+  const plotH = H - bottom - 12;
+  const band = (W - left) / list.length;
+  const bar = Math.min(24, band * 0.5);
+  const y = (v) => 12 + plotH - (v / top) * plotH;
+  const ticks = [0, 1, 2, 3, 4]
+    .map((i) => {
+      const v = step * i;
+      return `<line class="chart__grid" x1="${left}" x2="${W}" y1="${y(v)}" y2="${y(v)}"/><text class="chart__tick" x="${left - 8}" y="${y(v) + 4}" text-anchor="end">${esc(fullNumber(v))}</text>`;
+    })
+    .join('');
+  const bars = list
+    .map((r, i) => {
+      const x = left + band * i + (band - bar) / 2;
+      const h = Math.max(2, (r.total / top) * plotH);
+      const yTop = y(0) - h;
+      const rr = Math.min(4, h / 2);
+      // Скругление только у верхнего края столбика, основание — прямое.
+      const path = `M${x},${y(0)} V${yTop + rr} Q${x},${yTop} ${x + rr},${yTop} H${x + bar - rr} Q${x + bar},${yTop} ${x + bar},${yTop + rr} V${y(0)} Z`;
+      const tip = t('stats.tip', { version: r.version, n: fullNumber(r.total), setup: fullNumber(r.setup), zip: fullNumber(r.zip) });
+      const last = i === list.length - 1;
+      return `
+        <g class="chart__col" style="--i:${i}">
+          <rect class="chart__hit" x="${left + band * i}" y="0" width="${band}" height="${H - bottom}"><title>${esc(tip)}</title></rect>
+          <path class="chart__bar" d="${path}"/>
+          ${last ? `<text class="chart__value" x="${x + bar / 2}" y="${yTop - 6}" text-anchor="middle">${esc(fullNumber(r.total))}</text>` : ''}
+          <text class="chart__label" x="${x + bar / 2}" y="${H - 8}" text-anchor="middle">${esc(r.version)}</text>
+        </g>`;
+    })
+    .join('');
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(t('stats.chart'))}">${ticks}<line class="chart__base" x1="${left}" x2="${W}" y1="${y(0)}" y2="${y(0)}"/>${bars}</svg>`;
+}
+
+function renderStats() {
+  const data = state.stats;
+  if (!data) {
+    if (!state.statsBusy) loadStats();
+    return `<div class="page"><div class="loading"><div class="spinner"></div></div></div>`;
+  }
+  const releases = data.releases?.releases ?? [];
+  const rv = data.reviews ?? {};
+  const total = releases.reduce((n, r) => n + r.total, 0);
+  const latest = releases[releases.length - 1];
+  const starsMax = Math.max(1, ...(rv.stars ?? [0]));
+  const table = releases
+    .slice()
+    .reverse()
+    .map(
+      (r) => `<tr><td><b>${esc(r.version)}</b></td><td class="muted">${esc(formatWhen(r.publishedAt))}</td><td>${esc(fullNumber(r.setup))}</td><td>${esc(fullNumber(r.zip))}</td><td><b>${esc(fullNumber(r.total))}</b></td></tr>`
+    )
+    .join('');
+  const top = (rv.top ?? [])
+    .map(
+      (m, i) => `
+      <div class="srank reveal" style="--i:${i}">
+        <span class="srank__n">${i + 1}</span>
+        <span class="srank__name"><b>${esc(m.name)}</b><span>${esc(entry(m.game)?.info?.name ?? m.game)}</span></span>
+        <span class="srank__score">${icon('star')}${esc(formatScore(m.avg))}</span>
+        <span class="srank__count">${esc(pluralN(m.count, 'rev.count'))}</span>
+      </div>`
+    )
+    .join('');
+  const latestReviews = (rv.latest ?? [])
+    .map(
+      (r) => `
+      <div class="sreview reveal">
+        <div class="sreview__head">${avatarHtml(r.name)}<b>${esc(r.name)}</b><span class="stars" style="--rate:${r.stars * 20}%">★★★★★</span></div>
+        <p>${esc(r.text || '—')}</p>
+        <span class="muted small">${esc(r.modName)} · ${esc(entry(r.game)?.info?.name ?? r.game)} · ${esc(formatWhen(r.updated))}</span>
+      </div>`
+    )
+    .join('');
+  return `
+    <div class="page page--stats">
+      <div class="page__head stats__head">
+        <h1 class="page__title">${esc(t('stats.title'))}</h1>
+        <span class="muted small">${esc(data.releases?.repo ?? '')}</span>
+        <button class="btn btn--ghost btn--sm" data-action="stats-refresh"${state.statsBusy ? ' disabled' : ''}>${icon('refresh')}<span>${esc(state.statsBusy ? t('common.loading') : t('stats.refresh'))}</span></button>
+      </div>
+      <div class="kpis">
+        ${statTile(t('stats.downloads'), total, { ico: 'download', note: t('stats.releasesN', { n: releases.length }) })}
+        ${statTile(t('stats.latest', { version: latest?.version ?? '—' }), latest?.total ?? 0, { ico: 'sparkle' })}
+        ${statTile(t('stats.reviews'), rv.total ?? 0, { ico: 'chat', note: t('stats.authors', { n: rv.authors ?? 0 }) })}
+        ${statTile(t('stats.avg'), rv.avg ?? 0, { digits: 2, ico: 'star' })}
+      </div>
+      ${data.releases?.error ? `<p class="fnote is-error">${esc(data.releases.error)}</p>` : ''}
+      <section class="panel reveal">
+        <div class="panel__head"><h2>${esc(t('stats.chart'))}</h2></div>
+        ${downloadsChart(releases)}
+        <details class="stable"><summary>${esc(t('stats.table'))}</summary>
+          <table><thead><tr><th>${esc(t('stats.col.version'))}</th><th>${esc(t('stats.col.date'))}</th><th>${esc(t('stats.col.setup'))}</th><th>Zip</th><th>${esc(t('stats.col.total'))}</th></tr></thead><tbody>${table}</tbody></table>
+        </details>
+      </section>
+      <div class="stats__cols">
+        <section class="panel reveal">
+          <div class="panel__head"><h2>${esc(t('stats.stars'))}</h2></div>
+          <div class="sstars">${[5, 4, 3, 2, 1]
+            .map((n) => {
+              const c = rv.stars?.[n - 1] ?? 0;
+              return `<div class="sstars__row"><span>${n} ★</span><i style="--w:${Math.round((c / starsMax) * 100)}%"></i><b>${c}</b></div>`;
+            })
+            .join('')}</div>
+          <div class="panel__head"><h2>${esc(t('stats.top'))}</h2></div>
+          ${top || `<p class="muted">${esc(t('stats.noReviews'))}</p>`}
+        </section>
+        <section class="panel reveal">
+          <div class="panel__head"><h2>${esc(t('stats.fresh'))}</h2></div>
+          ${latestReviews || `<p class="muted">${esc(t('stats.noReviews'))}</p>`}
+        </section>
+      </div>
+    </div>`;
 }
 
 /* ================================================================== *
@@ -6756,6 +6955,20 @@ const ACTIONS = {
   },
   'nav-home': () => go('home'),
   'nav-friends': () => openFriends(),
+  'nav-stats': () => openStats(),
+  'stats-refresh': () => loadStats({ force: true }),
+  'about-version': async () => {
+    // Пять щелчков по версии — включить или спрятать «Статистику» (для владельца).
+    state.versionClicks = (state.versionClicks ?? 0) + 1;
+    clearTimeout(state.versionTimer);
+    state.versionTimer = setTimeout(() => (state.versionClicks = 0), 1500);
+    if (state.versionClicks < 5) return;
+    state.versionClicks = 0;
+    const on = !pref('ownerStats');
+    await setPref('ownerStats', on);
+    toast(t(on ? 'stats.enabled' : 'stats.disabled'));
+    renderRail();
+  },
   'app-update': () => openAppUpdate(),
   'app-update-check': () => checkAppUpdate(),
   'friend-add': () => addFriend(),
@@ -7194,6 +7407,7 @@ $('#brand').addEventListener('click', () => go('home'));
 $('#navHome').addEventListener('click', () => go('home'));
 $('#navDonate').addEventListener('click', () => go('donate'));
 $('#navFriends').addEventListener('click', () => openFriends());
+$('#navStats').addEventListener('click', () => openStats());
 
 /* --- своя рамка окна (3.0) --- */
 (async () => {

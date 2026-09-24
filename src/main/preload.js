@@ -88,6 +88,11 @@ contextBridge.exposeInMainWorld('modhub', {
       return () => ipcRenderer.removeListener('app-update-progress', listener);
     },
   },
+  /** Статистика для владельца: скачивания и оценки (3.0). */
+  stats: {
+    releases: () => invoke('stats:releases'),
+    reviews: () => invoke('stats:reviews'),
+  },
   /** Своя рамка окна: свернуть, развернуть, закрыть (3.0). */
   window: {
     control: (action) => invoke('window:control', action),
