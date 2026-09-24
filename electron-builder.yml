@@ -31,6 +31,8 @@ win:
       arch: [x64]
   icon: src/assets/icon.ico
   executableName: ModHub
+  # Имя для zip; у установщика своё — в разделе nsis.
+  artifactName: ModHub-${version}-win-${arch}.${ext}
   signAndEditExecutable: false
 nsis:
   oneClick: false
@@ -54,5 +56,3 @@ nsis:
   uninstallDisplayName: ModHub
   include: build/installer.nsh
   artifactName: ModHub-Setup-${version}.exe
-zip:
-  artifactName: ModHub-${version}-win-x64.${ext}
