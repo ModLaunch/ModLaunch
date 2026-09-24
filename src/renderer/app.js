@@ -2392,7 +2392,7 @@ function heroSlide(slide, index, active) {
       <article class="${cls} spot__slide--brand" ${attrs}>
         <div class="spot__bg spot__bg--photo" style="background-image:url('${esc(bannerArt(banner.art))}')"></div>
         <div class="spot__text">
-          <span class="tags"><span class="tagx tagx--brand">${icon('logo')}<span>ModHub</span></span></span>
+          <span class="tags"><span class="tagx tagx--brand">${icon('logo')}<span>ModLaunch</span></span></span>
           <h1>${esc(t(banner.title))}</h1>
           <p class="spot__desc">${esc(t(banner.text))}</p>
           <div class="spot__actions">
@@ -2450,7 +2450,7 @@ function heroThumb(slide, index, active) {
   const style =
     slide.kind === 'brand' ? `background-image:url('${esc(bannerArt(slide.banner.art))}')` : thumbStyle(slide.mod);
   const name = slide.kind === 'brand' ? t(slide.banner.title) : slide.mod.name;
-  const sub = slide.kind === 'brand' ? 'ModHub' : slide.game.name;
+  const sub = slide.kind === 'brand' ? 'ModLaunch' : slide.game.name;
   return `
     <button class="spot__thumb${active ? ' is-active' : ''}" type="button" data-action="hero" data-index="${index}" style="--hero:${HERO_SECONDS}s">
       <span class="spot__thumbpic" style="${style}"></span>
@@ -5457,7 +5457,7 @@ function settingsAbout() {
       t('settings.about'),
       `<div class="about">
          <span class="about__logo">${icon('logo')}</span>
-         <div><b class="about__name">Mod<span>Hub</span></b><span class="muted">${esc(t('settings.version'))} ${esc(info.version ?? '')}</span></div>
+         <div><b class="about__name">Mod<span>Launch</span></b><span class="muted">${esc(t('settings.version'))} ${esc(info.version ?? '')}</span></div>
        </div>
        <dl class="facts">
          <dt>${esc(t('settings.admin'))}</dt><dd>${esc(info.elevated ? t('settings.admin.yes') : t('settings.admin.no'))}</dd>
@@ -5592,7 +5592,7 @@ function accountModal(mode = 'signin', carry = {}) {
   openModal(`
     <div class="acc acc--${mode}">
       <button type="button" class="acc__x" data-close aria-label="${esc(t('common.close'))}">×</button>
-      <div class="acc__brand"><span class="acc__logo">${icon('logo')}</span><b>Mod<span>Hub</span></b></div>
+      <div class="acc__brand"><span class="acc__logo">${icon('logo')}</span><b>Mod<span>Launch</span></b></div>
       <h3 class="acc__title">${esc(title)}</h3>
       <p class="acc__lead">${esc(lead)}</p>
       ${tabs}

@@ -27,7 +27,7 @@ try {
 const API = 'https://api.nexusmods.com/v1';
 const V2 = 'https://api.nexusmods.com/v2/graphql';
 const PAGE = 24;
-const APP_HEADERS = { 'Application-Name': 'ModHub', 'Application-Version': VERSION };
+const APP_HEADERS = { 'Application-Name': 'ModLaunch', 'Application-Version': VERSION };
 
 /* ------------------------------------------------------------------ *
  *  nxm:// и API v1 (скачивание)

@@ -161,7 +161,7 @@ class SmapiIndex {
       try {
         const response = await this.fetch(SMAPI_API, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'User-Agent': `ModHub/${this.version}` },
+          headers: { 'Content-Type': 'application/json', 'User-Agent': `ModLaunch/${this.version}` },
           body: JSON.stringify({
             mods: ask.slice(0, 50).map((id) => ({ id, updateKeys: [] })),
             apiVersion: '4.0.0',

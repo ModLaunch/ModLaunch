@@ -89,7 +89,7 @@ function runLogged(command, args, options = {}) {
       if (!finished) {
         finished = true;
         child.kill();
-        resolve(finish(null, output + '\n[ModHub] превышено время ожидания'));
+        resolve(finish(null, output + '\n[ModLaunch] превышено время ожидания'));
       }
     }, timeout);
 

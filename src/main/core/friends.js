@@ -230,7 +230,7 @@ class FriendsClient {
       const map = { OFFLINE: 'OFFLINE', BUSY: 'BUSY', TOO_MANY: 'BUSY', SESSION: 'SIGN_IN', NOT_CONFIGURED: 'NOT_CONFIGURED', BAD_KEY: 'BAD_KEY' };
       throw new FriendsError(map[error.code] ?? 'SERVER', error.message);
     }
-    const name = cleanName(this.account.profile()?.name) || 'ModHub';
+    const name = cleanName(this.account.profile()?.name) || 'ModLaunch';
     // Другой аккаунт на этом компьютере — чужой список показывать нельзя.
     if (this.store.data.uid !== token.uid) {
       this.store.data = { uid: token.uid, code: null, view: null };

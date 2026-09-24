@@ -209,9 +209,9 @@ const psDir = (dir) => psq(String(dir).replace(/[\\/]+$/, '') + '\\');
 
 function registerScript({ target, exe, version, sizeKB }) {
   const strings = {
-    DisplayName: 'ModHub',
+    DisplayName: 'ModLaunch',
     DisplayVersion: version,
-    Publisher: 'ModHub',
+    Publisher: 'ModLaunch',
     DisplayIcon: `${exe},0`,
     InstallLocation: target,
     UninstallString: `"${exe}" --uninstall`,

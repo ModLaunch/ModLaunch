@@ -1,7 +1,7 @@
 {
   "name": "modhub",
-  "productName": "ModHub",
-  "version": "2.1.1",
+  "productName": "ModLaunch",
+  "version": "2.2.0",
   "description": "Установщик модов, который заменяет собой гайд по установке",
   "main": "src/main/index.js",
   "author": {

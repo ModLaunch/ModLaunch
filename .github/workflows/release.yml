@@ -26,9 +26,9 @@ jobs:
           tag_name: v${{ steps.v.outputs.version }}
           # Тег — на тот коммит, из которого собраны файлы, а не на ветку по умолчанию.
           target_commitish: ${{ github.sha }}
-          name: ModHub ${{ steps.v.outputs.version }}
+          name: ModLaunch ${{ steps.v.outputs.version }}
           body_path: build/release-notes.md
           make_latest: true
           files: |
-            dist/ModHub-Setup-${{ steps.v.outputs.version }}.exe
-            dist/ModHub-${{ steps.v.outputs.version }}-win-x64.zip
+            dist/ModLaunch-Setup-${{ steps.v.outputs.version }}.exe
+            dist/ModLaunch-${{ steps.v.outputs.version }}-win-x64.zip

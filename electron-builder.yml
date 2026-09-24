@@ -1,4 +1,4 @@
-# Сборка установщика ModHub-Setup-<версия>.exe (2.0).
+# Сборка установщика ModLaunch-Setup-<версия>.exe (2.0).
 #
 # Полноценный мастер установки NSIS: язык (русский/английский), условия
 # использования, выбор папки, ярлыки на рабочем столе и в «Пуске», запуск
@@ -8,8 +8,8 @@
 # программы с обфусцированным кодом в .build/app, а electron-builder
 # упаковывает уже её.
 appId: ModHub.Launcher
-productName: ModHub
-copyright: ModHub
+productName: ModLaunch
+copyright: ModLaunch
 directories:
   output: dist
   buildResources: build
@@ -26,13 +26,13 @@ win:
   target:
     - target: nsis
       arch: [x64]
-    # Портативная версия: одна папка в zip, распаковал — запустил ModHub.exe.
+    # Портативная версия: одна папка в zip, распаковал — запустил ModLaunch.exe.
     - target: zip
       arch: [x64]
   icon: src/assets/icon.ico
-  executableName: ModHub
+  executableName: ModLaunch
   # Имя для zip; у установщика своё — в разделе nsis.
-  artifactName: ModHub-${version}-win-${arch}.${ext}
+  artifactName: ModLaunch-${version}-win-${arch}.${ext}
   signAndEditExecutable: false
 nsis:
   oneClick: false
@@ -41,7 +41,7 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: always
   createStartMenuShortcut: true
-  shortcutName: ModHub
+  shortcutName: ModLaunch
   runAfterFinish: true
   license: build/license.txt
   installerIcon: src/assets/icon.ico
@@ -53,6 +53,6 @@ nsis:
   displayLanguageSelector: false
   unicode: true
   deleteAppDataOnUninstall: false
-  uninstallDisplayName: ModHub
+  uninstallDisplayName: ModLaunch
   include: build/installer.nsh
-  artifactName: ModHub-Setup-${version}.exe
+  artifactName: ModLaunch-Setup-${version}.exe

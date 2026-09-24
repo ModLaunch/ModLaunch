@@ -7,4 +7,8 @@
 !macro customInstall
   DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\ModHub"
   Delete "$INSTDIR\.modhub-install.json"
+  ; 2.2: программа стала ModLaunch — старые ярлыки и exe с прежним именем убираем.
+  Delete "$DESKTOP\ModHub.lnk"
+  Delete "$SMPROGRAMS\ModHub.lnk"
+  Delete "$INSTDIR\ModHub.exe"
 !macroend

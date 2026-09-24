@@ -40,6 +40,7 @@ if (!WIN) fs.chmodSync(exe, 0o755);
 /* --- свои данные программы --- */
 const USER = path.join(ROOT, 'user');
 fs.mkdirSync(USER, { recursive: true });
+process.env.MODLAUNCH_KEEP_USERDATA = '1';
 app.setPath('userData', USER);
 fs.writeFileSync(
   path.join(USER, 'settings.json'),

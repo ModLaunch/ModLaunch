@@ -14,7 +14,7 @@ try {
 } catch {
   /* версия нужна только для заголовка запроса */
 }
-const USER_AGENT = `ModHub/${VERSION} (+https://github.com/modhub/modhub)`;
+const USER_AGENT = `ModLaunch/${VERSION}`;
 
 /**
  * Скачивание файлов с отчётом о прогрессе и проверкой контрольной суммы.

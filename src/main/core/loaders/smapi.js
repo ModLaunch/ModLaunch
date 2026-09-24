@@ -126,7 +126,7 @@ async function install(game, onProgress = () => {}, ctx = {}) {
       cwd: path.dirname(installerExe),
       timeout: 300000,
       logFile: ctx.logFile,
-      header: '[ModHub] установка SMAPI',
+      header: '[ModLaunch] установка SMAPI',
     }
   );
 

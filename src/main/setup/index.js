@@ -114,7 +114,7 @@ function writeShortcuts(exe, target, withDesktop) {
   // значок-кубик. Для нового файла старой картинки в кэше нет.
   const ico = path.join(target, 'resources', core.ICON_FILE);
   const icon = fs.existsSync(ico) ? ico : exe;
-  const options = { target: exe, cwd: target, description: 'ModHub', icon, iconIndex: 0, appUserModelId: core.APP_ID };
+  const options = { target: exe, cwd: target, description: 'ModLaunch', icon, iconIndex: 0, appUserModelId: core.APP_ID };
   const links = shortcutPaths();
   const keep = [links.start, ...(withDesktop ? [links.desktop] : [])];
 

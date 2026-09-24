@@ -42,6 +42,11 @@ const { t, setLang, getLang } = require('./i18n');
 
 const isDev = process.argv.includes('--dev');
 
+// С 2.2 программа называется ModLaunch, но данные живут в прежней папке
+// %APPDATA%\ModHub: настройки, аккаунт, друзья и копии сохранений остаются.
+// Самопроверка задаёт свою папку раньше — её не трогаем.
+if (!process.env.MODLAUNCH_KEEP_USERDATA) app.setPath('userData', path.join(app.getPath('appData'), 'ModHub'));
+
 let mainWindow = null;
 let settings = null;
 /** Отзывы и оценки: общий сервер плюс копия на диске. */
@@ -134,7 +139,7 @@ function createWindow() {
   const place = winstate.restoreBounds(winstate.readState(stateFile), areas);
 
   mainWindow = new BrowserWindow({
-    title: `ModHub ${app.getVersion()}${elevated ? t('window.admin') : ''}`,
+    title: `ModLaunch ${app.getVersion()}${elevated ? t('window.admin') : ''}`,
     ...place.bounds,
     minWidth: winstate.MIN_W,
     minHeight: winstate.MIN_H,
@@ -162,7 +167,7 @@ function createWindow() {
       appIconPath: ico,
       appIconIndex: 0,
       relaunchCommand: `"${process.execPath}"`,
-      relaunchDisplayName: 'ModHub',
+      relaunchDisplayName: 'ModLaunch',
     });
   }
 
