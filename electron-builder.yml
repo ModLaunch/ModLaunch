@@ -9,7 +9,7 @@
 # ModLaunch-<версия>-win-x64.zip — та же программа одной папкой, без установки.
 #
 # Собирается командой `npm run dist`: build/build.js сначала готовит копию
-# программы с обфусцированным кодом в .build/app, а electron-builder
+# копию программы в .build/app, а electron-builder
 # упаковывает уже её.
 appId: ModHub.Launcher
 productName: ModLaunch

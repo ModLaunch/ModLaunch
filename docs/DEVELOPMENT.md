@@ -7,7 +7,7 @@
 ```
 npm install
 npm start          # запустить из исходников
-npm run dist       # собрать установщик и zip в dist/ (код обфусцируется)
+npm run dist       # собрать установщик и zip в dist/
 node tools/probe.js  # проверить каталоги и установку на живых сайтах
 node tools/friends-check.js  # друзья на правилах базы в эмуляторе Firebase
                              # (нужны firebase-tools и Java 21)

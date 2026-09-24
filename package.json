@@ -1,7 +1,7 @@
 {
   "name": "modhub",
   "productName": "ModLaunch",
-  "version": "3.0.2",
+  "version": "3.0.3",
   "description": "Установщик модов, который заменяет собой гайд по установке",
   "main": "src/main/index.js",
   "author": {
@@ -22,7 +22,6 @@
   "devDependencies": {
     "electron": "^38.0.0",
     "electron-builder": "^26.0.0",
-    "javascript-obfuscator": "^5.8.0",
     "resedit": "^3.1.0"
   }
 }
