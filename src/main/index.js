@@ -505,7 +505,7 @@ function savesDirFor(game, state) {
 
 /** Ошибки новых функций 1.10 — текстом из словаря, как всё остальное. */
 function explainCode(error) {
-  if (error?.code && /^(PROFILE|BACKUP|PACK|DXVK)_/.test(error.code)) {
+  if (error?.code && /^(PROFILE|BACKUP|PACK|DXVK|NEXUS_COLLECTION)/.test(error.code)) {
     const explained = new Error(t('err.' + error.code));
     explained.alreadyExplained = true;
     return explained;
@@ -1032,6 +1032,22 @@ function registerIpc() {
     return reshadeTool.install(dir, game.reshade.api, (stage) => sendProgress({ scope: 'loader', gameId, ...stage }));
   });
 
+  /* --- коллекции Nexus (3.1) --- */
+
+  handle('collections:list', async ({ gameId, page = 1, query = '' } = {}) => {
+    const game = games.byId(gameId);
+    if (game?.catalog?.kind !== 'nexus') return { collections: [], total: 0, hasMore: false, page: 1 };
+    return nexus.browseCollections(game.catalog.nexusDomain, { page, query });
+  });
+
+  handle('collections:get', async ({ gameId, slug } = {}) =>
+    coded(async () => {
+      const game = games.byId(gameId);
+      if (game?.catalog?.kind !== 'nexus') throw Object.assign(new Error('no nexus'), { code: 'NEXUS_COLLECTION' });
+      return nexus.getCollection(game.catalog.nexusDomain, slug);
+    })
+  );
+
   /* --- DXVK для любой игры (3.1) --- */
 
   /** Игры, куда ставили DXVK: список хранится в настройках, состояние — в папке игры. */
@@ -1093,14 +1109,15 @@ function registerIpc() {
     })
   );
 
-  handle('mods:installFromCatalog', async ({ gameId, modId }) => {
+  handle('mods:installFromCatalog', async ({ gameId, modId, pin = null }) => {
     const { game, state } = await stateFor(gameId, undefined, { scan: false });
     if (!state.loader.installed) {
       throw new Error(t('err.installLoaderFirst', { loader: game.loader.name }));
     }
     const registry = registryFor(gameId, state);
     if (game.catalog.kind === 'nexus') {
-      return installFromNexus(game, state, registry, modId, gameId);
+      const safePin = pin && Number.isInteger(Number(pin.fileId)) ? { fileId: Number(pin.fileId), version: String(pin.version ?? ''), fileName: pin.fileName ? String(pin.fileName) : null } : null;
+      return installFromNexus(game, state, registry, modId, gameId, safePin);
     }
     const mod = await lookupCatalogMod(game, modId);
     if (!mod) throw new Error(t('err.modNotInCatalog'));
@@ -2044,12 +2061,16 @@ function finishBrowserWait(key, outcome) {
  * там одну кнопку, остальное ModHub делает сам. Ключ для этого не нужен.
  * Так требуют правила Nexus: обход стоил бы пользователю аккаунта.
  */
-async function installFromNexus(game, state, registry, modId, gameId) {
+async function installFromNexus(game, state, registry, modId, gameId, pin = null) {
   const key = settings.data.nexusApiKey;
   const domain = game.catalog.nexusDomain;
   const details = await nexus.getDetails(domain, game.catalog.nexusGameId, modId);
   if (!details?.mod) throw new Error(t('err.modNotInCatalog'));
-  const { mod, mainFile } = details;
+  const { mod } = details;
+  // Коллекция (3.1) ставит ровно тот файл, что выбрал её автор, а не свежий «главный».
+  const mainFile = pin?.fileId
+    ? { fileId: Number(pin.fileId), version: pin.version || details.mainFile?.version || '', fileName: pin.fileName ?? null }
+    : details.mainFile;
   if (!mainFile) throw new Error(t('err.nexus.noFiles'));
 
   const hidden = new Set((game.catalog.hide ?? []).map(String));

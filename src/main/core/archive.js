@@ -210,4 +210,35 @@ function toZip(filePath) {
   return { path: out, temporary: true };
 }
 
-module.exports = { findModRoots, extractModRoot, extractAll, readEntryText, toZip };
+/**
+ * Распаковывает одну папку архива (без неё самой) в destDir — для настроек
+ * сборок Thunderstore: config/ из пакета ложится в BepInEx/config (3.1).
+ * Сравнение без учёта регистра: в сборках встречаются и Config/, и config/.
+ * @returns {string[]} относительные пути распакованных файлов
+ */
+function extractFolder(zipPath, folder, destDir) {
+  const zip = new AdmZip(zipPath);
+  const prefix = normalise(folder).replace(/\/?$/, '/').toLowerCase();
+  const written = [];
+  for (const entry of zip.getEntries()) {
+    if (entry.isDirectory) continue;
+    const name = normalise(entry.entryName);
+    if (JUNK.test(name) || !name.toLowerCase().startsWith(prefix)) continue;
+    const relative = name.slice(prefix.length);
+    if (!relative) continue;
+    const target = path.resolve(destDir, relative);
+    if (!target.startsWith(path.resolve(destDir) + path.sep)) continue;
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, entry.getData());
+    written.push(relative);
+  }
+  return written;
+}
+
+/** Есть ли в архиве папка (без учёта регистра). */
+function hasFolder(zipPath, folder) {
+  const prefix = normalise(folder).replace(/\/?$/, '/').toLowerCase();
+  return new AdmZip(zipPath).getEntries().some((e) => normalise(e.entryName).toLowerCase().startsWith(prefix));
+}
+
+module.exports = { findModRoots, extractModRoot, extractAll, extractFolder, hasFolder, readEntryText, toZip };

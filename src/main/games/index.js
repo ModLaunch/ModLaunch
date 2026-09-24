@@ -24,6 +24,8 @@ const ADAPTERS = [
   require('./lethal-company'),
   require('./subnautica'),
   require('./subnautica-below-zero'),
+  require('./valheim'),
+  require('./risk-of-rain-2'),
 ];
 
 const LOADERS = { smapi, bepinex, hkapi };

@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { downloadFile } = require('./download');
-const { findModRoots, extractModRoot, readEntryText, toZip } = require('./archive');
+const { findModRoots, extractModRoot, extractFolder, hasFolder, readEntryText, toZip } = require('./archive');
 const thunderstore = require('./sources/thunderstore');
 const modlinks = require('./sources/modlinks');
 const { ReShade, looksLikePreset, presetEffects } = require('./reshade');
@@ -85,12 +85,28 @@ async function installFromCatalog(ctx, mod, onProgress = () => {}, options = {})
       requestedBy: entry.id === mod.id ? null : mod.id,
     });
 
+    // Сборки Thunderstore (3.1) приносят настройки модов в config/ — им
+    // место в BepInEx/config, иначе сборка работает «с настройками по умолчанию».
+    if (entry.source === 'thunderstore' && game.loader?.kind === 'bepinex') applyPackConfig(state, archive);
+
     fs.rmSync(archive, { force: true });
     installed.push(record);
   }
 
   onProgress({ code: 'install.done', mod: mod.name, installed: installed.length });
   return { installed, missing: plan.missing };
+}
+
+/** config/ (или BepInEx/config/) из пакета — в BepInEx/config игры. */
+function applyPackConfig(state, archive) {
+  const target = path.join(state.path, 'BepInEx', 'config');
+  for (const folder of ['config', 'BepInEx/config']) {
+    try {
+      if (hasFolder(archive, folder)) extractFolder(archive, folder, target);
+    } catch {
+      /* не смогли разложить настройки — моды всё равно стоят */
+    }
+  }
 }
 
 function isLoaderPackage(game, id) {

@@ -92,7 +92,8 @@ async function tour() {
 
   await shot('01-home');
   const tiles = await text('.gtile__title, .gtile__logo');
-  check('на главной все пять игр', (await js(`document.querySelectorAll('.gtile').length`)) === 5, tiles.join(' · '));
+  const expected = require('../src/main/games').all().length;
+  check(`на главной все игры (${expected})`, (await js(`document.querySelectorAll('.gtile').length`)) === expected, tiles.join(' · '));
 
   await js(`openGame('subnautica', 'downloads')`);
   await shot('02-game');

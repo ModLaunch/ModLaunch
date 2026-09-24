@@ -320,8 +320,117 @@ async function getDetails(domain, gameId, modId) {
   return { mod, description: data.mod.description ?? '', requirements, mainFile: pickMainFile(data.modFiles) };
 }
 
+/* ------------------------------------------------------------------ *
+ *  Коллекции (3.1) — тоже без ключа. Поля проверены на живом API
+ *  (tools/experiment.js): collectionsV2 с фильтром gameDomain и
+ *  collectionRevision со списком файлов модов.
+ * ------------------------------------------------------------------ */
+
+const COLLECTIONS_PAGE = 12;
+
+function fromCollection(node, domain) {
+  if (!node?.slug) return null;
+  const revision = node.latestPublishedRevision ?? {};
+  return {
+    slug: String(node.slug),
+    name: plainText(node.name) || node.slug,
+    summary: plainText(node.summary),
+    image: node.tileImage?.url ?? null,
+    author: node.user?.name ?? '',
+    endorsements: Number(node.endorsements ?? 0),
+    downloads: Number(node.totalDownloads ?? 0),
+    modCount: Number(revision.modCount ?? 0),
+    adult: Boolean(revision.adultContent),
+    url: `https://www.nexusmods.com/games/${domain}/collections/${node.slug}`,
+  };
+}
+
+/** Популярные коллекции игры (или найденные по названию). */
+async function browseCollections(domain, options = {}) {
+  const page = Math.max(1, Number(options.page) || 1);
+  const needle = String(options.query ?? '').trim();
+  const filter = {
+    gameDomain: [{ value: domain, op: 'EQUALS' }],
+    adultContent: [{ value: false, op: 'EQUALS' }],
+    ...(needle ? { name: [{ value: needle, op: 'WILDCARD' }] } : {}),
+  };
+  const fields = 'slug name summary endorsements totalDownloads tileImage { url } user { name } latestPublishedRevision { modCount adultContent }';
+  const run = (withSort) =>
+    graphql(
+      `query($filter: CollectionsSearchFilter, $count: Int, $offset: Int${withSort ? ', $sort: [CollectionsSearchSort!]' : ''}) {
+        collectionsV2(filter: $filter, count: $count, offset: $offset${withSort ? ', sort: $sort' : ''}) { totalCount nodes { ${fields} } }
+      }`,
+      { filter, count: COLLECTIONS_PAGE, offset: (page - 1) * COLLECTIONS_PAGE, ...(withSort ? { sort: [{ endorsements: { direction: 'DESC' } }] } : {}) }
+    );
+  // Порядок «по одобрениям» — если Nexus его не примет, берём его порядок по умолчанию.
+  const data = await run(true).catch(() => run(false));
+  const result = data?.collectionsV2 ?? { totalCount: 0, nodes: [] };
+  const collections = (result.nodes ?? []).map((n) => fromCollection(n, domain)).filter((c) => c && !c.adult);
+  const total = Number(result.totalCount ?? collections.length);
+  return { collections, total, hasMore: page * COLLECTIONS_PAGE < total, page };
+}
+
+/** Ссылка на коллекцию или просто её код → код (slug). */
+function collectionSlug(input) {
+  const text = String(input ?? '').trim();
+  const fromUrl = /\/collections\/([a-z0-9]{4,12})(?:[/?#]|$)/i.exec(text);
+  if (fromUrl) return fromUrl[1].toLowerCase();
+  return /^[a-z0-9]{4,12}$/i.test(text) ? text.toLowerCase() : null;
+}
+
+/** Коллекция: описание и точный список файлов модов (как их выбрал автор). */
+async function getCollection(domain, slug) {
+  const code = collectionSlug(slug);
+  if (!code) throw Object.assign(new Error('bad collection'), { code: 'NEXUS_COLLECTION' });
+  const data = await graphql(
+    `query($slug: String!, $domain: String) {
+      collectionRevision(slug: $slug, domainName: $domain, viewAdultContent: false) {
+        revisionNumber adultContent
+        collection { slug name summary endorsements totalDownloads tileImage { url } user { name } game { domainName } }
+        modFiles { optional fileId file { fileId name version sizeInBytes uri modId mod { modId name pictureUrl adultContent } } }
+      }
+    }`,
+    { slug: code, domain }
+  ).catch((error) => {
+    // Нет связи — пусть так и скажет; ответ «такой коллекции нет» — это наш код.
+    if (error.retryable) throw error;
+    throw Object.assign(new Error(error.message), { code: 'NEXUS_COLLECTION' });
+  });
+  const revision = data?.collectionRevision;
+  if (!revision?.collection) throw Object.assign(new Error('no collection'), { code: 'NEXUS_COLLECTION' });
+  if (revision.collection.game?.domainName && revision.collection.game.domainName !== domain) {
+    throw Object.assign(new Error('other game'), { code: 'NEXUS_COLLECTION_GAME', game: revision.collection.game.domainName });
+  }
+  const seen = new Set();
+  const mods = [];
+  for (const entry of revision.modFiles ?? []) {
+    const file = entry?.file;
+    const modId = file?.modId ?? file?.mod?.modId;
+    if (!modId || seen.has(String(modId)) || file?.mod?.adultContent) continue;
+    seen.add(String(modId));
+    mods.push({
+      id: String(modId),
+      fileId: Number(entry.fileId ?? file.fileId),
+      name: plainText(file.mod?.name) || plainText(file.name) || `#${modId}`,
+      version: file.version ?? '',
+      fileName: file.uri ?? null,
+      size: Number(file.sizeInBytes ?? 0) || null,
+      icon: file.mod?.pictureUrl ?? null,
+      optional: Boolean(entry.optional),
+    });
+  }
+  return {
+    ...fromCollection({ ...revision.collection, latestPublishedRevision: { modCount: mods.length } }, domain),
+    revision: revision.revisionNumber ?? null,
+    mods,
+  };
+}
+
 module.exports = {
   parseNxmLink,
+  browseCollections,
+  getCollection,
+  collectionSlug,
   validateKey,
   getDownloadLinks,
   getModInfo,

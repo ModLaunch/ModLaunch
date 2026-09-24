@@ -96,6 +96,9 @@ const state = {
   dlOpen: false,
   /** Раздел настроек. */
   settingsTab: 'look',
+  collections: {},
+  collectionView: null,
+  collectionRun: null,
   dxvkGames: null,
   dxvkBusy: null,
   dxvkProgress: null,
@@ -707,6 +710,20 @@ const HELP = {
       ['Каталог модов Thunderstore', 'https://thunderstore.io/c/subnautica-below-zero/'],
       ['BepInExPack для Below Zero', 'https://thunderstore.io/c/subnautica-below-zero/p/Subnautica_Modding/BepInExPack/'],
       ['Моды Below Zero на Nexus', 'https://www.nexusmods.com/subnauticabelowzero/mods'],
+    ],
+  },
+  valheim: {
+    links: [
+      ['Каталог модов Thunderstore', 'https://thunderstore.io/c/valheim/'],
+      ['BepInExPack для Valheim', 'https://thunderstore.io/c/valheim/p/denikson/BepInExPack_Valheim/'],
+      ['Jötunn — библиотека для модов Valheim', 'https://valheim-modding.github.io/Jotunn/'],
+    ],
+  },
+  'risk-of-rain-2': {
+    links: [
+      ['Каталог модов Thunderstore', 'https://thunderstore.io/c/riskofrain2/'],
+      ['BepInExPack для Risk of Rain 2', 'https://thunderstore.io/c/riskofrain2/p/bbepis/BepInExPack/'],
+      ['R2API — библиотека для модов', 'https://thunderstore.io/c/riskofrain2/p/tristanmcpherson/R2API/'],
     ],
   },
 };
@@ -2267,6 +2284,8 @@ const EDITORS = {
   // Nautilus — общая библиотека, на которой стоят почти все моды Subnautica.
   subnautica: ['nautilus', 'subnauticamoddingnautilus', 'configurationmanager'],
   'subnautica-below-zero': ['nautilus', 'subnauticamoddingnautilus', 'configurationmanager'],
+  valheim: ['planteverything', 'equipmentandquickslots', 'extraslots', 'teleporteverything', 'multiuserchest', 'betterarchery'],
+  'risk-of-rain-2': ['starstorm2', 'propersave', 'lookingglass', 'scrollablelobbyui', 'enforcer', 'vanillavoid'],
 };
 
 const HERO_SECONDS = 8;
@@ -2612,7 +2631,7 @@ function gamesBlock() {
         <h2>${esc(t('home.yourGames'))}</h2>
         <button class="linkbtn" data-action="nav-games">${esc(t('home.allGames'))}${icon('chevRight')}</button>
       </div>
-      <div class="gtiles" style="--n:${order.length}">${order.map(gameCard).join('')}</div>
+      <div class="gtiles" style="--n:${order.length > 5 ? Math.ceil(order.length / 2) : order.length}">${order.map(gameCard).join('')}</div>
     </section>`;
 }
 
@@ -4775,6 +4794,169 @@ function picksBody(game) {
 }
 
 function packsBody(game) {
+  return (game.catalog?.kind === 'nexus' ? collectionsBlock(game) : '') + packsKits(game);
+}
+
+/* --- коллекции Nexus (3.1) --- */
+
+async function loadCollections(gameId, { more = false } = {}) {
+  const prev = state.collections[gameId];
+  if (prev?.loading) return;
+  const page = more && prev ? prev.page + 1 : 1;
+  state.collections[gameId] = { ...(prev ?? { items: [] }), loading: true, error: null };
+  try {
+    const data = await call(api.collections.list(gameId, page), { silent: true });
+    state.collections[gameId] = {
+      items: more && prev ? [...prev.items, ...(data?.collections ?? [])] : data?.collections ?? [],
+      total: data?.total ?? 0,
+      hasMore: Boolean(data?.hasMore),
+      page,
+      loading: false,
+    };
+  } catch (error) {
+    state.collections[gameId] = { ...(prev ?? { items: [] }), loading: false, error: error?.message ?? 'error' };
+  }
+  if (currentSection(gameId) === 'packs') softRender();
+}
+
+function collectionCard(game, c) {
+  return `
+    <button class="coll" type="button" data-action="collection-open" data-game="${esc(game.id)}" data-slug="${esc(c.slug)}">
+      <span class="coll__img"${c.image ? ` style="background-image:url('${esc(c.image)}')"` : ''}></span>
+      <span class="coll__body">
+        <strong>${esc(c.name)}</strong>
+        <span class="muted small">${esc(c.author ? t('coll.by', { author: c.author }) : '')}</span>
+        <span class="coll__meta">
+          <span>${icon('puzzle')}${esc(pluralN(c.modCount, 'kit.mods'))}</span>
+          ${c.endorsements ? `<span>${icon('heart')}${esc(formatCount(c.endorsements))}</span>` : ''}
+        </span>
+      </span>
+    </button>`;
+}
+
+function collectionsBlock(game) {
+  const data = state.collections[game.id];
+  if (!data) loadCollections(game.id);
+  const items = data?.items ?? [];
+  const body =
+    !data || (data.loading && !items.length)
+      ? `<div class="loading"><div class="spinner"></div></div>`
+      : data.error && !items.length
+        ? `<p class="muted small">${esc(t('coll.error'))} <button class="linkbtn" data-action="collections-retry" data-game="${esc(game.id)}">${esc(t('common.retry'))}</button></p>`
+        : items.length
+          ? `<div class="colls">${items.map((c) => collectionCard(game, c)).join('')}</div>
+             ${data.hasMore ? `<div class="panel__tail"><button class="btn btn--ghost btn--sm" data-action="collections-more" data-game="${esc(game.id)}"${data.loading ? ' disabled' : ''}>${esc(t('coll.more'))}</button></div>` : ''}`
+          : `<p class="muted small">${esc(t('coll.none'))}</p>`;
+  return `
+    <div class="panel panel--flat collsblock">
+      <div class="panel__head">
+        <h2>${esc(t('coll.title'))}</h2>
+        <span class="muted small">${esc(t('coll.hint'))}</span>
+      </div>
+      <div class="collink">
+        <label class="catsearch">
+          ${icon('external')}
+          <input id="collLink" type="text" autocomplete="off" spellcheck="false" placeholder="${esc(t('coll.link'))}" data-game="${esc(game.id)}" />
+        </label>
+        <button class="btn btn--ghost" data-action="collection-open-link" data-game="${esc(game.id)}">${esc(t('coll.linkOpen'))}</button>
+      </div>
+      ${body}
+    </div>`;
+}
+
+async function openCollection(gameId, slug) {
+  const game = entry(gameId)?.game;
+  if (!game) return;
+  openModal(`<div class="loading"><div class="spinner"></div></div>`);
+  let data;
+  try {
+    data = await call(api.collections.get(gameId, slug));
+  } catch {
+    closeModal();
+    return;
+  }
+  state.collectionView = { gameId, ...data, withOptional: false };
+  renderCollectionModal();
+}
+
+function collectionTodo() {
+  const view = state.collectionView;
+  const game = view ? entry(view.gameId)?.game : null;
+  if (!game) return [];
+  return view.mods.filter((m) => (view.withOptional || !m.optional) && !isInstalled(m, game));
+}
+
+function renderCollectionModal() {
+  const view = state.collectionView;
+  const game = view ? entry(view.gameId)?.game : null;
+  if (!game) return;
+  const have = view.mods.filter((m) => isInstalled(m, game)).length;
+  const optional = view.mods.filter((m) => m.optional).length;
+  const todo = collectionTodo();
+  const premium = Boolean(state.settings.nexusPremium);
+  const rows = view.mods
+    .map((m) => {
+      const done = isInstalled(m, game);
+      return `
+        <li class="collmod${done ? ' is-have' : ''}">
+          <span class="collmod__pic" style="${thumbStyle(m)}">${m.icon ? '' : esc(initials(m.name))}</span>
+          <span class="collmod__name">${esc(m.name)}${m.optional ? ` <span class="chip chip--sm">${esc(t('coll.optional'))}</span>` : ''}</span>
+          <span class="muted small">${esc(m.version || '')}</span>
+          ${done ? `<span class="collmod__ok">${icon('check')}</span>` : ''}
+        </li>`;
+    })
+    .join('');
+  openModal(`
+    <div class="collhead">
+      ${view.image ? `<span class="collhead__img" style="background-image:url('${esc(view.image)}')"></span>` : ''}
+      <div>
+        <h3>${esc(view.name)}</h3>
+        <p class="muted small">${esc(view.author ? t('coll.by', { author: view.author }) : '')} · ${esc(pluralN(view.mods.length, 'kit.mods'))} · ${esc(t('coll.have', { n: have }))}</p>
+      </div>
+    </div>
+    ${view.summary ? `<p class="muted small collsum">${esc(view.summary)}</p>` : ''}
+    <ul class="collmods">${rows}</ul>
+    ${optional ? `<label class="collopt"><input type="checkbox" data-change="collection-optional"${view.withOptional ? ' checked' : ''} /> <span>${esc(t('coll.withOptional', { n: optional }))}</span></label>` : ''}
+    <p class="collnote">${icon(premium ? 'sparkle' : 'info')}<span>${esc(t(premium ? 'coll.premium' : 'coll.free'))}</span></p>
+    <div class="modal__foot">
+      <button class="btn btn--ghost" data-action="open-url" data-url="${esc(view.url)}">${icon('external')}<span>${esc(t('coll.onNexus'))}</span></button>
+      <button class="btn btn--ghost" data-close>${esc(t('common.close'))}</button>
+      ${
+        todo.length
+          ? `<button class="btn btn--primary" data-action="collection-install">${icon('download')}<span>${esc(pluralN(todo.length, 'pack.installN'))}</span></button>`
+          : `<span class="getbtn is-done">${icon('check')}<span>${esc(t('kit.have'))}</span></span>`
+      }
+    </div>`);
+}
+
+async function installCollection() {
+  const view = state.collectionView;
+  if (!view || state.collectionRun) return;
+  const todo = collectionTodo();
+  if (!todo.length) return;
+  closeModal();
+  const run = { gameId: view.gameId, name: view.name, index: 0, total: todo.length, done: 0, failed: [], stopped: false };
+  state.collectionRun = run;
+  for (const [i, mod] of todo.entries()) {
+    if (run.stopped) break;
+    run.index = i + 1;
+    const ok = await installModOnce(view.gameId, mod.id, {
+      name: mod.name,
+      pin: { fileId: mod.fileId, version: mod.version, fileName: mod.fileName },
+      quiet: true,
+    });
+    if (ok) run.done += 1;
+    else if (!run.stopped) run.failed.push(mod.name);
+  }
+  state.collectionRun = null;
+  await refreshMods();
+  softRender();
+  if (run.stopped) toast(t('coll.stopped', { done: run.done, n: run.total }), 'warn');
+  else if (run.failed.length) toast(t('coll.partial', { done: run.done, n: run.total, list: run.failed.slice(0, 5).join(', ') }), 'warn');
+  else toast(t('coll.done', { name: run.name, n: run.done }));
+}
+
+function packsKits(game) {
   const kits = entry(game.id)?.info?.featured?.kits ?? [];
   const data = state.picks[game.id];
   const cards = kits
@@ -6758,7 +6940,7 @@ async function installMissingDeps(gameId, { quiet = false } = {}) {
   render();
 }
 
-async function installModOnce(gameId, modId, { name = null } = {}) {
+async function installModOnce(gameId, modId, { name = null, pin = null, quiet = false } = {}) {
   const item = entry(gameId);
   if (!item?.game?.found) {
     go('notfound', { gameId });
@@ -6783,7 +6965,7 @@ async function installModOnce(gameId, modId, { name = null } = {}) {
   const job = startJob({ gameId, modId, name: known?.name ?? name ?? modId, mod: known });
   let installedOk = false;
   try {
-    const result = await call(api.mods.installFromCatalog(gameId, modId));
+    const result = await call(api.mods.installFromCatalog(gameId, modId, pin));
     if (result?.cancelled) {
       finishJob(job, { cancelled: true });
       return;
@@ -6797,7 +6979,9 @@ async function installModOnce(gameId, modId, { name = null } = {}) {
     installedOk = true;
 
     const count = result?.installed?.length ?? 0;
-    if (result?.missing?.length) {
+    if (quiet) {
+      /* коллекция скажет итог сама */
+    } else if (result?.missing?.length) {
       toast(t('toast.missing', { n: count, list: result.missing.join(', ') }), 'warn');
     } else if (count > 1) {
       toast(t('toast.installedN', { n: count }));
@@ -6821,6 +7005,7 @@ function openBrowserWait(payload) {
   state.browserWait = { gameId: payload.gameId, modId: payload.modId, name: payload.mod, url: payload.url };
   openModal(`
     <div class="modal__head"><h3>${esc(t('nexus.wait.title'))}</h3></div>
+    ${state.collectionRun ? `<p class="collrun">${icon('list')}<span>${esc(t('coll.run', { name: state.collectionRun.name, i: state.collectionRun.index, n: state.collectionRun.total }))}</span></p>` : ''}
     <ol class="howto">
       <li>${esc(t('nexus.wait.step1', { mod: payload.mod ?? '' }))}</li>
       <li>${esc(t('nexus.wait.step2'))}</li>
@@ -7178,6 +7363,18 @@ const ACTIONS = {
     state.catalogCategory = node.dataset.category || null;
     loadCatalog(state.catalogFor ?? state.activeGameId, state.catalogMeta.query);
   },
+  'collection-open': (node) => openCollection(node.dataset.game, node.dataset.slug),
+  'collection-open-link': (node) => {
+    const value = $('#collLink')?.value?.trim();
+    if (!value) return $('#collLink')?.focus();
+    openCollection(node.dataset.game, value);
+  },
+  'collection-install': () => installCollection(),
+  'collections-more': (node) => loadCollections(node.dataset.game, { more: true }),
+  'collections-retry': (node) => {
+    delete state.collections[node.dataset.game];
+    loadCollections(node.dataset.game);
+  },
   'dxvk-pick': async () => {
     try {
       showDxvkPicked(await call(api.dxvk.pick()));
@@ -7394,6 +7591,7 @@ const ACTIONS = {
   zoom: (node) => openLightbox(node.dataset.src, node.dataset.video || null),
   'bw-cancel': async () => {
     const wait = state.browserWait;
+    if (state.collectionRun) state.collectionRun.stopped = true;
     closeBrowserWait();
     if (wait) await call(api.mods.browserCancel(wait.gameId, wait.modId), { silent: true }).catch(() => {});
   },
@@ -7573,11 +7771,26 @@ document.addEventListener('change', async (event) => {
   if (field.dataset.change === 'cat-sort') {
     state.catalogSort = field.value;
     await loadCatalog(gameId, state.catalogMeta.query ?? '');
-    await loadCatalog(gameId, state.catalogMeta.query ?? '');
+  } else if (field.dataset.change === 'collection-optional') {
+    if (!state.collectionView) return;
+    state.collectionView.withOptional = field.checked;
+    // Меняется только кнопка внизу — окно не перерисовываем целиком.
+    const todo = collectionTodo();
+    const button = $('#modalPanel [data-action="collection-install"] span');
+    if (button && todo.length) button.textContent = pluralN(todo.length, 'pack.installN');
+    else renderCollectionModal();
   } else if (field.dataset.change === 'pref') {
     await setPref(field.dataset.key, prefValue(field.dataset.key, field.value));
     render();
   }
+});
+
+/** Ссылка на коллекцию Nexus: Enter — открыть. */
+document.addEventListener('keydown', (event) => {
+  if (event.key !== 'Enter' || event.target.id !== 'collLink') return;
+  event.preventDefault();
+  const value = event.target.value.trim();
+  if (value) openCollection(event.target.dataset.game, value);
 });
 
 /** Поиск внутри раздела каталога. */

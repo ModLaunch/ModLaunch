@@ -59,7 +59,7 @@ contextBridge.exposeInMainWorld('modhub', {
     list: (gameId) => invoke('mods:list', gameId),
     setEnabled: (gameId, modId, enabled) => invoke('mods:setEnabled', { gameId, modId, enabled }),
     remove: (gameId, modId) => invoke('mods:remove', { gameId, modId }),
-    installFromCatalog: (gameId, modId) => invoke('mods:installFromCatalog', { gameId, modId }),
+    installFromCatalog: (gameId, modId, pin = null) => invoke('mods:installFromCatalog', { gameId, modId, pin }),
     browserCancel: (gameId, modId) => invoke('mods:browserCancel', { gameId, modId }),
     browserFile: (gameId, modId, filePath) => invoke('mods:browserFile', { gameId, modId, filePath }),
     installFromFile: (gameId, filePath) => invoke('mods:installFromFile', { gameId, filePath }),
@@ -115,6 +115,10 @@ contextBridge.exposeInMainWorld('modhub', {
   /** Оверлей в игре: посмотреть, как он выглядит, без игры (2.1). */
   overlay: {
     preview: (gameId) => invoke('overlay:preview', gameId),
+  },
+  collections: {
+    list: (gameId, page = 1, query = '') => invoke('collections:list', { gameId, page, query }),
+    get: (gameId, slug) => invoke('collections:get', { gameId, slug }),
   },
   dxvk: {
     list: () => invoke('dxvk:list'),

@@ -153,6 +153,23 @@ async function checkModlinks(game) {
   await checkPicks(game, (id) => modlinks.getById(id));
 }
 
+/** Коллекции Nexus (3.1): список и точный состав без ключа. */
+async function checkCollections() {
+  console.log('\n=== Коллекции Nexus ===');
+  for (const domain of ['subnautica', 'stardewvalley']) {
+    const list = await nexus.browseCollections(domain, { page: 1 });
+    report(list.collections.length > 0 && list.total > 0, `${domain}: коллекции`, `${list.total}; ${list.collections.slice(0, 3).map((c) => `${c.name} (${c.modCount})`).join(' / ')}`);
+  }
+  const c = await nexus.getCollection('subnautica', 'https://www.nexusmods.com/games/subnautica/collections/pnq4xb');
+  report(c.mods.length > 10 && c.mods.every((m) => m.id && Number.isInteger(m.fileId)) && c.mods.some((m) => m.id === '24'), 'subnautica: состав коллекции с номерами файлов', `${c.name}: ${c.mods.length} модов, напр. ${c.mods.slice(0, 3).map((m) => `${m.name}#${m.fileId}`).join(', ')}`);
+  try {
+    await nexus.getCollection('subnautica', 'htknoa');
+    report(false, 'коллекция другой игры отклоняется');
+  } catch (error) {
+    report(/NEXUS_COLLECTION/.test(error.code ?? ''), 'коллекция другой игры отклоняется', error.code);
+  }
+}
+
 async function checkInstall() {
   console.log('\n=== Настоящая установка ===');
   const bepinex = require('../src/main/core/loaders/bepinex');
@@ -160,10 +177,11 @@ async function checkInstall() {
   const { ModRegistry } = require('../src/main/core/registry');
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'modhub-probe-'));
 
-  for (const id of ['subnautica', 'subnautica-below-zero', 'lethal-company']) {
+  const DATA = { 'lethal-company': 'Lethal Company_Data', subnautica: 'Subnautica_Data', 'subnautica-below-zero': 'SubnauticaZero_Data', valheim: 'valheim_Data', 'risk-of-rain-2': 'Risk of Rain 2_Data' };
+  for (const id of Object.keys(DATA)) {
     const game = games.byId(id);
     const dir = path.join(root, id);
-    fs.mkdirSync(path.join(dir, id === 'lethal-company' ? 'Lethal Company_Data' : id === 'subnautica' ? 'Subnautica_Data' : 'SubnauticaZero_Data'), { recursive: true });
+    fs.mkdirSync(path.join(dir, DATA[id]), { recursive: true });
     try {
       await bepinex.install({ ...game, path: dir }, () => {});
       const state = bepinex.detect(dir);
@@ -282,6 +300,7 @@ async function checkSearch() {
       report(false, `${game.id}: проверка упала`, error.stack);
     }
   }
+  await checkCollections().catch((e) => report(false, 'коллекции упали', e.stack));
   await checkInstall().catch((e) => report(false, 'установка упала', e.stack));
 
   const failed = results.filter((r) => !r.ok);

@@ -42,6 +42,14 @@ function detect(gamePath) {
  */
 async function findPack(community, packageFullName) {
   const [owner, name] = packageFullName.split('-');
+  // Сначала — один пакет по имени (3.1): у Valheim и Lethal Company полный
+  // список сообщества весит десятки мегабайт и качается долго.
+  try {
+    const one = await fetchJson(`https://thunderstore.io/api/experimental/package/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/`, { timeout: 20000 });
+    if (one?.latest?.download_url) return { version: one.latest.version_number, downloadUrl: one.latest.download_url };
+  } catch {
+    /* запасной путь — полный список ниже */
+  }
   const data = await fetchJson(
     `https://thunderstore.io/c/${community}/api/v1/package/`,
     { timeout: 45000 }
