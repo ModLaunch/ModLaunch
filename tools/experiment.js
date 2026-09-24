@@ -1,102 +1,77 @@
 'use strict';
 
-/** Разовые опыты на живых сайтах (2.1): ReShade, SMAPI, требования Nexus. */
+/**
+ * Разовые опыты на живых сайтах. Запуск на GitHub: Actions → experiment.
+ *
+ * 3.1: коллекции Nexus — какие поля есть в GraphQL v2 и что приходит
+ * по настоящей коллекции; Thunderstore — сборки (modpacks) Valheim и
+ * Risk of Rain 2, их зависимости и папка config.
+ */
 
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
+const V2 = 'https://api.nexusmods.com/v2/graphql';
+const HEADERS = { 'Content-Type': 'application/json', Accept: 'application/json', 'Application-Name': 'ModLaunch', 'Application-Version': 'experiment' };
 
-async function text(url, opts) {
-  const r = await fetch(url, opts);
-  return { status: r.status, body: await r.text() };
+async function gql(query, variables = {}) {
+  const r = await fetch(V2, { method: 'POST', headers: HEADERS, body: JSON.stringify({ query, variables }) });
+  const json = await r.json().catch(() => null);
+  return { status: r.status, json };
 }
 
-async function reshade() {
-  console.log('=== ReShade ===');
-  const page = await text('https://reshade.me/');
-  console.log('reshade.me', page.status, page.body.length);
-  const links = [...page.body.matchAll(/href="([^"]*ReShade_Setup[^"]*\.exe)"/g)].map((m) => m[1]);
-  console.log('links:', links);
-  const link = links.find((l) => !/addon/i.test(l)) ?? links[0];
-  if (!link) return;
-  const url = new URL(link, 'https://reshade.me/').href;
-  const r = await fetch(url);
-  const buf = Buffer.from(await r.arrayBuffer());
-  console.log('setup', url, r.status, buf.length);
-  const file = path.join(os.tmpdir(), 'rs.exe');
-  fs.writeFileSync(file, buf);
-  const AdmZip = require('adm-zip');
-  try {
-    const zip = new AdmZip(file);
-    console.log('zip entries:', zip.getEntries().map((e) => `${e.entryName} ${e.header.size}`).join(' | '));
-  } catch (e) {
-    console.log('AdmZip failed:', e.message);
-    // Ищем начало zip вручную.
-    const sig = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
-    let at = buf.indexOf(sig);
-    const found = [];
-    while (at !== -1 && found.length < 5) {
-      found.push(at);
-      at = buf.indexOf(sig, at + 1);
-    }
-    console.log('local headers at', found, 'eocd at', buf.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06])));
-    const start = found[0];
-    if (start > 0) {
-      try {
-        const zip = new AdmZip(buf.subarray(start));
-        console.log('zip from offset entries:', zip.getEntries().map((e) => `${e.entryName} ${e.header.size}`).join(' | '));
-      } catch (e2) {
-        console.log('offset zip failed:', e2.message);
-      }
+const short = (value, n = 1800) => {
+  const text = JSON.stringify(value);
+  return text.length > n ? text.slice(0, n) + '…' : text;
+};
+
+async function fieldsOf(type) {
+  const { json } = await gql(`query($n: String!) { __type(name: $n) { name fields { name args { name type { name kind ofType { name kind } } } type { name kind ofType { name kind ofType { name kind } } } } inputFields { name type { name kind ofType { name kind } } } } }`, { n: type });
+  const t = json?.data?.__type;
+  if (!t) return console.log(type, '→ нет типа', short(json?.errors ?? json, 300));
+  const list = (t.fields ?? t.inputFields ?? []).map((f) => `${f.name}${f.args?.length ? '(' + f.args.map((a) => a.name).join(',') + ')' : ''}:${f.type?.name ?? f.type?.ofType?.name ?? f.type?.ofType?.ofType?.name ?? f.type?.kind}`);
+  console.log(`${type}: ${list.join('  ')}`);
+}
+
+async function nexusCollections() {
+  console.log('=== Nexus: коллекции ===');
+  const { json } = await gql(`{ __schema { queryType { fields { name args { name } } } } }`);
+  const q = (json?.data?.__schema?.queryType?.fields ?? []).filter((f) => /collection/i.test(f.name));
+  console.log('Query:', q.map((f) => `${f.name}(${f.args.map((a) => a.name).join(',')})`).join('  '));
+  for (const type of ['Collection', 'CollectionRevision', 'CollectionRevisionMod', 'ModFile', 'CollectionsSearchFilter', 'CollectionsFilter', 'CollectionPage', 'CollectionsSort', 'CollectionsSearchSort']) await fieldsOf(type);
+
+  for (const domain of ['stardewvalley', 'subnautica']) {
+    for (const [name, query, vars] of [
+      ['collectionsV2', `query($f: CollectionsSearchFilter) { collectionsV2(filter: $f, count: 3) { totalCount nodes { slug name } } }`, { f: { gameDomain: [{ value: domain, op: 'EQUALS' }] } }],
+      ['collectionsV2/gameDomainName', `query($f: CollectionsSearchFilter) { collectionsV2(filter: $f, count: 3) { totalCount nodes { slug name } } }`, { f: { gameDomainName: [{ value: domain, op: 'EQUALS' }] } }],
+      ['collections', `query($d: String) { collections(gameDomain: $d, count: 3) { nodes { slug name } } }`, { d: domain }],
+    ]) {
+      const r = await gql(query, vars);
+      console.log(domain, name, r.status, short(r.json, 600));
     }
   }
-  const list = await text('https://raw.githubusercontent.com/crosire/reshade-shaders/list/EffectPackages.ini');
-  console.log('EffectPackages.ini', list.status, '\n' + list.body.slice(0, 2500));
 }
 
-async function smapi() {
-  console.log('\n=== SMAPI API ===');
-  const body = {
-    mods: [
-      { id: 'Pathoschild.ContentPatcher', updateKeys: [] },
-      { id: 'spacechase0.GenericModConfigMenu', updateKeys: [] },
-      { id: 'FlashShifter.StardewValleyExpandedCP', updateKeys: [] },
-    ],
-    apiVersion: '4.0.0',
-    gameVersion: '1.6.14',
-    platform: 'Windows',
-    includeExtendedMetadata: true,
-  };
-  const r = await fetch('https://smapi.io/api/v3.0/mods', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'User-Agent': 'ModHub/2.1 (probe)' },
-    body: JSON.stringify(body),
-  });
-  const t = await r.text();
-  console.log(r.status, t.slice(0, 3000));
+async function nexusRevision(slug, domain) {
+  const queries = [
+    `query($s: String!, $d: String) { collectionRevision(slug: $s, domainName: $d, viewAdultContent: false) { revisionNumber collection { name slug summary tileImage { url } user { name } game { domainName } } modFiles { optional fileId file { fileId name version size uri modId mod { modId name pictureUrl } } } } }`,
+    `query($s: String!, $d: String) { collection(slug: $s, domainName: $d, viewAdultContent: false) { name slug latestPublishedRevision { revisionNumber modFiles { optional fileId file { fileId name version modId mod { modId name } } } } } }`,
+  ];
+  for (const q of queries) {
+    const r = await gql(q, { s: slug, d: domain });
+    console.log('revision', slug, r.status, short(r.json, 2500));
+  }
 }
 
-async function nexusReq() {
-  console.log('\n=== Nexus requirements ===');
-  for (const [gid, mid] of [[1155, 2800], [1155, 1119], [1303, 3753], [1303, 1063], [2706, 44]]) {
-    const r = await fetch('https://api.nexusmods.com/v2/graphql', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        query: `query { mod(modId: ${mid}, gameId: ${gid}) { name modRequirements { nexusRequirements { nodes { modId modName url gameId externalRequirement notes } } dlcRequirements { nodes { gameExpansion { name } } } } } }`,
-      }),
-    });
-    const j = await r.json();
-    console.log(gid, mid, JSON.stringify(j).slice(0, 900));
+async function thunderstorePacks() {
+  console.log('=== Thunderstore: сборки ===');
+  for (const community of ['valheim', 'riskofrain2']) {
+    const url = `https://thunderstore.io/api/cyberstorm/listing/${community}/?ordering=most-downloaded&included_categories=modpacks`;
+    const r = await fetch(url, { headers: { 'User-Agent': 'ModLaunch/experiment' } });
+    const body = await r.text();
+    console.log(community, r.status, body.slice(0, 600));
   }
 }
 
 (async () => {
-  for (const f of [reshade, smapi, nexusReq]) {
-    try {
-      await f();
-    } catch (e) {
-      console.log(f.name, 'EXC', e.stack);
-    }
-  }
+  await nexusCollections().catch((e) => console.log('ошибка', e));
+  for (const [slug, domain] of (process.env.SLUGS ?? '').split(',').filter(Boolean).map((s) => s.split(':'))) await nexusRevision(slug, domain);
+  await thunderstorePacks().catch((e) => console.log('ошибка', e));
 })();

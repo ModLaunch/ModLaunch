@@ -1,0 +1,21 @@
+# Разовые опыты на живых сайтах (tools/experiment.js). Только вручную.
+name: experiment
+on:
+  workflow_dispatch:
+    inputs:
+      slugs:
+        description: 'Коллекции Nexus через запятую: slug:домен'
+        required: false
+        default: ''
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node tools/experiment.js
+        env:
+          SLUGS: ${{ inputs.slugs }}
