@@ -15,6 +15,20 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="style.css" />
+    <script>
+      // Обложки игр — из Steam. Нет картинки по одному адресу — пробуем следующий, в конце своя.
+      function nextArt(img) {
+        var id = img.dataset.steam, step = Number(img.dataset.step || 0) + 1;
+        var chain = [
+          'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/' + id + '/library_600x900.jpg',
+          'https://cdn.akamai.steamstatic.com/steam/apps/' + id + '/library_600x900.jpg',
+          img.dataset.local,
+        ];
+        img.dataset.step = step;
+        if (step <= chain.length) img.src = chain[step - 1];
+        else img.onerror = null;
+      }
+    </script>
   </head>
   <body>
     <div class="bg" aria-hidden="true"><i></i><i></i><i></i></div>
@@ -88,23 +102,23 @@
         <h2 class="reveal" data-t="games.title">Пять игр — один лаунчер</h2>
         <div class="games__row">
           <article class="game reveal">
-            <img src="img/game-subnautica.svg" alt="" loading="lazy" />
+            <img src="https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/264710/library_600x900_2x.jpg" data-steam="264710" data-local="img/game-subnautica.svg" onerror="nextArt(this)" alt="Subnautica" loading="lazy" />
             <div><h3>Subnautica</h3><p>BepInEx · Nexus Mods</p></div>
           </article>
           <article class="game reveal">
-            <img src="img/game-subnautica-below-zero.svg" alt="" loading="lazy" />
-            <div><h3>Below Zero</h3><p>BepInEx · Nexus Mods</p></div>
+            <img src="https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/848450/library_600x900_2x.jpg" data-steam="848450" data-local="img/game-subnautica-below-zero.svg" onerror="nextArt(this)" alt="Subnautica: Below Zero" loading="lazy" />
+            <div><h3>Subnautica: Below Zero</h3><p>BepInEx · Nexus Mods</p></div>
           </article>
           <article class="game reveal">
-            <img src="img/game-stardew-valley.webp" alt="" loading="lazy" />
+            <img src="https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/413150/library_600x900_2x.jpg" data-steam="413150" data-local="img/game-stardew-valley.webp" onerror="nextArt(this)" alt="Stardew Valley" loading="lazy" />
             <div><h3>Stardew Valley</h3><p>SMAPI · Nexus Mods</p></div>
           </article>
           <article class="game reveal">
-            <img src="img/game-lethal-company.webp" alt="" loading="lazy" />
+            <img src="https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1966720/library_600x900_2x.jpg" data-steam="1966720" data-local="img/game-lethal-company.webp" onerror="nextArt(this)" alt="Lethal Company" loading="lazy" />
             <div><h3>Lethal Company</h3><p>BepInEx · Thunderstore</p></div>
           </article>
           <article class="game reveal">
-            <img src="img/game-hollow-knight.webp" alt="" loading="lazy" />
+            <img src="https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/367520/library_600x900_2x.jpg" data-steam="367520" data-local="img/game-hollow-knight.webp" onerror="nextArt(this)" alt="Hollow Knight" loading="lazy" />
             <div><h3>Hollow Knight</h3><p>Modding API · ModLinks</p></div>
           </article>
         </div>
@@ -167,6 +181,7 @@
           <button class="tab is-on" role="tab" data-shot="home" data-t="screens.home">Главная</button>
           <button class="tab" role="tab" data-shot="catalog" data-t="screens.catalog">Каталог</button>
           <button class="tab" role="tab" data-shot="mod" data-t="screens.mod">Страница мода</button>
+          <button class="tab" role="tab" data-shot="shaders" data-t="screens.shaders">Шейдеры</button>
           <button class="tab" role="tab" data-shot="overlay" data-t="screens.overlay">Оверлей в игре</button>
         </div>
         <figure class="stage reveal">

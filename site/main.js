@@ -74,12 +74,15 @@ const EN = {
   'foot.issues': 'Report a bug',
   'foot.note': 'Subnautica, Stardew Valley, Lethal Company and Hollow Knight are trademarks of their owners. ModLaunch is an unofficial project.',
   meta: 'Windows 10 / 11 · free',
+  'screens.shaders': 'Shaders',
+  'cap.shaders': 'Graphics mods and ReShade shaders in their own section, installed with one click.',
 };
 const CAPTIONS_RU = {
   'cap.home': 'Все ваши игры, подборка модов и топ скачиваний — на одном экране.',
   'cap.catalog': 'Тысячи модов с разделами, категориями, поиском и сортировкой.',
   'cap.mod': 'Всё о моде и что поставится вместе с ним.',
   'cap.overlay': 'Ctrl+Shift+M в игре: время сеанса, друзья, заметки и копия сохранений.',
+  'cap.shaders': 'Графические моды и шейдеры ReShade — в своём разделе, ставятся одной кнопкой.',
 };
 
 const ru = {};
