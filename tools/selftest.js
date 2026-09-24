@@ -114,7 +114,7 @@ async function tour() {
   await delay(800);
   await js(`(() => { const i = document.getElementById('searchInput'); i.value = 'seamoth'; i.dispatchEvent(new Event('input', { bubbles: true })); })()`);
   const searched = await waitFor(
-    () => js(`state.gameTab === 'market' && [...document.querySelectorAll('.mrow h3, .card h3')].some((n) => /seamoth/i.test(n.textContent))`),
+    () => js(`state.gameTab === 'market' && state.catalogSection === 'all' && [...document.querySelectorAll('.mrow h3, .card h3')].some((n) => /seamoth/i.test(n.textContent))`),
     30000
   );
   await shot('04b-search', 800);

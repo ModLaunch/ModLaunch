@@ -68,20 +68,6 @@
 .rail__btn--home:hover .rail__icon svg {
   transform: rotate(90deg);
 }
-.rail__btn--game {
-  animation: rail-pop 0.5s var(--ease-spring) both;
-}
-.rail__games > :nth-child(1) { animation-delay: 0.05s; }
-.rail__games > :nth-child(2) { animation-delay: 0.1s; }
-.rail__games > :nth-child(3) { animation-delay: 0.15s; }
-.rail__games > :nth-child(4) { animation-delay: 0.2s; }
-.rail__games > :nth-child(5) { animation-delay: 0.25s; }
-@keyframes rail-pop {
-  from {
-    opacity: 0;
-    transform: translateX(-10px) scale(0.85);
-  }
-}
 .rail__badge {
   animation: badge-bump 0.5s var(--ease-spring) both, badge-glow 2.2s ease-out 0.5s infinite;
 }
@@ -166,8 +152,12 @@
 .gtile {
   transform: perspective(700px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg)) translateY(var(--lift, 0));
   transition: transform 0.35s var(--ease), box-shadow 0.35s var(--ease);
-  animation: tile-in 0.6s var(--ease) both;
   will-change: transform;
+}
+/* Появление — только когда экран открыли, а не при каждой перерисовке
+   (пока ищутся игры, экран обновляется часто). */
+.main:not(.is-still) .gtile {
+  animation: tile-in 0.6s var(--ease) both;
 }
 .gtile:hover {
   --lift: -4px;
@@ -203,8 +193,8 @@
 
 /* --- витрина: медленное приближение кадра ------------------------------ */
 
-.spot__slide.is-active .spot__bg,
-.spot__slide.is-active .spot__backdrop {
+.main:not(.is-still) .spot__slide.is-active .spot__bg,
+.main:not(.is-still) .spot__slide.is-active .spot__backdrop {
   animation: ken-burns 14s ease-out both;
 }
 @keyframes ken-burns {
@@ -262,10 +252,10 @@
 
 /* --- переключатели разделов: активная вкладка «встаёт» ---------------- */
 
-.secpill.is-active,
-.catchip.is-active,
-.gtab.is-active,
-.seg__btn.is-active {
+.main:not(.is-still) .secpill.is-active,
+.main:not(.is-still) .catchip.is-active,
+.main:not(.is-still) .gtab.is-active,
+.main:not(.is-still) .seg__btn.is-active {
   animation: tab-on 0.35s var(--ease-spring);
 }
 @keyframes tab-on {
@@ -279,7 +269,7 @@
 
 /* --- панель справа: карточки выезжают лесенкой ------------------------- */
 
-.aside__inner > .acard {
+.aside__inner:not(.is-still) > .acard {
   animation: acard-in 0.45s var(--ease) both;
 }
 .aside__inner > .acard:nth-child(2) { animation-delay: 0.06s; }
@@ -358,7 +348,7 @@
     transform: translateY(-5px);
   }
 }
-.kpi {
+.main:not(.is-still) .kpi {
   animation: kpi-in 0.6s var(--ease) both;
 }
 .kpis > :nth-child(2) { animation-delay: 0.07s; }
@@ -379,7 +369,7 @@
 .settings__tab:hover {
   transform: translateX(3px);
 }
-.scard {
+.main:not(.is-still) .scard {
   animation: acard-in 0.4s var(--ease) both;
 }
 

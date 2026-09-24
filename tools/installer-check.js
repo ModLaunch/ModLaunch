@@ -73,7 +73,7 @@ async function main() {
 
   const exe = path.join(target, 'ModLaunch.exe');
   const until = Date.now() + 240000;
-  const windowShotAt = Date.now() + 9000;
+  const windowShotAt = Date.now() + 3500;
   let shotTaken = false;
   while (Date.now() < until && !fs.existsSync(path.join(target, 'resources', 'app.asar'))) {
     // Окно установщика появляется после распаковки — снимаем его через несколько секунд.

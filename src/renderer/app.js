@@ -897,7 +897,7 @@ async function loadInstalledMedia(gameId) {
  * Ошибка не превращается в «ничего нет»: её текст показывается на месте
  * каталога вместе с кнопкой «Повторить».
  */
-async function loadCatalog(gameId, query = '', { append = false } = {}) {
+async function loadCatalog(gameId, query = '', { append = false, everywhere = false } = {}) {
   const item = entry(gameId);
   if (!item?.game) {
     state.catalog = [];
@@ -911,6 +911,11 @@ async function loadCatalog(gameId, query = '', { append = false } = {}) {
     const sorts = SORTS_BY_KIND[item.game.catalog?.kind] ?? ['popular'];
     const wanted = pref('catalogDefaultSort');
     state.catalogSort = sorts.includes(wanted) ? wanted : 'popular';
+  }
+  // Поиск из шапки — по всему каталогу, в каком бы разделе ни открылась игра.
+  if (everywhere) {
+    state.catalogSection = 'all';
+    state.catalogCategory = null;
   }
   loadCategories(item.game);
 
@@ -7488,10 +7493,10 @@ async function runTopSearch() {
   } else {
     state.gameTab = 'market';
   }
-  // Поиск из шапки ищет по всему каталогу, а не в подборке.
-  if (isSpecialSection(state.catalogSection)) state.catalogSection = 'all';
+  // Поиск из шапки ищет по всему каталогу игры, а не в открытом разделе
+  // («Шейдеры», «Постройки»): для поиска внутри раздела — поле над каталогом.
   renderRail();
-  await loadCatalog(target, state.query);
+  await loadCatalog(target, state.query, { everywhere: true });
 }
 
 $('#searchInput').addEventListener('input', (event) => {

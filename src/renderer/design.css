@@ -4603,8 +4603,10 @@ body.is-maximized .wctl__restore {
   fill: #8b6cff;
   transform-box: fill-box;
   transform-origin: 50% 100%;
-  animation: bar-grow 0.8s var(--ease) calc(var(--i) * 60ms) both;
   transition: filter 0.15s;
+}
+.main:not(.is-still) .chart__bar {
+  animation: bar-grow 0.8s var(--ease) calc(var(--i) * 60ms) both;
 }
 .chart__hit {
   fill: transparent;
