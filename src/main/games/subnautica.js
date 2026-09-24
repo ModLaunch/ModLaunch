@@ -43,7 +43,17 @@ module.exports = {
     browseUrl: 'https://www.nexusmods.com/subnautica/mods',
   },
 
-  sections: pick('all', 'picks', 'buildings', 'vehicles', 'items', 'gameplay', 'visuals', 'ui', 'tools', 'packs'),
+  sections: pick('all', 'picks', 'buildings', 'vehicles', 'items', 'gameplay', 'ui', 'tools', 'visuals', 'packs'),
+  // Точные названия категорий Nexus (проверены на сайте, tools/probe.js).
+  nexusCategories: {
+    buildings: ['Buildables'],
+    vehicles: ['Vehicles and Upgrades'],
+    items: ['Items', 'Crafting'],
+    gameplay: ['Gameplay', 'Creatures', 'Environment', 'Adventure'],
+    ui: ['User Interface'],
+    tools: ['Libraries', 'Utilities', 'Modding Tools'],
+    visuals: ['Visuals and Graphics'],
+  },
   featured: {
     // Номера модов на Nexus. Nautilus — библиотека, без которой не работает
     // почти ничего, поэтому она первая и входит в каждый набор.

@@ -913,7 +913,6 @@ function registerIpc() {
         query,
         hide: game.catalog.hide,
         categories: section.nexus,
-        keywords: section.id === 'all' ? [] : section.keywords,
       });
     }
 

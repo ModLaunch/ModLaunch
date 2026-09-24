@@ -39,7 +39,18 @@ module.exports = {
     browseUrl: 'https://www.nexusmods.com/stardewvalley/mods',
   },
 
-  sections: pick('all', 'picks', 'buildings', 'content', 'visuals', 'gameplay', 'cosmetics', 'ui', 'tools', 'packs'),
+  sections: pick('all', 'picks', 'buildings', 'content', 'gameplay', 'items', 'cosmetics', 'ui', 'tools', 'visuals', 'packs'),
+  // Точные названия категорий Nexus (проверены на сайте, tools/probe.js).
+  nexusCategories: {
+    buildings: ['Buildings', 'Furniture', 'Interiors'],
+    content: ['Expansions', 'New Characters', 'Maps', 'Locations', 'Events', 'Dialogue'],
+    gameplay: ['Gameplay Mechanics', 'Cheats', 'Fishing', 'Crops', 'Livestock and Animals', 'Crafting'],
+    items: ['Items', 'Clothing'],
+    cosmetics: ['Characters', 'Portraits', 'Pets / Horses', 'Player'],
+    ui: ['User Interface'],
+    tools: ['Modding Tools'],
+    visuals: ['Visuals and Graphics'],
+  },
   featured: {
     // Самое скачиваемое и нужное почти в любой сборке Stardew (номера на Nexus).
     // Lookup Anything, Chests Anywhere, Automate, NPC Map Locations, Generic Mod

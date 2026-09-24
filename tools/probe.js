@@ -80,20 +80,25 @@ async function checkNexusGame(game) {
   console.log(`\n=== ${game.name} (Nexus: ${game.catalog.nexusDomain}) ===`);
   await nexusCategories(game.catalog.nexusDomain, game.catalog.nexusGameId);
   const all = await nexus.browse(game.catalog.nexusDomain, { page: 1 });
-  const allIds = new Set(all.mods.map((m) => m.id));
   report(all.total > 0, `${game.id}: весь каталог`, `${all.total} модов`);
   for (const section of game.sections) {
     if (section.special || section.id === 'all') continue;
     const s = sectionOf(game, section.id);
     try {
-      const r = await nexus.browse(game.catalog.nexusDomain, { page: 1, categories: s.nexus, keywords: s.keywords });
-      const same = r.mods.length && r.mods.every((m) => allIds.has(m.id)) && r.total === all.total;
+      const r = await nexus.browse(game.catalog.nexusDomain, { page: 1, categories: s.nexus });
       const cats = [...new Set(r.mods.map((m) => m.categories[0]))].slice(0, 4).join(', ');
-      report(r.total > 0 && !same, `${game.id}: раздел ${section.id}`, `${r.total} модов; категории: ${cats}; пример: ${r.mods.slice(0, 3).map((m) => m.name).join(' / ')}`);
+      // Раздел работает, если нашёл моды и их меньше, чем во всём каталоге,
+      // а категории найденных — ровно те, что просили.
+      const inside = r.mods.every((m) => s.nexus.includes(m.categories[0]));
+      report(r.total > 0 && r.total < all.total && inside, `${game.id}: раздел ${section.id}`, `${r.total} модов; категории: ${cats}; пример: ${r.mods.slice(0, 3).map((m) => m.name).join(' / ')}`);
     } catch (error) {
       report(false, `${game.id}: раздел ${section.id}`, error.message);
     }
   }
+  // Поиск внутри раздела: категория + имя вместе.
+  const firstCat = sectionOf(game, 'buildings').nexus.length ? 'buildings' : 'tools';
+  const withQuery = await nexus.browse(game.catalog.nexusDomain, { page: 1, categories: sectionOf(game, firstCat).nexus, query: 'base' });
+  report(withQuery.total >= 0, `${game.id}: поиск «base» в разделе ${firstCat}`, `${withQuery.total}: ${withQuery.mods.slice(0, 3).map((m) => m.name).join(' / ')}`);
   await checkPicks(game, async (id) => (await nexus.getDetails(game.catalog.nexusDomain, game.catalog.nexusGameId, id))?.mod);
 }
 
@@ -172,10 +177,20 @@ async function checkInstall() {
   const state = { path: dir, modsDir: game.modsDir(dir), found: true };
   const registry = new ModRegistry(path.join(root, 'data'), game.id, { modsDir: state.modsDir, storageDir: path.join(dir, 'ModHub') });
   try {
-    const mod = await thunderstore.getById('lethal-company', 'notnotnotswipez-MoreCompany');
-    const result = await install.installFromCatalog({ game, state, registry }, mod, () => {});
+    const names = [];
+    for (const id of ['notnotnotswipez-MoreCompany', 'tinyhoot-ShipLoot', 'x753-More_Suits']) {
+      const mod = await thunderstore.getById('lethal-company', id);
+      const result = await install.installFromCatalog({ game, state, registry }, mod, () => {});
+      names.push(...result.installed.map((r) => r.name));
+    }
     const files = fs.readdirSync(state.modsDir);
-    report(result.installed.length > 0 && files.length > 0, 'lethal-company: MoreCompany ставится', `поставлено: ${result.installed.map((r) => r.name).join(', ')}; в plugins: ${files.join(', ')}`);
+    const bad = files.filter((f) => /^(plugins|bepinex|bepinexpack)$/i.test(f));
+    const records = registry.list().map((r) => `${r.id} → ${r.folder}`);
+    report(files.length >= 3 && !bad.length, 'lethal-company: три мода ставятся рядом и не затирают друг друга', `поставлено: ${names.join(', ')}; в plugins: ${files.join(', ')}; реестр: ${records.join('; ')}`);
+    const dlls = [];
+    const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).forEach((e) => (e.isDirectory() ? walk(path.join(d, e.name)) : /\.dll$/i.test(e.name) && dlls.push(path.relative(state.modsDir, path.join(d, e.name)))));
+    walk(state.modsDir);
+    report(dlls.length >= 3, 'lethal-company: dll модов на месте', dlls.join(', '));
   } catch (error) {
     report(false, 'lethal-company: MoreCompany ставится', error.message);
   }

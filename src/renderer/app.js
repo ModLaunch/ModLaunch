@@ -4591,15 +4591,57 @@ async function setSection(gameId, id) {
   await loadCatalog(gameId, state.catalogMeta.query ?? '');
 }
 
-/** Шапка каталога: разделы, поиск, порядок, «показывать по». */
+/**
+ * Два уровня, как у Modrinth: сверху — что ищем (нужные моды, моды,
+ * шейдеры и графика, сборки), под «Модами» — категории маленькими
+ * кнопками (постройки, транспорт…). Раньше всё это стояло одной строкой
+ * вперемешку, и строка разъезжалась на две.
+ */
+const TYPE_ICON = { picks: 'trophy', mods: 'puzzle', visuals: 'image', packs: 'list' };
+
+function typeOfSection(id) {
+  if (id === 'picks') return 'picks';
+  if (id === 'visuals') return 'visuals';
+  if (id === 'packs' || id === 'modpacks') return 'packs';
+  return 'mods';
+}
+
+/** Типы, которые есть у игры, и раздел, который открывает каждый из них. */
+function typesOf(gameId) {
+  const list = sectionsOf(gameId);
+  const out = [];
+  if (list.includes('picks')) out.push(['picks', 'picks']);
+  out.push(['mods', 'all']);
+  if (list.includes('visuals')) out.push(['visuals', 'visuals']);
+  if (list.includes('modpacks')) out.push(['packs', 'modpacks']);
+  else if (list.includes('packs')) out.push(['packs', 'packs']);
+  return out;
+}
+
+/** Категории внутри «Модов»: всё, что не тип. */
+function categoriesOf(gameId) {
+  return sectionsOf(gameId).filter((id) => id === 'all' || typeOfSection(id) === 'mods');
+}
+
+/** Шапка каталога: типы, категории, поиск, порядок, «показывать по». */
 function catalogHead(game) {
   const section = currentSection(game.id);
-  const pills = sectionsOf(game.id)
+  const type = typeOfSection(section);
+  const tabs = typesOf(game.id)
     .map(
-      (id) =>
-        `<button class="secpill${id === section ? ' is-active' : ''}" type="button" role="tab" aria-selected="${id === section}" data-action="cat-section" data-game="${esc(game.id)}" data-section="${esc(id)}">${icon(SECTION_ICON[id] ?? 'grid')}<span>${esc(t('sec.' + id))}</span></button>`
+      ([id, target]) =>
+        `<button class="secpill${id === type ? ' is-active' : ''}" type="button" role="tab" aria-selected="${id === type}" data-action="cat-section" data-game="${esc(game.id)}" data-section="${esc(target)}">${icon(TYPE_ICON[id])}<span>${esc(t('type.' + id))}</span></button>`
     )
     .join('');
+  const chips =
+    type === 'mods'
+      ? `<div class="catchips" role="tablist" aria-label="${esc(t('sec.title'))}">${categoriesOf(game.id)
+          .map(
+            (id) =>
+              `<button class="catchip${id === section ? ' is-active' : ''}" type="button" data-action="cat-section" data-game="${esc(game.id)}" data-section="${esc(id)}">${id === 'all' ? '' : icon(SECTION_ICON[id] ?? 'grid')}<span>${esc(t('sec.' + id))}</span></button>`
+          )
+          .join('')}</div>`
+      : '';
   const special = isSpecialSection(section);
   const sorts = SORTS_BY_KIND[game.catalog?.kind] ?? ['popular'];
   const view = pref('catalogView');
@@ -4608,7 +4650,8 @@ function catalogHead(game) {
   const count = state.catalogMeta.total || state.catalog.length;
   return `
     <div class="cathead">
-      <nav class="secbar" role="tablist" aria-label="${esc(t('sec.title'))}">${pills}</nav>
+      <nav class="secbar" role="tablist" aria-label="${esc(t('sec.title'))}">${tabs}</nav>
+      ${chips}
       ${
         special
           ? ''

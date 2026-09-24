@@ -38,7 +38,18 @@ module.exports = {
     browseUrl: 'https://www.nexusmods.com/subnauticabelowzero/mods',
   },
 
-  sections: pick('all', 'picks', 'buildings', 'vehicles', 'items', 'gameplay', 'visuals', 'ui', 'tools', 'packs'),
+  sections: pick('all', 'picks', 'buildings', 'vehicles', 'items', 'gameplay', 'ui', 'tools', 'visuals', 'packs'),
+  // Точные названия категорий Nexus (проверены на сайте, tools/probe.js).
+  // «Shader Presets» — это и есть шейдеры: пресеты ReShade для Below Zero.
+  nexusCategories: {
+    buildings: ['Base Pieces'],
+    vehicles: ['Vehicles and Upgrades'],
+    items: ['Items'],
+    gameplay: ['Gameplay Effects and Changes', 'Adventure', 'Environment', 'Bug Fixes'],
+    ui: ['User Interface'],
+    tools: ['Library', 'Utilities'],
+    visuals: ['Shader Presets'],
+  },
   featured: {
     picks: [
       '373', // Nautilus BZ

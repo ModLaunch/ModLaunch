@@ -39,7 +39,7 @@ module.exports = {
     browseUrl: 'https://thunderstore.io/c/lethal-company/',
   },
 
-  sections: pick('all', 'picks', 'content', 'items', 'cosmetics', 'audio', 'visuals', 'tools', 'modpacks'),
+  sections: pick('all', 'picks', 'content', 'items', 'gameplay', 'cosmetics', 'audio', 'tools', 'visuals', 'modpacks'),
   featured: {
     picks: ['notnotnotswipez-MoreCompany', 'tinyhoot-ShipLoot', 'anormaltwig-LateCompany', 'x753-More_Suits', 'Evaisa-LethalThings', 'malco-Lategame_Upgrades'],
     kits: [],

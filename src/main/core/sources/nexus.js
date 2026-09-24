@@ -191,45 +191,21 @@ const SORTS = {
 /**
  * Страница витрины или поиска.
  *
- * categories (2.0) — шаблоны имени категории для раздела каталога
- * («*Buildable*»). Названия категорий у игр на Nexus разные, поэтому
- * шаблоны пробуются по очереди, пока один не найдёт моды; не нашёл ни один
- * (или сервер не понял фильтр) — ищем по словам из названия (keywords).
+ * categories (2.0.1) — точные названия категорий Nexus для раздела каталога.
+ * Как понимает фильтры Nexus, проверено на живом сайте (tools/experiment.js):
+ *   • categoryName работает только с точным названием («Buildables»);
+ *     шаблоны со звёздочкой не находят ничего;
+ *   • несколько значений в одном поле — это «И», а не «ИЛИ»: для нескольких
+ *     категорий нужен вложенный фильтр с op: OR.
  *
- * @param {{page?: number, sort?: string, query?: string, hide?: string[],
- *          categories?: string[], keywords?: string[]}} options
+ * @param {{page?: number, sort?: string, query?: string, hide?: string[], categories?: string[]}} options
  */
-const sectionWinners = new Map();
-
 async function browse(domain, options = {}) {
-  const categories = (options.categories ?? []).filter(Boolean).slice(0, 6);
-  const keywords = (options.keywords ?? []).filter(Boolean).slice(0, 6);
-  if (!categories.length && !keywords.length) return browsePlain(domain, options);
-
-  const attempts = [
-    ...categories.map((value) => ({ categoryName: [{ value, op: 'WILDCARD' }] })),
-    ...keywords.map((value) => ({ name: [{ value: `*${value}*`, op: 'WILDCARD' }] })),
-  ];
-  // Сработавший фильтр запоминаем: «Ещё» и повторные заходы в раздел
-  // не перебирают заново шаблоны, которые у этой игры ничего не находят.
-  const key = `${domain}|${categories.join(',')}|${keywords.join(',')}`;
-  const known = sectionWinners.get(key);
-  if (known !== undefined) attempts.unshift(attempts.splice(known, 1)[0]);
-  let last = null;
-  for (const extra of attempts) {
-    try {
-      const result = await browsePlain(domain, options, extra);
-      if (result.total > 0) {
-        if (known === undefined) sectionWinners.set(key, attempts.indexOf(extra));
-        return result;
-      }
-      last = result;
-    } catch (error) {
-      last = last ?? { error };
-    }
-  }
-  if (last?.error) throw last.error;
-  return last ?? { mods: [], total: 0, hasMore: false, page: Math.max(1, Number(options.page) || 1) };
+  const categories = (options.categories ?? []).filter(Boolean).slice(0, 12);
+  if (!categories.length) return browsePlain(domain, options);
+  const one = (value) => ({ categoryName: [{ value, op: 'EQUALS' }] });
+  const section = categories.length === 1 ? one(categories[0]) : { filter: [{ op: 'OR', filter: categories.map(one) }] };
+  return browsePlain(domain, options, section);
 }
 
 async function browsePlain(domain, options = {}, section = {}) {
@@ -253,8 +229,7 @@ async function browsePlain(domain, options = {}, section = {}) {
 
   // Имя «содержит» — для одного слова; для фразы, если так ничего нет,
   // — поиск по словам («stardew expanded» найдёт Stardew Valley Expanded).
-  // Раздел ищет по имени (keywords), а человек ещё и ввёл запрос —
-  // запрос главнее: он точнее слова раздела.
+  // Запрос человека ищется внутри раздела: категория и имя вместе.
   let result = await run(needle ? { name: [{ value: needle, op: 'WILDCARD' }] } : {});
   if (needle && !result.totalCount && /\s/.test(needle)) {
     result = await run({ nameStemmed: [{ value: needle, op: 'MATCHES' }] });

@@ -3801,3 +3801,50 @@ button.crumb:hover {
 .ghero--compact .btn--play {
   height: 42px;
 }
+
+/* 2.0.1 — верхняя строка: типы (одна строка, крупно); ниже — категории. */
+.secbar {
+  flex-wrap: nowrap;
+  width: max-content;
+  max-width: 100%;
+  border-radius: 999px;
+}
+.secpill {
+  height: 40px;
+  padding: 0 20px;
+  font-size: 14.5px;
+}
+.catchips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.catchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.catchip svg {
+  width: 14px;
+  height: 14px;
+}
+.catchip:hover {
+  color: var(--text);
+  border-color: var(--accent-line);
+}
+.catchip.is-active {
+  color: var(--accent-ink, #fff);
+  background: var(--accent);
+  border-color: var(--accent);
+}

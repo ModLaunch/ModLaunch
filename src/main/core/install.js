@@ -35,6 +35,9 @@ async function installFromCatalog(ctx, mod, onProgress = () => {}, options = {})
 
   onProgress({ code: 'install.deps', mod: mod.name });
   const plan = await buildPlan(game, mod);
+  // Загрузчик (BepInExPack) в зависимостях почти у каждого мода Thunderstore.
+  // Он ставится своей кнопкой в корень игры — как мод в plugins он только мешает.
+  plan.order = plan.order.filter((entry) => !isLoaderPackage(game, entry.id));
 
   if (plan.missing.length > 0) {
     // Не тихо пропускаем, а говорим прямо: иначе человек получит
@@ -88,6 +91,19 @@ async function installFromCatalog(ctx, mod, onProgress = () => {}, options = {})
   onProgress({ code: 'install.done', mod: mod.name, installed: installed.length });
   return { installed, missing: plan.missing };
 }
+
+function isLoaderPackage(game, id) {
+  const wanted = String(game.loader?.thunderstorePackage ?? '').toLowerCase();
+  const name = String(id ?? '').toLowerCase();
+  return Boolean(name) && (name === wanted || /-bepinexpack(_[\w]+)?$/.test(name));
+}
+
+/**
+ * Имена папок-«контейнеров»: архив вида BepInEx/plugins/Мод.dll даёт корень
+ * «plugins», и два таких мода легли бы в одну папку — второй стёр бы первый.
+ * Такую папку называем по самому моду.
+ */
+const GENERIC_FOLDER = /^(plugins|bepinex|patchers|core|mods|files|release|releases|bin|dll|dlls|build|output|x64|net\d*|netstandard[\d.]*)$/i;
 
 /**
  * Строит порядок установки: зависимости раньше того, что от них зависит.
@@ -143,7 +159,11 @@ function installZip(ctx, archivePath, meta = {}) {
       if (text) fileMeta = game.readModMeta(text, root.name) ?? {};
     }
 
-    const folderName = sanitiseFolder(fileMeta.name || root.name || meta.name || 'mod');
+    const rawName = fileMeta.name || root.name || meta.name || 'mod';
+    const generic = GENERIC_FOLDER.test(String(rawName).trim());
+    let folderName = sanitiseFolder(generic ? meta.name || meta.id || rawName : rawName);
+    // Две папки одного архива (plugins и patchers) не должны лечь в одну.
+    if (folders.includes(folderName)) folderName = sanitiseFolder(`${folderName} (${rawName})`);
     const destination = path.join(state.modsDir, folderName);
 
     // Переустановка поверх: сносим старую папку, иначе останутся файлы
@@ -156,8 +176,10 @@ function installZip(ctx, archivePath, meta = {}) {
     folders.push(folderName);
 
     const record = {
-      id: meta.id ?? fileMeta.id ?? folderName,
-      name: meta.name ?? fileMeta.name ?? folderName,
+      // Второй и следующие корни архива — части того же мода, со своим id,
+      // иначе запись второй части затёрла бы запись первой.
+      id: primary && meta.id ? `${meta.id}#${folderName}` : meta.id ?? fileMeta.id ?? folderName,
+      name: primary ? fileMeta.name || folderName : meta.name ?? fileMeta.name ?? folderName,
       version: fileMeta.version || meta.version || '',
       author: fileMeta.author || meta.author || '',
       source: meta.source ?? 'file',
@@ -167,7 +189,7 @@ function installZip(ctx, archivePath, meta = {}) {
       folder: folderName,
       fileCount: files.length,
       dependencies: (fileMeta.dependencies ?? []).map((d) => d.id),
-      requestedBy: meta.requestedBy ?? null,
+      requestedBy: primary && meta.id ? meta.id : meta.requestedBy ?? null,
       enabled: true,
       missing: false,
     };
@@ -209,4 +231,4 @@ function checkDependencies(registry) {
   return problems;
 }
 
-module.exports = { installFromCatalog, installArchive, checkDependencies, buildPlan };
+module.exports = { installFromCatalog, installArchive, checkDependencies, buildPlan, isLoaderPackage, GENERIC_FOLDER };

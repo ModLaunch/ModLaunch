@@ -86,30 +86,39 @@ async function search(community, query = '', options = {}) {
   const params = new URLSearchParams({ page: String(page), ordering: ORDERINGS[options.sort] ?? ORDERINGS.popular });
   const needle = String(query ?? '').trim();
   if (needle) params.set('q', needle);
-  // Раздел каталога (2.0): категории Thunderstore по слагам.
+  // Раздел каталога: сайт принимает номера категорий, а не слаги
+  // (проверено на живом сайте, tools/experiment.js). Несколько номеров — «ИЛИ».
   const wanted = (options.categories ?? []).map((c) => String(c).toLowerCase()).filter(Boolean);
-  const filtered = new URLSearchParams(params);
-  for (const slug of wanted) filtered.append('included_categories', slug);
-
-  const url = (p) => `${BASE}/api/cyberstorm/listing/${encodeURIComponent(community)}/?${p}`;
-  let data;
-  let serverFiltered = wanted.length > 0;
-  try {
-    data = await fetchJson(url(wanted.length ? filtered : params), { timeout: 20000 });
-  } catch (error) {
-    if (!wanted.length) throw error;
-    // Сервер не понял фильтр — берём страницу целиком и отбираем сами.
-    data = await fetchJson(url(params), { timeout: 20000 });
-    serverFiltered = false;
+  if (wanted.length) {
+    const ids = await categoryIds(community, wanted);
+    // Ни одной такой категории у сообщества нет — раздел пуст, а не «всё подряд».
+    if (!ids.length) return { mods: [], total: 0, hasMore: false, page };
+    for (const id of ids) params.append('included_categories', id);
   }
-  let mods = (data?.results ?? [])
+
+  const data = await fetchJson(`${BASE}/api/cyberstorm/listing/${encodeURIComponent(community)}/?${params}`, {
+    timeout: 20000,
+  });
+  const mods = (data?.results ?? [])
     .filter((item) => item && !item.is_nsfw && !item.is_deprecated)
     .map((item) => toMod(item, community));
-  if (wanted.length && !serverFiltered) {
-    const norm = (v) => String(v).toLowerCase().replace(/[^a-z0-9]+/g, '-');
-    mods = mods.filter((m) => m.categories.some((c) => wanted.includes(norm(c))));
-  }
   return { mods, total: Number(data?.count ?? mods.length), hasMore: Boolean(data?.next), page };
+}
+
+/** Категории сообщества: слаг → номер. Список меняется редко — держим час. */
+const categoryCache = new Map(); // community -> { at, map }
+async function categoryIds(community, slugs) {
+  let entry = categoryCache.get(community);
+  if (!entry || Date.now() - entry.at > 60 * 60 * 1000) {
+    const data = await fetchJson(`${BASE}/api/cyberstorm/community/${encodeURIComponent(community)}/filters/`, { timeout: 20000 });
+    const map = new Map();
+    for (const c of data?.package_categories ?? []) {
+      if (c?.slug && c?.id) map.set(String(c.slug).toLowerCase(), String(c.id));
+    }
+    entry = { at: Date.now(), map };
+    categoryCache.set(community, entry);
+  }
+  return slugs.map((slug) => entry.map.get(slug)).filter(Boolean);
 }
 
 /** Полная карточка пакета: версия, ссылка на архив, зависимости. */

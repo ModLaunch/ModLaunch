@@ -1,58 +1,39 @@
 'use strict';
 
 /**
- * Разделы каталога — «Моды / Постройки / Графика / Сборки» (2.0).
+ * Разделы каталога (2.0.1).
  *
- * У каждого сайта свои категории, поэтому раздел описывается для всех
- * источников сразу, а нужный фильтр выбирает сам источник:
+ * Раздел описывается для всех источников сразу, а нужный фильтр выбирает
+ * сам источник:
  *
- *   nexus        — шаблоны имени категории Nexus («*Buildable*»); пробуются
- *                  по очереди, пока какой-то не даст результат, а если
- *                  категорий нет — слова из названия мода (keywords);
- *   thunderstore — слаги категорий Thunderstore (included_categories);
+ *   nexus        — ТОЧНЫЕ названия категорий Nexus. Они у каждой игры свои
+ *                  («Buildables» у Subnautica, «Base Pieces» у Below Zero),
+ *                  поэтому живут в описании игры: game.nexusCategories.
+ *                  Шаблоны вида «*Build*» Nexus не понимает — это проверено
+ *                  на живом сайте (tools/experiment.js).
+ *   thunderstore — слаги категорий Thunderstore; в номера их переводит
+ *                  источник по списку категорий сообщества.
  *   modlinks     — теги ModLinks (Hollow Knight).
  *
- * Особые разделы: all — весь каталог; picks — «Нужные моды», список
- * проверенных модов из описания игры (featured.picks); packs — «Сборки»:
- * готовые наборы модов (featured.kits) и сборки из файла.
+ * Особые разделы: all — весь каталог; picks — «Нужные моды» из описания
+ * игры (featured.picks); packs — «Сборки»: наборы (featured.kits) и файлы.
  */
 
 const S = {
   all: { id: 'all' },
   picks: { id: 'picks', special: 'picks' },
   packs: { id: 'packs', special: 'packs' },
-  buildings: {
-    id: 'buildings',
-    nexus: ['*Buildable*', '*Building*', '*Base*', '*Furniture*', '*Decor*'],
-    keywords: ['build', 'base', 'decor', 'furniture'],
-  },
-  vehicles: { id: 'vehicles', nexus: ['*Vehicle*', '*Seamoth*', '*Cyclops*'], keywords: ['seamoth', 'cyclops', 'prawn', 'seatruck', 'vehicle'] },
-  visuals: {
-    id: 'visuals',
-    nexus: ['*Visual*', '*Graphic*', '*Shader*', '*ReShade*', '*Lighting*', '*Texture*'],
-    thunderstore: ['asset-replacements', 'cosmetics', 'visuals', 'graphics'],
-    keywords: ['shader', 'reshade', 'graphics', 'texture', 'lighting'],
-  },
-  gameplay: { id: 'gameplay', nexus: ['*Gameplay*', '*Balance*', '*Mechanic*'], modlinks: ['Gameplay'], keywords: ['gameplay', 'tweak'] },
-  items: { id: 'items', nexus: ['*Item*', '*Equipment*', '*Tool*', '*Weapon*'], thunderstore: ['items', 'equipment'], keywords: ['item', 'tool', 'module'] },
-  content: {
-    id: 'content',
-    nexus: ['*Expansion*', '*New Content*', '*Location*', '*Map*'],
-    thunderstore: ['moons', 'interiors', 'monsters', 'items'],
-    modlinks: ['Expansion', 'Boss'],
-    keywords: ['expansion', 'expanded'],
-  },
-  cosmetics: { id: 'cosmetics', nexus: ['*Cosmetic*', '*Character*', '*Portrait*'], thunderstore: ['cosmetics', 'suits', 'emotes'], modlinks: ['Cosmetic'], keywords: ['skin', 'outfit', 'portrait'] },
-  audio: { id: 'audio', nexus: ['*Audio*', '*Sound*', '*Music*'], thunderstore: ['audio'], keywords: ['music', 'sound'] },
-  ui: { id: 'ui', nexus: ['*User Interface*', '*UI*', '*Interface*'], keywords: ['ui', 'hud', 'menu'] },
-  tools: {
-    id: 'tools',
-    nexus: ['*Modders*', '*Modding*', '*Librar*', '*Utilit*', '*Framework*'],
-    thunderstore: ['libraries', 'tools', 'bepinex'],
-    modlinks: ['Library', 'Utility'],
-    keywords: ['library', 'api', 'framework', 'lib'],
-  },
-  modpacks: { id: 'modpacks', thunderstore: ['modpacks'], keywords: ['modpack'] },
+  buildings: { id: 'buildings', thunderstore: ['furniture'] },
+  vehicles: { id: 'vehicles', thunderstore: ['vehicles'] },
+  items: { id: 'items', thunderstore: ['items', 'equipment'] },
+  gameplay: { id: 'gameplay', thunderstore: ['tweaks-and-quality-of-life', 'performance', 'bug-fixes'], modlinks: ['Gameplay'] },
+  content: { id: 'content', thunderstore: ['moons', 'interiors', 'monsters', 'weather', 'hazards'], modlinks: ['Expansion', 'Boss'] },
+  visuals: { id: 'visuals', thunderstore: ['asset-replacements'] },
+  cosmetics: { id: 'cosmetics', thunderstore: ['cosmetics', 'suits', 'emotes'], modlinks: ['Cosmetic'] },
+  audio: { id: 'audio', thunderstore: ['audio', 'boombox'] },
+  ui: { id: 'ui' },
+  tools: { id: 'tools', thunderstore: ['libraries', 'tools'], modlinks: ['Library', 'Utility'] },
+  modpacks: { id: 'modpacks', thunderstore: ['modpacks'] },
 };
 
 /** Список разделов по id: pick('all', 'buildings', …). */
@@ -63,9 +44,11 @@ function pick(...ids) {
   });
 }
 
-/** Раздел игры по id; неизвестный — «все». */
+/** Раздел игры по id с фильтром Nexus этой игры; неизвестный — «все». */
 function sectionOf(game, id) {
-  return (game.sections ?? []).find((s) => s.id === id) ?? S.all;
+  const section = (game.sections ?? []).find((s) => s.id === id) ?? S.all;
+  const nexus = game.nexusCategories?.[section.id] ?? [];
+  return { ...section, nexus };
 }
 
 module.exports = { SECTIONS: S, pick, sectionOf };
