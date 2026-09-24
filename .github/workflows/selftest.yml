@@ -1,0 +1,33 @@
+# Самопроверка на настоящем Windows (2.1): ModHub из исходников с
+# ненастоящей Subnautica проходит по экранам, «запускает игру», открывает
+# оверлей поверх окна и снимает всё в PNG. Снимки — в ветке ci-screens.
+name: selftest
+on:
+  workflow_dispatch:
+  push:
+    branches: ['**']
+    paths: ['src/**', 'tools/selftest.js', '.github/workflows/selftest.yml']
+permissions:
+  contents: write
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npx electron tools/selftest.js
+      - name: Снимки — в ветку ci-screens
+        if: always()
+        shell: bash
+        run: |
+          cd tools/selftest-out
+          git init -q -b ci-screens
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Снимки самопроверки ${GITHUB_SHA::7}"
+          git push -q -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" ci-screens
