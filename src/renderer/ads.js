@@ -4,7 +4,7 @@
  * Реклама в шапке ModHub.
  *
  * Место справа в шапке — рекламное. Пока своих рекламодателей нет, его
- * занимают объявления самого ModHub: премиум, подсказка про игры, «на чай»
+ * занимают объявления самого ModHub: подсказка про игры, «на чай»
  * и — если в ads.config.json указан адрес — «разместите у нас рекламу».
  *
  * Как только в src/main/ads.config.json появится адрес ленты (feedUrl),
@@ -17,7 +17,6 @@
  */
 
 const HOUSE_ADS = [
-  { id: 'house-premium', kind: 'premium', go: 'premium', icon: 'crown', title: 'ad.premium.title', text: 'ad.premium.text' },
   { id: 'house-games', kind: 'games', go: 'games', icon: 'grid', title: 'ad.games.title', text: 'ad.games.text' },
   { id: 'house-donate', kind: 'donate', go: 'donate', icon: 'cup', title: 'ad.donate.title', text: 'ad.donate.text' },
   {
@@ -40,7 +39,7 @@ function buildAds(feed, lang) {
   const remote = (feed?.items ?? [])
     .filter((ad) => ad && ad.title && ad.url && (!ad.lang || ad.lang === lang))
     .map((ad) => ({ ...ad, remote: true }));
-  // 2.1: своих объявлений (премиум, «на чай») в шапке больше нет —
+  // 2.1: своих объявлений («на чай») в шапке больше нет —
   // место пустует, пока в ленте нет настоящей рекламы.
   return remote;
 }

@@ -27,7 +27,7 @@ const state = {
   /** id -> { info, status: 'unknown'|'searching'|'found'|'missing'|'error', game, progress } */
   games: new Map(),
   order: [],
-  view: 'home', // home | games | popular | mod | game | premium | donate | settings | notfound | friends
+  view: 'home', // home | games | popular | mod | game | donate | settings | notfound | friends
   activeGameId: null,
   gameTab: 'downloads', // downloads | market | log
   modView: null, // { gameId, modId }
@@ -1894,9 +1894,6 @@ function renderCrumbs() {
     case 'notfound':
       parts = [gameCrumb, crumb(t('games.notDetected'))];
       break;
-    case 'premium':
-      parts = [crumb(t('nav.premium'))];
-      break;
     case 'donate':
       parts = [crumb(t('nav.donate'))];
       break;
@@ -1991,7 +1988,6 @@ function renderRail() {
   }
 
   for (const [id, key] of [
-    ['navPremium', 'nav.premium'],
     ['navHome', 'nav.menu'],
     ['navFriends', 'friends.title'],
     ['navDonate', 'nav.donate'],
@@ -2001,7 +1997,6 @@ function renderRail() {
     node.querySelector('.rail__tip').textContent = t(key);
   }
 
-  $('#navPremium').classList.toggle('is-active', state.view === 'premium');
   $('#navHome').classList.toggle('is-active', state.view === 'home' || state.view === 'games');
   $('#navDonate').classList.toggle('is-active', state.view === 'donate');
   $('#navSettings').classList.toggle('is-active', state.view === 'settings' && state.settingsTab !== 'accounts');
@@ -2046,7 +2041,7 @@ function renderTopbar() {
  * оценки, нашлась игра — перезапускала бы объявление.
  */
 function adsHidden() {
-  return Boolean(state.settings.premium);
+  return false;
 }
 
 async function loadAds() {
@@ -2091,7 +2086,7 @@ function renderAd({ animate = false } = {}) {
       </span>
       ${ad.remote || ad.url ? `<span class="ad__go">${icon('external')}</span>` : `<span class="ad__go">${icon('chevRight')}</span>`}
     </button>
-    <button class="ad__tag" type="button" data-action="ad-why" title="${esc(t('ad.why'))}">${esc(t('ad.label'))}</button>`;
+    <span class="ad__tag">${esc(t('ad.label'))}</span>`;
 }
 
 function rotateAd() {
@@ -2125,7 +2120,6 @@ function render() {
     popular: renderPopular,
     mod: renderModPage,
     game: renderGame,
-    premium: renderPremium,
     donate: renderDonate,
     settings: renderSettings,
     friends: renderFriends,
@@ -4910,59 +4904,7 @@ function gameRow(gameId) {
     </article>`;
 }
 
-/* --- премиум, чай, настройки --------------------------------------- */
-
-function renderPremium() {
-  const plans = [
-    ['premium.month1', 1],
-    ['premium.month3', 3],
-    ['premium.month12', 12],
-  ];
-
-  return `
-    <div class="page page--narrow">
-      <section class="premium">
-        <div class="premium__head">
-          <span class="premium__crown">${icon('crown')}</span>
-          <div>
-            <h1>${esc(t('premium.title'))}</h1>
-            <p class="premium__price">${esc(t('premium.price'))}</p>
-          </div>
-          <div class="switch">
-            ${['USD', 'BYN']
-              .map(
-                (code) =>
-                  `<button class="switch__btn${state.currency === code ? ' is-active' : ''}" data-action="currency" data-currency="${code}">${code}</button>`
-              )
-              .join('')}
-          </div>
-        </div>
-
-        <ul class="perks">
-          ${['premium.perk1', 'premium.perk2', 'premium.perk3', 'premium.perk4']
-            .map((key) => `<li>${icon('check')}<span>${esc(t(key))}</span></li>`)
-            .join('')}
-        </ul>
-
-        <h3 class="premium__plans">${esc(t('premium.plans'))}</h3>
-        <div class="plans">
-          ${plans
-            .map(
-              ([key]) => `
-                <div class="plan">
-                  <span class="plan__name">${esc(t(key))}</span>
-                  <span class="plan__price">${esc(t('premium.na'))}</span>
-                  <span class="plan__cur">${esc(state.currency)}</span>
-                </div>`
-            )
-            .join('')}
-        </div>
-
-        <button class="btn btn--gold btn--lg" disabled title="${esc(t('premium.soon'))}">${icon('crown')}<span>${esc(t('premium.buySoon'))}</span></button>
-        <p class="muted small">${esc(t('premium.soon'))}</p>
-      </section>
-    </div>`;
-}
+/* --- чай, настройки ------------------------------------------------ */
 
 function renderDonate() {
   return `
@@ -5128,7 +5070,7 @@ function settingsLook() {
             ['off', t('settings.motion.off')],
           ], pref('motion'))
         )
-    ) + `<p class="settings__note muted small">${icon('info')}<span>${esc(t('settings.golden'))}</span></p>`
+    )
   );
 }
 
@@ -6727,13 +6669,11 @@ const ACTIONS = {
     if (ad.go) return go(ad.go);
     if (ad.url) api.app.openExternal(ad.url);
   },
-  'ad-why': () => go('premium'),
   'dl-toggle': () => toggleDownloads(),
   'aside-toggle': async () => {
     await setPref('aside', pref('aside') === false);
     render();
   },
-  'nav-premium': () => go('premium'),
   'account-open': (node) => accountModal(node.dataset.mode || 'signin'),
   'nav-account': () => openAccountSettings(),
   'account-signout': async () => {
@@ -7127,7 +7067,6 @@ document.addEventListener('input', (event) => {
 
 $('#brand').addEventListener('click', () => go('home'));
 $('#navHome').addEventListener('click', () => go('home'));
-$('#navPremium').addEventListener('click', () => go('premium'));
 $('#navDonate').addEventListener('click', () => go('donate'));
 $('#navFriends').addEventListener('click', () => openFriends());
 $('#navSettings').addEventListener('click', () => go('settings'));

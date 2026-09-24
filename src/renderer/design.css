@@ -822,9 +822,6 @@ p {
 .rail__btn--game.is-active::before {
   background: var(--accent);
 }
-.rail__btn--premium::before {
-  background: var(--gold);
-}
 .rail__tip {
   border-radius: var(--r-2);
   padding: 6px 11px;
@@ -2386,14 +2383,6 @@ button.crumb:hover {
 }
 .qbtn.is-busy svg {
   animation: spin 1s linear infinite;
-}
-
-/* Светлая тема: золото на белом должно читаться. */
-[data-theme='light'] .apremium__go {
-  color: #9a6408;
-}
-[data-theme='light'] .apremium {
-  border-color: rgba(201, 146, 36, 0.35);
 }
 
 /* --- порядок и вид над каталогом (когда панели справа нет) ----------- */
