@@ -142,6 +142,21 @@ const DICT = {
     'err.PACK_GAME': 'Сборка сделана для игры, которую эта версия ModHub не поддерживает.',
     'err.presetEmpty': 'В архиве нет пресета ReShade (файла .ini со списком эффектов).',
     'err.presetUnsupported': 'Для этой игры ModHub пока не умеет ставить шейдеры.',
+    // 2.1 — друзья.
+    'err.friends.NOT_CONFIGURED': 'Друзья пока что временно недоступны.',
+    'err.friends.SIGN_IN': 'Друзья есть у аккаунта ModHub — войдите или создайте его.',
+    'err.friends.OFFLINE': 'Нет связи с сервером друзей. Проверьте интернет.',
+    'err.friends.BUSY': 'Сервер друзей сейчас перегружен. Попробуйте через несколько минут.',
+    'err.friends.DENIED':
+      'Сервер друзей отклонил запрос. Обычно это значит, что в Firebase не вставлены правила из firebase/friends.rules.',
+    'err.friends.NOT_FOUND': 'Такого запроса уже нет — список обновлён.',
+    'err.friends.EXISTS': 'Это уже сделано — список обновлён.',
+    'err.friends.PRECONDITION': 'Это уже сделано — список обновлён.',
+    'err.friends.BAD_KEY': 'Сервер друзей не принял ключ программы.',
+    'err.friends.SERVER': 'Сервер друзей ответил ошибкой: {reason}',
+    'err.friends.BAD_CODE': 'Код друга — восемь букв и цифр, например ABCD-2345.',
+    'err.friends.NO_SUCH_CODE': 'Такого кода нет. Проверьте его у друга.',
+    'err.friends.SELF': 'Это ваш собственный код.',
     'err.updateManual': 'Моды с Nexus обновляются через сайт: откройте страницу мода.',
   },
 
@@ -269,6 +284,21 @@ const DICT = {
     'err.PACK_GAME': 'This modpack is for a game this ModHub version does not support.',
     'err.presetEmpty': 'The archive has no ReShade preset (an .ini file with a list of effects).',
     'err.presetUnsupported': 'ModHub cannot install shaders for this game yet.',
+    // 2.1 — friends.
+    'err.friends.NOT_CONFIGURED': 'Friends are temporarily unavailable.',
+    'err.friends.SIGN_IN': 'Friends live in a ModHub account — sign in or create one.',
+    'err.friends.OFFLINE': 'Cannot reach the friends server. Check your internet connection.',
+    'err.friends.BUSY': 'The friends server is busy right now. Try again in a few minutes.',
+    'err.friends.DENIED':
+      'The friends server refused the request. Usually this means the rules from firebase/friends.rules are not pasted into Firebase.',
+    'err.friends.NOT_FOUND': 'That request is gone — the list has been refreshed.',
+    'err.friends.EXISTS': 'Already done — the list has been refreshed.',
+    'err.friends.PRECONDITION': 'Already done — the list has been refreshed.',
+    'err.friends.BAD_KEY': 'The friends server did not accept the app key.',
+    'err.friends.SERVER': 'The friends server returned an error: {reason}',
+    'err.friends.BAD_CODE': 'A friend code is eight letters and digits, like ABCD-2345.',
+    'err.friends.NO_SUCH_CODE': 'No such code. Double-check it with your friend.',
+    'err.friends.SELF': 'That is your own code.',
     'err.updateManual': 'Nexus mods update through the website: open the mod page.',
   },
 };

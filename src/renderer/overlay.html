@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; script-src 'self'"
+    />
+    <title>ModHub</title>
+    <link rel="stylesheet" href="overlay.css" />
+  </head>
+  <body>
+    <!--
+      Оверлей в игре (2.1). Окно прозрачное и во весь экран: игра видна
+      сквозь затемнение. Щелчок мимо карточек или Esc — закрыть.
+    -->
+    <div class="ov" id="ov" hidden>
+      <header class="ov__bar">
+        <div class="ov__brand">
+          <svg viewBox="96 96 320 320" aria-hidden="true">
+            <circle cx="256" cy="256" r="58" fill="#8b6cff" />
+            <circle cx="256" cy="256" r="26" fill="#fff" />
+            <circle cx="150" cy="150" r="30" fill="#b9a6ff" />
+            <circle cx="362" cy="150" r="30" fill="#ffd27a" />
+            <circle cx="150" cy="362" r="30" fill="#b9a6ff" />
+            <circle cx="362" cy="362" r="30" fill="#b9a6ff" />
+          </svg>
+          <b>ModHub</b>
+        </div>
+        <div class="ov__now">
+          <span id="ovGame"></span>
+          <span class="ov__timer" id="ovTimer"></span>
+        </div>
+        <div class="ov__right">
+          <span class="ov__clock" id="ovClock"></span>
+          <span class="ov__key" id="ovKey"></span>
+          <button class="ov__close" id="ovClose" type="button" aria-label="Esc">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18" /></svg>
+          </button>
+        </div>
+      </header>
+
+      <main class="ov__grid" id="ovGrid">
+        <section class="ov__card ov__card--game" id="ovSession"></section>
+        <section class="ov__card" id="ovFriends"></section>
+        <section class="ov__card" id="ovNotes"></section>
+      </main>
+    </div>
+
+    <script src="i18n.js"></script>
+    <script src="overlay.js"></script>
+  </body>
+</html>

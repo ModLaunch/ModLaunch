@@ -20,10 +20,14 @@ const api = window.modhub;
 const t = (key, params) => window.I18N.t(key, params);
 
 const state = {
+  /** Друзья (2.1): { configured, signedIn, code, friends, incoming, outgoing } с сервера. */
+  friends: null,
+  friendsBusy: false,
+  friendsError: null,
   /** id -> { info, status: 'unknown'|'searching'|'found'|'missing'|'error', game, progress } */
   games: new Map(),
   order: [],
-  view: 'home', // home | games | popular | mod | game | premium | donate | settings | notfound
+  view: 'home', // home | games | popular | mod | game | premium | donate | settings | notfound | friends
   activeGameId: null,
   gameTab: 'downloads', // downloads | market | log
   modView: null, // { gameId, modId }
@@ -158,6 +162,10 @@ const PREF_DEFAULTS = {
   confirmRemove: true,
   gameDefaultTab: 'downloads', // downloads | market | profiles
   autoDeps: true, // ставить требования мода вместе с ним (2.1)
+  // 2.1 — друзья и оверлей в игре.
+  friendsStatus: 'all', // all — во что играю | online — только «в сети» | hidden — невидимка
+  overlay: true,
+  overlayKey: 'CommandOrControl+Shift+M',
   compactHero: true, // шапка игры полосой во всех вкладках, кроме «Загрузок»
 };
 
@@ -414,6 +422,10 @@ const ICONS = {
   smile:
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 14.5c1.8 2.2 5.2 2.2 7 0M9 9.5h.01M15 9.5h.01" stroke-width="2"/></svg>',
   user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20c1.2-3.6 4-5.5 7.5-5.5s6.3 1.9 7.5 5.5"/></svg>',
+  users: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8.5" r="3.3"/><path d="M3 19.5c.9-3.2 3.2-5 6-5s5.1 1.8 6 5"/><path d="M15.2 5.4a3.2 3.2 0 0 1 0 6.2"/><path d="M17.4 14.7c1.8.7 3 2.3 3.6 4.8"/></svg>',
+  plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="8.5" y="8.5" width="11" height="11" rx="2.5"/><path d="M15.5 8.5v-2a2 2 0 0 0-2-2h-7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2"/></svg>',
+  overlay: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="13" rx="2.5"/><rect x="12.5" y="7.5" width="6" height="7" rx="1.5"/><path d="M8 20.5h8" stroke-linecap="round"/></svg>',
   lock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" stroke-linecap="round"/></svg>',
   mail: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3.5" y="5.5" width="17" height="13" rx="2.5"/><path d="m4.5 7 7.5 6 7.5-6" stroke-linecap="round"/></svg>',
   logout: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4.5H7a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h7"/><path d="M11 12h9.5M17 8.5l3.5 3.5-3.5 3.5"/></svg>',
@@ -1888,6 +1900,9 @@ function renderCrumbs() {
     case 'donate':
       parts = [crumb(t('nav.donate'))];
       break;
+    case 'friends':
+      parts = [crumb(t('friends.title'))];
+      break;
     default:
       parts = [crumb(t('nav.menu'))];
   }
@@ -1978,6 +1993,7 @@ function renderRail() {
   for (const [id, key] of [
     ['navPremium', 'nav.premium'],
     ['navHome', 'nav.menu'],
+    ['navFriends', 'friends.title'],
     ['navDonate', 'nav.donate'],
     ['navSettings', 'nav.settings'],
   ]) {
@@ -1989,6 +2005,7 @@ function renderRail() {
   $('#navHome').classList.toggle('is-active', state.view === 'home' || state.view === 'games');
   $('#navDonate').classList.toggle('is-active', state.view === 'donate');
   $('#navSettings').classList.toggle('is-active', state.view === 'settings' && state.settingsTab !== 'accounts');
+  renderFriendsRail();
   renderAccountRail();
 
   // Иконки рисуются здесь, а не в разметке: так они переживают смену языка.
@@ -2111,6 +2128,7 @@ function render() {
     premium: renderPremium,
     donate: renderDonate,
     settings: renderSettings,
+    friends: renderFriends,
   };
 
   const view = screens[state.view] ?? renderHome;
@@ -5325,6 +5343,24 @@ function settingsLaunch() {
         settingRow(t('launch.restore'), t('launch.restore.hint'), toggle('restoreAfterGame', pref('restoreAfterGame'))) +
         settingRow(t('launch.track'), t('launch.track.hint'), toggle('trackPlaytime', pref('trackPlaytime')))
     ) +
+    settingsCard(
+      t('ov.title'),
+      settingRow(t('ov.on'), t('ov.on.hint'), toggle('overlay', pref('overlay'))) +
+        settingRow(
+          t('ov.key'),
+          t('ov.key.hint'),
+          segmented('overlayKey', [
+            ['CommandOrControl+Shift+M', 'Ctrl+Shift+M'],
+            ['Alt+`', 'Alt+`'],
+            ['Shift+F1', 'Shift+F1'],
+          ], pref('overlayKey'))
+        ) +
+        settingRow(
+          t('ov.preview'),
+          t('ov.preview.hint'),
+          `<button class="btn btn--ghost btn--sm" data-action="overlay-preview">${icon('overlay')}<span>${esc(t('ov.preview.go'))}</span></button>`
+        )
+    ) +
     settingsCard(t('launch.args'), argRows, t('launch.args.hint')) +
     settingsCard(
       t('launch.time'),
@@ -5556,6 +5592,9 @@ async function loadAccount({ refresh = true } = {}) {
 /** После входа, выхода или регистрации — всё, что зависит от «кто я». */
 function accountChanged(profile) {
   if (profile) state.account = profile;
+  state.friends = null;
+  state.friendsError = null;
+  loadFriends({ force: true });
   renderRail();
   render();
   refreshRatings({ force: true });
@@ -5874,6 +5913,262 @@ function renderAccountRail() {
   node.querySelector('.rail__tip').textContent = acc.signedIn
     ? `${acc.name ?? ''}${acc.admin ? ' · ' + t('acc.admin') : ''}`
     : t('acc.tab.signin');
+}
+
+/* ================================================================== *
+ *  Друзья (2.1)
+ *
+ *  Код друга, запросы и кто во что играет — через тот же Firebase, что
+ *  отзывы и аккаунт. Список спрашивается у сервера, только пока его видно
+ *  (экран «Друзья» или панель на главной), и не чаще раза в минуту:
+ *  бесплатный лимит Firebase общий на всех.
+ * ================================================================== */
+
+const FRIENDS_POLL_MS = 60 * 1000;
+
+function friendsOnScreen() {
+  return state.view === 'friends' || (state.view === 'home' && asideVisible());
+}
+
+async function loadFriends({ force = false } = {}) {
+  if (!api.friends) return;
+  if (!state.friends) state.friends = await call(api.friends.view(), { silent: true }).catch(() => null);
+  if (!state.friends?.configured || !state.account.signedIn || state.friendsBusy) {
+    renderFriendsRail();
+    return;
+  }
+  state.friendsBusy = true;
+  try {
+    state.friends = await call(api.friends.refresh(force), { silent: true });
+    state.friendsError = null;
+    // Код заводится при первом заходе на экран — чтобы было что дать другу.
+    if (!state.friends.code && state.view === 'friends') {
+      await call(api.friends.code(), { silent: true }).catch(() => null);
+      state.friends = await call(api.friends.view(), { silent: true }).catch(() => state.friends);
+    }
+  } catch (error) {
+    state.friendsError = error.message;
+  } finally {
+    state.friendsBusy = false;
+  }
+  renderFriendsRail();
+  if (friendsOnScreen()) softRender();
+}
+
+function openFriends() {
+  go('friends');
+  // Открыли экран сами — показать и свежие запросы, не дожидаясь пяти минут.
+  loadFriends({ force: true });
+}
+
+/** Кнопка «Друзья» в рельсе: видна, когда сервер подключён; число — входящие запросы. */
+function renderFriendsRail() {
+  const node = $('#navFriends');
+  if (!node) return;
+  node.hidden = !state.account?.configured;
+  node.classList.toggle('is-active', state.view === 'friends');
+  const waiting = state.account?.signedIn ? state.friends?.incoming?.length ?? 0 : 0;
+  let badge = node.querySelector('.rail__badge');
+  if (waiting && !badge) {
+    badge = document.createElement('span');
+    badge.className = 'rail__badge';
+    node.append(badge);
+  }
+  if (badge) {
+    if (waiting) badge.textContent = String(waiting);
+    else badge.remove();
+  }
+}
+
+/** «25 мин назад», «3 ч назад», «2 дня назад». */
+function friendAgo(value) {
+  const ms = Date.now() - Date.parse(value ?? '');
+  if (!Number.isFinite(ms)) return '';
+  if (ms < 60 * 1000) return t('friends.justNow');
+  if (ms < 60 * 60 * 1000) return t('friends.ago', { time: formatDuration(ms) });
+  if (ms < 24 * 60 * 60 * 1000) return t('friends.ago', { time: t('time.h', { h: Math.floor(ms / 3600000) }) });
+  return agoText(value);
+}
+
+function friendStatus(friend) {
+  if (friend.state === 'playing') {
+    const long = friend.since ? formatDuration(Date.now() - Date.parse(friend.since)) : '';
+    return t('friends.playing', { game: friend.gameName || friend.game }) + (long ? ` · ${long}` : '');
+  }
+  if (friend.state === 'online') return t('friends.online');
+  return friend.seen ? `${t('friends.offline')} · ${friendAgo(friend.seen)}` : t('friends.offline');
+}
+
+/** Игра друга, если она есть и у нас: её значок и переход к ней. */
+function friendGame(friend) {
+  return friend.state === 'playing' && entry(friend.game) ? friend.game : null;
+}
+
+function friendRow(friend, { compact = false } = {}) {
+  const gameId = friendGame(friend);
+  const art = gameId ? `<span class="frow__game" style="background-image:url('${esc(gameArt(gameId, 'icon'))}')"></span>` : '';
+  const actions = compact
+    ? ''
+    : `${gameId ? `<button class="btn btn--ghost btn--sm" data-action="open-game" data-game="${esc(gameId)}">${icon('gamepad')}<span>${esc(t('friends.toGame'))}</span></button>` : ''}
+       <button class="qbtn" type="button" data-action="friend-remove" data-uid="${esc(friend.uid)}" data-name="${esc(friend.name)}" title="${esc(t('friends.remove'))}" aria-label="${esc(t('friends.remove'))}">${icon('close')}</button>`;
+  return `
+    <div class="frow is-${esc(friend.state)}${compact ? ' frow--compact' : ''}">
+      <span class="frow__face">${avatarHtml(friend.name)}<i class="frow__dot"></i></span>
+      <span class="frow__text"><b>${esc(friend.name)}</b><span>${esc(friendStatus(friend))}</span></span>
+      ${art}${actions}
+    </div>`;
+}
+
+function renderFriends() {
+  const view = state.friends;
+  if (view && !view.configured) {
+    return `<div class="page"><section class="empty"><h3>${esc(t('friends.title'))}</h3><p>${esc(t('err.friendsOff'))}</p></section></div>`;
+  }
+  if (!state.account.signedIn) {
+    return `
+      <div class="page page--friends">
+        <section class="fhero reveal">
+          <span class="fhero__icon">${icon('users')}</span>
+          <h1>${esc(t('friends.title'))}</h1>
+          <p>${esc(t('friends.signin.text'))}</p>
+          <div class="fhero__actions">
+            <button class="btn btn--primary btn--lg" data-action="account-open" data-mode="signin">${esc(t('acc.tab.signin'))}</button>
+            <button class="btn btn--ghost btn--lg" data-action="account-open" data-mode="signup">${esc(t('acc.tab.signup'))}</button>
+          </div>
+        </section>
+      </div>`;
+  }
+  const friends = view?.friends ?? [];
+  const incoming = view?.incoming ?? [];
+  const outgoing = view?.outgoing ?? [];
+  const online = friends.filter((f) => f.state !== 'offline').length;
+  const loading = !view?.at && state.friendsBusy;
+  const status = pref('friendsStatus');
+
+  const requests = incoming.length
+    ? `<section class="panel reveal">
+         <div class="panel__head"><h2>${esc(t('friends.incoming'))}</h2></div>
+         <div class="flist">${incoming
+           .map(
+             (r) => `
+             <div class="frow">
+               <span class="frow__face">${avatarHtml(r.name)}</span>
+               <span class="frow__text"><b>${esc(r.name)}</b><span>${esc(r.at ? friendAgo(r.at) : '')}</span></span>
+               <button class="btn btn--primary btn--sm" data-action="friend-accept" data-uid="${esc(r.uid)}">${icon('check')}<span>${esc(t('friends.accept'))}</span></button>
+               <button class="btn btn--ghost btn--sm" data-action="friend-decline" data-uid="${esc(r.uid)}">${esc(t('friends.decline'))}</button>
+             </div>`
+           )
+           .join('')}</div>
+       </section>`
+    : '';
+
+  const list = friends.length
+    ? `<div class="flist">${friends.map((f) => friendRow(f)).join('')}</div>`
+    : loading
+      ? `<div class="loading"><div class="spinner"></div></div>`
+      : `<p class="fempty">${esc(t('friends.empty'))}</p>`;
+
+  const waiting = outgoing.length
+    ? `<section class="panel panel--flat reveal">
+         <div class="panel__head"><h2>${esc(t('friends.outgoing'))}</h2></div>
+         <div class="flist">${outgoing
+           .map(
+             (r) => `
+             <div class="frow is-offline">
+               <span class="frow__face">${avatarHtml(r.name)}</span>
+               <span class="frow__text"><b>${esc(r.name)}</b><span>${esc(t('friends.waiting'))}</span></span>
+               <button class="btn btn--ghost btn--sm" data-action="friend-decline" data-uid="${esc(r.uid)}">${esc(t('friends.cancel'))}</button>
+             </div>`
+           )
+           .join('')}</div>
+       </section>`
+    : '';
+
+  return `
+    <div class="page page--friends">
+      <section class="fhead reveal">
+        <div class="fhead__me">
+          ${myAvatar('avatar--lg')}
+          <div>
+            <h1>${esc(t('friends.title'))}</h1>
+            <p class="fhead__code">${esc(t('friends.myCode'))}
+              ${
+                view?.code
+                  ? `<b class="fcode">${esc(view.code)}</b><button class="qbtn" type="button" data-action="friend-copy" title="${esc(t('friends.copy'))}" aria-label="${esc(t('friends.copy'))}">${icon('copy')}</button>`
+                  : `<span class="muted">…</span>`
+              }
+            </p>
+          </div>
+        </div>
+        <div class="fadd">
+          <input id="friendCode" type="text" maxlength="12" autocomplete="off" spellcheck="false" placeholder="${esc(t('friends.add.placeholder'))}" />
+          <button class="btn btn--primary" data-action="friend-add">${icon('plus')}<span>${esc(t('friends.add'))}</span></button>
+        </div>
+      </section>
+      ${state.friendsError ? `<p class="fnote is-error">${esc(state.friendsError)}</p>` : ''}
+      ${requests}
+      <section class="panel reveal">
+        <div class="panel__head">
+          <h2>${esc(friends.length ? t('friends.onlineN', { n: online, total: friends.length }) : t('friends.list'))}</h2>
+          <label class="dd" title="${esc(t('friends.status'))}">${icon('eye')}
+            <select data-change="pref" data-key="friendsStatus" aria-label="${esc(t('friends.status'))}">
+              ${['all', 'online', 'hidden'].map((id) => `<option value="${id}"${status === id ? ' selected' : ''}>${esc(t('friends.status.' + id))}</option>`).join('')}
+            </select>${icon('chevRight')}
+          </label>
+        </div>
+        ${list}
+      </section>
+      ${waiting}
+    </div>`;
+}
+
+/** Друзья в правой панели главной: кто сейчас в сети и во что играет. */
+function friendsAside() {
+  const view = state.friends;
+  if (!state.account?.signedIn || !view?.configured) return '';
+  const friends = view.friends ?? [];
+  const incoming = view.incoming?.length ?? 0;
+  const online = friends.filter((f) => f.state !== 'offline');
+  const shown = (online.length ? online : friends).slice(0, 6);
+  const body = shown.length
+    ? `<div class="alist">${shown.map((f) => friendRow(f, { compact: true })).join('')}</div>`
+    : `<button class="aact" type="button" data-action="nav-friends">${icon('plus')}<span>${esc(t('friends.aside.add'))}</span></button>`;
+  return asideCard(online.length ? t('friends.aside.online', { n: online.length }) : t('friends.title'), body, {
+    icon: 'users',
+    extra: `<button class="linkbtn" data-action="nav-friends">${esc(incoming ? pluralN(incoming, 'friends.requestsN') : t('aside.all'))}</button>`,
+  });
+}
+
+async function addFriend() {
+  const input = $('#friendCode');
+  const code = input?.value ?? '';
+  if (!code.trim()) {
+    input?.focus();
+    return;
+  }
+  const result = await call(api.friends.add(code)).catch(() => null);
+  if (!result) return;
+  if (input) input.value = '';
+  toast(t('friends.added.' + result.status, { name: result.name }));
+  state.friends = await call(api.friends.view(), { silent: true }).catch(() => state.friends);
+  renderFriendsRail();
+  render();
+}
+
+async function copyFriendCode() {
+  const code = state.friends?.code;
+  if (!code) return;
+  try {
+    await navigator.clipboard.writeText(code);
+  } catch {
+    const area = document.createElement('textarea');
+    area.value = code;
+    document.body.append(area);
+    area.select();
+    document.execCommand('copy');
+    area.remove();
+  }
+  toast(t('friends.copied'));
 }
 
 /* ================================================================== *
@@ -6390,6 +6685,37 @@ const ACTIONS = {
     render();
   },
   'nav-home': () => go('home'),
+  'nav-friends': () => openFriends(),
+  'friend-add': () => addFriend(),
+  'friend-copy': () => copyFriendCode(),
+  'friend-accept': async (node) => {
+    const view = await call(api.friends.accept(node.dataset.uid)).catch(() => null);
+    if (view) state.friends = view;
+    renderFriendsRail();
+    render();
+  },
+  'friend-decline': async (node) => {
+    const view = await call(api.friends.remove(node.dataset.uid)).catch(() => null);
+    if (view) state.friends = view;
+    renderFriendsRail();
+    render();
+  },
+  'friend-remove': async (node) => {
+    const ok = await confirmModal({
+      title: t('friends.remove.title', { name: node.dataset.name }),
+      text: t('friends.remove.text'),
+      confirmLabel: t('friends.remove'),
+      danger: true,
+    });
+    if (!ok) return;
+    const view = await call(api.friends.remove(node.dataset.uid)).catch(() => null);
+    if (view) state.friends = view;
+    render();
+  },
+  'overlay-preview': () => {
+    const gameId = (entry(state.activeGameId)?.game?.found ? state.activeGameId : null) ?? readyGames()[0]?.game.id ?? state.order[0];
+    api.overlay?.preview(gameId);
+  },
   'ad-open': () => {
     const ad = currentAd();
     if (!ad) return;
@@ -6798,6 +7124,7 @@ $('#brand').addEventListener('click', () => go('home'));
 $('#navHome').addEventListener('click', () => go('home'));
 $('#navPremium').addEventListener('click', () => go('premium'));
 $('#navDonate').addEventListener('click', () => go('donate'));
+$('#navFriends').addEventListener('click', () => openFriends());
 $('#navSettings').addEventListener('click', () => go('settings'));
 $('#navAccount').addEventListener('click', () => {
   if (state.account.signedIn) openAccountSettings();
@@ -6833,6 +7160,13 @@ document.addEventListener('keydown', (event) => {
     event.preventDefault();
     if (event.key === 'ArrowLeft') goBack();
     else goForward();
+  }
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter' && event.target?.id === 'friendCode') {
+    event.preventDefault();
+    addFriend();
   }
 });
 
@@ -7081,6 +7415,15 @@ setTimeout(hideSplash, SPLASH_MAX);
     if (pref('updatesOnStart')) setTimeout(() => checkAllUpdates({ quiet: true }), 4000);
     setInterval(rotateHero, 1000);
     setInterval(() => refreshRatings(), 3 * 60 * 1000);
+    loadFriends();
+    // Раз в минуту, пока друзей видно и окно ModHub в фокусе: пока человек
+    // играет, а ModHub где-то сзади, сервер не дёргаем. Вернулся — сразу.
+    setInterval(() => {
+      if (document.hasFocus() && friendsOnScreen()) loadFriends();
+    }, FRIENDS_POLL_MS);
+    window.addEventListener('focus', () => {
+      if (friendsOnScreen()) loadFriends();
+    });
   } catch (error) {
     $('#main').innerHTML = `
       <section class="empty"><h3>${esc(t('error.boot'))}</h3><p>${esc(error.message)}</p></section>`;

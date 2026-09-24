@@ -83,11 +83,18 @@ class Account {
    * @param {{encrypt: (s: string) => string, decrypt: (s: string) => string} | null} [options.protect]
    * @param {{uid?: string, refreshToken?: string} | null} [options.legacyAuth] — безымянная запись из отзывов 1.9.2
    * @param {() => string} [options.lang] — язык писем: ru / en
+   * @param {{identity?: string, secureToken?: string, firestore?: string}} [options.endpoints]
+   *   — адреса Firebase; меняются только в проверках с эмулятором
    */
-  constructor({ config, file, fetch: fetchImpl, protect = null, legacyAuth = null, lang = () => 'ru' } = {}) {
+  constructor({ config, file, fetch: fetchImpl, protect = null, legacyAuth = null, lang = () => 'ru', endpoints = {} } = {}) {
     this.config = {
       projectId: String(config?.projectId ?? '').trim(),
       apiKey: String(config?.apiKey ?? '').trim(),
+    };
+    this.ep = {
+      identity: endpoints.identity ?? IDENTITY,
+      secureToken: endpoints.secureToken ?? SECURE_TOKEN,
+      firestore: endpoints.firestore ?? FIRESTORE,
     };
     this.file = file;
     this.fetch = fetchImpl ?? globalThis.fetch;
@@ -191,7 +198,7 @@ class Account {
   }
 
   identity(pathname) {
-    return `${IDENTITY}/${pathname}?key=${encodeURIComponent(this.config.apiKey)}`;
+    return `${this.ep.identity}/${pathname}?key=${encodeURIComponent(this.config.apiKey)}`;
   }
 
   /* --- кто сейчас ------------------------------------------------------ */
@@ -263,7 +270,7 @@ class Account {
 
   async _refresh(slot, refreshToken) {
     const data = await this.request(
-      `${SECURE_TOKEN}/token?key=${encodeURIComponent(this.config.apiKey)}`,
+      `${this.ep.secureToken}/token?key=${encodeURIComponent(this.config.apiKey)}`,
       { grant_type: 'refresh_token', refresh_token: refreshToken },
       { form: true }
     );
@@ -398,7 +405,7 @@ class Account {
     const user = this.data.user;
     if (!user?.email) return false;
     const { idToken } = await this.token();
-    const url = `${FIRESTORE}/projects/${encodeURIComponent(this.config.projectId)}/databases/(default)/documents/admins/${encodeURIComponent(user.email)}?key=${encodeURIComponent(this.config.apiKey)}`;
+    const url = `${this.ep.firestore}/projects/${encodeURIComponent(this.config.projectId)}/databases/(default)/documents/admins/${encodeURIComponent(user.email)}?key=${encodeURIComponent(this.config.apiKey)}`;
     let response;
     try {
       response = await this.fetch(url, { method: 'GET', headers: { Accept: 'application/json', Authorization: `Bearer ${idToken}` } });

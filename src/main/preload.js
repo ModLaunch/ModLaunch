@@ -72,6 +72,19 @@ contextBridge.exposeInMainWorld('modhub', {
   },
 
   /** Шейдеры: ReShade в папке игры (2.1). */
+  /** Друзья: код друга, запросы, кто во что играет (2.1). */
+  friends: {
+    view: () => invoke('friends:view'),
+    refresh: (force = false) => invoke('friends:refresh', { force }),
+    code: () => invoke('friends:code'),
+    add: (code) => invoke('friends:add', code),
+    accept: (uid) => invoke('friends:accept', uid),
+    remove: (uid) => invoke('friends:remove', uid),
+  },
+  /** Оверлей в игре: посмотреть, как он выглядит, без игры (2.1). */
+  overlay: {
+    preview: (gameId) => invoke('overlay:preview', gameId),
+  },
   reshade: {
     status: (gameId) => invoke('reshade:status', gameId),
     install: (gameId) => invoke('reshade:install', gameId),

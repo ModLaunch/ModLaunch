@@ -1,6 +1,6 @@
 'use strict';
 
-const { app, BrowserWindow, ipcMain, dialog, shell, screen, safeStorage } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, screen, safeStorage, globalShortcut } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -27,6 +27,8 @@ const { isNewer } = require('./core/updates');
 const { sectionOf } = require('./games/sections');
 const deps = require('./core/deps');
 const { ReShade } = require('./core/reshade');
+const { FriendsClient, FriendsError, BEAT_MS } = require('./core/friends');
+const { Overlay } = require('./overlay');
 const watchdl = require('./core/watchdl');
 const winstate = require('./core/winstate');
 const { APP_ID, ICON_FILE } = require('./setup/core');
@@ -61,6 +63,13 @@ let playtime = null;
 let smapiIndex = null;
 /** ReShade и пресеты шейдеров (2.1). */
 let reshadeTool = null;
+/** Друзья, «в сети / в игре» и оверлей в игре (2.1). */
+let friends = null;
+let overlay = null;
+/** Игра, запущенная из ModHub и ещё не закрытая: { gameId, startedAt }. */
+let gameSession = null;
+/** Игра, для которой оверлей открыли кнопкой «Посмотреть» в настройках. */
+let overlayPreview = null;
 const registries = new Map();
 /** Ссылка nxm://, пришедшая до того, как окно успело открыться. */
 let pendingNxmLink = null;
@@ -160,6 +169,8 @@ function createWindow() {
   mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
 
   winstate.track(mainWindow, stateFile);
+  // Спрятанное окно оверлея тоже окно: без этого программа не закрылась бы.
+  mainWindow.on('closed', () => overlay?.destroy());
 
   mainWindow.once('ready-to-show', () => {
     if (place.maximized) mainWindow.maximize();
@@ -280,6 +291,104 @@ function startReviews() {
   playtime = new PlayTime({ file: path.join(dataDir(), 'playtime.json') });
   smapiIndex = new deps.SmapiIndex({ file: path.join(dataDir(), 'smapi-index.json'), version: app.getVersion() });
   reshadeTool = new ReShade({ cacheDir: path.join(dataDir(), 'reshade') });
+  friends = new FriendsClient({ config, account, dataDir: dataDir(), version: app.getVersion() });
+  friends.setMode(settings.data.friendsStatus);
+}
+
+/* ------------------------------------------------------------------ *
+ *  Друзья: отметка «в сети / в игре» (2.1)
+ * ------------------------------------------------------------------ */
+
+function presenceBeat(options) {
+  if (!friends?.configured || !account?.signedIn) return;
+  friends.beat(options).catch((error) => console.error('[friends]', error.code ?? error));
+}
+
+function startPresence() {
+  presenceBeat();
+  setInterval(presenceBeat, BEAT_MS).unref?.();
+}
+
+/** Игра запущена или закрыта: друзьям — «в игре» / «в сети», оверлею — сочетание клавиш. */
+function setSession(next) {
+  gameSession = next;
+  const game = next ? games.byId(next.gameId) : null;
+  friends?.setActivity(game ? { state: 'playing', game: game.id, gameName: game.name } : { state: 'online' });
+  presenceBeat();
+  if (next && settings.data.overlay !== false) overlay?.arm(settings.data.overlayKey);
+  else overlay?.disarm();
+}
+
+function explainFriends(error) {
+  if (error instanceof AccountError) return explainAccount(error);
+  if (!(error instanceof FriendsError)) return error;
+  const explained = new Error(t(`err.friends.${error.code}`, { reason: error.message }));
+  explained.alreadyExplained = true;
+  explained.code = `FRIENDS_${error.code}`;
+  return explained;
+}
+
+async function friendsCall(fn) {
+  try {
+    return await fn();
+  } catch (error) {
+    throw explainFriends(error);
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ *  Оверлей в игре (2.1)
+ * ------------------------------------------------------------------ */
+
+function overlayGameId() {
+  return gameSession?.gameId ?? overlayPreview ?? null;
+}
+
+async function overlayState() {
+  const gameId = overlayGameId();
+  const game = gameId ? games.byId(gameId) : null;
+  let mods = [];
+  let savesDir = null;
+  if (game) {
+    try {
+      const { state } = await stateFor(gameId, undefined, { scan: false });
+      const registry = state.found ? registryFor(gameId, state) : null;
+      mods = registry ? registry.reconcile().filter((m) => m.enabled !== false && m.kind !== 'preset').map((m) => m.name) : [];
+      savesDir = state.found ? savesDirFor(game, state) : null;
+    } catch (error) {
+      console.error('[overlay]', error);
+    }
+  }
+  const time = gameId ? playtime.all()[gameId] : null;
+  // Картинка игры: кадр из Steam (если уже скачан), иначе своя из программы.
+  const art = [];
+  if (game) {
+    const media = game.steamAppId ? await Promise.race([steamMedia.forApp(game.steamAppId).catch(() => null), delay(1500)]) : null;
+    art.push(...[media?.hero?.[0], media?.header?.[0]].filter(Boolean));
+    for (const ext of ['jpg', 'svg']) {
+      const local = `art/game-${game.id}.${ext}`;
+      if (fs.existsSync(path.join(__dirname, '..', 'renderer', local))) art.push(local);
+    }
+  }
+  return {
+    lang: getLang(),
+    art,
+    key: Overlay.keyOf(settings.data.overlayKey),
+    game: game ? { id: game.id, name: game.name, accent: game.accent } : null,
+    startedAt: gameSession && gameSession.gameId === gameId ? new Date(gameSession.startedAt).toISOString() : null,
+    totalMs: time?.totalMs ?? 0,
+    mods,
+    note: (gameId && settings.data.notes?.[gameId]) || '',
+    backups: { supported: Boolean(savesDir), last: gameId ? backups.list(gameId)[0]?.at ?? null : null },
+    friends: friends.view(),
+  };
+}
+
+function showMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
 }
 
 /**
@@ -666,6 +775,14 @@ function registerIpc() {
     // Язык меняется на лету: сообщения основного процесса должны говорить
     // на том же языке, что и кнопки вокруг них, уже со следующего ответа.
     if (patch && 'language' in patch) setLang(settings.data.language);
+    if (patch && 'friendsStatus' in patch) {
+      friends.setMode(settings.data.friendsStatus);
+      presenceBeat({ force: true });
+    }
+    if (patch && ('overlay' in patch || 'overlayKey' in patch)) {
+      if (gameSession && settings.data.overlay !== false) overlay.arm(settings.data.overlayKey);
+      else overlay.disarm();
+    }
     return true;
   });
 
@@ -764,17 +881,19 @@ function registerIpc() {
     const launched = diagnostics.launchGame(game, state.path, {
       extraArgs: settings.data.launchArgs?.[gameId] ?? '',
       onExit: () => {
-        const session = track ? playtime.stop(gameId) : { counted: false, ms: 0 };
+        if (gameSession?.gameId === gameId) setSession(null);
+        const played = track ? playtime.stop(gameId) : { counted: false, ms: 0 };
         if (mainWindow && !mainWindow.isDestroyed()) {
           // Игру закрыли — вернуть окно ModHub, если его сворачивали.
           if (settings.data.afterLaunch === 'minimize' && settings.data.restoreAfterGame !== false && mainWindow.isMinimized()) {
             mainWindow.restore();
           }
-          mainWindow.webContents.send('game-exit', { gameId, ...session, playtime: playtime.all() });
+          mainWindow.webContents.send('game-exit', { gameId, ...played, playtime: playtime.all() });
         }
       },
     });
     if (track) playtime.start(gameId);
+    setSession({ gameId, startedAt: Date.now() });
     if (settings.data.afterLaunch === 'minimize' && mainWindow && !mainWindow.isDestroyed()) mainWindow.minimize();
     // Всё, что сейчас стоит и включено, поехало в игру вместе с ней:
     // такие моды теперь можно оценить.
@@ -1206,6 +1325,7 @@ function registerIpc() {
     accountCall(async () => {
       const profile = await account.signUp(input);
       reviews.sync({ force: true }).catch(() => {});
+      presenceBeat({ force: true });
       return profile;
     })
   );
@@ -1214,11 +1334,17 @@ function registerIpc() {
     accountCall(async () => {
       const profile = await account.signIn(input);
       reviews.sync({ force: true }).catch(() => {});
+      presenceBeat({ force: true });
       return profile;
     })
   );
 
-  handle('account:signOut', async () => account.signOut());
+  handle('account:signOut', async () => {
+    // Пока пропуск ещё есть — погасить «в сети», иначе друзья видели бы
+    // человека онлайн ещё шесть минут.
+    await friends.goOffline().catch(() => {});
+    return account.signOut();
+  });
 
   handle('account:rename', async ({ name }) => accountCall(() => account.rename(name)));
 
@@ -1241,6 +1367,8 @@ function registerIpc() {
           await reviews.remove({ game: review.game, mod: review.mod }).catch(() => {});
         }
       }
+      // Код друга, «в сети» и дружбы уходят вместе с аккаунтом.
+      await friends.forget().catch(() => {});
       return account.deleteAccount(password);
     })
   );
@@ -1453,6 +1581,55 @@ function registerIpc() {
       out[game.id] = { count: items.length, last: items[0]?.at ?? null, bytes: items.reduce((n, b) => n + b.size, 0) };
     }
     return { dir: path.join(dataDir(), 'backups'), games: out };
+  });
+
+  /* --- друзья (2.1) --- */
+
+  handle('friends:view', async () => friends.view());
+  handle('friends:refresh', async ({ force = false } = {}) => friendsCall(() => friends.refresh({ force })));
+  handle('friends:code', async () => friendsCall(() => friends.myCode()));
+  handle('friends:add', async (code) => friendsCall(() => friends.add(code)));
+  handle('friends:accept', async (uid) => friendsCall(() => friends.accept(uid)));
+  handle('friends:remove', async (uid) => friendsCall(() => friends.remove(uid)));
+
+  /* --- оверлей в игре (2.1) --- */
+
+  handle('overlay:state', async () => overlayState());
+  handle('overlay:hide', async () => {
+    overlay.hide();
+    return true;
+  });
+  handle('overlay:open-app', async () => {
+    overlay.hide();
+    showMainWindow();
+    return true;
+  });
+  handle('overlay:backup', async () =>
+    coded(async () => {
+      const gameId = overlayGameId();
+      if (!gameId) throw new Error(t('err.gameNotFound'));
+      const { game, state } = await stateFor(gameId, undefined, { scan: false });
+      const made = backups.create(gameId, state.found ? savesDirFor(game, state) : null, 'manual', { keep: backupKeep() });
+      if (!made) throw Object.assign(new Error('no saves'), { code: 'BACKUP_NO_SAVES' });
+      return made;
+    })
+  );
+  handle('overlay:note', async (text) => {
+    const gameId = overlayGameId();
+    if (!gameId) return false;
+    settings.data.notes = { ...(settings.data.notes ?? {}), [gameId]: String(text ?? '').slice(0, 4000) };
+    settings.save();
+    return true;
+  });
+  handle('overlay:friends', async () => {
+    if (!friends.configured || !account.signedIn) return friends.view();
+    return friends.refresh().catch(() => friends.view());
+  });
+  /** «Посмотреть оверлей» из настроек — без игры, для знакомства. */
+  handle('overlay:preview', async (gameId) => {
+    overlayPreview = games.byId(gameId) ? gameId : null;
+    overlay.show();
+    return true;
   });
 
   /* --- игровое время (1.10) --- */
@@ -1829,7 +2006,23 @@ async function bootstrap() {
   registerProtocol();
   registerIpc();
   pendingNxmLink = extractNxmLink(process.argv);
+  overlay = new Overlay({
+    page: path.join(__dirname, '..', 'renderer', 'overlay.html'),
+    preload: path.join(__dirname, 'overlay-preload.js'),
+    icon: appIcon(),
+  });
   createWindow();
+  startPresence();
+
+  // Закрывают ModHub — друзьям сразу «не в сети» (но не дольше пары секунд).
+  let leaving = false;
+  app.on('before-quit', (event) => {
+    if (leaving || !friends?.published) return;
+    event.preventDefault();
+    leaving = true;
+    Promise.race([friends.goOffline().catch(() => {}), delay(2500)]).finally(() => app.quit());
+  });
+  app.on('will-quit', () => globalShortcut.unregisterAll());
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

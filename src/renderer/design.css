@@ -3514,9 +3514,12 @@ button.crumb:hover {
 }
 .catline .dd {
   height: 44px;
+}
+/* Выпадашка со значком слева вместо подписи: значок на месте, стрелка справа. */
+.dd:has(> svg:first-child) {
   padding-left: var(--sp-4);
 }
-.catline .dd > svg:first-child {
+.dd > svg:first-child {
   position: static;
   width: 15px;
   height: 15px;
@@ -4030,4 +4033,250 @@ button.crumb:hover {
   font-size: 13px;
   color: var(--muted);
   cursor: pointer;
+}
+
+/* ================================================================== *
+ *  2.1 — друзья
+ *
+ *  Размеры — по той же шкале Фибоначчи (8, 13, 21, 34, 55), что и весь
+ *  интерфейс: соседние шаги относятся как золотое сечение.
+ * ================================================================== */
+
+.page--friends {
+  max-width: 890px;
+}
+
+/* Не вошли: одна карточка с приглашением. */
+.fhero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-7) var(--sp-6);
+  border: 1px solid var(--line);
+  border-radius: var(--r-4);
+  background:
+    radial-gradient(circle at 50% 0%, var(--accent-soft), transparent 61.8%),
+    var(--surface);
+  text-align: center;
+}
+.fhero__icon {
+  width: 55px;
+  height: 55px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent-line);
+}
+.fhero__icon svg {
+  width: 28px;
+  height: 28px;
+}
+.fhero h1 {
+  font-size: var(--fs-8);
+}
+.fhero p {
+  max-width: 480px;
+  color: var(--muted);
+  line-height: 1.618;
+}
+.fhero__actions {
+  display: flex;
+  gap: var(--sp-3);
+  margin-top: var(--sp-3);
+}
+
+/* Шапка: я и мой код слева, «добавить по коду» справа. */
+.fhead {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-5);
+  padding: var(--sp-5);
+  border: 1px solid var(--line);
+  border-radius: var(--r-4);
+  background:
+    radial-gradient(circle at 0% 0%, var(--accent-soft), transparent 61.8%),
+    var(--surface);
+}
+.fhead__me {
+  flex: 1 1 280px;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  min-width: 0;
+}
+.fhead__me h1 {
+  font-size: var(--fs-6);
+}
+.fhead__code {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: var(--fs-1);
+}
+.fcode {
+  padding: 3px var(--sp-3);
+  border-radius: var(--r-2);
+  background: var(--surface-2);
+  color: var(--text);
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: var(--fs-3);
+  letter-spacing: 0.08em;
+  user-select: all;
+}
+.fhead__code .qbtn {
+  width: 28px;
+  height: 28px;
+}
+.fadd {
+  flex: 1 1 320px;
+  display: flex;
+  gap: var(--sp-3);
+}
+.fadd input {
+  flex: 1;
+  min-width: 0;
+  height: var(--h-m);
+  padding: 0 var(--sp-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-3);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  letter-spacing: 0.04em;
+  outline: 0;
+}
+.fadd input::placeholder {
+  font-family: inherit;
+  letter-spacing: 0;
+}
+.fadd input:focus {
+  border-color: var(--accent-line);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.fnote {
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-3);
+  background: var(--surface-2);
+  font-size: var(--fs-1);
+}
+.fnote.is-error {
+  color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
+}
+.fempty {
+  padding: var(--sp-5) 0;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* Строка друга: кружок с точкой состояния, имя, во что играет. */
+.flist {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.frow {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  min-width: 0;
+  padding: var(--sp-3);
+  border-radius: var(--r-3);
+}
+.frow:hover {
+  background: var(--surface-2);
+}
+.frow--compact {
+  padding: 6px var(--sp-3);
+}
+.frow__face {
+  position: relative;
+  flex: 0 0 auto;
+  display: grid;
+}
+.frow--compact .avatar {
+  width: 34px;
+  height: 34px;
+  font-size: 12px;
+}
+.frow__dot {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--surface);
+  background: var(--muted);
+}
+.frow.is-online .frow__dot {
+  background: var(--ok, #2fbf71);
+}
+.frow.is-playing .frow__dot {
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+}
+.frow.is-offline .avatar {
+  filter: grayscale(0.7);
+  opacity: 0.7;
+}
+.frow__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.frow__text b,
+.frow__text span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.frow__text span {
+  font-size: var(--fs-1);
+  color: var(--muted);
+}
+.frow.is-playing .frow__text span {
+  color: var(--accent);
+  font-weight: 600;
+}
+.frow__game {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--r-2);
+  background-size: cover;
+  background-position: center;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+.frow--compact .frow__game {
+  width: 28px;
+  height: 28px;
+}
+
+/* Число входящих запросов на кнопке «Друзья» в рельсе. */
+.rail__badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  border: 2px solid var(--bg);
+  background: var(--danger, #ff5f6d);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 800;
+  line-height: 1;
 }

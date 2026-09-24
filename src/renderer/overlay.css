@@ -1,0 +1,373 @@
+/*
+ * Оверлей в игре (2.1).
+ *
+ * Отдельный лёгкий файл: окно оверлея не тянет за собой стили всего ModHub.
+ * Пропорции — золотые: карточка сеанса шире соседних в φ = 1.618 раза,
+ * отступы и скругления — шаги шкалы Фибоначчи (8, 13, 21, 34, 55).
+ */
+
+:root {
+  --bg-dim: rgba(6, 8, 14, 0.66);
+  --card: rgba(20, 23, 32, 0.94);
+  --card-2: rgba(255, 255, 255, 0.05);
+  --line: rgba(255, 255, 255, 0.09);
+  --text: #eef0f6;
+  --muted: #9aa1b3;
+  --accent: #8b6cff;
+  --ok: #46c08a;
+  --gold: #e7b44a;
+  --sp-3: 8px;
+  --sp-4: 13px;
+  --sp-5: 21px;
+  --sp-6: 34px;
+  --sp-7: 55px;
+  --r-3: 13px;
+  --r-4: 21px;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+}
+
+html,
+body {
+  height: 100%;
+  background: transparent;
+  color: var(--text);
+  font: 14px/1.45 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+  overflow: hidden;
+  user-select: none;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+.ov {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(ellipse at 50% 38%, rgba(10, 12, 20, 0.35), var(--bg-dim) 61.8%),
+    var(--bg-dim);
+  animation: ov-in 0.18s ease-out both;
+}
+.ov[hidden] {
+  display: none;
+}
+@keyframes ov-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* --- верхняя полоса --- */
+
+.ov__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-5);
+  height: 55px;
+  padding: 0 var(--sp-6);
+  background: linear-gradient(rgba(8, 10, 16, 0.85), rgba(8, 10, 16, 0.4));
+  border-bottom: 1px solid var(--line);
+}
+.ov__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  font-size: 16px;
+}
+.ov__brand svg {
+  width: 24px;
+  height: 24px;
+}
+.ov__now {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  color: var(--muted);
+}
+.ov__now #ovGame {
+  color: var(--text);
+  font-weight: 600;
+}
+.ov__timer {
+  font-variant-numeric: tabular-nums;
+}
+.ov__right {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-5);
+  color: var(--muted);
+}
+.ov__clock {
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.ov__key {
+  font-size: 12.4px;
+}
+.ov__close {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--card-2);
+  cursor: pointer;
+}
+.ov__close:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+.ov__close svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* --- карточки: 1.618 : 1 : 1 --- */
+
+.ov__grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1.618fr) minmax(0, 1fr) minmax(0, 1fr);
+  align-content: center;
+  gap: var(--sp-5);
+  width: min(1220px, 100% - 2 * var(--sp-6));
+  margin: 0 auto;
+  padding: var(--sp-6) 0 var(--sp-7);
+}
+@media (max-width: 1100px) {
+  .ov__grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .ov__card--game {
+    grid-column: 1 / -1;
+  }
+}
+.ov__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  min-height: 377px; /* 233 × φ */
+  padding: var(--sp-5);
+  border: 1px solid var(--line);
+  border-radius: var(--r-4);
+  background: var(--card);
+  box-shadow: 0 21px 55px -21px rgba(0, 0, 0, 0.7);
+  animation: card-in 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  user-select: text;
+}
+.ov__card:nth-child(2) {
+  animation-delay: 0.04s;
+}
+.ov__card:nth-child(3) {
+  animation-delay: 0.08s;
+}
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateY(13px) scale(0.985);
+  }
+}
+.ov__card h3 {
+  font-size: 15.8px;
+}
+.ov__label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.ov__muted {
+  color: var(--muted);
+  font-size: 12.4px;
+}
+
+/* --- сеанс --- */
+
+.ov__card--game {
+  position: relative;
+  overflow: hidden;
+  padding: 0;
+}
+.ovs__art {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center 30%;
+  opacity: 0.55;
+  mask-image: linear-gradient(to bottom, #000 0%, rgba(0, 0, 0, 0.55) 45%, transparent 85%);
+}
+.ovs__body {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  height: 100%;
+  padding: var(--sp-6) var(--sp-6) var(--sp-5);
+  background: linear-gradient(to bottom, transparent, rgba(12, 14, 22, 0.75) 55%);
+}
+.ovs__body h2 {
+  font-size: 28.8px;
+  line-height: 1.15;
+}
+.ovs__time {
+  font-size: 55px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  text-shadow: 0 0 34px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+.ovs__mods {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: auto;
+  padding: var(--sp-4);
+  border-radius: var(--r-3);
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 12.4px;
+}
+.ovs__mods span {
+  color: var(--muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.ovs__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+}
+.ov__btn {
+  height: 42px;
+  padding: 0 var(--sp-5);
+  border: 1px solid var(--line);
+  border-radius: var(--r-3);
+  background: rgba(255, 255, 255, 0.07);
+  font-weight: 600;
+  cursor: pointer;
+}
+.ov__btn:hover {
+  background: rgba(255, 255, 255, 0.13);
+}
+.ov__btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.ov__btn--main {
+  border-color: transparent;
+  background: var(--accent);
+  color: #fff;
+}
+.ov__btn--main:hover {
+  background: color-mix(in srgb, var(--accent) 85%, #fff);
+}
+.ovs__note {
+  min-height: 1.45em;
+}
+
+/* --- друзья --- */
+
+.ovf {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: auto;
+}
+.ovf__row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: 6px var(--sp-3);
+  border-radius: var(--r-3);
+}
+.ovf__row:hover {
+  background: var(--card-2);
+}
+.ovf__face {
+  position: relative;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 800;
+  color: #fff;
+  background: linear-gradient(135deg, hsl(var(--h) 72% 60%), hsl(calc(var(--h) + 40) 66% 38%));
+}
+.ovf__face i {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid #161922;
+  background: var(--muted);
+}
+.ovf__row.is-online .ovf__face i {
+  background: var(--ok);
+}
+.ovf__row.is-playing .ovf__face i {
+  background: var(--accent);
+}
+.ovf__row.is-offline .ovf__face {
+  filter: grayscale(0.7);
+  opacity: 0.7;
+}
+.ovf__text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ovf__text b,
+.ovf__text span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.ovf__text span {
+  font-size: 12.4px;
+  color: var(--muted);
+}
+.ovf__row.is-playing .ovf__text span {
+  color: color-mix(in srgb, var(--accent) 70%, #fff);
+}
+
+/* --- заметки --- */
+
+#ovNote {
+  flex: 1;
+  min-height: 233px;
+  padding: var(--sp-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-3);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text);
+  font: inherit;
+  line-height: 1.618;
+  resize: none;
+  outline: 0;
+}
+#ovNote:focus {
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+}
+.ovn__state {
+  min-height: 1.45em;
+}

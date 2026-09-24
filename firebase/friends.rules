@@ -1,0 +1,71 @@
+    // ── Друзья ModHub 2.1 ────────────────────────────────────────────────
+    // Вставить в консоли Firebase: Firestore Database → Правила, внутрь
+    // блока match /databases/{database}/documents { … }, рядом с правилами
+    // отзывов, и нажать «Опубликовать». Отзывы эти строки не трогают.
+
+    // Друзья — только у аккаунта с почтой (не у безымянной записи).
+    function friendsMember() {
+      return request.auth != null && request.auth.token.get('email', '') != '';
+    }
+    function friendsName(value) {
+      return value is string && value.size() > 0 && value.size() <= 32;
+    }
+
+    // Код друга → uid. Узнать можно только по точному коду: списка кодов нет.
+    match /codes/{code} {
+      allow get: if friendsMember();
+      allow create: if friendsMember()
+        && code.matches('^[A-HJ-NP-Z2-9]{8}$')
+        && request.resource.data.keys().hasOnly(['uid', 'name', 'created'])
+        && request.resource.data.uid == request.auth.uid
+        && friendsName(request.resource.data.name)
+        && request.resource.data.created == request.time;
+      allow delete: if friendsMember() && resource.data.uid == request.auth.uid;
+    }
+
+    // «В сети» и «в игре». Пишет только хозяин, читают по точному uid.
+    match /profiles/{uid} {
+      allow get: if friendsMember();
+      allow create, update: if friendsMember()
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['name', 'code', 'state', 'game', 'gameName', 'app', 'seen', 'since'])
+        && friendsName(request.resource.data.name)
+        && request.resource.data.code is string && request.resource.data.code.size() <= 8
+        && request.resource.data.state in ['online', 'playing', 'offline']
+        && request.resource.data.game is string && request.resource.data.game.size() <= 40
+        && request.resource.data.gameName is string && request.resource.data.gameName.size() <= 60
+        && request.resource.data.app is string && request.resource.data.app.size() <= 20
+        && request.resource.data.seen == request.time
+        && request.resource.data.since is timestamp
+        && request.resource.data.since <= request.time;
+      allow delete: if friendsMember() && request.auth.uid == uid;
+    }
+
+    // Дружба: один документ на пару, его имя — «меньший uid_больший uid».
+    // Запрос «ждёт» (pending), пока второй не примет (accepted).
+    match /friendships/{pair} {
+      allow get, list: if friendsMember() && request.auth.uid in resource.data.users;
+      allow create: if friendsMember()
+        && request.resource.data.keys().hasOnly(['users', 'from', 'to', 'fromName', 'toName', 'status', 'created', 'updated'])
+        && request.resource.data.from == request.auth.uid
+        && request.resource.data.to is string
+        && request.resource.data.to != request.auth.uid
+        && request.resource.data.users == (request.auth.uid < request.resource.data.to
+             ? [request.auth.uid, request.resource.data.to]
+             : [request.resource.data.to, request.auth.uid])
+        && pair == request.resource.data.users[0] + '_' + request.resource.data.users[1]
+        && request.resource.data.status == 'pending'
+        && friendsName(request.resource.data.fromName)
+        && friendsName(request.resource.data.toName)
+        && request.resource.data.created == request.time
+        && request.resource.data.updated == request.time;
+      allow update: if friendsMember()
+        && resource.data.to == request.auth.uid
+        && resource.data.status == 'pending'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'toName', 'updated'])
+        && request.resource.data.status == 'accepted'
+        && friendsName(request.resource.data.toName)
+        && request.resource.data.updated == request.time;
+      allow delete: if friendsMember() && request.auth.uid in resource.data.users;
+    }
+    // ── конец правил друзей ──────────────────────────────────────────────
