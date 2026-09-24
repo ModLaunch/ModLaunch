@@ -123,6 +123,22 @@ function filePageUrl(domain, modId, fileId, { nmm = false } = {}) {
  * ------------------------------------------------------------------ */
 
 async function graphql(query, variables = {}) {
+  // Nexus изредка не отвечает за 20 секунд или отдаёт 5xx — на живом сайте
+  // это случается примерно раз на сотню запросов. Один повтор почти всегда
+  // проходит, и человек не видит пустого места вместо мода.
+  let lastError;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      return await graphqlOnce(query, variables);
+    } catch (error) {
+      lastError = error;
+      if (!error.retryable) throw error;
+    }
+  }
+  throw lastError;
+}
+
+async function graphqlOnce(query, variables) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 20000);
   let response;
@@ -134,11 +150,15 @@ async function graphql(query, variables = {}) {
       signal: controller.signal,
     });
   } catch (error) {
-    throw new Error(t('err.nexus.offline', { reason: error.name === 'AbortError' ? 'timeout' : error.message }));
+    throw Object.assign(new Error(t('err.nexus.offline', { reason: error.name === 'AbortError' ? 'timeout' : error.message })), {
+      retryable: true,
+    });
   } finally {
     clearTimeout(timer);
   }
-  if (!response.ok) throw new Error(t('err.nexus.http', { status: response.status }));
+  if (!response.ok) {
+    throw Object.assign(new Error(t('err.nexus.http', { status: response.status })), { retryable: response.status >= 500 || response.status === 429 });
+  }
   const json = await response.json();
   if (!json?.data) throw new Error(t('err.nexus.http', { status: json?.errors?.[0]?.message ?? '?' }));
   return json.data;
