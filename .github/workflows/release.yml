@@ -24,6 +24,8 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.v.outputs.version }}
+          # Тег — на тот коммит, из которого собраны файлы, а не на ветку по умолчанию.
+          target_commitish: ${{ github.sha }}
           name: ModHub ${{ steps.v.outputs.version }}
           body_path: build/release-notes.md
           make_latest: true
