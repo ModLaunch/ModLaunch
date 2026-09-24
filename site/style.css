@@ -224,12 +224,6 @@ section {
   font-size: 20px;
   font-weight: 800;
 }
-.brand img {
-  transition: transform 0.7s var(--spring);
-}
-.brand:hover img {
-  transform: rotate(180deg);
-}
 .brand b {
   color: var(--accent-2);
 }
@@ -726,8 +720,32 @@ details p {
   background: radial-gradient(600px circle at 50% 0%, rgba(124, 92, 255, 0.22), transparent 70%), rgba(255, 255, 255, 0.02);
   text-align: center;
 }
-.final img {
-  animation: spin 18s linear infinite;
+/* Логотип: вокруг неподвижного центра вращаются четыре кружка. */
+.logo {
+  flex: none;
+  overflow: visible;
+}
+.logo__orbit,
+.logo__core {
+  transform-box: view-box;
+  transform-origin: 12px 12px;
+}
+.logo__orbit {
+  animation: spin 14s linear infinite;
+}
+.brand:hover .logo__orbit {
+  animation-duration: 2.4s;
+}
+.logo--big .logo__orbit {
+  animation-duration: 9s;
+}
+.logo__core {
+  animation: core 3s ease-in-out infinite;
+}
+@keyframes core {
+  50% {
+    transform: scale(1.08);
+  }
 }
 @keyframes spin {
   to {
