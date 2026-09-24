@@ -2,6 +2,7 @@
 
 const path = require('node:path');
 const os = require('node:os');
+const { pick } = require('./sections');
 
 /**
  * Адаптер Stardew Valley.
@@ -36,6 +37,19 @@ module.exports = {
     // SMAPI ставится кнопкой загрузчика, в витрине ему делать нечего.
     hide: ['2400'],
     browseUrl: 'https://www.nexusmods.com/stardewvalley/mods',
+  },
+
+  sections: pick('all', 'picks', 'buildings', 'content', 'visuals', 'gameplay', 'cosmetics', 'ui', 'tools', 'packs'),
+  featured: {
+    // Самое скачиваемое и нужное почти в любой сборке Stardew (номера на Nexus).
+    // Lookup Anything, Chests Anywhere, Automate, NPC Map Locations, Generic Mod
+    // Config Menu, Content Patcher, Stardew Valley Expanded, UI Info Suite 2, Tractor Mod.
+    picks: ['541', '518', '1063', '239', '5098', '1915', '3753', '7098', '1401'],
+    kits: [
+      { id: 'sdv-comfort', mods: ['5098', '541', '518', '239', '7098'] },
+      { id: 'sdv-farm', mods: ['1063', '1401', '518'] },
+      { id: 'sdv-expanded', mods: ['1915', '3753'] },
+    ],
   },
 
   /** Как опознать мод внутри архива. */

@@ -2,13 +2,14 @@
 
 const path = require('node:path');
 const { findGameExecutable } = require('../core/executable');
+const { pick } = require('./sections');
 
 /**
  * Адаптер Subnautica: Below Zero.
  *
  * Продолжение Subnautica на том же движке и с тем же устройством модов:
- * BepInExPack и моды — из сообщества Below Zero на Thunderstore, плагины —
- * в BepInEx/plugins. Папка данных — «SubnauticaZero_Data», по ней игра
+ * BepInExPack — из сообщества Below Zero на Thunderstore, плагины —
+ * в BepInEx/plugins, каталог модов (2.0) — Nexus Mods. Папка данных — «SubnauticaZero_Data», по ней игра
  * и отличается от первой части.
  *
  * Сохранения, как и у первой части, лежат в папке игры: SNAppData/SavedGames.
@@ -31,9 +32,33 @@ module.exports = {
   thunderstoreCommunity: 'subnautica-below-zero',
 
   catalog: {
-    kind: 'thunderstore',
-    community: 'subnautica-below-zero',
-    browseUrl: 'https://thunderstore.io/c/subnautica-below-zero/',
+    kind: 'nexus',
+    nexusDomain: 'subnauticabelowzero',
+    nexusGameId: 2706,
+    browseUrl: 'https://www.nexusmods.com/subnauticabelowzero/mods',
+  },
+
+  sections: pick('all', 'picks', 'buildings', 'vehicles', 'items', 'gameplay', 'visuals', 'ui', 'tools', 'packs'),
+  featured: {
+    picks: [
+      '373', // Nautilus BZ
+      '44', // Slot Extender Zero
+      '287', // Building Tweaks (строить в Seatruck)
+      '264', // Base Clocks
+      '599', // Pinup — закреплённые постройки
+      '470', // CustomItems
+      '52', // Seatruck Storage
+      '53', // Seatruck Arms
+      '54', // Seatruck Depth Upgrades
+      '55', // Seatruck Speed Upgrades
+      '137', // Seatruck Scanner Module
+      '417', // ModdedArmsHelperBZ
+      '444', // ECC Library BZ
+    ],
+    kits: [
+      { id: 'bz-builder', mods: ['373', '287', '264', '599', '470'] },
+      { id: 'bz-seatruck', mods: ['373', '44', '417', '52', '53', '54', '55', '137'] },
+    ],
   },
 
   modMarker: {

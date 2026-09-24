@@ -1,26 +1,53 @@
-# Сборка ModHub-Setup.exe: один exe без распаковщика NSIS.
-# Установщик — сама программа (src/main/setup): если имя файла содержит
-# «Setup», вместо лаунчера открывается окно установки.
+# Сборка установщика ModHub-Setup-<версия>.exe (2.0).
+#
+# Полноценный мастер установки NSIS: язык (русский/английский), условия
+# использования, выбор папки, ярлыки на рабочем столе и в «Пуске», запуск
+# после установки, удаление через «Приложения» Windows.
+#
+# Собирается командой `npm run dist`: build/build.js сначала готовит копию
+# программы с обфусцированным кодом в .build/app, а electron-builder
+# упаковывает уже её.
 appId: ModHub.Launcher
 productName: ModHub
 copyright: ModHub
 directories:
   output: dist
+  buildResources: build
+  app: .build/app
 files:
   - package.json
   - src/**/*
-  - "!src/**/*.md"
+  - node_modules/**/*
 extraResources:
   - from: src/assets/icon.ico
     to: modhub.ico
+afterPack: build/after-pack.js
 win:
   target:
-    - target: portable
+    - target: nsis
       arch: [x64]
   icon: src/assets/icon.ico
   executableName: ModHub
   signAndEditExecutable: false
-portable:
-  artifactName: ModHub-Setup-${version}.exe
+nsis:
+  oneClick: false
+  perMachine: false
+  allowElevation: true
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: ModHub
+  runAfterFinish: true
+  license: build/license.txt
+  installerIcon: src/assets/icon.ico
+  uninstallerIcon: src/assets/icon.ico
+  installerHeaderIcon: src/assets/icon.ico
+  multiLanguageInstaller: true
+  installerLanguages: [ru_RU, en_US]
+  language: '1049'
+  displayLanguageSelector: false
   unicode: true
-afterPack: build/after-pack.js
+  deleteAppDataOnUninstall: false
+  uninstallDisplayName: ModHub
+  include: build/installer.nsh
+  artifactName: ModHub-Setup-${version}.exe

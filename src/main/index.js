@@ -24,6 +24,7 @@ const { Backups } = require('./core/backups');
 const { PlayTime } = require('./core/playtime');
 const { buildPack, parsePack } = require('./core/modpack');
 const { isNewer } = require('./core/updates');
+const { sectionOf } = require('./games/sections');
 const watchdl = require('./core/watchdl');
 const winstate = require('./core/winstate');
 const { APP_ID, ICON_FILE } = require('./setup/core');
@@ -894,17 +895,26 @@ function registerIpc() {
     const opts = options ?? {};
     const page = Math.max(1, Number(opts.page) || 1);
     let result = { mods: [], total: 0, hasMore: false, page };
+    // Раздел каталога (2.0): «Постройки», «Графика»… — свой фильтр у каждого сайта.
+    const section = sectionOf(game, opts.section);
 
     if (game.catalog.kind === 'thunderstore') {
-      result = await thunderstore.search(game.catalog.community, query ?? '', { ...opts, page });
+      result = await thunderstore.search(game.catalog.community, query ?? '', { ...opts, page, categories: section.thunderstore });
     } else if (game.catalog.kind === 'modlinks') {
       // Категории есть только у ModLinks; «по алфавиту» — тоже здесь, список целиком на диске.
-      let all = await modlinks.search(query ?? '', { category: opts.category || undefined });
+      let all = await modlinks.search(query ?? '', { category: opts.category || undefined, categories: section.modlinks });
       if (opts.sort === 'name') all = [...all].sort((a, b) => a.name.localeCompare(b.name, 'ru'));
       const size = 24;
       result = { mods: all.slice((page - 1) * size, page * size), total: all.length, hasMore: page * size < all.length, page };
     } else if (game.catalog.kind === 'nexus') {
-      result = await nexus.browse(game.catalog.nexusDomain, { ...opts, page, query, hide: game.catalog.hide });
+      result = await nexus.browse(game.catalog.nexusDomain, {
+        ...opts,
+        page,
+        query,
+        hide: game.catalog.hide,
+        categories: section.nexus,
+        keywords: section.id === 'all' ? [] : section.keywords,
+      });
     }
 
     if (opts.limit) result = { ...result, mods: result.mods.slice(0, opts.limit) };
@@ -922,6 +932,30 @@ function registerIpc() {
     if (game.catalog.kind === 'thunderstore') return thunderstore.categories(game.catalog.community);
     if (game.catalog.kind === 'modlinks') return modlinks.categories();
     return [];
+  });
+
+  /**
+   * Несколько модов по номерам — для «Нужных модов» и готовых наборов (2.0).
+   * По одному запросу на мод, не больше четырёх разом; пропавший из
+   * каталога мод просто не попадает в ответ.
+   */
+  handle('catalog:many', async ({ gameId, ids }) => {
+    const { game } = await stateFor(gameId, undefined, { scan: false });
+    const list = (Array.isArray(ids) ? ids : []).map(String).slice(0, 40);
+    const out = new Array(list.length).fill(null);
+    let next = 0;
+    const worker = async () => {
+      while (next < list.length) {
+        const index = next++;
+        try {
+          out[index] = await lookupCatalogMod(game, list[index]);
+        } catch {
+          out[index] = null;
+        }
+      }
+    };
+    await Promise.all([worker(), worker(), worker(), worker()]);
+    return out.filter(Boolean);
   });
 
   handle('catalog:get', async ({ gameId, modId }) => {

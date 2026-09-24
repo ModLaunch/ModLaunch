@@ -100,6 +100,8 @@ function describe(game) {
     browseUrl: game.catalog.browseUrl ?? null,
     steamAppId: game.steamAppId ?? null,
     hasSaves: typeof game.savesDir === 'function',
+    sections: (game.sections ?? []).map((s) => s.id),
+    featured: game.featured ?? { picks: [], kits: [] },
   };
 }
 

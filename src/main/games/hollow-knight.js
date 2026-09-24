@@ -2,6 +2,7 @@
 
 const path = require('node:path');
 const os = require('node:os');
+const { pick } = require('./sections');
 const hkapi = require('../core/loaders/hkapi');
 const { findGameExecutable } = require('../core/executable');
 
@@ -32,6 +33,15 @@ module.exports = {
   catalog: {
     kind: 'modlinks',
     browseUrl: 'https://github.com/hk-modding/modlinks',
+  },
+
+  sections: pick('all', 'picks', 'content', 'gameplay', 'cosmetics', 'tools', 'packs'),
+  featured: {
+    picks: ['Custom Knight', 'Benchwarp', 'Pale Court', 'Randomizer 4', 'HKMP', 'QoL', 'DebugMod'],
+    kits: [
+      { id: 'hk-comfort', mods: ['Benchwarp', 'QoL'] },
+      { id: 'hk-coop', mods: ['HKMP', 'Custom Knight'] },
+    ],
   },
 
   modMarker: {

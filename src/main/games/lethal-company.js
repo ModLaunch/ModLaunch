@@ -2,6 +2,7 @@
 
 const path = require('node:path');
 const os = require('node:os');
+const { pick } = require('./sections');
 const { findGameExecutable } = require('../core/executable');
 
 /**
@@ -36,6 +37,12 @@ module.exports = {
     kind: 'thunderstore',
     community: 'lethal-company',
     browseUrl: 'https://thunderstore.io/c/lethal-company/',
+  },
+
+  sections: pick('all', 'picks', 'content', 'items', 'cosmetics', 'audio', 'visuals', 'tools', 'modpacks'),
+  featured: {
+    picks: ['notnotnotswipez-MoreCompany', 'tinyhoot-ShipLoot', 'anormaltwig-LateCompany', 'x753-More_Suits', 'Evaisa-LethalThings', 'malco-Lategame_Upgrades'],
+    kits: [],
   },
 
   modMarker: {

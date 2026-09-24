@@ -171,6 +171,8 @@ async function search(query, options = {}) {
 
   let result = mods;
   if (options.category) result = result.filter((m) => m.categories.includes(options.category));
+  // Раздел каталога (2.0): любой из тегов.
+  if (options.categories?.length) result = result.filter((m) => m.categories.some((c) => options.categories.includes(c)));
 
   if (needle) {
     result = result

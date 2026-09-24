@@ -115,6 +115,8 @@ contextBridge.exposeInMainWorld('modhub', {
     search: (gameId, query, options) => invoke('catalog:search', { gameId, query, options }),
     categories: (gameId) => invoke('catalog:categories', gameId),
     get: (gameId, modId) => invoke('catalog:get', { gameId, modId }),
+    /** Несколько модов по номерам: «Нужные моды» и наборы (2.0). */
+    many: (gameId, ids) => invoke('catalog:many', { gameId, ids }),
     details: (gameId, modId) => invoke('catalog:details', { gameId, modId }),
     /** Досмотреть картинки модов, которых нет во встроенном указателе. */
     media: (gameId, ids) => invoke('catalog:media', { gameId, ids }),

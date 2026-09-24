@@ -2,15 +2,19 @@
 
 const path = require('node:path');
 const { findGameExecutable } = require('../core/executable');
+const { pick } = require('./sections');
 
 /**
  * Адаптер Subnautica.
  *
  * Игра на Unity. После обновления 2.0 («Living Large») сообщество перешло
- * на BepInEx: собранный под игру BepInExPack лежит в сообществе Subnautica
- * на Thunderstore вместе с самими модами. Поэтому устройство такое же, как
- * у Lethal Company: загрузчик — одним пакетом в корень игры, плагины —
- * в BepInEx/plugins, каталог и зависимости — с Thunderstore.
+ * на BepInEx: собранный под игру BepInExPack берётся из сообщества Subnautica
+ * на Thunderstore, плагины кладутся в BepInEx/plugins.
+ *
+ * Каталог (2.0) — Nexus Mods: на Thunderstore у Subnautica всего несколько
+ * десятков модов, а всё нужное — Nautilus, Decorations Mod, постройки,
+ * транспорт — выкладывают на Nexus. Картинки модов ModHub показывает
+ * оттуда же, по ссылке.
  *
  * Сохранения Subnautica хранит прямо в папке игры (SNAppData/SavedGames),
  * а не в профиле Windows, — их и копируют резервные копии ModHub.
@@ -33,9 +37,40 @@ module.exports = {
   thunderstoreCommunity: 'subnautica',
 
   catalog: {
-    kind: 'thunderstore',
-    community: 'subnautica',
-    browseUrl: 'https://thunderstore.io/c/subnautica/',
+    kind: 'nexus',
+    nexusDomain: 'subnautica',
+    nexusGameId: 1155,
+    browseUrl: 'https://www.nexusmods.com/subnautica/mods',
+  },
+
+  sections: pick('all', 'picks', 'buildings', 'vehicles', 'items', 'gameplay', 'visuals', 'ui', 'tools', 'packs'),
+  featured: {
+    // Номера модов на Nexus. Nautilus — библиотека, без которой не работает
+    // почти ничего, поэтому она первая и входит в каждый набор.
+    picks: [
+      '1262', // Nautilus
+      '2800', // Decorations Mod (Continued)
+      '1119', // Base Kits
+      '3143', // Composite Buildables (continued)
+      '2447', // Modularily Based
+      '3816', // Builder Module
+      '1180', // SleekBases
+      '142', // Slot Extender
+      '382', // CustomBatteries
+      '235', // Better Scanner Room
+      '314', // Fabrication Station
+      '365', // Seamoth Arms
+      '859', // Vehicle Framework
+      '1135', // More Seamoth Depth Modules
+      '722', // Tweaks and Fixes
+      '3419', // Inventory Stacking
+      '1104', // BepInEx Tweaks
+    ],
+    kits: [
+      { id: 'sn-builder', mods: ['1262', '2800', '1119', '3143', '2447', '1180'] },
+      { id: 'sn-vehicles', mods: ['1262', '142', '365', '859', '1135', '3816'] },
+      { id: 'sn-comfort', mods: ['1262', '722', '3419', '235', '382', '1104'] },
+    ],
   },
 
   modMarker: {

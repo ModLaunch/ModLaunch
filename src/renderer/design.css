@@ -3484,3 +3484,320 @@ button.crumb:hover {
   gap: 12px;
   font-size: 13.5px;
 }
+
+/* ================================================================== *
+ *  2.0 — каталог по разделам
+ * ================================================================== */
+
+.panel--catalog {
+  display: grid;
+  gap: var(--sp-4);
+}
+.cathead {
+  display: grid;
+  gap: var(--sp-3);
+  position: sticky;
+  top: calc(-1 * var(--sp-4));
+  z-index: 3;
+  padding: var(--sp-3) 0;
+  background: linear-gradient(var(--surface) 82%, transparent);
+}
+
+/* Вкладки разделов: пилюли в общей «капсуле», активная — цветом игры. */
+.secbar {
+  display: flex;
+  gap: 4px;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-2, rgba(255, 255, 255, 0.03));
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.secbar::-webkit-scrollbar {
+  display: none;
+}
+.secpill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: 0 0 auto;
+  height: 36px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 700;
+  font-size: 13.5px;
+  cursor: pointer;
+  transition: background 0.18s, color 0.18s;
+}
+.secpill svg {
+  width: 16px;
+  height: 16px;
+}
+.secpill:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.05);
+}
+.secpill.is-active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent-line);
+}
+
+/* Поиск по разделу — широкий, как главный элемент экрана. */
+.catsearch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 48px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-3);
+  background: var(--surface-2, rgba(255, 255, 255, 0.03));
+  transition: border-color 0.18s, box-shadow 0.18s;
+}
+.catsearch:focus-within {
+  border-color: var(--accent-line);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.catsearch svg {
+  width: 18px;
+  height: 18px;
+  color: var(--muted);
+  flex: 0 0 auto;
+}
+.catsearch input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+}
+
+.catbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+}
+.catbar__count {
+  margin-left: auto;
+  font-size: 13px;
+}
+
+/* Выпадашка «Сортировка: Популярные ⌄». */
+.dd {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 34px 0 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  background: var(--surface-2, rgba(255, 255, 255, 0.03));
+  font-size: 13.5px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.dd:hover {
+  border-color: var(--accent-line);
+}
+.dd select {
+  appearance: none;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  padding-right: 4px;
+}
+.dd select option {
+  background: var(--surface);
+  color: var(--text);
+}
+.dd > svg {
+  position: absolute;
+  right: 12px;
+  width: 14px;
+  height: 14px;
+  transform: rotate(90deg);
+  pointer-events: none;
+}
+.dd--plain {
+  padding-left: 12px;
+}
+
+/* Метки у строки мода. */
+.chip--src {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.chip--loader {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.chip--loader svg {
+  width: 12px;
+  height: 12px;
+}
+.chip--link {
+  border: 0;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.chip--link:hover {
+  color: var(--text);
+}
+.chip.is-have {
+  color: #8ff0b5;
+}
+.chip svg {
+  width: 12px;
+  height: 12px;
+}
+
+.catintro {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+.catintro svg {
+  width: 18px;
+  height: 18px;
+  color: var(--accent);
+  flex: 0 0 auto;
+}
+
+/* Готовые наборы модов. */
+.kits {
+  display: grid;
+  gap: var(--sp-3);
+}
+.kit {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-5);
+  padding: var(--sp-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-3);
+  background: var(--surface);
+}
+.kit:hover {
+  border-color: var(--accent-line);
+}
+.kit__pics {
+  display: grid;
+  grid-template-columns: repeat(2, 44px);
+  gap: 4px;
+}
+.kit__pic {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background-size: cover;
+  background-position: center;
+  background-color: var(--surface-3);
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 800;
+  color: #fff;
+}
+.kit__body h3 {
+  margin: 0 0 4px;
+  font-size: 17px;
+}
+.kit__body p {
+  margin: 0 0 8px;
+  font-size: 13.5px;
+}
+.kit__side {
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+}
+.panel--flat {
+  background: transparent;
+  box-shadow: none;
+}
+.panel__tail--start {
+  justify-content: flex-start;
+}
+
+@media (max-width: 900px) {
+  .kit {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .kit__side {
+    justify-items: start;
+  }
+}
+
+/* Разделы переносятся на вторую строку, а не прячутся за краем. */
+.secbar {
+  flex-wrap: wrap;
+  border-radius: var(--r-3);
+  overflow: visible;
+}
+
+/*
+ * Эргономика 2.0: в каталоге, профилях и сохранениях шапка игры
+ * сжимается в полосу — на экране остаётся место для самого дела.
+ */
+.page--game .ghero.ghero--compact {
+  min-height: 0;
+  aspect-ratio: auto;
+  max-height: none;
+  padding: var(--sp-4) var(--sp-5);
+  grid-template-columns: minmax(0, 1fr);
+}
+.ghero--compact .ghero__shots,
+.ghero--compact .ghero__path,
+.ghero--compact .ghero__time {
+  display: none;
+}
+.ghero--compact .ghero__body {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  justify-items: start;
+  gap: var(--sp-3) var(--sp-5);
+  width: 100%;
+  text-align: left;
+}
+.ghero--compact .ghero__title {
+  font-size: 26px;
+  margin: 0;
+}
+.ghero--compact .ghero__logo {
+  max-height: 48px;
+  max-width: 220px;
+}
+.ghero--compact .ghero__actions {
+  margin: 0;
+  justify-self: end;
+}
+.ghero--compact .btn--play {
+  height: 42px;
+}
