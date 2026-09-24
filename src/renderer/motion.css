@@ -1,0 +1,399 @@
+/*
+ * Анимации ModLaunch 3.0.
+ *
+ * Всё движение интерфейса, добавленное в 3.0, — здесь, одним файлом.
+ * Настройка «Анимации» действует и на него: «Выключены» гасит всё
+ * (правила :root[data-motion='off'] в design.css), «Спокойные» — ускоряет.
+ * Двигаются только transform и opacity: так анимации не тормозят окно.
+ */
+
+/* --- фон: медленно плывущие пятна света за содержимым ---------------- */
+
+.shell {
+  position: relative;
+}
+.shell::before,
+.shell::after {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  width: 520px;
+  height: 520px;
+  border-radius: 50%;
+  filter: blur(89px);
+  opacity: 0.16;
+  pointer-events: none;
+  animation: orb-drift 34s ease-in-out infinite alternate;
+}
+.shell::before {
+  top: -180px;
+  right: 8%;
+  background: var(--accent, #7c5cff);
+}
+.shell::after {
+  bottom: -220px;
+  left: 12%;
+  background: #2bb3c0;
+  animation-duration: 42s;
+  animation-direction: alternate-reverse;
+}
+.shell > * {
+  position: relative;
+  z-index: 1;
+}
+@keyframes orb-drift {
+  to {
+    transform: translate(-140px, 90px) scale(1.25);
+  }
+}
+:root[data-theme='light'] .shell::before,
+:root[data-theme='light'] .shell::after {
+  opacity: 0.08;
+}
+
+/* --- рельс ------------------------------------------------------------ */
+
+.rail__btn {
+  transition: background 0.18s, color 0.18s, border-color 0.18s, transform 0.28s var(--ease-spring);
+}
+.rail__btn:hover {
+  transform: translateY(-2px) scale(1.06);
+}
+.rail__btn:active {
+  transform: scale(0.94);
+}
+.rail__btn--home .rail__icon svg {
+  transition: transform 0.6s var(--ease-spring);
+}
+.rail__btn--home:hover .rail__icon svg {
+  transform: rotate(90deg);
+}
+.rail__btn--game {
+  animation: rail-pop 0.5s var(--ease-spring) both;
+}
+.rail__games > :nth-child(1) { animation-delay: 0.05s; }
+.rail__games > :nth-child(2) { animation-delay: 0.1s; }
+.rail__games > :nth-child(3) { animation-delay: 0.15s; }
+.rail__games > :nth-child(4) { animation-delay: 0.2s; }
+.rail__games > :nth-child(5) { animation-delay: 0.25s; }
+@keyframes rail-pop {
+  from {
+    opacity: 0;
+    transform: translateX(-10px) scale(0.85);
+  }
+}
+.rail__badge {
+  animation: badge-bump 0.5s var(--ease-spring) both, badge-glow 2.2s ease-out 0.5s infinite;
+}
+@keyframes badge-bump {
+  from {
+    transform: scale(0);
+  }
+}
+@keyframes badge-glow {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 95, 109, 0.55);
+  }
+  100% {
+    box-shadow: 0 0 0 8px transparent;
+  }
+}
+
+/* --- шапка ------------------------------------------------------------ */
+
+.brand__logo svg {
+  transition: transform 0.7s var(--ease-spring);
+}
+.brand:hover .brand__logo svg {
+  transform: rotate(180deg) scale(1.08);
+}
+.search {
+  transition: border-color 0.16s, box-shadow 0.25s, background 0.16s, transform 0.25s var(--ease);
+}
+.search:focus-within {
+  transform: translateY(-1px);
+}
+.dlt__btn.is-active .dlt__ring,
+.dlt__btn[data-active='true'] .dlt__ring {
+  animation: spin 2.4s linear infinite;
+}
+
+/* --- кнопки: блик при наведении и лёгкий подъём ----------------------- */
+
+.btn--primary,
+.getbtn {
+  position: relative;
+  overflow: hidden;
+}
+.btn--primary::after,
+.getbtn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: linear-gradient(100deg, transparent 35%, rgba(255, 255, 255, 0.28) 50%, transparent 65%);
+  transform: translateX(-120%);
+  pointer-events: none;
+}
+.btn--primary:hover::after,
+.getbtn:hover::after {
+  animation: btn-sheen 0.75s var(--ease) both;
+}
+@keyframes btn-sheen {
+  to {
+    transform: translateX(120%);
+  }
+}
+.btn,
+.getbtn {
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.25s, filter 0.15s, transform 0.22s var(--ease-spring);
+}
+.btn:hover,
+.getbtn:hover {
+  transform: translateY(-1px);
+}
+.btn:active,
+.getbtn:active {
+  transform: translateY(0) scale(0.96);
+}
+.btn--primary:hover,
+.getbtn:hover {
+  box-shadow: 0 8px 21px -8px var(--accent, #7c5cff);
+}
+
+/* --- плитки игр: наклон за мышью, приближение арта --------------------- */
+
+.gtile {
+  transform: perspective(700px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg)) translateY(var(--lift, 0));
+  transition: transform 0.35s var(--ease), box-shadow 0.35s var(--ease);
+  animation: tile-in 0.6s var(--ease) both;
+  will-change: transform;
+}
+.gtile:hover {
+  --lift: -4px;
+  box-shadow: 0 21px 34px -13px rgba(0, 0, 0, 0.65);
+}
+.gtile:hover .gtile__art {
+  transform: scale(1.08);
+}
+.gtiles > :nth-child(1) { animation-delay: 0.04s; }
+.gtiles > :nth-child(2) { animation-delay: 0.1s; }
+.gtiles > :nth-child(3) { animation-delay: 0.16s; }
+.gtiles > :nth-child(4) { animation-delay: 0.22s; }
+.gtiles > :nth-child(5) { animation-delay: 0.28s; }
+@keyframes tile-in {
+  from {
+    opacity: 0;
+    transform: perspective(700px) translateY(21px) scale(0.96);
+  }
+}
+.gtile::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(circle at var(--glare-x, 50%) var(--glare-y, 0%), rgba(255, 255, 255, 0.18), transparent 55%);
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+.gtile:hover::after {
+  opacity: 1;
+}
+
+/* --- витрина: медленное приближение кадра ------------------------------ */
+
+.spot__slide.is-active .spot__bg,
+.spot__slide.is-active .spot__backdrop {
+  animation: ken-burns 14s ease-out both;
+}
+@keyframes ken-burns {
+  from {
+    transform: scale(1.12);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+/* --- карточки и строки модов ------------------------------------------ */
+
+.mrow,
+.card,
+.kit,
+.arow,
+.qrow,
+.frow,
+.srank {
+  transition: transform 0.25s var(--ease), box-shadow 0.25s var(--ease), background 0.18s, border-color 0.18s;
+}
+.mrow:hover,
+.card:hover,
+.kit:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 13px 34px -18px rgba(0, 0, 0, 0.75);
+}
+.mrow .mrow__pic,
+.card .cover {
+  transition: transform 0.45s var(--ease);
+}
+.mrow:hover .mrow__pic {
+  transform: scale(1.06) rotate(-1.5deg);
+}
+.arow:hover,
+.qrow:hover,
+.frow:hover {
+  transform: translateX(3px);
+}
+.card--ghost,
+.skeleton-lines i {
+  background: linear-gradient(90deg, var(--surface-2) 25%, color-mix(in srgb, var(--surface-2) 55%, var(--surface-3, #2a2f3b)) 50%, var(--surface-2) 75%);
+  background-size: 300% 100%;
+  animation: skeleton 1.4s ease-in-out infinite;
+}
+@keyframes skeleton {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+
+/* --- переключатели разделов: активная вкладка «встаёт» ---------------- */
+
+.secpill.is-active,
+.catchip.is-active,
+.gtab.is-active,
+.seg__btn.is-active {
+  animation: tab-on 0.35s var(--ease-spring);
+}
+@keyframes tab-on {
+  from {
+    transform: scale(0.9);
+  }
+}
+.toggle i {
+  transition: transform 0.3s var(--ease-spring), background 0.2s;
+}
+
+/* --- панель справа: карточки выезжают лесенкой ------------------------- */
+
+.aside__inner > .acard {
+  animation: acard-in 0.45s var(--ease) both;
+}
+.aside__inner > .acard:nth-child(2) { animation-delay: 0.06s; }
+.aside__inner > .acard:nth-child(3) { animation-delay: 0.12s; }
+.aside__inner > .acard:nth-child(4) { animation-delay: 0.18s; }
+.aside__inner > .acard:nth-child(5) { animation-delay: 0.24s; }
+@keyframes acard-in {
+  from {
+    opacity: 0;
+    transform: translateX(13px);
+  }
+}
+
+/* --- друзья: «в игре» дышит ------------------------------------------ */
+
+.frow.is-playing .frow__dot {
+  animation: live 2s ease-out infinite;
+}
+.frow.is-online .frow__dot {
+  animation: live-soft 2.6s ease-out infinite;
+}
+@keyframes live {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 70%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 8px transparent;
+  }
+}
+@keyframes live-soft {
+  0% {
+    box-shadow: 0 0 0 0 rgba(70, 192, 138, 0.55);
+  }
+  100% {
+    box-shadow: 0 0 0 7px transparent;
+  }
+}
+
+/* --- всплывашки и окна ------------------------------------------------- */
+
+.toast {
+  animation: toast-spring 0.5s var(--ease-spring) both;
+}
+@keyframes toast-spring {
+  from {
+    opacity: 0;
+    transform: translateX(34px) scale(0.92);
+  }
+}
+.modal:not([hidden]) .modal__backdrop {
+  animation: backdrop-in 0.3s ease both;
+}
+.modal:not([hidden]) .modal__panel {
+  animation: modal-spring 0.45s var(--ease-spring) both;
+}
+@keyframes backdrop-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes modal-spring {
+  from {
+    opacity: 0;
+    transform: translateY(21px) scale(0.94);
+  }
+}
+
+/* --- пустые экраны и заставки ------------------------------------------ */
+
+.empty h3,
+.fhero__icon {
+  animation: float 5s ease-in-out infinite;
+}
+@keyframes float {
+  50% {
+    transform: translateY(-5px);
+  }
+}
+.kpi {
+  animation: kpi-in 0.6s var(--ease) both;
+}
+.kpis > :nth-child(2) { animation-delay: 0.07s; }
+.kpis > :nth-child(3) { animation-delay: 0.14s; }
+.kpis > :nth-child(4) { animation-delay: 0.21s; }
+@keyframes kpi-in {
+  from {
+    opacity: 0;
+    transform: translateY(21px) scale(0.96);
+  }
+}
+
+/* --- настройки -------------------------------------------------------- */
+
+.settings__tab {
+  transition: background 0.16s, color 0.16s, transform 0.25s var(--ease-spring);
+}
+.settings__tab:hover {
+  transform: translateX(3px);
+}
+.scard {
+  animation: acard-in 0.4s var(--ease) both;
+}
+
+/* --- шапка игры: арт чуть уезжает при прокрутке ------------------------ */
+
+.ghero__bg,
+.gbar__art {
+  transform: translateY(calc(var(--scroll, 0) * 0.25px)) scale(1.06);
+  transition: transform 0.1s linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell::before,
+  .shell::after {
+    animation: none;
+  }
+}

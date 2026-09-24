@@ -6,13 +6,13 @@ on:
   workflow_dispatch:
   push:
     branches: ['**']
-    paths: ['src/**', 'tools/selftest.js', '.github/workflows/selftest.yml']
+    paths: ['src/**', 'build/**', 'electron-builder.yml', 'tools/selftest.js', 'tools/installer-check.js', '.github/workflows/selftest.yml']
 permissions:
   contents: write
 jobs:
   windows:
     runs-on: windows-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -20,6 +20,11 @@ jobs:
           node-version: 22
       - run: npm ci
       - run: npx electron tools/selftest.js
+      - name: Установщик — собрать и поставить по-настоящему
+        if: always()
+        run: |
+          node build/build.js
+          node tools/installer-check.js
       - name: Снимки — в ветку ci-screens
         if: always()
         shell: bash

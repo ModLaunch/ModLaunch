@@ -7409,6 +7409,40 @@ $('#navDonate').addEventListener('click', () => go('donate'));
 $('#navFriends').addEventListener('click', () => openFriends());
 $('#navStats').addEventListener('click', () => openStats());
 
+/* --- живое движение (3.0): наклон плиток за мышью, параллакс шапки игры --- */
+(() => {
+  let tilted = null;
+  const reset = (node) => {
+    node?.style.removeProperty('--tilt-x');
+    node?.style.removeProperty('--tilt-y');
+  };
+  document.addEventListener('mousemove', (event) => {
+    const tile = pref('motion') === 'full' ? event.target.closest?.('.gtile') : null;
+    if (tilted && tilted !== tile) reset(tilted);
+    tilted = tile;
+    if (!tile) return;
+    const box = tile.getBoundingClientRect();
+    const x = (event.clientX - box.left) / box.width;
+    const y = (event.clientY - box.top) / box.height;
+    tile.style.setProperty('--tilt-y', `${((x - 0.5) * 10).toFixed(2)}deg`);
+    tile.style.setProperty('--tilt-x', `${((0.5 - y) * 8).toFixed(2)}deg`);
+    tile.style.setProperty('--glare-x', `${(x * 100).toFixed(1)}%`);
+    tile.style.setProperty('--glare-y', `${(y * 100).toFixed(1)}%`);
+  });
+  document.addEventListener('mouseleave', () => reset(tilted));
+
+  const main = $('#main');
+  let ticking = false;
+  main.addEventListener('scroll', () => {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(() => {
+      main.style.setProperty('--scroll', String(Math.min(400, main.scrollTop)));
+      ticking = false;
+    });
+  });
+})();
+
 /* --- своя рамка окна (3.0) --- */
 (async () => {
   if (!api.window) return;
