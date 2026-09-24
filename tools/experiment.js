@@ -61,20 +61,16 @@ async function nexusRevision(slug, domain) {
 }
 
 async function thunderstorePacks() {
-  console.log('=== Thunderstore: категории и сборки ===');
+  console.log('=== Thunderstore: популярные моды Valheim и RoR2 ===');
+  const H = { headers: { 'User-Agent': 'ModLaunch/experiment' } };
   for (const community of ['valheim', 'riskofrain2']) {
-    const filters = await (await fetch(`https://thunderstore.io/api/cyberstorm/community/${community}/filters/`, { headers: { 'User-Agent': 'ModLaunch/experiment' } })).json();
-    const cats = (filters.package_categories ?? []).map((c) => `${c.slug}=${c.id}`);
-    console.log(community, 'категории:', cats.join(' '));
-    const packs = (filters.package_categories ?? []).find((c) => /modpack/i.test(c.slug));
-    const top = await (await fetch(`https://thunderstore.io/api/cyberstorm/listing/${community}/?ordering=most-downloaded${packs ? `&included_categories=${packs.id}` : ''}`, { headers: { 'User-Agent': 'ModLaunch/experiment' } })).json();
-    console.log(community, 'сборки:', (top.results ?? []).slice(0, 4).map((p) => `${p.namespace}-${p.name}`).join(' '));
-    const all = await (await fetch(`https://thunderstore.io/api/cyberstorm/listing/${community}/?ordering=most-downloaded`, { headers: { 'User-Agent': 'ModLaunch/experiment' } })).json();
-    console.log(community, 'топ:', (all.results ?? []).slice(0, 12).map((p) => `${p.namespace}-${p.name}`).join(' '));
-    const pack = { valheim: 'denikson/BepInExPack_Valheim', riskofrain2: 'bbepis/BepInExPack' }[community];
-    const exp = await fetch(`https://thunderstore.io/api/experimental/package/${pack}/`, { headers: { 'User-Agent': 'ModLaunch/experiment' } });
-    const expJson = await exp.json().catch(() => null);
-    console.log(community, 'загрузчик', exp.status, expJson?.latest?.version_number, expJson?.latest?.download_url);
+    const filters = await (await fetch(`https://thunderstore.io/api/cyberstorm/community/${community}/filters/`, H)).json();
+    const skip = new Set((filters.package_categories ?? []).filter((c) => /librar|modpack|tools|ai-gen/.test(c.slug)).map((c) => c.name));
+    for (const page of [1, 2, 3]) {
+      const list = await (await fetch(`https://thunderstore.io/api/cyberstorm/listing/${community}/?ordering=most-downloaded&page=${page}`, H)).json();
+      const rows = (list.results ?? []).filter((p) => !(p.categories ?? []).some((c) => skip.has(c.name)));
+      console.log(community, page, rows.map((p) => `${p.namespace}-${p.name}[${(p.categories ?? []).map((c) => c.name).join('/')}]`).join('  '));
+    }
   }
 }
 
