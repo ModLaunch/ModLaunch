@@ -174,20 +174,16 @@ p {
   animation: none !important;
 }
 
-/* Экран входит мягко: чуть снизу, из лёгкой дымки. */
+/* Экран проявляется на месте — без сдвига снизу. */
 .is-entering {
-  animation: page-in-19 0.46s var(--ease) both;
+  animation: page-in-19 0.3s var(--ease) both;
 }
 @keyframes page-in-19 {
   from {
     opacity: 0;
-    transform: translateY(13px) scale(0.995);
-    filter: blur(3px);
   }
   to {
     opacity: 1;
-    transform: none;
-    filter: none;
   }
 }
 

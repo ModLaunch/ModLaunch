@@ -322,8 +322,9 @@
 .modal:not([hidden]) .modal__backdrop {
   animation: backdrop-in 0.3s ease both;
 }
+/* Окно проявляется на своём месте, в центре: без прыжка снизу. */
 .modal:not([hidden]) .modal__panel {
-  animation: modal-spring 0.45s var(--ease-spring) both;
+  animation: modal-spring 0.26s var(--ease) both;
 }
 @keyframes backdrop-in {
   from {
@@ -333,7 +334,7 @@
 @keyframes modal-spring {
   from {
     opacity: 0;
-    transform: translateY(21px) scale(0.94);
+    transform: scale(0.96);
   }
 }
 

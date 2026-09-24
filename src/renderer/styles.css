@@ -1610,7 +1610,6 @@ button.card__cta:active {
 @keyframes page-in {
   from {
     opacity: 0;
-    transform: translateY(12px);
   }
 }
 
@@ -1702,7 +1701,7 @@ button.card__cta:active {
 @keyframes modal-in {
   from {
     opacity: 0;
-    transform: translateY(14px) scale(0.97);
+    transform: scale(0.97);
   }
 }
 
