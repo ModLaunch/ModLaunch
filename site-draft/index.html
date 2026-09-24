@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ModLaunch — моды в один клик</title>
+    <meta name="description" content="ModLaunch — бесплатный лаунчер модов для Subnautica, Below Zero, Stardew Valley, Lethal Company и Hollow Knight. Установка в один клик, зависимости, шейдеры, друзья и оверлей в игре." />
+    <meta name="theme-color" content="#0b0c12" />
+    <meta property="og:title" content="ModLaunch — моды в один клик" />
+    <meta property="og:description" content="Бесплатный лаунчер модов для Subnautica, Stardew Valley, Lethal Company, Hollow Knight и Below Zero." />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="https://modlaunch.github.io/ModLaunch/img/home.webp" />
+    <link rel="icon" href="img/logo.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="style.css" />
+    <script>
+      // Обложки игр — из Steam. Нет картинки по одному адресу — пробуем следующий, в конце своя.
+      function nextArt(img) {
+        var id = img.dataset.steam, step = Number(img.dataset.step || 0) + 1;
+        var chain = [
+          'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/' + id + '/library_600x900.jpg',
+          'https://cdn.akamai.steamstatic.com/steam/apps/' + id + '/library_600x900.jpg',
+          img.dataset.local,
+        ];
+        img.dataset.step = step;
+        if (step <= chain.length) img.src = chain[step - 1];
+        else img.onerror = null;
+      }
+    </script>
+  </head>
+  <body>
+    <div class="bg" aria-hidden="true"><i></i><i></i><i></i></div>
+
+    <header class="nav" id="nav">
+      <div class="wrap nav__in">
+        <a class="brand" href="#top" aria-label="ModLaunch">
+          <img src="img/logo.svg" alt="" width="30" height="30" />
+          <span>Mod<b>Launch</b></span>
+        </a>
+        <nav class="nav__links">
+          <a href="#features" data-t="nav.features">Возможности</a>
+          <a href="#games" data-t="nav.games">Игры</a>
+          <a href="#screens" data-t="nav.screens">Скриншоты</a>
+          <a href="#faq" data-t="nav.faq">Вопросы</a>
+        </nav>
+        <div class="nav__end">
+          <button class="lang" id="lang" type="button" aria-label="Language">EN</button>
+          <a class="btn btn--sm btn--primary" href="#download" data-t="nav.download">Скачать</a>
+        </div>
+      </div>
+    </header>
+
+    <main id="top">
+      <!-- Первый экран -->
+      <section class="hero wrap">
+        <div class="hero__text">
+          <p class="chip reveal"><span class="chip__dot"></span><span data-t="hero.chip">Вышла версия</span> <b class="js-version">3.0</b></p>
+          <h1 class="reveal">
+            <span data-t="hero.title1">Моды</span>
+            <span class="grad" data-t="hero.title2">в один клик</span>
+          </h1>
+          <p class="lead reveal" data-t="hero.lead">
+            ModLaunch сам находит игры, ставит загрузчик модов, подтягивает зависимости и следит за обновлениями. Вы просто выбираете мод и играете.
+          </p>
+          <div class="hero__cta reveal" id="download">
+            <a class="btn btn--primary btn--lg js-setup" href="https://github.com/ModLaunch/ModLaunch/releases/latest">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19h14" /></svg>
+              <span><span data-t="hero.download">Скачать для Windows</span><small class="js-meta">Windows 10 / 11 · бесплатно</small></span>
+            </a>
+            <a class="btn btn--ghost btn--lg" href="https://github.com/ModLaunch/ModLaunch" target="_blank" rel="noopener">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 19c-4.3 1.4-4.3-2.5-6-3m12 5v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.2 4.2 0 0 0-.1-3.2s-1.1-.3-3.5 1.3a12.3 12.3 0 0 0-6.2 0C6.5 2.8 5.4 3.1 5.4 3.1a4.2 4.2 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21" /></svg>
+              <span data-t="hero.source">Исходный код</span>
+            </a>
+          </div>
+          <ul class="hero__facts reveal">
+            <li class="js-dl" hidden><b class="js-downloads" data-count="0">0</b><span data-t="hero.downloads">скачиваний</span></li>
+            <li><b>5</b><span data-t="hero.games">игр</span></li>
+            <li><b>0 ₽</b><span data-t="hero.free">навсегда</span></li>
+          </ul>
+        </div>
+
+        <div class="hero__shot reveal" id="tilt">
+          <div class="window">
+            <div class="window__bar"><i></i><i></i><i></i></div>
+            <img src="img/home.webp" alt="Главный экран ModLaunch" width="1366" height="768" />
+          </div>
+          <div class="float float--a">
+            <span class="float__ico">✓</span>
+            <span><b data-t="float.a1">Nautilus установлен</b><small data-t="float.a2">и BepInEx вместе с ним</small></span>
+          </div>
+          <div class="float float--b">
+            <span class="float__ico float__ico--up">↑</span>
+            <span><b data-t="float.b1">Обновление готово</b><small data-t="float.b2">3 мода · 1 клик</small></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Игры -->
+      <section class="games wrap" id="games">
+        <h2 class="reveal" data-t="games.title">Пять игр — один лаунчер</h2>
+        <div class="games__row">
+          <article class="game reveal">
+            <img src="https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/264710/library_600x900_2x.jpg" data-steam="264710" data-local="img/game-subnautica.svg" onerror="nextArt(this)" alt="Subnautica" loading="lazy" />
+            <div><h3>Subnautica</h3><p>BepInEx · Nexus Mods</p></div>
+          </article>
+          <article class="game reveal">
+            <img src="https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/848450/library_600x900_2x.jpg" data-steam="848450" data-local="img/game-subnautica-below-zero.svg" onerror="nextArt(this)" alt="Subnautica: Below Zero" loading="lazy" />
+            <div><h3>Subnautica: Below Zero</h3><p>BepInEx · Nexus Mods</p></div>
+          </article>
+          <article class="game reveal">
+            <img src="https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/413150/library_600x900_2x.jpg" data-steam="413150" data-local="img/game-stardew-valley.webp" onerror="nextArt(this)" alt="Stardew Valley" loading="lazy" />
+            <div><h3>Stardew Valley</h3><p>SMAPI · Nexus Mods</p></div>
+          </article>
+          <article class="game reveal">
+            <img src="https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1966720/library_600x900_2x.jpg" data-steam="1966720" data-local="img/game-lethal-company.webp" onerror="nextArt(this)" alt="Lethal Company" loading="lazy" />
+            <div><h3>Lethal Company</h3><p>BepInEx · Thunderstore</p></div>
+          </article>
+          <article class="game reveal">
+            <img src="https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/367520/library_600x900_2x.jpg" data-steam="367520" data-local="img/game-hollow-knight.webp" onerror="nextArt(this)" alt="Hollow Knight" loading="lazy" />
+            <div><h3>Hollow Knight</h3><p>Modding API · ModLinks</p></div>
+          </article>
+        </div>
+      </section>
+
+      <!-- Возможности -->
+      <section class="features wrap" id="features">
+        <h2 class="reveal" data-t="feat.title">Всё, что нужно для модов</h2>
+        <p class="sub reveal" data-t="feat.sub">Без ручного копирования файлов, распаковки архивов и поиска, почему игра не запускается.</p>
+        <div class="fgrid">
+          <article class="fcard fcard--wide reveal">
+            <div class="fcard__ico">
+              <svg viewBox="0 0 24 24"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19h14" /></svg>
+            </div>
+            <h3 data-t="feat.1t">Установка в один клик</h3>
+            <p data-t="feat.1p">Нажали «Установить» — ModLaunch сам поставит BepInEx, SMAPI или Modding API, скачает мод и положит его куда нужно.</p>
+          </article>
+          <article class="fcard reveal">
+            <div class="fcard__ico">
+              <svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5" /><circle cx="18" cy="6" r="2.5" /><circle cx="12" cy="18" r="2.5" /><path d="M7.5 8 11 15.8M16.5 8 13 15.8" /></svg>
+            </div>
+            <h3 data-t="feat.2t">Зависимости сами</h3>
+            <p data-t="feat.2p">Нужные библиотеки встанут вместе с модом. Чего не хватает — видно сразу.</p>
+          </article>
+          <article class="fcard reveal">
+            <div class="fcard__ico">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" /><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" /></svg>
+            </div>
+            <h3 data-t="feat.3t">Шейдеры и графика</h3>
+            <p data-t="feat.3p">ReShade и пресеты ставятся тем же одним нажатием.</p>
+          </article>
+          <article class="fcard reveal">
+            <div class="fcard__ico">
+              <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2" /><path d="M3 19c.6-3.3 3-5 6-5s5.4 1.7 6 5" /><circle cx="17.5" cy="9" r="2.4" /><path d="M16 14.2c2.6-.3 4.5 1.3 5 4.3" /></svg>
+            </div>
+            <h3 data-t="feat.4t">Друзья и оверлей</h3>
+            <p data-t="feat.4p">Видно, кто из друзей во что играет. В игре — Ctrl+Shift+M: таймер, заметки, копия сохранений.</p>
+          </article>
+          <article class="fcard reveal">
+            <div class="fcard__ico">
+              <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3" /><path d="M8 9h8M8 13h8M8 17h5" /></svg>
+            </div>
+            <h3 data-t="feat.5t">Профили и сохранения</h3>
+            <p data-t="feat.5p">Разные наборы модов для разных прохождений и копии сохранений перед экспериментами.</p>
+          </article>
+          <article class="fcard fcard--full reveal">
+            <div class="fcard__ico">
+              <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v4.5h-4.5" /></svg>
+            </div>
+            <h3 data-t="feat.6t">Всегда свежая версия</h3>
+            <p data-t="feat.6p">ModLaunch сам скачивает свои обновления, проверяет их контрольную сумму и ставит по одной кнопке. Моды тоже проверяются на новые версии.</p>
+          </article>
+        </div>
+      </section>
+
+      <!-- Скриншоты -->
+      <section class="screens wrap" id="screens">
+        <h2 class="reveal" data-t="screens.title">Как это выглядит</h2>
+        <div class="tabs reveal" role="tablist">
+          <button class="tab is-on" role="tab" data-shot="home" data-t="screens.home">Главная</button>
+          <button class="tab" role="tab" data-shot="catalog" data-t="screens.catalog">Каталог</button>
+          <button class="tab" role="tab" data-shot="mod" data-t="screens.mod">Страница мода</button>
+          <button class="tab" role="tab" data-shot="overlay" data-t="screens.overlay">Оверлей в игре</button>
+        </div>
+        <figure class="stage reveal">
+          <div class="window window--big">
+            <div class="window__bar"><i></i><i></i><i></i></div>
+            <img id="shot" src="img/home.webp" alt="" width="1366" height="768" />
+          </div>
+          <figcaption id="shotCap" data-t="cap.home">Все ваши игры, подборка модов и топ скачиваний — на одном экране.</figcaption>
+        </figure>
+      </section>
+
+      <!-- Три шага -->
+      <section class="steps wrap">
+        <h2 class="reveal" data-t="steps.title">Начать — минута</h2>
+        <ol class="steps__row">
+          <li class="reveal"><b>1</b><h3 data-t="steps.1t">Скачайте</h3><p data-t="steps.1p">Один файл, около 80 МБ.</p></li>
+          <li class="reveal"><b>2</b><h3 data-t="steps.2t">Установите</h3><p data-t="steps.2p">«Установить» — и ModLaunch на рабочем столе.</p></li>
+          <li class="reveal"><b>3</b><h3 data-t="steps.3t">Играйте с модами</h3><p data-t="steps.3p">Игры найдутся сами. Выберите мод и нажмите «Играть».</p></li>
+        </ol>
+      </section>
+
+      <!-- Вопросы -->
+      <section class="faq wrap" id="faq">
+        <h2 class="reveal" data-t="faq.title">Частые вопросы</h2>
+        <div class="faq__list">
+          <details class="reveal">
+            <summary data-t="faq.1q">Это бесплатно?</summary>
+            <p data-t="faq.1a">Да, полностью. Без подписок и платных функций.</p>
+          </details>
+          <details class="reveal">
+            <summary data-t="faq.2q">Windows пишет «неизвестный издатель». Это безопасно?</summary>
+            <p data-t="faq.2a">Так Windows пишет про любые программы без платной цифровой подписи. Нажмите «Подробнее» → «Выполнить в любом случае». Исходный код можно посмотреть на GitHub, а установщик собирается там же автоматически.</p>
+          </details>
+          <details class="reveal">
+            <summary data-t="faq.3q">Откуда берутся моды?</summary>
+            <p data-t="faq.3a">С тех же сайтов, где их выкладывают авторы: Nexus Mods, Thunderstore и ModLinks. ModLaunch ничего не перезаливает — он скачивает оригинал.</p>
+          </details>
+          <details class="reveal">
+            <summary data-t="faq.4q">Нужен ли аккаунт?</summary>
+            <p data-t="faq.4a">Нет. Аккаунт ModLaunch нужен только для друзей и отзывов — всё остальное работает без него.</p>
+          </details>
+          <details class="reveal">
+            <summary data-t="faq.5q">Моя игра не в списке</summary>
+            <p data-t="faq.5a">Напишите в разделе Issues на GitHub, какую игру добавить следующей.</p>
+          </details>
+        </div>
+      </section>
+
+      <!-- Финал -->
+      <section class="final wrap reveal">
+        <img src="img/logo.svg" alt="" width="64" height="64" />
+        <h2 data-t="final.title">Готовы попробовать?</h2>
+        <a class="btn btn--primary btn--lg js-setup" href="https://github.com/ModLaunch/ModLaunch/releases/latest">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19h14" /></svg>
+          <span><span data-t="hero.download">Скачать для Windows</span><small class="js-meta">Windows 10 / 11 · бесплатно</small></span>
+        </a>
+        <a class="final__zip js-zip" href="https://github.com/ModLaunch/ModLaunch/releases/latest" data-t="final.zip">Портативная версия (zip)</a>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <div class="wrap foot__in">
+        <span>© 2026 ModLaunch</span>
+        <a href="https://github.com/ModLaunch/ModLaunch" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/ModLaunch/ModLaunch/releases" target="_blank" rel="noopener" data-t="foot.releases">Все версии</a>
+        <a href="https://github.com/ModLaunch/ModLaunch/issues" target="_blank" rel="noopener" data-t="foot.issues">Сообщить об ошибке</a>
+        <span class="foot__note" data-t="foot.note">Subnautica, Stardew Valley, Lethal Company и Hollow Knight — товарные знаки их владельцев. ModLaunch — неофициальный проект.</span>
+      </div>
+    </footer>
+
+    <script src="main.js"></script>
+  </body>
+</html>

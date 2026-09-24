@@ -1,0 +1,53 @@
+# Снимки черновика сайта (папка site-draft/) в настоящем браузере с доступом
+# в интернет — чтобы увидеть сайт так, как его увидит посетитель, до выкладки.
+# Снимки — в ветке site-screens.
+name: site-preview
+on:
+  workflow_dispatch:
+  push:
+    branches: ['**']
+    paths: ['site-draft/**', '.github/workflows/site-preview.yml']
+permissions:
+  contents: write
+jobs:
+  shots:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm i --no-save --no-package-lock playwright@1.55.0 && npx playwright install --with-deps chromium
+      - name: Снимки
+        run: |
+          (cd site-draft && python3 -m http.server 8765 &) ; sleep 2
+          cat > shots.js <<'JS'
+          const { chromium } = require('playwright');
+          const fs = require('fs');
+          (async () => {
+            const b = await chromium.launch();
+            for (const [name, w, h, mobile] of [['desk', 1440, 900, false], ['phone', 390, 844, true]]) {
+              const p = await b.newPage({ viewport: { width: w, height: h }, isMobile: mobile, locale: 'ru-RU' });
+              await p.goto('http://localhost:8765/', { waitUntil: 'networkidle' });
+              const H = await p.evaluate(() => document.body.scrollHeight);
+              for (let y = 0; y < H; y += 400) { await p.evaluate((y) => scrollTo({ top: y, behavior: 'instant' }), y); await p.waitForTimeout(150); }
+              await p.evaluate(() => scrollTo({ top: 0, behavior: 'instant' }));
+              await p.waitForTimeout(2500);
+              await p.screenshot({ path: `out/${name}-top.png` });
+              await p.screenshot({ path: `out/${name}.png`, fullPage: true });
+              const art = await p.evaluate(() => [...document.querySelectorAll('.game img')].map((i) => i.currentSrc + ' ' + i.naturalWidth + 'x' + i.naturalHeight));
+              fs.writeFileSync(`out/${name}.json`, JSON.stringify(art, null, 1));
+            }
+            await b.close();
+          })();
+          JS
+          mkdir -p out && node shots.js
+      - name: В ветку site-screens
+        run: |
+          cd out
+          git init -q -b site-screens
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A && git commit -q -m "Снимки черновика сайта ${GITHUB_SHA::7}"
+          git push -q -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" site-screens
