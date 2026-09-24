@@ -46,7 +46,7 @@ module.exports = {
     content: ['Expansions', 'New Characters', 'Maps', 'Locations', 'Events', 'Dialogue'],
     gameplay: ['Gameplay Mechanics', 'Cheats', 'Fishing', 'Crops', 'Livestock and Animals', 'Crafting'],
     items: ['Items', 'Clothing'],
-    cosmetics: ['Characters', 'Portraits', 'Pets / Horses', 'Player'],
+    cosmetics: ['Characters', 'Portraits', 'Pets / Horses', 'Player', '!New Characters'],
     ui: ['User Interface'],
     tools: ['Modding Tools'],
     visuals: ['Visuals and Graphics'],

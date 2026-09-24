@@ -395,7 +395,7 @@ const STRINGS = {
     'games.play': 'Играть',
     'games.market': 'Каталог модов',
     'games.log': 'Лог',
-    'games.downloads': 'Загрузки',
+    'games.downloads': 'Установленные',
     'games.modsCount': 'Модов: {n}',
     'games.noWrite': 'Нет прав на запись — нужен перезапуск от имени администратора',
 
@@ -510,7 +510,7 @@ const STRINGS = {
     'nexus.browser.ok': 'Понятно',
     'nexus.hint.free': 'Бесплатный аккаунт Nexus: установка завершается одной кнопкой на их сайте.',
 
-    'inst.title': 'Загрузки',
+    'inst.title': 'Установленные моды',
     'inst.empty': 'Пока ничего не установлено',
     'inst.empty.text': 'Откройте «Рынок» — там каталог модов для этой игры.',
     'inst.fromFile': 'Из файла',
@@ -857,7 +857,7 @@ const STRINGS = {
     'cset.aside': 'Правая панель',
     'cset.aside.hint': 'Скрыть — больше места под каталог',
     'cset.hero': 'Компактная шапка игры',
-    'cset.hero.hint': 'В каталоге, профилях и сохранениях шапка сжимается в полосу — больше места для модов',
+    'cset.hero.hint': 'Шапка игры — узкой полосой: список модов видно сразу, без прокрутки',
     'cset.behavior': 'Поведение',
     'cset.gameTab': 'Вкладка игры по умолчанию',
     'cset.gameTab.hint': 'Что открывать, когда вы нажимаете на игру',
@@ -1248,7 +1248,7 @@ const STRINGS = {
     'games.play': 'Play',
     'games.market': 'Mod catalogue',
     'games.log': 'Log',
-    'games.downloads': 'Downloads',
+    'games.downloads': 'Installed',
     'games.modsCount': 'Mods: {n}',
     'games.noWrite': 'No write access — ModHub has to restart as administrator',
 
@@ -1364,7 +1364,7 @@ const STRINGS = {
     'nexus.browser.ok': 'Got it',
     'nexus.hint.free': 'Free Nexus account: the install finishes with one button on their site.',
 
-    'inst.title': 'Downloads',
+    'inst.title': 'Installed mods',
     'inst.empty': 'Nothing installed yet',
     'inst.empty.text': 'Open the Market — the mod catalogue for this game lives there.',
     'inst.fromFile': 'From file',
@@ -1711,7 +1711,7 @@ const STRINGS = {
     'cset.aside': 'Right panel',
     'cset.aside.hint': 'Hide it for more catalogue space',
     'cset.hero': 'Compact game header',
-    'cset.hero.hint': 'In the catalogue, profiles and saves the header shrinks to a strip — more room for mods',
+    'cset.hero.hint': 'The game header is a slim strip: the mod list is visible right away, no scrolling',
     'cset.behavior': 'Behaviour',
     'cset.gameTab': 'Default game tab',
     'cset.gameTab.hint': 'What opens when you click a game',

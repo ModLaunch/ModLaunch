@@ -201,10 +201,21 @@ const SORTS = {
  * @param {{page?: number, sort?: string, query?: string, hide?: string[], categories?: string[]}} options
  */
 async function browse(domain, options = {}) {
-  const categories = (options.categories ?? []).filter(Boolean).slice(0, 12);
-  if (!categories.length) return browsePlain(domain, options);
+  const all = (options.categories ?? []).filter(Boolean).slice(0, 12);
+  // «!Название» — исключить: EQUALS у Nexus ловит и категории, в чьих
+  // названиях есть искомое («Characters» находит и «New Characters»).
+  const include = all.filter((c) => !c.startsWith('!'));
+  const exclude = all.filter((c) => c.startsWith('!')).map((c) => c.slice(1));
+  if (!include.length) return browsePlain(domain, options);
   const one = (value) => ({ categoryName: [{ value, op: 'EQUALS' }] });
-  const section = categories.length === 1 ? one(categories[0]) : { filter: [{ op: 'OR', filter: categories.map(one) }] };
+  const section = include.length === 1 ? one(include[0]) : { filter: [{ op: 'OR', filter: include.map(one) }] };
+  if (exclude.length) {
+    section.filter = [...(section.filter ?? []), ...exclude.map((value) => ({ categoryName: [{ value, op: 'NOT_EQUALS' }] }))];
+    if (section.categoryName) {
+      section.filter.push({ categoryName: section.categoryName });
+      delete section.categoryName;
+    }
+  }
   return browsePlain(domain, options, section);
 }
 

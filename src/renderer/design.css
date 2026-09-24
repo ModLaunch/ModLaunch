@@ -3848,3 +3848,85 @@ button.crumb:hover {
   background: var(--accent);
   border-color: var(--accent);
 }
+
+/* 2.0.1 — шапка игры полосой. */
+.gbar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-5);
+  min-height: 96px;
+  padding: var(--sp-4) var(--sp-5);
+  border: 1px solid var(--line);
+  border-radius: var(--r-4);
+  overflow: hidden;
+  isolation: isolate;
+  color: #f4f2ff;
+  background: #0d0b16;
+}
+.gbar__bg {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-size: cover;
+  background-position: center 35%;
+}
+.gbar__bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(8, 7, 14, 0.92) 0%, rgba(8, 7, 14, 0.72) 45%, rgba(8, 7, 14, 0.35) 100%);
+}
+.gbar__title {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+.gbar__title h1 {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.1;
+}
+.gbar__logo {
+  max-height: 46px;
+  max-width: 240px;
+  object-fit: contain;
+  object-position: left center;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.6));
+}
+.gbar__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
+  margin: 0;
+  font-size: 13px;
+  color: #d8d3ee;
+}
+.gbar__meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.gbar__meta svg {
+  width: 13px;
+  height: 13px;
+  opacity: 0.85;
+}
+.gbar__path {
+  opacity: 0.8;
+  white-space: nowrap;
+}
+.gbar__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  flex: 0 0 auto;
+}
+@media (max-width: 760px) {
+  .gbar {
+    flex-wrap: wrap;
+  }
+}

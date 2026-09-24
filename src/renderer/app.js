@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Интерфейс ModHub 2.0.0.
+ * Интерфейс ModHub 2.0.1.
  *
  * Без сборщиков и фреймворков: обычный DOM, один файл на логику и один на
  * словарь. Для программы такого размера это осознанный выбор — нет шага
@@ -1806,12 +1806,9 @@ function gameAside(game) {
       <div><b>${enabled}</b><span>${esc(t('aside.stat.enabled'))}</span></div>
       <div class="${state.problems.length ? 'is-warn' : ''}"><b>${state.problems.length}</b><span>${esc(t('aside.stat.problems'))}</span></div>
     </div>`;
+  // Вкладки игры и так на виду — здесь только то, чего на них нет.
   const actions = [
-    ['tab', 'market', 'shop', t('games.market')],
     ['install-file', null, 'folder', t('inst.fromFile')],
-    ['tab', 'profiles', 'list', t('games.profiles')],
-    ['tab', 'saves', 'shield', t('games.saves')],
-    ['tab', 'log', 'warn', t('games.log')],
     ['rescan', null, 'refresh', t('games.detectAgain')],
   ]
     .map(
@@ -3975,7 +3972,8 @@ function renderGame() {
 
   return `
     <div class="page page--game" style="${accentStyle(game.accent)}">
-      <header class="ghero${gameLogo(game.id) ? ' has-logo' : ''}${state.gameTab !== 'downloads' && pref('compactHero') ? ' ghero--compact' : ''}">
+      ${pref('compactHero') ? gameBar(game) : `
+      <header class="ghero${gameLogo(game.id) ? ' has-logo' : ''}">
         <div class="ghero__bg" style="background-image:url('${esc(gameArt(game.id))}');animation-delay:${driftPhase()}"></div>
         <div class="ghero__body">
           ${
@@ -4009,7 +4007,7 @@ function renderGame() {
           </div>
         </div>
         ${gameShotsBlock(game.id)}
-      </header>
+      </header>`}
 
       ${game.writable ? '' : `<div class="warnbar">${icon('warn')}<span>${esc(t('games.noWrite'))}</span><button class="btn btn--sm btn--primary" data-action="elevate">${esc(t('error.elevate.btn'))}</button></div>`}
 
@@ -4027,6 +4025,39 @@ function renderGame() {
         <div class="layout__body">${body}</div>
       </div>
     </div>`;
+}
+
+/**
+ * Шапка игры полосой (2.0.1): арт игры фоном, название или логотип, одна
+ * строка состояния — загрузчик, игровое время, папка — и кнопки. Раньше
+ * шапка занимала треть окна, и список модов приходилось искать прокруткой.
+ */
+function gameBar(game) {
+  const logo = gameLogo(game.id);
+  const p = pref('trackPlaytime') ? state.playtime[game.id] : null;
+  const time = p?.running ? t('time.running') : p?.totalMs ? t('time.total', { time: formatDuration(p.totalMs) }) : '';
+  return `
+    <header class="gbar">
+      <div class="gbar__bg" style="background-image:url('${esc(gameArt(game.id))}')"></div>
+      <div class="gbar__title">
+        ${logo ? `<h1 class="sr-only">${esc(game.name)}</h1><img class="gbar__logo" src="${esc(logo)}" alt="${esc(game.name)}" referrerpolicy="no-referrer" />` : `<h1>${esc(game.name)}</h1>`}
+        <p class="gbar__meta">
+          <span><i class="dot dot--${game.loader.installed ? 'ok' : 'warn'}"></i>${esc(
+            game.loader.installed ? t('games.loaderReady', { loader: game.loader.name }) : t('games.loaderMissing', { loader: game.loader.name })
+          )}</span>
+          ${time ? `<span>${icon(p?.running ? 'play' : 'cup')}${esc(time)}</span>` : ''}
+          <span class="gbar__path" title="${esc(game.path)}">${icon('folder')}${esc(shortPath(game.path))}</span>
+        </p>
+      </div>
+      <div class="gbar__actions">
+        <button class="btn btn--glass btn--sm" data-action="open-folder" data-path="${esc(game.path)}" title="${esc(t('games.openFolder'))}">${icon('folder')}<span>${esc(t('games.openFolder'))}</span></button>
+        ${
+          game.loader.installed
+            ? `<button class="btn btn--play" data-action="play" data-game="${esc(game.id)}">${icon('play')}<span>${esc(t('games.play'))}</span></button>`
+            : `<button class="btn btn--play" data-action="install-loader" data-game="${esc(game.id)}">${icon('download')}<span>${esc(t('games.installLoader', { loader: game.loader.name }))}</span></button>`
+        }
+      </div>
+    </header>`;
 }
 
 /**

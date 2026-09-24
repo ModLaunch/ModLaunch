@@ -89,7 +89,9 @@ async function checkNexusGame(game) {
       const cats = [...new Set(r.mods.map((m) => m.categories[0]))].slice(0, 4).join(', ');
       // Раздел работает, если нашёл моды и их меньше, чем во всём каталоге,
       // а категории найденных — ровно те, что просили.
-      const inside = r.mods.every((m) => s.nexus.includes(m.categories[0]));
+      const include = s.nexus.filter((c) => !c.startsWith('!'));
+      const exclude = s.nexus.filter((c) => c.startsWith('!')).map((c) => c.slice(1));
+      const inside = r.mods.every((m) => include.includes(m.categories[0]) && !exclude.includes(m.categories[0]));
       report(r.total > 0 && r.total < all.total && inside, `${game.id}: раздел ${section.id}`, `${r.total} модов; категории: ${cats}; пример: ${r.mods.slice(0, 3).map((m) => m.name).join(' / ')}`);
     } catch (error) {
       report(false, `${game.id}: раздел ${section.id}`, error.message);
