@@ -456,7 +456,7 @@ h1 > span {
 }
 .games__row {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(7, 1fr);
   gap: 13px;
   margin-top: 34px;
 }
@@ -483,10 +483,8 @@ h1 > span {
   background: var(--surface);
 }
 .game h3 {
-  font-size: 16px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-size: 15px;
+  line-height: 1.25;
 }
 .game p {
   margin: 3px 0 0;
@@ -808,7 +806,7 @@ details p {
     padding-top: 34px;
   }
   .games__row {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
   }
   .fgrid,
   .steps__row {

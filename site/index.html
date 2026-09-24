@@ -4,10 +4,10 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>ModLaunch — моды в один клик</title>
-    <meta name="description" content="ModLaunch — бесплатный лаунчер модов для Subnautica, Below Zero, Stardew Valley, Lethal Company и Hollow Knight. Установка в один клик, зависимости, шейдеры, друзья и оверлей в игре." />
+    <meta name="description" content="ModLaunch — бесплатный лаунчер модов для Subnautica, Below Zero, Stardew Valley, Lethal Company, Hollow Knight, Valheim и Risk of Rain 2. Установка в один клик, зависимости, шейдеры, друзья и оверлей в игре." />
     <meta name="theme-color" content="#0b0c12" />
     <meta property="og:title" content="ModLaunch — моды в один клик" />
-    <meta property="og:description" content="Бесплатный лаунчер модов для Subnautica, Stardew Valley, Lethal Company, Hollow Knight и Below Zero." />
+    <meta property="og:description" content="Бесплатный лаунчер модов для Subnautica, Stardew Valley, Valheim, Lethal Company, Risk of Rain 2, Hollow Knight и Below Zero." />
     <meta property="og:type" content="website" />
     <meta property="og:image" content="https://modlaunch.github.io/ModLaunch/img/home.webp" />
     <link rel="icon" href="img/logo.svg" type="image/svg+xml" />
@@ -76,7 +76,7 @@
           </div>
           <ul class="hero__facts reveal">
             <li class="js-dl" hidden><b class="js-downloads" data-count="0">0</b><span data-t="hero.downloads">скачиваний</span></li>
-            <li><b>5</b><span data-t="hero.games">игр</span></li>
+            <li><b>7</b><span data-t="hero.games">игр</span></li>
             <li><b>0 ₽</b><span data-t="hero.free">навсегда</span></li>
           </ul>
         </div>
@@ -99,7 +99,7 @@
 
       <!-- Игры -->
       <section class="games wrap" id="games">
-        <h2 class="reveal" data-t="games.title">Пять игр — один лаунчер</h2>
+        <h2 class="reveal" data-t="games.title">Семь игр — один лаунчер</h2>
         <div class="games__row">
           <article class="game reveal">
             <img src="https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/264710/library_600x900_2x.jpg" data-steam="264710" data-local="img/game-subnautica.svg" onerror="nextArt(this)" alt="Subnautica" loading="lazy" />
@@ -120,6 +120,14 @@
           <article class="game reveal">
             <img src="https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/367520/library_600x900_2x.jpg" data-steam="367520" data-local="img/game-hollow-knight.webp" onerror="nextArt(this)" alt="Hollow Knight" loading="lazy" />
             <div><h3>Hollow Knight</h3><p>Modding API · ModLinks</p></div>
+          </article>
+          <article class="game reveal">
+            <img src="https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/892970/library_600x900_2x.jpg" data-steam="892970" data-local="img/game-valheim.webp" onerror="nextArt(this)" alt="Valheim" loading="lazy" />
+            <div><h3>Valheim</h3><p>BepInEx · Thunderstore</p></div>
+          </article>
+          <article class="game reveal">
+            <img src="https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/632360/library_600x900_2x.jpg" data-steam="632360" data-local="img/game-risk-of-rain-2.webp" onerror="nextArt(this)" alt="Risk of Rain 2" loading="lazy" />
+            <div><h3>Risk of Rain 2</h3><p>BepInEx · Thunderstore</p></div>
           </article>
         </div>
       </section>
@@ -164,7 +172,21 @@
             <h3 data-t="feat.5t">Профили и сохранения</h3>
             <p data-t="feat.5p">Разные наборы модов для разных прохождений и копии сохранений перед экспериментами.</p>
           </article>
-          <article class="fcard fcard--full reveal">
+          <article class="fcard reveal">
+            <div class="fcard__ico">
+              <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="5" rx="1.5" /><rect x="3" y="11" width="18" height="5" rx="1.5" /><path d="M7 20h10" /></svg>
+            </div>
+            <h3 data-t="feat.7t">Коллекции и сборки</h3>
+            <p data-t="feat.7p">Коллекции Nexus и сборки Thunderstore ставятся целиком — ровно в тех версиях, что выбрал автор.</p>
+          </article>
+          <article class="fcard reveal">
+            <div class="fcard__ico">
+              <svg viewBox="0 0 24 24"><path d="M4 17 9 7l4 7 3-4 4 7z" /><circle cx="17" cy="6" r="2" /></svg>
+            </div>
+            <h3 data-t="feat.8t">DXVK для старых игр</h3>
+            <p data-t="feat.8p">Выберите exe любой старой игры — ModLaunch поставит DXVK, чтобы убрать фризы. Убирается одной кнопкой.</p>
+          </article>
+          <article class="fcard reveal">
             <div class="fcard__ico">
               <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v4.5h-4.5" /></svg>
             </div>

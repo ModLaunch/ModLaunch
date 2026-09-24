@@ -186,8 +186,11 @@ async function tour() {
     const files = fs.readdirSync(OLD);
     check('DXVK: скачан с GitHub и поставлен', put?.ok && ['d3d11.dll', 'dxgi.dll', 'd3d10core.dll', 'dxvk.modlaunch.json'].every((f) => files.includes(f)), put?.ok ? `${put.data.version}: ${files.join(', ')}` : put?.error);
     check('DXVK: своя DLL игры сохранена', files.includes('dxgi.dll.modlaunch-backup'));
-    await js(`state.settingsTab = 'graphics'; go('settings')`);
-    await shot('11-dxvk', 1500);
+    // После закрытия игры программа сама возвращается на главную — ждём этого и уходим в «Графику».
+    await delay(2000);
+    await js(`state.settingsTab = 'graphics'; state.dxvkGames = null; go('settings')`);
+    await waitFor(() => js(`Boolean(document.querySelector('.dxvk__row'))`), 8000);
+    await shot('11-dxvk', 1200);
     const off = await js(`window.modhub.dxvk.remove(${JSON.stringify(oldExe)})`);
     const left = fs.readdirSync(OLD).sort();
     check('DXVK: убран, всё как было', off?.ok && left.join(',') === 'dxgi.dll,oldgame.exe' && fs.readFileSync(path.join(OLD, 'dxgi.dll'), 'utf8') === 'own dll of the game', left.join(', '));

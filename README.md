@@ -27,6 +27,8 @@ ModLaunch finds your game, installs the mod loader and downloads mods together w
 | Lethal Company | BepInEx | Thunderstore |
 | Subnautica | BepInEx | Thunderstore, Nexus Mods |
 | Subnautica: Below Zero | BepInEx | Thunderstore, Nexus Mods |
+| Valheim | BepInEx | Thunderstore |
+| Risk of Rain 2 | BepInEx | Thunderstore |
 
 Steam, Epic, GOG and standalone copies are found automatically. If a game isn't found, point ModLaunch to its folder once.
 
@@ -54,6 +56,8 @@ You only need to do this once. Updates are installed by ModLaunch itself.
 - **Mod management:** turn mods on and off without deleting them, check for mod updates, mod profiles and modpacks you can share as a file.
 - **Save backups** before every game launch.
 - **Shaders:** ReShade is installed for you, presets go straight into the game folder.
+- **Nexus collections and Thunderstore modpacks** install as a whole, in exactly the versions the author picked. With Nexus Premium it's fully automatic; without it ModLaunch opens each mod page in turn and installs what you download.
+- **DXVK for any older game** (Settings → Graphics): pick the game's exe, ModLaunch detects 32/64-bit and the DirectX version, installs the latest DXVK and removes it with one click, restoring the original files.
 - **Friends:** add friends by code and see who is online and what they're playing.
 - **In-game overlay** (Ctrl+Shift+M): session time, friends, save backup and notes for the game.
 - **Reviews and ratings** for mods, shared between all ModLaunch users.
