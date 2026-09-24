@@ -1,64 +1,102 @@
 'use strict';
 
-/** Разовые опыты с фильтрами Nexus и Thunderstore: какой формат понимает сайт. */
+/** Разовые опыты на живых сайтах (2.1): ReShade, SMAPI, требования Nexus. */
 
-async function gql(filter) {
-  const r = await fetch('https://api.nexusmods.com/v2/graphql', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      query: 'query($filter: ModsFilter){ mods(filter: $filter, count: 3, sort: [{ downloads: { direction: DESC } }]) { totalCount nodes { name modCategory { name } } } }',
-      variables: { filter },
-    }),
-  });
-  const j = await r.json();
-  if (j.errors) return 'ERR ' + JSON.stringify(j.errors).slice(0, 200);
-  return `${j.data.mods.totalCount} :: ${j.data.mods.nodes.map((n) => `${n.name} [${n.modCategory?.name}]`).join(' | ')}`;
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+
+async function text(url, opts) {
+  const r = await fetch(url, opts);
+  return { status: r.status, body: await r.text() };
 }
 
-const base = { gameDomainName: [{ value: 'subnautica', op: 'EQUALS' }], adultContent: [{ value: false, op: 'EQUALS' }] };
-const cat = (value, op = 'EQUALS') => ({ categoryName: [{ value, op }] });
+async function reshade() {
+  console.log('=== ReShade ===');
+  const page = await text('https://reshade.me/');
+  console.log('reshade.me', page.status, page.body.length);
+  const links = [...page.body.matchAll(/href="([^"]*ReShade_Setup[^"]*\.exe)"/g)].map((m) => m[1]);
+  console.log('links:', links);
+  const link = links.find((l) => !/addon/i.test(l)) ?? links[0];
+  if (!link) return;
+  const url = new URL(link, 'https://reshade.me/').href;
+  const r = await fetch(url);
+  const buf = Buffer.from(await r.arrayBuffer());
+  console.log('setup', url, r.status, buf.length);
+  const file = path.join(os.tmpdir(), 'rs.exe');
+  fs.writeFileSync(file, buf);
+  const AdmZip = require('adm-zip');
+  try {
+    const zip = new AdmZip(file);
+    console.log('zip entries:', zip.getEntries().map((e) => `${e.entryName} ${e.header.size}`).join(' | '));
+  } catch (e) {
+    console.log('AdmZip failed:', e.message);
+    // Ищем начало zip вручную.
+    const sig = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
+    let at = buf.indexOf(sig);
+    const found = [];
+    while (at !== -1 && found.length < 5) {
+      found.push(at);
+      at = buf.indexOf(sig, at + 1);
+    }
+    console.log('local headers at', found, 'eocd at', buf.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06])));
+    const start = found[0];
+    if (start > 0) {
+      try {
+        const zip = new AdmZip(buf.subarray(start));
+        console.log('zip from offset entries:', zip.getEntries().map((e) => `${e.entryName} ${e.header.size}`).join(' | '));
+      } catch (e2) {
+        console.log('offset zip failed:', e2.message);
+      }
+    }
+  }
+  const list = await text('https://raw.githubusercontent.com/crosire/reshade-shaders/list/EffectPackages.ini');
+  console.log('EffectPackages.ini', list.status, '\n' + list.body.slice(0, 2500));
+}
 
-const tests = {
-  'cat EQUALS Buildables': { ...base, ...cat('Buildables') },
-  'cat WILDCARD Buildables': { ...base, ...cat('Buildables', 'WILDCARD') },
-  'cat WILDCARD Build*': { ...base, ...cat('Build*', 'WILDCARD') },
-  'cat WILDCARD *uild*': { ...base, ...cat('*uild*', 'WILDCARD') },
-  'cat MATCHES build': { ...base, ...cat('build', 'MATCHES') },
-  'cat 2 values EQUALS': { ...base, categoryName: [{ value: 'Buildables', op: 'EQUALS' }, { value: 'Items', op: 'EQUALS' }] },
-  'nested OR': { ...base, filter: [{ op: 'OR', filter: [cat('Buildables'), cat('Items')] }] },
-  'root op OR (only cats)': { op: 'OR', filter: [cat('Buildables'), cat('Items')], ...base },
-  'name WILDCARD decor': { ...base, name: [{ value: 'decor', op: 'WILDCARD' }] },
-  'name WILDCARD *decor*': { ...base, name: [{ value: '*decor*', op: 'WILDCARD' }] },
-  'name WILDCARD Decor*': { ...base, name: [{ value: 'Decor*', op: 'WILDCARD' }] },
-  'nameStemmed MATCHES decoration': { ...base, nameStemmed: [{ value: 'decoration', op: 'MATCHES' }] },
-  'cat Buildables + name WILDCARD *base*': { ...base, ...cat('Buildables'), name: [{ value: '*base*', op: 'WILDCARD' }] },
-  'cat Buildables + nameStemmed base': { ...base, ...cat('Buildables'), nameStemmed: [{ value: 'base', op: 'MATCHES' }] },
-};
+async function smapi() {
+  console.log('\n=== SMAPI API ===');
+  const body = {
+    mods: [
+      { id: 'Pathoschild.ContentPatcher', updateKeys: [] },
+      { id: 'spacechase0.GenericModConfigMenu', updateKeys: [] },
+      { id: 'FlashShifter.StardewValleyExpandedCP', updateKeys: [] },
+    ],
+    apiVersion: '4.0.0',
+    gameVersion: '1.6.14',
+    platform: 'Windows',
+    includeExtendedMetadata: true,
+  };
+  const r = await fetch('https://smapi.io/api/v3.0/mods', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'User-Agent': 'ModHub/2.1 (probe)' },
+    body: JSON.stringify(body),
+  });
+  const t = await r.text();
+  console.log(r.status, t.slice(0, 3000));
+}
 
-async function ts(query) {
-  const r = await fetch(`https://thunderstore.io/api/cyberstorm/listing/lethal-company/?${query}`);
-  if (!r.ok) return `HTTP ${r.status}`;
-  const j = await r.json();
-  return `${j.count} :: ${(j.results ?? []).slice(0, 3).map((p) => `${p.name} [${(p.categories ?? []).map((c) => c.name ?? c).join(',')}]`).join(' | ')}`;
+async function nexusReq() {
+  console.log('\n=== Nexus requirements ===');
+  for (const [gid, mid] of [[1155, 2800], [1155, 1119], [1303, 3753], [1303, 1063], [2706, 44]]) {
+    const r = await fetch('https://api.nexusmods.com/v2/graphql', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query: `query { mod(modId: ${mid}, gameId: ${gid}) { name modRequirements { nexusRequirements { nodes { modId modName url gameId externalRequirement notes } } dlcRequirements { nodes { gameExpansion { name } } } } } }`,
+      }),
+    });
+    const j = await r.json();
+    console.log(gid, mid, JSON.stringify(j).slice(0, 900));
+  }
 }
 
 (async () => {
-  console.log('=== Nexus ===');
-  for (const [name, filter] of Object.entries(tests)) console.log(name.padEnd(40), await gql(filter).catch((e) => 'EXC ' + e.message));
-  console.log('\n=== Thunderstore ===');
-  for (const q of [
-    'page=1',
-    'page=1&included_categories=cosmetics',
-    'page=1&included_categories=692',
-    'page=1&included_categories=659',
-    'page=1&included_categories[]=692',
-    'page=1&included_categories=692&included_categories=686',
-    'page=1&section=modpacks',
-    'page=1&q=suit&included_categories=692',
-  ]) console.log(q.padEnd(56), await ts(q).catch((e) => 'EXC ' + e.message));
-  const f = await (await fetch('https://thunderstore.io/api/cyberstorm/community/lethal-company/filters/')).json();
-  console.log('\nsections:', JSON.stringify(f.sections));
-  const f2 = await (await fetch('https://thunderstore.io/api/cyberstorm/community/subnautica/filters/').catch(() => null))?.json?.().catch(() => null);
-  console.log('subnautica filters:', JSON.stringify(f2).slice(0, 600));
+  for (const f of [reshade, smapi, nexusReq]) {
+    try {
+      await f();
+    } catch (e) {
+      console.log(f.name, 'EXC', e.stack);
+    }
+  }
 })();

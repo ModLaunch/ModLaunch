@@ -15,4 +15,6 @@ jobs:
         with:
           node-version: 22
       - run: npm ci --omit=dev --ignore-scripts
+      - run: node tools/experiment.js
+        continue-on-error: true
       - run: node tools/probe.js
