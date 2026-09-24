@@ -1,0 +1,201 @@
+'use strict';
+
+/**
+ * Проверка ModHub на живых сайтах (2.0.1).
+ *
+ * Запускается на серверах GitHub (.github/workflows/check.yml): там есть
+ * интернет, а у разработчика его может не быть. Проверяет то, что нельзя
+ * проверить без сети:
+ *
+ *   1. Nexus Mods: какие фильтры понимает GraphQL (схема), что находит каждый
+ *      раздел каталога, открываются ли моды из «Нужных» и наборов.
+ *   2. Thunderstore: категории сообщества, фильтр разделов, «Нужные».
+ *   3. ModLinks (Hollow Knight): разделы по тегам.
+ *   4. Настоящая установка: BepInEx для Subnautica в пустую «папку игры»
+ *      и мод Lethal Company с зависимостями из Thunderstore.
+ *
+ * Ничего не падает молча: каждая проверка пишет PASS или FAIL, в конце —
+ * итог и код выхода.
+ */
+
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+
+const games = require('../src/main/games');
+const { sectionOf } = require('../src/main/games/sections');
+const nexus = require('../src/main/core/sources/nexus');
+const thunderstore = require('../src/main/core/sources/thunderstore');
+const modlinks = require('../src/main/core/sources/modlinks');
+
+const results = [];
+function report(ok, name, detail = '') {
+  results.push({ ok, name });
+  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? `  —  ${detail}` : ''}`);
+}
+
+async function nexusRaw(query, variables = {}) {
+  const response = await fetch('https://api.nexusmods.com/v2/graphql', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ query, variables }),
+  });
+  return response.json();
+}
+
+async function schema() {
+  console.log('\n=== Nexus GraphQL: схема фильтров ===');
+  const json = await nexusRaw(`{
+    filter: __type(name: "ModsFilter") { inputFields { name type { name kind ofType { name kind ofType { name } } } } }
+    ops: __type(name: "FilterComparisonOperator") { enumValues { name } }
+    query: __type(name: "Query") { fields { name args { name } } }
+  }`);
+  if (json.errors) console.log('errors:', JSON.stringify(json.errors).slice(0, 500));
+  console.log('ModsFilter:', (json.data?.filter?.inputFields ?? []).map((f) => f.name).join(', '));
+  console.log('Operators:', (json.data?.ops?.enumValues ?? []).map((v) => v.name).join(', '));
+  console.log('Query:', (json.data?.query?.fields ?? []).map((f) => `${f.name}(${f.args.map((a) => a.name).join(',')})`).join(' '));
+}
+
+async function nexusCategories(domain, gameId) {
+  // Имена категорий игры — по первым 400 самым скачиваемым модам.
+  const counts = new Map();
+  for (let offset = 0; offset < 400; offset += 100) {
+    const json = await nexusRaw(
+      `query($filter: ModsFilter, $count: Int, $offset: Int) { mods(filter: $filter, count: $count, offset: $offset, sort: [{ downloads: { direction: DESC } }]) { nodes { modCategory { name categoryId } } } }`,
+      { filter: { gameDomainName: [{ value: domain, op: 'EQUALS' }] }, count: 100, offset }
+    );
+    if (json.errors) {
+      console.log('categories error:', JSON.stringify(json.errors).slice(0, 300));
+      break;
+    }
+    for (const node of json.data?.mods?.nodes ?? []) {
+      const key = `${node.modCategory?.name} #${node.modCategory?.categoryId}`;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+  }
+  console.log(`Категории ${domain}:`, [...counts].sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k}=${n}`).join(' | '));
+}
+
+async function checkNexusGame(game) {
+  console.log(`\n=== ${game.name} (Nexus: ${game.catalog.nexusDomain}) ===`);
+  await nexusCategories(game.catalog.nexusDomain, game.catalog.nexusGameId);
+  const all = await nexus.browse(game.catalog.nexusDomain, { page: 1 });
+  const allIds = new Set(all.mods.map((m) => m.id));
+  report(all.total > 0, `${game.id}: весь каталог`, `${all.total} модов`);
+  for (const section of game.sections) {
+    if (section.special || section.id === 'all') continue;
+    const s = sectionOf(game, section.id);
+    try {
+      const r = await nexus.browse(game.catalog.nexusDomain, { page: 1, categories: s.nexus, keywords: s.keywords });
+      const same = r.mods.length && r.mods.every((m) => allIds.has(m.id)) && r.total === all.total;
+      const cats = [...new Set(r.mods.map((m) => m.categories[0]))].slice(0, 4).join(', ');
+      report(r.total > 0 && !same, `${game.id}: раздел ${section.id}`, `${r.total} модов; категории: ${cats}; пример: ${r.mods.slice(0, 3).map((m) => m.name).join(' / ')}`);
+    } catch (error) {
+      report(false, `${game.id}: раздел ${section.id}`, error.message);
+    }
+  }
+  await checkPicks(game, async (id) => (await nexus.getDetails(game.catalog.nexusDomain, game.catalog.nexusGameId, id))?.mod);
+}
+
+async function checkPicks(game, lookup) {
+  const ids = [...new Set([...(game.featured?.picks ?? []), ...(game.featured?.kits ?? []).flatMap((k) => k.mods)])];
+  for (const id of ids) {
+    try {
+      const mod = await lookup(id);
+      report(Boolean(mod), `${game.id}: нужный мод ${id}`, mod ? `${mod.name}${mod.icon ? ' [есть картинка]' : ' [без картинки]'}` : 'не найден');
+    } catch (error) {
+      report(false, `${game.id}: нужный мод ${id}`, error.message);
+    }
+  }
+}
+
+async function checkThunderstore(game) {
+  console.log(`\n=== ${game.name} (Thunderstore: ${game.catalog.community}) ===`);
+  try {
+    const filters = await (await fetch(`https://thunderstore.io/api/cyberstorm/community/${game.catalog.community}/filters/`)).json();
+    console.log('filters:', JSON.stringify(filters).slice(0, 1500));
+  } catch (error) {
+    console.log('filters error', error.message);
+  }
+  const all = await thunderstore.search(game.catalog.community, '', { page: 1 });
+  report(all.total > 0, `${game.id}: весь каталог`, `${all.total}`);
+  for (const section of game.sections) {
+    if (section.special || section.id === 'all') continue;
+    const s = sectionOf(game, section.id);
+    try {
+      const r = await thunderstore.search(game.catalog.community, '', { page: 1, categories: s.thunderstore });
+      const cats = [...new Set(r.mods.flatMap((m) => m.categories))].slice(0, 6).join(', ');
+      report(r.mods.length > 0 && r.total < all.total, `${game.id}: раздел ${section.id}`, `${r.total}; категории: ${cats}; пример: ${r.mods.slice(0, 3).map((m) => m.name).join(' / ')}`);
+    } catch (error) {
+      report(false, `${game.id}: раздел ${section.id}`, error.message);
+    }
+  }
+  await checkPicks(game, (id) => thunderstore.getById(game.catalog.community, id));
+}
+
+async function checkModlinks(game) {
+  console.log(`\n=== ${game.name} (ModLinks) ===`);
+  const all = await modlinks.search('', {});
+  report(all.length > 0, `${game.id}: весь каталог`, `${all.length}`);
+  for (const section of game.sections) {
+    if (section.special || section.id === 'all') continue;
+    const s = sectionOf(game, section.id);
+    const r = await modlinks.search('', { categories: s.modlinks });
+    report(r.length > 0 && r.length < all.length, `${game.id}: раздел ${section.id}`, `${r.length}`);
+  }
+  await checkPicks(game, (id) => modlinks.getById(id));
+}
+
+async function checkInstall() {
+  console.log('\n=== Настоящая установка ===');
+  const bepinex = require('../src/main/core/loaders/bepinex');
+  const install = require('../src/main/core/install');
+  const { ModRegistry } = require('../src/main/core/registry');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'modhub-probe-'));
+
+  for (const id of ['subnautica', 'subnautica-below-zero', 'lethal-company']) {
+    const game = games.byId(id);
+    const dir = path.join(root, id);
+    fs.mkdirSync(path.join(dir, id === 'lethal-company' ? 'Lethal Company_Data' : id === 'subnautica' ? 'Subnautica_Data' : 'SubnauticaZero_Data'), { recursive: true });
+    try {
+      await bepinex.install({ ...game, path: dir }, () => {});
+      const state = bepinex.detect(dir);
+      report(fs.existsSync(path.join(dir, 'BepInEx', 'core')) && fs.existsSync(path.join(dir, 'winhttp.dll')), `${id}: BepInEx ставится`, JSON.stringify(state));
+    } catch (error) {
+      report(false, `${id}: BepInEx ставится`, error.message);
+    }
+  }
+
+  // Мод с зависимостями — весь путь установки, как у кнопки «Установить».
+  const game = games.byId('lethal-company');
+  const dir = path.join(root, 'lethal-company');
+  const state = { path: dir, modsDir: game.modsDir(dir), found: true };
+  const registry = new ModRegistry(path.join(root, 'data'), game.id, { modsDir: state.modsDir, storageDir: path.join(dir, 'ModHub') });
+  try {
+    const mod = await thunderstore.getById('lethal-company', 'notnotnotswipez-MoreCompany');
+    const result = await install.installFromCatalog({ game, state, registry }, mod, () => {});
+    const files = fs.readdirSync(state.modsDir);
+    report(result.installed.length > 0 && files.length > 0, 'lethal-company: MoreCompany ставится', `поставлено: ${result.installed.map((r) => r.name).join(', ')}; в plugins: ${files.join(', ')}`);
+  } catch (error) {
+    report(false, 'lethal-company: MoreCompany ставится', error.message);
+  }
+}
+
+(async () => {
+  await schema().catch((e) => console.log('schema error', e.message));
+  for (const game of games.all()) {
+    try {
+      if (game.catalog.kind === 'nexus') await checkNexusGame(game);
+      else if (game.catalog.kind === 'thunderstore') await checkThunderstore(game);
+      else if (game.catalog.kind === 'modlinks') await checkModlinks(game);
+    } catch (error) {
+      report(false, `${game.id}: проверка упала`, error.stack);
+    }
+  }
+  await checkInstall().catch((e) => report(false, 'установка упала', e.stack));
+
+  const failed = results.filter((r) => !r.ok);
+  console.log(`\nИтого: ${results.length - failed.length} PASS, ${failed.length} FAIL`);
+  for (const f of failed) console.log(`  FAIL ${f.name}`);
+  process.exitCode = failed.length ? 1 : 0;
+})();

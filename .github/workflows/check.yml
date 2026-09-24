@@ -1,0 +1,18 @@
+# Проверка на живых сайтах: каталоги, разделы, «Нужные моды», установка.
+name: check
+on:
+  workflow_dispatch:
+  push:
+    branches: ['**']
+    paths: ['src/**', 'tools/**', '.github/workflows/check.yml']
+jobs:
+  probe:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --omit=dev --ignore-scripts
+      - run: node tools/probe.js

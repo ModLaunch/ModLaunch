@@ -1,0 +1,32 @@
+# Выпуск: установщик и портативная версия — на страницу «Релизы» GitHub.
+# Запуск: вкладка Actions → release → Run workflow, или тег vX.Y.Z.
+name: release
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - id: v
+        shell: bash
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+      - run: node build/build.js
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.v.outputs.version }}
+          name: ModHub ${{ steps.v.outputs.version }}
+          body_path: build/release-notes.md
+          make_latest: true
+          files: |
+            dist/ModHub-Setup-${{ steps.v.outputs.version }}.exe
+            dist/ModHub-${{ steps.v.outputs.version }}-win-x64.zip

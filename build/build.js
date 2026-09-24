@@ -95,5 +95,5 @@ function stage() {
 
 stage();
 if (!process.argv.includes('--stage')) {
-  execSync('npx electron-builder --win nsis --x64', { cwd: ROOT, stdio: 'inherit' });
+  execSync('npx electron-builder --win --x64 --publish never', { cwd: ROOT, stdio: 'inherit' });
 }
