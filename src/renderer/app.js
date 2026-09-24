@@ -110,6 +110,9 @@ const state = {
   catalogSection: 'all',
   /** «Нужные моды» и наборы: gameId -> { loading, mods, byId, error }. */
   picks: {},
+  /** ReShade в папке игры: gameId -> { supported, installed, dll, preset } (2.1). */
+  reshade: {},
+  reshadeBusy: null,
 };
 
 /* ================================================================== *
@@ -128,7 +131,9 @@ const PREF_DEFAULTS = {
   motion: 'full', // full | reduced | off
   startView: 'home', // home | last
   heroAutoplay: true,
-  homeSections: { recommend: true, chart: true, shelves: true, fresh: true, favorites: true },
+  // Подборка и полки по играм повторяли «Топ модов» — с 2.1 они выключены,
+  // включаются в «Настройки → Вид».
+  homeSections: { recommend: false, chart: true, shelves: false, fresh: true, favorites: true },
   notifyDone: true,
   soundDone: false,
   dlAutoOpen: false,
@@ -303,14 +308,15 @@ function formatScore(avg) {
   return (Number(avg) || 0).toFixed(2);
 }
 
-/** Строка оценки под названием мода: ★★★★★ 4.50 · 3 отзыва / 0.00 · не оценено. */
+/** Строка оценки под названием мода: ★★★★★ 4.50 · 3 отзыва. */
 function ratingLine(gameId, modId, { compact = false } = {}) {
   const { avg, count } = ratingOf(gameId, modId);
-  // В плотных списках «0.00 ★★★★★» у каждого неоценённого мода — только шум.
-  if (compact && !count) return '';
-  const note = count ? pluralN(count, 'rev.count') : t('rev.unrated');
+  // «0.00 · не оценено» у каждого неоценённого мода — только шум: оценить
+  // мод зовёт плитка на его странице.
+  if (!count) return '';
+  const note = pluralN(count, 'rev.count');
   return `
-    <span class="rate${count ? '' : ' is-empty'}${compact ? ' rate--compact' : ''}" title="${esc(`${formatScore(avg)} · ${note}`)}">
+    <span class="rate${compact ? ' rate--compact' : ''}" title="${esc(`${formatScore(avg)} · ${note}`)}">
       <span class="rate__stars" style="--rate:${Math.round((avg / 5) * 100)}%"></span>
       <b>${esc(formatScore(avg))}</b>
       ${compact ? '' : `<span class="rate__note">${esc(note)}</span>`}
@@ -1290,6 +1296,9 @@ const STAGE_OF = {
   'loader.unpack': 'extract',
   'loader.backup': 'extract',
   'loader.install': 'extract',
+  'reshade.download': 'download',
+  'reshade.install': 'extract',
+  'reshade.effects': 'download',
 };
 
 /** Событие прогресса от основного процесса → состояние загрузки. */
@@ -1713,36 +1722,10 @@ function downloadsBlock() {
   });
 }
 
-const TIP_COUNT = 6;
-function tipBlock() {
-  const n = (Math.floor(Date.now() / (1000 * 60 * 60)) % TIP_COUNT) + 1;
-  return asideCard(t('aside.tip'), `<p class="atip">${esc(t('tip.' + n))}</p>`, { icon: 'sparkle', cls: 'acard--tip' });
-}
-
-function premiumBlock() {
-  if (pref('aside') === false || state.settings.premium) return '';
-  return `
-    <button class="apremium" type="button" data-action="nav-premium">
-      <span class="apremium__crown">${icon('crown')}</span>
-      <b>${esc(t('ad.premium.title'))}</b>
-      <span>${esc(t('aside.premium.text'))}</span>
-      <span class="apremium__go">${esc(t('aside.premium.go'))}${icon('chevRight')}</span>
-    </button>`;
-}
-
 function homeAside() {
-  const games = state.order.map(quickGameRow).join('');
-  return (
-    asideCard(t('aside.play'), `<div class="alist">${games}</div>`, {
-      icon: 'play',
-      extra: `<button class="linkbtn" data-action="nav-games">${esc(t('aside.all'))}</button>`,
-    }) +
-    accountAsideBlock() +
-    downloadsBlock() +
-    recentBlock(5) +
-    tipBlock() +
-    premiumBlock()
-  );
+  // Игры с кнопкой «Играть» теперь прямо на главной — здесь их не дублируем.
+  // Советов и рекламы премиума тоже нет (2.1).
+  return accountAsideBlock() + friendsAsideBlock() + downloadsBlock() + recentBlock(6);
 }
 
 /* --- каталог: сортировка и фильтры -------------------------------- */
@@ -1775,27 +1758,13 @@ function catalogAside(game) {
       )
     : '';
 
-  const total = state.catalogTotals[game.id] || (state.catalogFor === game.id && !state.catalogMeta.query ? state.catalogMeta.total : 0) || 0;
   const source = { nexus: 'Nexus Mods', thunderstore: 'Thunderstore', modlinks: 'ModLinks' }[kind] ?? '';
-  // Порядок и вид с 2.0 — над каталогом, в панели их больше не дублируем.
-  return (
-    asideCard(
-      t('aside.display'),
-      `<div class="aline">
-         <span>${esc(t('aside.hideInstalled'))}</span>
-         ${toggle('hideInstalled', pref('hideInstalled'))}
-       </div>`,
-      { icon: 'eye' }
-    ) +
-    catBlock +
-    asideCard(
-      t('aside.source'),
-      `<p class="asource"><b>${esc(source)}</b><span class="muted small">${esc(total ? t('home.inCatalog', { n: total.toLocaleString(window.I18N.lang === 'en' ? 'en-US' : 'ru-RU') }) : '')}</span></p>
-       ${game.catalog?.browseUrl ? `<button class="btn btn--ghost btn--sm btn--block" data-action="open-url" data-url="${esc(game.catalog.browseUrl)}">${icon('external')}<span>${esc(t('aside.openSite', { site: source }))}</span></button>` : ''}`,
-      { icon: 'shop' }
-    ) +
-    downloadsBlock()
-  );
+  // Порядок, вид и число модов — над каталогом. Здесь — что уже стоит у
+  // этой игры (чтобы не искать это в списке) и сам сайт.
+  const site = game.catalog?.browseUrl
+    ? `<div class="acard acard--bare"><button class="aact" type="button" data-action="open-url" data-url="${esc(game.catalog.browseUrl)}">${icon('external')}<span>${esc(t('aside.openSite', { site: source }))}</span></button></div>`
+    : '';
+  return catBlock + downloadsBlock() + recentBlock(8, game.id) + site;
 }
 
 /* --- страница игры ------------------------------------------------- */
@@ -1809,22 +1778,13 @@ function gameAside(game) {
       <div><b>${enabled}</b><span>${esc(t('aside.stat.enabled'))}</span></div>
       <div class="${state.problems.length ? 'is-warn' : ''}"><b>${state.problems.length}</b><span>${esc(t('aside.stat.problems'))}</span></div>
     </div>`;
-  // Вкладки игры и так на виду — здесь только то, чего на них нет.
-  const actions = [
-    ['install-file', null, 'folder', t('inst.fromFile')],
-    ['rescan', null, 'refresh', t('games.detectAgain')],
-  ]
-    .map(
-      ([action, tab, ico, label]) =>
-        `<button class="aact" type="button" data-action="${action}"${tab ? ` data-tab="${tab}"` : ''} data-game="${esc(game.id)}">${icon(ico)}<span>${esc(label)}</span></button>`
-    )
-    .join('');
+  // Вкладки игры и так на виду — здесь только то, чего на них нет:
+  // «Из файла» есть над списком модов, а сам список — и есть «недавнее».
+  const rescan = `<button class="aact" type="button" data-action="rescan" data-game="${esc(game.id)}">${icon('refresh')}<span>${esc(t('games.detectAgain'))}</span></button>`;
   return (
-    asideCard(game.name, stats + `<div class="aacts">${actions}</div>`, { icon: 'grid' }) +
+    asideCard(game.name, stats + `<div class="aacts aacts--one">${rescan}</div>`, { icon: 'grid' }) +
     downloadsBlock() +
-    (state.gameTab === 'market' ? '' : recentBlock(4, game.id)) +
-    (state.gameTab === 'market' ? '' : popularBlock(game)) +
-    tipBlock()
+    (state.gameTab === 'market' ? '' : popularBlock(game))
   );
 }
 
@@ -1835,50 +1795,23 @@ function modAside() {
   const mod = view?.mod;
   const game = entry(view?.gameId)?.game;
   if (!mod || !game) return homeAside();
+  // Имя, автор, версия, оценка, загрузки, дата и зависимости уже есть на
+  // самой странице мода — справа только то, чего там нет.
   const facts = [
-    [t('aside.fact.game'), game.name],
-    [t('aside.fact.author'), mod.author ? shortAuthors(mod.author) : '—'],
-    [t('aside.fact.version'), mod.version || '—'],
-    [t('aside.fact.updated'), mod.updatedAt ? `${formatMonth(mod.updatedAt)} · ${agoText(mod.updatedAt)}` : '—'],
-    [t('aside.fact.downloads'), mod.downloads ? formatCount(mod.downloads) : '—'],
     [t('aside.fact.loader'), game.loader?.name ?? '—'],
     [t('aside.fact.source'), { nexus: 'Nexus Mods', thunderstore: 'Thunderstore', modlinks: 'ModLinks' }[game.catalog?.kind] ?? '—'],
   ];
-  const score = ratingOf(game.id, mod.id);
   const cats = (mod.categories ?? []).filter(Boolean);
   const badges = modBadges(mod, game.id);
-  const reqs = view.details?.requirements ?? [];
-  const reqRows = reqs.length
-    ? reqs
-        .slice(0, 8)
-        .map(
-          (r) => `<button class="arow" type="button" ${r.id && r.available !== false ? `data-action="open-mod" data-game="${esc(game.id)}" data-mod="${esc(r.id)}"` : 'disabled'}>
-            <span class="arow__pic" style="${gradientStyle({ id: r.id || r.name, name: r.name })}">${esc(initials(r.name))}</span>
-            <span class="arow__text"><b>${esc(r.name)}</b><span>${esc(isInstalled({ id: r.id }, game) ? t('mod.installed') : t('aside.dep'))}</span></span>
-          </button>`
-        )
-        .join('')
-    : `<p class="muted small">${esc(view.details ? t('aside.noDeps') : t('common.loading'))}</p>`;
+  const chips = cats.length || badges.length
+    ? `<div class="achips">${badges.map(badgeTag).join('')}${cats.map((c) => `<span class="chip">${esc(tagLabel(c))}</span>`).join('')}</div>`
+    : '';
   return (
     asideCard(
       t('aside.about'),
-      `<dl class="afacts">${facts.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>`,
+      `<dl class="afacts">${facts.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>${chips}`,
       { icon: 'info' }
     ) +
-    asideCard(
-      t('rev.title'),
-      `<div class="ascore${score.count ? '' : ' is-empty'}"><b>${esc(formatScore(score.avg))}</b>${ratingLine(game.id, mod.id)}</div>
-       <button class="btn btn--ghost btn--sm btn--block" data-action="goto-reviews">${icon('chat')}<span>${esc(t('rev.write'))}</span></button>`,
-      { icon: 'star' }
-    ) +
-    (cats.length || badges.length
-      ? asideCard(
-          t('aside.tags'),
-          `<div class="achips">${badges.map(badgeTag).join('')}${cats.map((c) => `<span class="chip">${esc(tagLabel(c))}</span>`).join('')}</div>`,
-          { icon: 'tag' }
-        )
-      : '') +
-    asideCard(t('aside.deps'), `<div class="alist">${reqRows}</div>`, { icon: 'puzzle' }) +
     downloadsBlock()
   );
 }
@@ -1966,13 +1899,10 @@ function renderCrumbs() {
 function modRow(mod, game, index = 0, { rank = -1 } = {}) {
   const installed = isInstalled(mod, game);
   const job = visibleJob(game.id, mod.id);
+  // Только категории: сайт и загрузчик у всех модов игры одинаковые —
+  // повторять их в каждой строке незачем (2.1).
   const cats = pref('showTags') ? (mod.categories ?? []).filter(Boolean).slice(0, 3) : [];
-  // Метки как в Modrinth: категории, откуда мод и чем грузится.
-  const origin = pref('showTags')
-    ? `<span class="chip chip--src">${esc({ nexus: 'Nexus', thunderstore: 'Thunderstore', modlinks: 'ModLinks' }[mod.source] ?? '')}</span>${
-        game.loader?.name ? `<span class="chip chip--loader">${icon('puzzle')}${esc(game.loader.name)}</span>` : ''
-      }`
-    : '';
+  const origin = '';
   const cta = job
     ? jobCta(job, 'getbtn getbtn--sm')
     : installed
@@ -2434,8 +2364,10 @@ function heroPicks(feed) {
 
 function heroSlides(feed) {
   const picks = heroPicks(feed);
-  if (!picks.length) return BANNERS.map((banner) => ({ kind: 'brand', banner }));
-  return [{ kind: 'brand', banner: BANNERS[0] }, ...picks.map((pick) => ({ kind: 'mod', ...pick }))];
+  // Рекламных слайдов про ModHub больше нет (2.1): человек уже в ModHub.
+  // Пока модов нет (нет сети или игр) — один слайд-приветствие.
+  if (!picks.length) return [{ kind: 'brand', banner: BANNERS[0] }];
+  return picks.map((pick) => ({ kind: 'mod', ...pick }));
 }
 
 function heroSlide(slide, index, active) {
@@ -2609,37 +2541,38 @@ function gameCard(gameId) {
   const item = entry(gameId);
   const info = item.info;
   const found = Boolean(item.game?.found);
+  const ready = found && item.game.loader.installed;
   const { line, mark } = gameStatus(gameId);
-  const count = found ? state.catalogTotals[gameId] : 0;
+  const logo = gameLogo(gameId);
+  const mods = (state.library[gameId] ?? []).length;
   return `
-    <button class="gcard${found ? '' : ' is-off'}${gameLogo(gameId) ? ' has-logo' : ''}" style="${accentStyle(info.accent)}" data-action="${found ? 'open-game' : 'not-found'}" data-game="${esc(gameId)}">
-      <span class="gcard__art" style="background-image:url('${esc(gameArt(gameId))}')"></span>
-      ${gameLogo(gameId) ? `<img class="gcard__logo" src="${esc(gameLogo(gameId))}" alt="" referrerpolicy="no-referrer" />` : ''}
-      <span class="gcard__badge">${esc(initials(info.shortName))}</span>
-      <span class="gcard__body">
-        <span class="gcard__name">${esc(info.name)}</span>
-        <span class="gcard__line"><i class="dot dot--${mark}"></i>${esc(line)}</span>
-        ${count ? `<span class="gcard__count">${esc(t('home.inCatalog', { n: count.toLocaleString(window.I18N.lang === 'en' ? 'en-US' : 'ru-RU') }))}</span>` : ''}
-      </span>
-      <span class="gcard__go">${icon(found ? 'arrowRight' : 'search')}</span>
-    </button>`;
+    <article class="gtile${found ? '' : ' is-off'}" style="${accentStyle(info.accent)}">
+      <button class="gtile__main" type="button" data-action="${found ? 'open-game' : 'not-found'}" data-game="${esc(gameId)}" title="${esc(info.name)}">
+        <span class="gtile__art" style="background-image:url('${esc(gameArt(gameId))}')"></span>
+        ${logo ? `<img class="gtile__logo" src="${esc(logo)}" alt="" referrerpolicy="no-referrer" />` : `<b class="gtile__title">${esc(info.name)}</b>`}
+        <span class="gtile__line"><i class="dot dot--${mark}"></i>${esc(found && mods ? pluralN(mods, 'aside.mods') : line)}</span>
+      </button>
+      ${
+        ready
+          ? `<button class="gtile__play" type="button" data-action="play" data-game="${esc(gameId)}" title="${esc(t('games.play'))}" aria-label="${esc(t('games.play'))}">${icon('play')}</button>`
+          : ''
+      }
+    </article>`;
 }
 
+/**
+ * «Ваши игры» (2.1): все игры одним рядом — ни одна не уезжает за край.
+ * Плитка — золотой прямоугольник (1,618 : 1), найденные игры — первыми.
+ */
 function gamesBlock() {
+  const order = [...state.order].sort((a, b) => Number(Boolean(entry(b)?.game?.found)) - Number(Boolean(entry(a)?.game?.found)));
   return `
-    <section class="block reveal">
+    <section class="block block--games reveal">
       <div class="block__head">
         <h2>${esc(t('home.yourGames'))}</h2>
         <button class="linkbtn" data-action="nav-games">${esc(t('home.allGames'))}${icon('chevRight')}</button>
       </div>
-      <div class="gcards">
-        ${state.order.map(gameCard).join('')}
-        <button class="gcard gcard--more" data-action="nav-games">
-          <span class="gcard__plus">${icon('grid')}</span>
-          <span class="gcard__name">${esc(t('home.allGames'))}</span>
-          <span class="gcard__line">${esc(t('home.allGames.text'))}</span>
-        </button>
-      </div>
+      <div class="gtiles" style="--n:${order.length}">${order.map(gameCard).join('')}</div>
     </section>`;
 }
 
@@ -2697,7 +2630,6 @@ function recommendBlock(feed, loading) {
       <div class="block__head">
         <div>
           <h2>${esc(t('home.recommend'))}</h2>
-          <p class="muted small">${esc(t('home.recommend.text'))}</p>
         </div>
       </div>
       <div class="mosaic">${body}</div>
@@ -2802,7 +2734,7 @@ function freshShelf() {
     .slice(0, 14)
     .map(({ mod, game }, i) => modCard(mod, game, i, { fresh: true, showGame: true }))
     .join('');
-  return shelfBlock({ id: 'shelf-fresh', title: t('home.fresh'), sub: t('home.fresh.text'), chip: icon('sparkle'), cards });
+  return shelfBlock({ id: 'shelf-fresh', title: t('home.fresh'), chip: icon('sparkle'), cards });
 }
 
 function renderHome() {
@@ -2813,8 +2745,8 @@ function renderHome() {
   const show = pref('homeSections');
   return `
     <div class="page page--home">
-      ${heroBlock(feed)}
       ${gamesBlock()}
+      ${heroBlock(feed)}
       ${ready.length ? (show.recommend !== false ? recommendBlock(feed, loading) : '') : emptyGamesBlock()}
       ${ready.length && show.chart !== false ? chartBlock(feed, loading) : ''}
       ${show.shelves !== false ? gameShelves() : ''}
@@ -3149,6 +3081,46 @@ function catalogBody(game) {
   const section = currentSection(game.id);
   if (section === 'picks') return picksBody(game);
   if (section === 'packs') return packsBody(game);
+  return (section === 'visuals' ? reshadeBar(game) : '') + catalogList(game);
+}
+
+/**
+ * Плашка ReShade над «Шейдерами и графикой» (2.1): стоит ли он и что
+ * нажать в игре. Пресет можно ставить и без него — ModHub поставит ReShade
+ * сам, — но кнопка рядом честнее, чем сюрприз посреди установки.
+ */
+function reshadeBar(game) {
+  const rs = state.reshade[game.id];
+  if (!rs) {
+    loadReshade(game.id);
+    return '';
+  }
+  if (!rs.supported) return '';
+  const busy = state.reshadeBusy === game.id;
+  return `
+    <div class="rsbar${rs.installed ? ' is-on' : ''}">
+      <span class="rsbar__icon">${icon('image')}</span>
+      <div class="rsbar__text">
+        <b>${esc(rs.installed ? t('rs.on') : t('rs.off'))}</b>
+        <span>${esc(rs.installed ? (rs.preset ? t('rs.on.preset', { preset: rs.preset.replace(/^\.\\/, '') }) : t('rs.on.hint')) : t('rs.off.hint'))}</span>
+      </div>
+      ${
+        rs.installed
+          ? `<button class="btn btn--ghost btn--sm" data-action="open-folder" data-path="${esc(rs.dir ?? '')}">${icon('folder')}<span>${esc(t('games.openFolder'))}</span></button>`
+          : `<button class="btn btn--primary btn--sm" data-action="reshade-install" data-game="${esc(game.id)}"${busy ? ' disabled' : ''}>${icon('download')}<span>${esc(busy ? t('rs.installing') : t('rs.install'))}</span></button>`
+      }
+    </div>`;
+}
+
+async function loadReshade(gameId) {
+  if (!api.reshade || state.reshade[gameId]?.loading) return;
+  state.reshade[gameId] = { loading: true, supported: false };
+  const data = await call(api.reshade.status(gameId), { silent: true }).catch(() => null);
+  state.reshade[gameId] = data ?? { supported: false };
+  softRender();
+}
+
+function catalogList(game) {
   const meta = state.catalogMeta;
   if (meta.error && state.catalog.length === 0) return errorBlock(meta.error);
   if (state.catalogLoading && state.catalog.length === 0) {
@@ -3309,7 +3281,7 @@ function renderModPage() {
   if (!game) return emptyGamesBlock();
   if (!mod) {
     return view?.detailsError
-      ? `<div class="page">${backButton()}${errorBlock(view.detailsError, 'retry-mod')}</div>`
+      ? `<div class="page">${errorBlock(view.detailsError, 'retry-mod')}</div>`
       : `<div class="loading"><div class="spinner"></div></div>`;
   }
 
@@ -3370,8 +3342,6 @@ function renderModPage() {
 
   return `
     <div class="page" style="${accentStyle(game.accent)}">
-      ${backButton()}
-
       <section class="product">
         <div class="product__backdrop" style="${backdropStyle(face)}"></div>
         <div class="product__main">
@@ -3386,8 +3356,12 @@ function renderModPage() {
 
             <div class="product__stats">
               <button class="stat stat--rate${score.count ? '' : ' is-empty'}" data-action="goto-reviews" title="${esc(t('rev.title'))}">
-                <b>${esc(formatScore(score.avg))} <span class="stars" style="--rate:${Math.round((score.avg / 5) * 100)}%">★★★★★</span></b>
-                <span>${esc(score.count ? pluralN(score.count, 'rev.count') : t('rev.unrated'))}</span>
+                ${
+                  score.count
+                    ? `<b>${esc(formatScore(score.avg))} <span class="stars" style="--rate:${Math.round((score.avg / 5) * 100)}%">★★★★★</span></b>
+                       <span>${esc(pluralN(score.count, 'rev.count'))}</span>`
+                    : `<b>${icon('star')}</b><span>${esc(t('rev.write'))}</span>`
+                }
               </button>
               ${mod.downloads ? `<div><b>${esc(formatCount(mod.downloads))}</b><span>${esc(t('mod.stat.downloads'))}</span></div>` : ''}
               ${updated ? `<div><b>${esc(updated)}</b><span>${esc(t('mod.stat.updated'))}</span></div>` : ''}
@@ -3421,7 +3395,6 @@ function renderModPage() {
                   ? `<button class="btn btn--ghost" data-action="open-url" data-url="${esc(wiki)}">${icon('book')}<span>${esc(t('mod.wiki'))}</span></button>`
                   : ''
               }
-              <button class="btn btn--ghost" data-action="goto-reviews">${icon('chat')}<span>${esc(t('rev.write'))}</span></button>
               ${favButton(game, mod)}
             </div>
             ${nexusBrowser && !installed ? `<p class="product__hint">${icon('info')}<span>${esc(t('nexus.hint.browser'))}</span></p>` : ''}
@@ -3452,7 +3425,7 @@ function renderModPage() {
       ${
         requirements.length
           ? `<section class="panel reveal">
-               <div class="panel__head"><h2>${esc(t(nexus ? 'mod.deps.nexus' : 'mod.deps'))}</h2></div>
+               <div class="panel__head"><h2>${esc(t(nexus && !pref('autoDeps') ? 'mod.deps.nexus' : 'mod.deps'))}</h2></div>
                <ul class="deps">${requirements.map(requirementRow).join('')}</ul>
              </section>`
           : ''
@@ -4164,6 +4137,7 @@ function installedRow(game, mod) {
         <h4>${title}${mod.version ? ` <span class="muted">${esc(mod.version)}</span>` : ''}</h4>
         <p class="muted small">
           ${catalogId ? ratingLine(game.id, catalogId, { compact: true }) : ''}
+          ${mod.kind === 'preset' ? `<span class="chip chip--loader">${icon('image')}${esc(t('inst.preset'))}</span>` : ''}
           ${esc(mod.author || '')}
           ${mod.missing ? `· <span class="danger">${esc(t('inst.missing'))}</span>` : ''}
           ${!mod.enabled ? `· ${esc(t('inst.off'))}` : ''}
@@ -4534,9 +4508,8 @@ function isFavorite(gameId, modId) {
 
 function favButton(game, mod) {
   const on = isFavorite(game.id, mod.id);
-  return `<button class="btn btn--ghost${on ? ' is-fav' : ''}" data-action="fav-toggle" data-game="${esc(game.id)}" data-mod="${esc(mod.id)}" aria-pressed="${on}">
-      ${icon('heart')}<span>${esc(on ? t('fav.remove') : t('fav.add'))}</span>
-    </button>`;
+  const label = on ? t('fav.remove') : t('fav.add');
+  return `<button class="btn btn--ghost btn--square${on ? ' is-fav' : ''}" data-action="fav-toggle" data-game="${esc(game.id)}" data-mod="${esc(mod.id)}" aria-pressed="${on}" title="${esc(label)}" aria-label="${esc(label)}">${icon('heart')}</button>`;
 }
 
 async function toggleFavorite(gameId, modId) {
@@ -4577,7 +4550,7 @@ function favoritesShelf() {
       return modCard(mod, game, i, { showGame: true });
     })
     .join('');
-  return shelfBlock({ id: 'shelf-favorites', title: t('home.favorites'), sub: t('home.favorites.text'), chip: icon('heart'), cards });
+  return shelfBlock({ id: 'shelf-favorites', title: t('home.favorites'), chip: icon('heart'), cards });
 }
 
 /* ================================================================== *
@@ -4686,6 +4659,8 @@ function catalogHead(game) {
   const viewButton = (id, ico) =>
     `<button class="ctool__view${view === id ? ' is-active' : ''}" type="button" data-action="set-pref" data-key="catalogView" data-value="${id}" title="${esc(t('view.' + id))}" aria-label="${esc(t('view.' + id))}">${icon(ico)}</button>`;
   const count = state.catalogMeta.total || state.catalog.length;
+  // Поиск, порядок и вид — одной строкой; число модов — внутри поиска,
+  // сколько показывать за раз — в настройках каталога.
   return `
     <div class="cathead">
       <nav class="secbar" role="tablist" aria-label="${esc(t('sec.title'))}">${tabs}</nav>
@@ -4693,24 +4668,20 @@ function catalogHead(game) {
       ${
         special
           ? ''
-          : `<label class="catsearch">
-               ${icon('search')}
-               <input id="catSearch" type="search" autocomplete="off" spellcheck="false"
-                 placeholder="${esc(section === 'all' ? t('cat.searchAll', { game: game.name }) : t('cat.search', { section: t('sec.' + section).toLowerCase(), game: game.name }))}"
-                 value="${esc(state.catalogMeta.query ?? '')}" />
-             </label>
-             <div class="catbar">
-               <label class="dd"><span>${esc(t('cat.sort'))}</span>
-                 <select data-change="cat-sort">${sorts
+          : `<div class="catline">
+               <label class="catsearch">
+                 ${icon('search')}
+                 <input id="catSearch" type="search" autocomplete="off" spellcheck="false"
+                   placeholder="${esc(section === 'all' ? t('cat.searchAll', { game: game.name }) : t('cat.search', { section: t('sec.' + section).toLowerCase(), game: game.name }))}"
+                   value="${esc(state.catalogMeta.query ?? '')}" />
+                 ${count ? `<span class="catsearch__n" title="${esc(t('popular.count', { n: fullNumber(count) }))}">${esc(fullNumber(count))}</span>` : ''}
+               </label>
+               <label class="dd" title="${esc(t('cat.sort'))}">${icon('sort')}
+                 <select data-change="cat-sort" aria-label="${esc(t('cat.sort'))}">${sorts
                    .map((id) => `<option value="${id}"${state.catalogSort === id ? ' selected' : ''}>${esc(t('sort.' + id))}</option>`)
                    .join('')}</select>${icon('chevRight')}
                </label>
-               <label class="dd"><span>${esc(t('cat.show'))}</span>
-                 <select data-change="page-size">${[20, 40, 60, 100]
-                   .map((n) => `<option value="${n}"${Number(pref('catalogPageSize')) === n ? ' selected' : ''}>${n}</option>`)
-                   .join('')}</select>${icon('chevRight')}
-               </label>
-               <span class="catbar__count muted">${count ? esc(t('popular.count', { n: fullNumber(count) })) : ''}</span>
+               <label class="catbar__toggle">${toggle('hideInstalled', pref('hideInstalled'))}<span>${esc(t('aside.hideInstalled'))}</span></label>
                <div class="cattools__view">${viewButton('list', 'list')}${viewButton('grid', 'grid')}</div>
              </div>`
       }
@@ -4750,7 +4721,6 @@ function picksBody(game) {
   if (!mods.length) return `<section class="empty"><h3>${esc(t('picks.empty'))}</h3></section>`;
   const list = pref('catalogView') === 'list';
   return `
-    <p class="catintro">${icon('trophy')}<span>${esc(t('picks.intro', { game: game.name }))}</span></p>
     <div class="${list ? 'mlist' : 'grid'}">${mods.map((mod, i) => (list ? modRow(mod, game, i) : modCard(mod, game, i))).join('')}</div>`;
 }
 
@@ -4790,7 +4760,6 @@ function packsBody(game) {
     })
     .join('');
   return `
-    <p class="catintro">${icon('list')}<span>${esc(t('packs.intro'))}</span></p>
     ${cards ? `<div class="kits">${cards}</div>` : `<section class="empty"><h3>${esc(t('packs.none'))}</h3></section>`}
     <div class="panel panel--flat">
       <div class="panel__head"><h2>${esc(t('pack.title'))}</h2><span class="muted small">${esc(t('pack.hint'))}</span></div>
@@ -4817,6 +4786,11 @@ async function installKit(gameId, kitId) {
   for (const id of todo) await installMod(gameId, id);
   toast(t('pack.done'));
   softRender();
+}
+
+/** Друзья в правой панели главной — заполняется разделом «Друзья» (2.1). */
+function friendsAsideBlock() {
+  return typeof friendsAside === 'function' ? friendsAside() : '';
 }
 
 function renderLog(game) {
@@ -6124,6 +6098,8 @@ async function installModOnce(gameId, modId, { name = null } = {}) {
 
     await refreshMods();
     finishJob(job, { ok: true });
+    // Могли поставить пресет шейдеров — а вместе с ним и ReShade.
+    delete state.reshade[gameId];
     render();
     installedOk = true;
 
@@ -6257,6 +6233,22 @@ async function resetPrefs() {
 
 const ACTIONS = {
   'nav-games': () => go('games'),
+  'reshade-install': async (node) => {
+    const gameId = node.dataset.game;
+    state.reshadeBusy = gameId;
+    render();
+    try {
+      await call(api.reshade.install(gameId));
+      toast(t('rs.done'));
+    } catch {
+      /* причина уже показана */
+    } finally {
+      state.reshadeBusy = null;
+      hideProgress();
+      delete state.reshade[gameId];
+      render();
+    }
+  },
   'deps-install': (node) => {
     // Кнопку нажал человек — пробуем заново и то, что уже не получилось раньше.
     for (const key of [...depsTried]) if (key.startsWith(`${node.dataset.game}|`)) depsTried.delete(key);
@@ -6772,8 +6764,6 @@ document.addEventListener('change', async (event) => {
   if (field.dataset.change === 'cat-sort') {
     state.catalogSort = field.value;
     await loadCatalog(gameId, state.catalogMeta.query ?? '');
-  } else if (field.dataset.change === 'page-size') {
-    await setPref('catalogPageSize', Number(field.value) || 20);
     await loadCatalog(gameId, state.catalogMeta.query ?? '');
   } else if (field.dataset.change === 'pref') {
     await setPref(field.dataset.key, prefValue(field.dataset.key, field.value));

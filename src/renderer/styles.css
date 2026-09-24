@@ -2901,7 +2901,11 @@ button.deps__name:hover {
   color: rgba(255, 255, 255, 0.24);
 }
 .stat--rate.is-empty b {
-  color: #d9d4ee;
+  color: var(--gold, #e7b44a);
+}
+.stat--rate.is-empty b svg {
+  width: 20px;
+  height: 20px;
 }
 
 /* --- блок «Отзывы» -------------------------------------------------- */

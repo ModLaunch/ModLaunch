@@ -40,11 +40,9 @@ function buildAds(feed, lang) {
   const remote = (feed?.items ?? [])
     .filter((ad) => ad && ad.title && ad.url && (!ad.lang || ad.lang === lang))
     .map((ad) => ({ ...ad, remote: true }));
-  if (remote.length) return remote;
-
-  return HOUSE_ADS.filter((ad) => !ad.needs || feed?.[ad.needs]).map((ad) =>
-    ad.needs ? { ...ad, url: feed[ad.needs] } : { ...ad }
-  );
+  // 2.1: своих объявлений (премиум, «на чай») в шапке больше нет —
+  // место пустует, пока в ленте нет настоящей рекламы.
+  return remote;
 }
 
 const ModHubAds = { HOUSE_ADS, buildAds };
