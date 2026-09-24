@@ -74,12 +74,33 @@ const EN = {
   'foot.issues': 'Report a bug',
   'foot.note': 'Subnautica, Stardew Valley, Lethal Company and Hollow Knight are trademarks of their owners. ModLaunch is an unofficial project.',
   meta: 'Windows 10 / 11 · free',
+  'screens.shaders': 'Shaders',
+  'screens.setup': 'Installer',
+  'cap.shaders': 'Graphics mods and ReShade shaders in their own section, installed with one click.',
+  'cap.setup': 'Its own installer: picks a folder, creates shortcuts and updates ModLaunch in seconds.',
+  'cmp.title': 'Used to take half an hour. Now it’s one click',
+  'cmp.old': 'By hand',
+  'cmp.o1': 'Figure out which mod loader the game needs and install it',
+  'cmp.o2': 'Download the mod archive and unpack it into the right folder',
+  'cmp.o3': 'Work out which libraries are missing and hunt them down one by one',
+  'cmp.o4': 'Check every mod for updates yourself',
+  'cmp.o5': 'Guess why the game crashes',
+  'cmp.new': 'With ModLaunch',
+  'cmp.n1': 'The loader installs itself with your first mod',
+  'cmp.n2': 'Hit “Install” and the mod is in place',
+  'cmp.n3': 'Dependencies come along with the mod',
+  'cmp.n4': 'Update all mods with one button',
+  'cmp.n5': 'Game log and disabling mods in two clicks',
+  'news.title': 'What’s new in',
+  'news.all': 'Full changelog →',
 };
 const CAPTIONS_RU = {
   'cap.home': 'Все ваши игры, подборка модов и топ скачиваний — на одном экране.',
   'cap.catalog': 'Тысячи модов с разделами, категориями, поиском и сортировкой.',
   'cap.mod': 'Всё о моде и что поставится вместе с ним.',
   'cap.overlay': 'Ctrl+Shift+M в игре: время сеанса, друзья, заметки и копия сохранений.',
+  'cap.shaders': 'Графические моды и шейдеры ReShade — в своём разделе, ставятся одной кнопкой.',
+  'cap.setup': 'Свой установщик: выбор папки, ярлыки и обновление ModLaunch за несколько секунд.',
 };
 
 const ru = {};
@@ -104,6 +125,7 @@ function applyLang() {
   });
   document.getElementById('lang').textContent = lang === 'en' ? 'RU' : 'EN';
   renderRelease();
+  renderNews();
 }
 document.getElementById('lang').addEventListener('click', () => {
   lang = lang === 'en' ? 'ru' : 'en';
@@ -149,6 +171,8 @@ async function loadRelease() {
     // Маленькое число на витрине не показываем — только когда скачиваний уже заметно много.
     document.querySelector('.js-dl').hidden = total < 100;
     if (counter.dataset.shown) countUp(counter);
+    notes = { body: String(latest.body || ''), url: latest.html_url };
+    renderNews();
     renderRelease();
   } catch {
     /* без сети — остаются ссылки на страницу выпусков */
@@ -167,6 +191,45 @@ function countUp(node) {
     if (k < 1) requestAnimationFrame(step);
   };
   requestAnimationFrame(step);
+}
+
+let notes = null;
+const clean = (text) => text.replace(/\*\*|`/g, '').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').trim();
+function renderNews() {
+  const section = document.getElementById('news');
+  if (!notes || lang !== 'ru') {
+    section.hidden = true;
+    return;
+  }
+  const part = notes.body.split(/^##\s+/m).find((chunk) => /^Что нового/i.test(chunk)) ?? '';
+  const items = part
+    .split(/\r?\n/)
+    .map((line) => /^\s*[-*]\s+\*\*(.+?)\*\*\s*(.*)$/.exec(line))
+    .filter(Boolean)
+    // То, что только для владельца программы, на витрину не выносим.
+    .filter(([, title, text]) => !/владельц/i.test(title + text))
+    .slice(0, 6);
+  if (!items.length) {
+    section.hidden = true;
+    return;
+  }
+  const list = document.getElementById('newsList');
+  list.replaceChildren(
+    ...items.map(([, title, text], i) => {
+      const card = document.createElement('article');
+      card.className = 'news__item reveal';
+      card.style.setProperty('--d', `${i * 0.06}s`);
+      const h = document.createElement('h3');
+      h.textContent = clean(title).replace(/[.:]$/, '');
+      const p = document.createElement('p');
+      p.textContent = clean(text);
+      card.append(h, p);
+      seen.observe(card);
+      return card;
+    })
+  );
+  document.querySelectorAll('.js-notes').forEach((n) => (n.href = notes.url));
+  section.hidden = false;
 }
 
 /* --- появление при прокрутке --- */
@@ -198,6 +261,17 @@ const nav = document.getElementById('nav');
 const onScroll = () => nav.classList.toggle('is-scrolled', window.scrollY > 10);
 window.addEventListener('scroll', onScroll, { passive: true });
 onScroll();
+
+/* --- кнопка «Скачать» внизу на телефоне: когда большие кнопки не видны --- */
+
+const dock = document.getElementById('dock');
+const bigButtons = new Map();
+const dockWatch = new IntersectionObserver((entries) => {
+  for (const entry of entries) bigButtons.set(entry.target, entry.isIntersecting);
+  dock.classList.toggle('is-on', window.scrollY > 200 && ![...bigButtons.values()].some(Boolean));
+});
+document.querySelectorAll('.btn--lg.js-setup').forEach((node) => dockWatch.observe(node));
+window.addEventListener('scroll', () => dock.classList.toggle('is-on', window.scrollY > 200 && ![...bigButtons.values()].some(Boolean)), { passive: true });
 
 /* --- окно на первом экране наклоняется за мышью --- */
 
