@@ -108,6 +108,12 @@
             <kbd class="search__kbd">Ctrl K</kbd>
           </label>
 
+          <!-- Вышла новая версия ModLaunch (3.0). -->
+          <button class="updpill" id="updPill" type="button" data-action="app-update" hidden>
+            <span class="updpill__glow"></span>
+            <span data-icon="sparkle"></span><span class="updpill__text" id="updPillText"></span>
+          </button>
+
           <!-- Показать или спрятать правую панель. -->
           <button class="navbtn asidebtn" id="asideBtn" type="button" data-action="aside-toggle">
             <span data-icon="panel"></span>
@@ -128,6 +134,20 @@
 
           <!-- Рекламное место. Что в нём крутится — src/renderer/ads.js и ads.config.json. -->
           <div class="adslot" id="adSlot" aria-live="off"></div>
+
+          <!-- Свернуть, развернуть, закрыть — вместо белой полосы Windows (3.0). -->
+          <div class="wctl" id="wctl" hidden>
+            <button class="wctl__btn" type="button" data-win="minimize" aria-label="—">
+              <svg viewBox="0 0 12 12"><path d="M2 6.5h8" /></svg>
+            </button>
+            <button class="wctl__btn" type="button" data-win="maximize" aria-label="□">
+              <svg class="wctl__max" viewBox="0 0 12 12"><rect x="2" y="2" width="8" height="8" rx="1.5" /></svg>
+              <svg class="wctl__restore" viewBox="0 0 12 12"><rect x="2" y="4" width="6" height="6" rx="1.2" /><path d="M4.2 4V3.2A1.2 1.2 0 0 1 5.4 2H8.8A1.2 1.2 0 0 1 10 3.2v3.4A1.2 1.2 0 0 1 8.8 7.8H8" /></svg>
+            </button>
+            <button class="wctl__btn wctl__btn--close" type="button" data-win="close" aria-label="✕">
+              <svg viewBox="0 0 12 12"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7" /></svg>
+            </button>
+          </div>
         </header>
 
         <!--

@@ -594,3 +594,144 @@ h1 {
     transition: none !important;
   }
 }
+
+/* ------------------------------------------------------------------ *
+ *  3.0 — карточки возможностей, искры, конфетти
+ * ------------------------------------------------------------------ */
+
+.feats {
+  position: relative;
+  min-height: 116px;
+}
+.feat {
+  position: absolute;
+  inset: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(139, 108, 255, 0.16), rgba(255, 255, 255, 0.03));
+  opacity: 0;
+  transform: translateY(10px) scale(0.98);
+  transition: opacity 0.5s ease, transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+  pointer-events: none;
+}
+.feat.is-on {
+  opacity: 1;
+  transform: none;
+}
+.feat__icon {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 13px;
+  background: rgba(139, 108, 255, 0.22);
+  color: #cbbcff;
+}
+.feat.is-on .feat__icon {
+  animation: pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.feat__icon svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.feat__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+  color: rgba(238, 240, 246, 0.72);
+}
+.feat__text b {
+  color: #fff;
+  font-size: 14.5px;
+}
+.feats__dots {
+  position: absolute;
+  bottom: 0;
+  left: 4px;
+  display: flex;
+  gap: 6px;
+}
+.feats__dots i {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  transition: width 0.4s ease, background 0.4s ease;
+}
+.feats__dots i.is-on {
+  width: 18px;
+  background: #8b6cff;
+}
+
+/* Искры, которые медленно поднимаются в левой половине. */
+.art::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(2px 2px at 18% 80%, rgba(255, 255, 255, 0.7), transparent 60%),
+    radial-gradient(1.5px 1.5px at 72% 65%, rgba(255, 210, 122, 0.8), transparent 60%),
+    radial-gradient(2px 2px at 40% 95%, rgba(185, 166, 255, 0.8), transparent 60%),
+    radial-gradient(1.5px 1.5px at 85% 90%, rgba(255, 255, 255, 0.6), transparent 60%),
+    radial-gradient(2px 2px at 28% 60%, rgba(111, 227, 213, 0.7), transparent 60%);
+  background-size: 100% 100%;
+  animation: sparks 9s linear infinite;
+  opacity: 0.8;
+}
+@keyframes sparks {
+  from {
+    transform: translateY(40px);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.8;
+  }
+  to {
+    transform: translateY(-420px);
+    opacity: 0;
+  }
+}
+body[data-mood='working'] .art::after {
+  animation-duration: 4s;
+}
+
+.confetti {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 50;
+}
+.confetti i {
+  position: absolute;
+  top: -12px;
+  left: var(--x);
+  width: 8px;
+  height: 12px;
+  border-radius: 2px;
+  animation: confetti var(--d) cubic-bezier(0.2, 0.6, 0.4, 1) var(--delay) forwards;
+}
+@keyframes confetti {
+  to {
+    transform: translate(var(--dx), 580px) rotate(var(--r));
+    opacity: 0.2;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .art::after,
+  .confetti {
+    display: none;
+  }
+}

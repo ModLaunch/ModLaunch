@@ -65,6 +65,19 @@ const STRINGS = {
     'uninstall.bye': 'Спасибо, что были с нами. Моды в играх остались на месте.',
     'uninstall.error': 'Не получилось удалить',
     'uninstall.hint': 'Моды, которые уже стоят в играх, остаются на месте.',
+
+    'update.title': 'Обновляю ModLaunch до {version}',
+    'update.lead': 'Пара секунд — и программа откроется снова.',
+    'feat.1.title': 'Моды в один клик',
+    'feat.1.text': 'Сам найдёт игру, поставит загрузчик и зависимости.',
+    'feat.2.title': 'Оверлей в игре',
+    'feat.2.text': 'Ctrl+Shift+M — время сеанса, друзья и заметки поверх игры.',
+    'feat.3.title': 'Шейдеры без мучений',
+    'feat.3.text': 'ReShade и эффекты пресета ставятся сами.',
+    'feat.4.title': 'Друзья',
+    'feat.4.text': 'Кто в сети и во что играет — прямо в лаунчере.',
+    'feat.5.title': 'Сохранения под защитой',
+    'feat.5.text': 'Копия перед каждым запуском игры.',
   },
 
   en: {
@@ -130,6 +143,19 @@ const STRINGS = {
     'uninstall.bye': 'Thanks for using it. Mods in your games stay in place.',
     'uninstall.error': 'Could not uninstall',
     'uninstall.hint': 'Mods already installed into your games stay in place.',
+
+    'update.title': 'Updating ModLaunch to {version}',
+    'update.lead': 'A few seconds and the app opens again.',
+    'feat.1.title': 'Mods in one click',
+    'feat.1.text': 'Finds the game, installs the loader and dependencies.',
+    'feat.2.title': 'In-game overlay',
+    'feat.2.text': 'Ctrl+Shift+M — session time, friends and notes over the game.',
+    'feat.3.title': 'Painless shaders',
+    'feat.3.text': 'ReShade and the preset’s effects install themselves.',
+    'feat.4.title': 'Friends',
+    'feat.4.text': 'Who is online and what they play — right in the launcher.',
+    'feat.5.title': 'Saves protected',
+    'feat.5.text': 'A backup before every game launch.',
   },
 };
 

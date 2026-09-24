@@ -69,18 +69,69 @@
     );
   }
 
-  async function progressScreen(titleKey, hintKey) {
+  /** Пока копируются файлы — что умеет программа, карточка за карточкой. */
+  const FEATURES = [
+    ['feat.1', '<path d="M12 3v12m0 0-4.5-4.5M12 15l4.5-4.5M4.5 19.5h15"/>'],
+    ['feat.2', '<rect x="3.5" y="5" width="17" height="12" rx="2.5"/><rect x="12.5" y="8" width="5" height="6" rx="1"/>'],
+    ['feat.3', '<path d="M12 3.5l2.4 5 5.3.7-3.9 3.7 1 5.3L12 15.7l-4.8 2.5 1-5.3-3.9-3.7 5.3-.7z"/>'],
+    ['feat.4', '<circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19c.9-3 3-4.6 5.5-4.6s4.6 1.6 5.5 4.6"/><path d="M15.5 5.6a3 3 0 0 1 0 5.8M17.4 14.6c1.6.6 2.6 2.1 3.1 4.4"/>'],
+    ['feat.5', '<path d="M12 3.5 5 6.5v5c0 4.2 3 7.6 7 9 4-1.4 7-4.8 7-9v-5z"/><path d="m9 12 2.2 2.2L15.5 10"/>'],
+  ];
+  let featureTimer = null;
+
+  function featuresHtml() {
+    return `<div class="feats" id="feats">${FEATURES.map(
+      ([key, svg], i) =>
+        `<div class="feat${i === 0 ? ' is-on' : ''}"><span class="feat__icon"><svg viewBox="0 0 24 24">${svg}</svg></span><span class="feat__text"><b>${esc(t(key + '.title'))}</b><span>${esc(t(key + '.text'))}</span></span></div>`,
+    ).join('')}<div class="feats__dots">${FEATURES.map((_, i) => `<i class="${i === 0 ? 'is-on' : ''}"></i>`).join('')}</div></div>`;
+  }
+
+  function rotateFeatures() {
+    clearInterval(featureTimer);
+    let index = 0;
+    featureTimer = setInterval(() => {
+      const cards = document.querySelectorAll('.feat');
+      const dots = document.querySelectorAll('.feats__dots i');
+      if (!cards.length) return clearInterval(featureTimer);
+      index = (index + 1) % cards.length;
+      cards.forEach((card, i) => card.classList.toggle('is-on', i === index));
+      dots.forEach((dot, i) => dot.classList.toggle('is-on', i === index));
+    }, 2600);
+  }
+
+  async function progressScreen(titleKey, hintKey, vars = {}) {
     state.progress = 0;
+    const withFeatures = state.info.mode !== 'uninstall';
     await show(
-      `<h1>${esc(t(titleKey))}</h1>
+      `<h1>${esc(t(titleKey, vars))}</h1>
       <p class="step" id="step">&nbsp;</p>
       <div class="pct" id="pct">0<small>%</small></div>
       <div class="track"><div class="fill" id="fill"></div></div>
       <div class="meta" id="meta"></div>
       <div class="spacer"></div>
-      <p class="hint">${esc(t(hintKey))}</p>`,
+      ${withFeatures ? featuresHtml() : `<p class="hint">${esc(t(hintKey))}</p>`}`,
       'working',
     );
+    if (withFeatures) rotateFeatures();
+  }
+
+  /** Праздничный залп конфетти поверх окна. */
+  function confetti() {
+    const layer = document.createElement('div');
+    layer.className = 'confetti';
+    const colors = ['#8b6cff', '#b9a6ff', '#ffd27a', '#6fe3d5', '#ff8fb5'];
+    for (let i = 0; i < 70; i += 1) {
+      const piece = document.createElement('i');
+      piece.style.setProperty('--x', `${Math.random() * 100}%`);
+      piece.style.setProperty('--dx', `${(Math.random() - 0.5) * 240}px`);
+      piece.style.setProperty('--r', `${Math.random() * 720 - 360}deg`);
+      piece.style.setProperty('--d', `${1.4 + Math.random() * 1.4}s`);
+      piece.style.setProperty('--delay', `${Math.random() * 0.35}s`);
+      piece.style.background = colors[i % colors.length];
+      layer.append(piece);
+    }
+    document.body.append(layer);
+    setTimeout(() => layer.remove(), 3400);
   }
 
   // Шаги неравные по времени: основное — копирование, остальное — секунды.
@@ -97,7 +148,7 @@
 
     fill.style.width = `${(ratio * 100).toFixed(1)}%`;
     $('#pct').innerHTML = `${Math.round(ratio * 100)}<small>%</small>`;
-    if (state.info.mode === 'install' && payload.step) $('#step').textContent = t(`step.${payload.step}`);
+    if (state.info.mode !== 'uninstall' && payload.step) $('#step').textContent = t(`step.${payload.step}`);
     if (payload.total) {
       const mb = (bytes) => Math.round(bytes / 1048576);
       $('#meta').textContent = t('progress.bytes', { done: mb(payload.done), total: mb(payload.total) });
@@ -107,8 +158,10 @@
   async function install() {
     if (state.busy) return;
     state.busy = true;
-    await progressScreen(state.existing ? 'progress.update' : 'progress.install', 'progress.hint');
+    if (state.info.mode === 'update') await progressScreen('update.title', 'progress.hint', { version: state.info.version });
+    else await progressScreen(state.existing ? 'progress.update' : 'progress.install', 'progress.hint');
     const result = await api.install({ target: state.target, desktop: state.desktop });
+    clearInterval(featureTimer);
     state.busy = false;
     if (!result?.ok) return failure(result);
     await wait(450);
@@ -117,6 +170,18 @@
 
   async function done() {
     const title = state.existing ? t('done.titleUpdate', { version: state.info.version }) : t('done.title');
+    confetti();
+    // Обновление из самой программы: сразу открыть её снова.
+    if (state.info.mode === 'update') {
+      await show(
+        `<div class="badge">${ICON_OK}</div>
+        <h1>${esc(title)}</h1>
+        <p class="lead">${esc(t('update.lead'))}</p>`,
+        'done',
+      );
+      setTimeout(() => api.launch(), 900);
+      return;
+    }
     await show(
       `<div class="badge">${ICON_OK}</div>
       <h1>${esc(title)}</h1>
@@ -246,7 +311,7 @@
     state.existing = info.existing;
 
     document.documentElement.lang = info.lang;
-    document.title = t(info.mode === 'uninstall' ? 'window.titleUninstall' : 'window.title');
+    document.title = t(info.mode === 'uninstall' ? 'window.titleUninstall' : info.mode === 'update' ? 'welcome.titleUpdate' : 'window.title');
     $('#title').textContent = document.title;
     $('#ver').textContent = `v${info.version}`;
     $('#btnMin').title = t('window.min');
@@ -254,6 +319,11 @@
 
     api.onProgress(onProgress);
     if (info.mode === 'uninstall') await uninstallConfirm();
-    else await welcome();
+    else if (info.mode === 'update') {
+      // Ярлык на рабочем столе не добавляем и не убираем: какой был, такой и останется.
+      state.desktop = false;
+      state.launch = true;
+      await install();
+    } else await welcome();
   })();
 })();

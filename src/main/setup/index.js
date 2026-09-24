@@ -26,6 +26,8 @@ const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 /** 'install' | 'uninstall' | null — в каком режиме запущена программа. */
 function detectMode(argv = process.argv, env = process.env) {
   if (argv.includes('--uninstall')) return 'uninstall';
+  // Автообновление (3.0): программа скачала новый установщик и запустила его так.
+  if (argv.includes('--update')) return 'update';
   if (argv.includes('--setup')) return 'install';
   if (argv.includes('--portable')) return null;
   const outer = env.PORTABLE_EXECUTABLE_FILE;
@@ -61,8 +63,8 @@ function runPowerShell(script, timeout = 30000) {
 
 function shortcutPaths() {
   return {
-    start: path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'ModHub.lnk'),
-    desktop: path.join(app.getPath('desktop'), 'ModHub.lnk'),
+    start: path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'ModLaunch.lnk'),
+    desktop: path.join(app.getPath('desktop'), 'ModLaunch.lnk'),
   };
 }
 
@@ -93,7 +95,7 @@ function findShortcuts() {
     for (const entry of entries) {
       const full = path.join(dir, entry.name);
       if (entry.isDirectory() && depth > 0) walk(full, kind, depth - 1);
-      else if (entry.isFile() && /\.lnk$/i.test(entry.name) && /modhub/i.test(entry.name)) {
+      else if (entry.isFile() && /\.lnk$/i.test(entry.name) && /modhub|modlaunch/i.test(entry.name)) {
         let target = '';
         try {
           target = shell.readShortcutLink(full).target;
@@ -186,7 +188,7 @@ function run(mode, { startApp }) {
   let switching = false;
   let installed = null;
   let removal = null;
-  const probe = mode === 'install' ? probeExisting() : Promise.resolve(null);
+  const probe = mode === 'install' || mode === 'update' ? probeExisting() : Promise.resolve(null);
   const send = (payload) => win?.webContents.send('setup:progress', payload);
 
   if (process.platform === 'win32') app.setAppUserModelId(`${core.APP_ID}.Setup`);
@@ -213,7 +215,10 @@ function run(mode, { startApp }) {
     // Холодный PowerShell иногда думает секунду-две. Окно ждать не должно:
     // не успел — предлагаем папку по умолчанию, её мы проверим и так.
     const existing = await Promise.race([probe, delay(1500).then(() => null)]);
-    const target = core.normalizeTarget(existing?.dir || core.defaultInstallDir());
+    // ModHub 2.x ставился через NSIS в Programs\modhub — обновляем его на месте.
+    const nsis = core.nsisInstallDir();
+    const nsisHere = core.inspectTarget(nsis).kind === 'ours';
+    const target = core.normalizeTarget(existing?.dir || (nsisHere ? nsis : core.defaultInstallDir()));
     const state = core.inspectTarget(target);
     return {
       mode,

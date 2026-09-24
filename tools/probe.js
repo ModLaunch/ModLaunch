@@ -243,7 +243,33 @@ async function checkDeps() {
   report(found['Pathoschild.ContentPatcher']?.nexusId === '1915', 'зависимости: SMAPI знает номер Content Patcher на Nexus', JSON.stringify(found));
 }
 
+/** Поиск из шапки (весь каталог, без раздела) — у каждого сайта свой. */
+async function checkSearch() {
+  console.log('\n=== Поиск ===');
+  const cases = [
+    ['subnautica', 'nexus', 'seamoth', /seamoth/i],
+    ['subnautica-below-zero', 'nexus', 'seatruck', /seatruck/i],
+    ['stardew-valley', 'nexus', 'stardew expanded', /expanded/i],
+    ['lethal-company', 'thunderstore', 'more company', /more\s*company/i],
+    ['hollow-knight', 'modlinks', 'bench', /bench/i],
+  ];
+  for (const [id, kind, query, expect] of cases) {
+    const game = games.byId(id);
+    try {
+      let mods = [];
+      if (kind === 'nexus') mods = (await nexus.browse(game.catalog.nexusDomain, { page: 1, query, hide: game.catalog.hide })).mods;
+      else if (kind === 'thunderstore') mods = (await thunderstore.search(game.catalog.community, query, { page: 1 })).mods;
+      else mods = await modlinks.search(query, {});
+      const names = mods.slice(0, 3).map((m) => m.name);
+      report(mods.length > 0 && mods.slice(0, 5).some((m) => expect.test(m.name)), `поиск «${query}» — ${id}`, `${mods.length}: ${names.join(' / ')}`);
+    } catch (error) {
+      report(false, `поиск «${query}» — ${id}`, error.message);
+    }
+  }
+}
+
 (async () => {
+  await checkSearch().catch((e) => report(false, 'поиск упал', e.stack));
   await checkShaders().catch((e) => report(false, 'шейдеры упали', e.stack));
   await checkDeps().catch((e) => report(false, 'зависимости упали', e.stack));
   await schema().catch((e) => console.log('schema error', e.message));

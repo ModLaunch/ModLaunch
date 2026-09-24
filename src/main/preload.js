@@ -72,6 +72,32 @@ contextBridge.exposeInMainWorld('modhub', {
   },
 
   /** Шейдеры: ReShade в папке игры (2.1). */
+  /** Обновления самой программы из GitHub Releases (3.0). */
+  update: {
+    status: () => invoke('update:status'),
+    check: () => invoke('update:check'),
+    install: () => invoke('update:install'),
+    onAvailable: (handler) => {
+      const listener = (_event, payload) => handler(payload);
+      ipcRenderer.on('app-update', listener);
+      return () => ipcRenderer.removeListener('app-update', listener);
+    },
+    onProgress: (handler) => {
+      const listener = (_event, payload) => handler(payload);
+      ipcRenderer.on('app-update-progress', listener);
+      return () => ipcRenderer.removeListener('app-update-progress', listener);
+    },
+  },
+  /** Своя рамка окна: свернуть, развернуть, закрыть (3.0). */
+  window: {
+    control: (action) => invoke('window:control', action),
+    state: () => invoke('window:state'),
+    onState: (handler) => {
+      const listener = (_event, payload) => handler(payload);
+      ipcRenderer.on('window-state', listener);
+      return () => ipcRenderer.removeListener('window-state', listener);
+    },
+  },
   /** Друзья: код друга, запросы, кто во что играет (2.1). */
   friends: {
     view: () => invoke('friends:view'),

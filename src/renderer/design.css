@@ -2064,7 +2064,7 @@ button.arow:disabled {
 /* --- шапка: крошки и кнопка панели ---------------------------------- */
 
 .topbar {
-  grid-template-columns: auto auto minmax(0, 1fr) minmax(260px, 560px) auto auto auto;
+  grid-template-columns: auto auto minmax(0, 1fr) minmax(260px, 560px) auto auto auto auto auto;
 }
 .crumbs {
   display: flex;
@@ -4268,4 +4268,203 @@ button.crumb:hover {
   font-size: 10.5px;
   font-weight: 800;
   line-height: 1;
+}
+
+/* ================================================================== *
+ *  3.0 — своя рамка окна
+ *
+ *  За шапку окно тянут и разворачивают двойным щелчком; всё, что в ней
+ *  нажимается, из перетаскивания исключено.
+ * ================================================================== */
+
+body.is-frameless .topbar {
+  -webkit-app-region: drag;
+  user-select: none;
+}
+body.is-frameless .topbar button,
+body.is-frameless .topbar input,
+body.is-frameless .topbar a,
+body.is-frameless .topbar .search,
+body.is-frameless .topbar .crumbs > *,
+body.is-frameless .topbar .dlp,
+body.is-frameless .topbar .adslot {
+  -webkit-app-region: no-drag;
+}
+body.is-frameless .rail__btn--home {
+  -webkit-app-region: no-drag;
+}
+
+.wctl {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: var(--sp-3);
+  padding-left: var(--sp-4);
+  border-left: 1px solid var(--line);
+  align-self: stretch;
+}
+.wctl[hidden] {
+  display: none;
+}
+.wctl__btn {
+  width: 42px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-2);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.16s, color 0.16s, transform 0.16s var(--ease-spring);
+}
+.wctl__btn svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+}
+.wctl__btn:hover {
+  background: var(--surface-3, rgba(255, 255, 255, 0.08));
+  color: var(--text);
+}
+.wctl__btn:active {
+  transform: scale(0.92);
+}
+.wctl__btn--close:hover {
+  background: #e5484d;
+  color: #fff;
+}
+.wctl__restore {
+  display: none;
+}
+body.is-maximized .wctl__max {
+  display: none;
+}
+body.is-maximized .wctl__restore {
+  display: block;
+}
+
+/* --- 3.0: новая версия ModLaunch ------------------------------------ */
+
+.updpill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  height: 34px;
+  padding: 0 var(--sp-4);
+  border: 1px solid color-mix(in srgb, var(--gold) 55%, transparent);
+  border-radius: 999px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--gold) 26%, var(--surface)), var(--surface-2));
+  color: var(--gold-2, #ffd27a);
+  font: inherit;
+  font-size: var(--fs-1);
+  font-weight: 750;
+  white-space: nowrap;
+  cursor: pointer;
+  overflow: hidden;
+  animation: pill-in 0.6s var(--ease-spring) both;
+}
+.updpill[hidden] {
+  display: none;
+}
+.updpill svg {
+  width: 14px;
+  height: 14px;
+}
+.updpill__glow {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.35) 50%, transparent 70%);
+  transform: translateX(-120%);
+  animation: sheen-run 3.2s ease-in-out infinite;
+  pointer-events: none;
+}
+.updpill.is-ready {
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--gold) 60%, transparent);
+  animation: pill-in 0.6s var(--ease-spring) both, pill-pulse 2.4s ease-out 0.6s infinite;
+}
+@keyframes pill-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.9);
+  }
+}
+@keyframes sheen-run {
+  0%,
+  55% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(120%);
+  }
+}
+@keyframes pill-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--gold) 55%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 13px transparent;
+  }
+}
+
+.modal__panel--update {
+  width: min(560px, 92vw);
+}
+.upd__head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+}
+.upd__badge {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-3);
+  color: #241a05;
+  background: linear-gradient(145deg, var(--gold-2, #ffd27a), var(--gold, #e7b44a));
+  animation: pop-in 0.5s var(--ease-spring) both;
+}
+.upd__badge svg {
+  width: 22px;
+  height: 22px;
+}
+.upd__notes {
+  max-height: 46vh;
+  overflow: auto;
+  margin: var(--sp-4) 0;
+  padding: var(--sp-4);
+  border-radius: var(--r-3);
+  background: var(--surface-2);
+  font-size: var(--fs-1);
+  line-height: 1.6;
+}
+.upd__notes h4 {
+  margin: var(--sp-3) 0 var(--sp-2);
+  font-size: var(--fs-2);
+}
+.upd__notes h4:first-child {
+  margin-top: 0;
+}
+.upd__notes ul {
+  margin: 0;
+  padding-left: var(--sp-5);
+}
+.upd__notes li + li {
+  margin-top: 4px;
+}
+.upd__notes p {
+  margin: 0 0 var(--sp-2);
+  color: var(--muted);
+}
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6) rotate(-12deg);
+  }
 }

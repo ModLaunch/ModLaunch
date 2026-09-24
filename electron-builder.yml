@@ -1,8 +1,12 @@
-# Сборка установщика ModLaunch-Setup-<версия>.exe (2.0).
+# Сборка ModLaunch (3.0).
 #
-# Полноценный мастер установки NSIS: язык (русский/английский), условия
-# использования, выбор папки, ярлыки на рабочем столе и в «Пуске», запуск
-# после установки, удаление через «Приложения» Windows.
+# ModLaunch-Setup-<версия>.exe — свой установщик: одна программа в обёртке
+# portable. Обёртка распаковывает ModLaunch во временную папку (пока идёт
+# распаковка, видна заставка build/splash.bmp) и запускает его; по имени
+# файла с «Setup» программа открывает своё окно установки (src/setup),
+# а с флагом --update — сразу обновляет уже установленную копию.
+#
+# ModLaunch-<версия>-win-x64.zip — та же программа одной папкой, без установки.
 #
 # Собирается командой `npm run dist`: build/build.js сначала готовит копию
 # программы с обфусцированным кодом в .build/app, а electron-builder
@@ -24,35 +28,15 @@ extraResources:
 afterPack: build/after-pack.js
 win:
   target:
-    - target: nsis
+    - target: portable
       arch: [x64]
-    # Портативная версия: одна папка в zip, распаковал — запустил ModLaunch.exe.
     - target: zip
       arch: [x64]
   icon: src/assets/icon.ico
   executableName: ModLaunch
-  # Имя для zip; у установщика своё — в разделе nsis.
   artifactName: ModLaunch-${version}-win-${arch}.${ext}
   signAndEditExecutable: false
-nsis:
-  oneClick: false
-  perMachine: false
-  allowElevation: true
-  allowToChangeInstallationDirectory: true
-  createDesktopShortcut: always
-  createStartMenuShortcut: true
-  shortcutName: ModLaunch
-  runAfterFinish: true
-  license: build/license.txt
-  installerIcon: src/assets/icon.ico
-  uninstallerIcon: src/assets/icon.ico
-  installerHeaderIcon: src/assets/icon.ico
-  multiLanguageInstaller: true
-  installerLanguages: [ru_RU, en_US]
-  language: '1049'
-  displayLanguageSelector: false
-  unicode: true
-  deleteAppDataOnUninstall: false
-  uninstallDisplayName: ModLaunch
-  include: build/installer.nsh
+portable:
   artifactName: ModLaunch-Setup-${version}.exe
+  splashImage: build/splash.bmp
+  unpackDirName: ModLaunchSetup

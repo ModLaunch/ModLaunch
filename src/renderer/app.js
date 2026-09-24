@@ -20,6 +20,9 @@ const api = window.modhub;
 const t = (key, params) => window.I18N.t(key, params);
 
 const state = {
+  /** Новая версия самой программы (3.0): ответ updater.status(). */
+  appUpdate: null,
+  appUpdateProgress: null,
   /** Друзья (2.1): { configured, signedIn, code, friends, incoming, outgoing } с сервера. */
   friends: null,
   friendsBusy: false,
@@ -162,6 +165,7 @@ const PREF_DEFAULTS = {
   confirmRemove: true,
   gameDefaultTab: 'downloads', // downloads | market | profiles
   autoDeps: true, // ставить требования мода вместе с ним (2.1)
+  autoUpdate: true, // скачивать новую версию ModLaunch заранее (3.0)
   // 2.1 — друзья и оверлей в игре.
   friendsStatus: 'all', // all — во что играю | online — только «в сети» | hidden — невидимка
   overlay: true,
@@ -5384,7 +5388,25 @@ function settingsUpdates() {
         )
         .join('')}</div>`
     : `<p class="muted small">${esc(Object.keys(state.updates).length ? t('upd.none') : t('upd.never'))}</p>`;
+  const app = state.appUpdate;
+  const appLine = !app?.configured
+    ? t('upd.app.off')
+    : app.available
+      ? t('upd.app.available', { version: app.latest.version })
+      : app.checkedAt
+        ? t('upd.app.latest', { version: app.current })
+        : t('upd.app.version', { version: app.current ?? state.appInfo?.version ?? '' });
   return (
+    settingsCard(
+      'ModLaunch',
+      settingRow(
+        appLine,
+        t('upd.app.hint'),
+        app?.available
+          ? `<button class="btn btn--primary btn--sm" data-action="app-update">${icon('sparkle')}<span>${esc(t('upd.app.open'))}</span></button>`
+          : `<button class="btn btn--ghost btn--sm" data-action="app-update-check"${state.appUpdateChecking ? ' disabled' : ''}>${icon('refresh')}<span>${esc(state.appUpdateChecking ? t('upd.checking') : t('upd.check'))}</span></button>`
+      ) + settingRow(t('upd.app.auto'), t('upd.app.auto.hint'), toggle('autoUpdate', pref('autoUpdate')))
+    ) +
     settingsCard(
       t('settings.tab.updates'),
       settingRow(t('upd.onStart'), t('upd.onStart.hint'), toggle('updatesOnStart', pref('updatesOnStart'))) +
@@ -5860,6 +5882,107 @@ function renderAccountRail() {
   node.querySelector('.rail__tip').textContent = acc.signedIn
     ? `${acc.name ?? ''}${acc.admin ? ' · ' + t('acc.admin') : ''}`
     : t('acc.tab.signin');
+}
+
+/* ================================================================== *
+ *  Обновления самой программы (3.0)
+ *
+ *  Вышла новая версия — в шапке загорается «Обновление 3.x». По щелчку —
+ *  что нового и кнопка «Обновить и перезапустить»: установщик уже скачан
+ *  (если в настройках не выключено) и проверен по sha256 с GitHub.
+ * ================================================================== */
+
+function renderUpdatePill() {
+  const pill = $('#updPill');
+  if (!pill) return;
+  const u = state.appUpdate;
+  pill.hidden = !u?.available;
+  if (!u?.available) return;
+  const p = state.appUpdateProgress;
+  $('#updPillText').textContent =
+    p && p.ratio < 1 && !u.downloaded ? `${Math.round((p.ratio ?? 0) * 100)}%` : t('upd.app.pill', { version: u.latest.version });
+  pill.classList.toggle('is-ready', Boolean(u.downloaded));
+}
+
+/** Заметки к выпуску с GitHub: заголовки, списки и **жирное** — без чужого HTML. */
+function releaseNotesHtml(text) {
+  const inline = (line) => esc(line).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/`([^`]+)`/g, '<code>$1</code>');
+  let html = '';
+  let list = false;
+  for (const raw of String(text ?? '').replace(/\r/g, '').split('\n')) {
+    const line = raw.trim();
+    if (/^[-*] /.test(line)) {
+      if (!list) html += '<ul>';
+      list = true;
+      html += `<li>${inline(line.slice(2))}</li>`;
+      continue;
+    }
+    if (list) html += '</ul>';
+    list = false;
+    if (!line) continue;
+    if (/^#{1,3} /.test(line)) html += `<h4>${inline(line.replace(/^#+ /, ''))}</h4>`;
+    else html += `<p>${inline(line)}</p>`;
+  }
+  return html + (list ? '</ul>' : '');
+}
+
+function openAppUpdate() {
+  const u = state.appUpdate;
+  if (!u?.available) return;
+  const busy = state.appUpdateBusy;
+  openModal(`
+    <div class="modal__head upd__head">
+      <span class="upd__badge">${icon('sparkle')}</span>
+      <div><h3>${esc(t('upd.app.title', { version: u.latest.version }))}</h3><span class="muted small">${esc(t('upd.app.now', { version: u.current }))}</span></div>
+    </div>
+    <div class="upd__notes">${releaseNotesHtml(u.latest.notes)}</div>
+    <div class="modal__foot">
+      <button class="btn btn--ghost" data-close>${esc(t('upd.app.later'))}</button>
+      ${
+        u.canInstall
+          ? `<button class="btn btn--primary" id="updGo"${busy ? ' disabled' : ''}>${icon('download')}<span>${esc(busy ? t('upd.app.installing') : t('upd.app.install'))}</span></button>`
+          : `<button class="btn btn--primary" data-action="open-url" data-url="${esc(u.latest.page ?? '')}">${icon('external')}<span>${esc(t('upd.app.page'))}</span></button>`
+      }
+    </div>`);
+  $('#modalPanel').classList.add('modal__panel--update');
+  $('#updGo')?.addEventListener('click', async () => {
+    state.appUpdateBusy = true;
+    openAppUpdate();
+    await call(api.update.install()).catch(() => {
+      state.appUpdateBusy = false;
+      openAppUpdate();
+    });
+  });
+}
+
+async function initAppUpdates() {
+  if (!api.update) return;
+  state.appUpdate = await call(api.update.status(), { silent: true }).catch(() => null);
+  renderUpdatePill();
+  api.update.onAvailable((status) => {
+    const first = !state.appUpdate?.available;
+    state.appUpdate = status;
+    renderUpdatePill();
+    if (first) toast(t('upd.app.toast', { version: status.latest.version }));
+    if (state.view === 'settings') softRender();
+  });
+  api.update.onProgress((p) => {
+    state.appUpdateProgress = p;
+    renderUpdatePill();
+  });
+}
+
+async function checkAppUpdate() {
+  state.appUpdateChecking = true;
+  softRender();
+  const status = await call(api.update.check()).catch(() => null);
+  state.appUpdateChecking = false;
+  if (status) {
+    state.appUpdate = status;
+    renderUpdatePill();
+    if (!status.available) toast(t('upd.app.latest', { version: status.current }));
+  }
+  softRender();
 }
 
 /* ================================================================== *
@@ -6633,6 +6756,8 @@ const ACTIONS = {
   },
   'nav-home': () => go('home'),
   'nav-friends': () => openFriends(),
+  'app-update': () => openAppUpdate(),
+  'app-update-check': () => checkAppUpdate(),
   'friend-add': () => addFriend(),
   'friend-copy': () => copyFriendCode(),
   'friend-accept': async (node) => {
@@ -7069,6 +7194,23 @@ $('#brand').addEventListener('click', () => go('home'));
 $('#navHome').addEventListener('click', () => go('home'));
 $('#navDonate').addEventListener('click', () => go('donate'));
 $('#navFriends').addEventListener('click', () => openFriends());
+
+/* --- своя рамка окна (3.0) --- */
+(async () => {
+  if (!api.window) return;
+  const info = await call(api.window.state(), { silent: true }).catch(() => null);
+  if (!info?.frameless) return;
+  document.body.classList.add('is-frameless');
+  document.body.classList.toggle('is-maximized', Boolean(info.maximized));
+  $('#wctl').hidden = false;
+  api.window.onState((next) => document.body.classList.toggle('is-maximized', Boolean(next?.maximized)));
+  $('#wctl').addEventListener('click', (event) => {
+    const button = event.target.closest('[data-win]');
+    if (button) api.window.control(button.dataset.win);
+  });
+  const titles = { minimize: 'win.minimize', maximize: 'win.maximize', close: 'win.close' };
+  for (const node of document.querySelectorAll('[data-win]')) node.title = t(titles[node.dataset.win]);
+})();
 $('#navSettings').addEventListener('click', () => go('settings'));
 $('#navAccount').addEventListener('click', () => {
   if (state.account.signedIn) openAccountSettings();
@@ -7076,24 +7218,45 @@ $('#navAccount').addEventListener('click', () => {
 });
 
 let searchTimer = null;
+/**
+ * Поиск из шапки. Ищет в каталоге текущей игры (или первой найденной) и
+ * сразу показывает каталог: раньше со страницы игры, открытой на
+ * «Установленных», запрос уходил, а экран оставался прежним — казалось,
+ * что поиск не работает.
+ */
+async function runTopSearch() {
+  const target = (entry(state.activeGameId)?.game?.found ? state.activeGameId : null) ?? readyGames()[0]?.game.id;
+  if (!target) {
+    if (state.query.trim()) toast(t('search.noGames'), 'error');
+    return;
+  }
+  // Первый символ поиска уводит на экран каталога — это шаг истории.
+  // Дальнейший набор уточняет тот же экран и новых шагов не добавляет.
+  const onCatalog = state.view === 'popular' || (state.view === 'game' && state.gameTab === 'market');
+  if (!onCatalog) remember({ view: 'popular', gameId: target, query: state.query });
+  if (state.activeGameId !== target || state.view !== 'game') {
+    state.activeGameId = target;
+    state.view = 'popular';
+  } else {
+    state.gameTab = 'market';
+  }
+  // Поиск из шапки ищет по всему каталогу, а не в подборке.
+  if (isSpecialSection(state.catalogSection)) state.catalogSection = 'all';
+  renderRail();
+  await loadCatalog(target, state.query);
+}
+
 $('#searchInput').addEventListener('input', (event) => {
   state.query = event.target.value;
   clearTimeout(searchTimer);
-  searchTimer = setTimeout(async () => {
-    const target = (entry(state.activeGameId)?.game?.found ? state.activeGameId : null) ?? readyGames()[0]?.game.id;
-    if (!target) return;
-    // Первый символ поиска уводит на экран каталога — это шаг истории.
-    // Дальнейший набор уточняет тот же экран и новых шагов не добавляет.
-    if (state.view !== 'game' && state.view !== 'popular') {
-      remember({ view: 'popular', gameId: target, query: state.query });
-    }
-    state.activeGameId = target;
-    if (state.view !== 'game') state.view = 'popular';
-    // Поиск из шапки ищет по всему каталогу, а не в подборке.
-    if (isSpecialSection(state.catalogSection)) state.catalogSection = 'all';
-    renderRail();
-    await loadCatalog(target, state.query);
-  }, 250);
+  searchTimer = setTimeout(runTopSearch, 250);
+});
+
+$('#searchInput').addEventListener('keydown', (event) => {
+  if (event.key !== 'Enter') return;
+  clearTimeout(searchTimer);
+  state.query = event.target.value;
+  runTopSearch();
 });
 
 document.addEventListener('keydown', (event) => {
@@ -7359,6 +7522,7 @@ setTimeout(hideSplash, SPLASH_MAX);
     if (pref('updatesOnStart')) setTimeout(() => checkAllUpdates({ quiet: true }), 4000);
     setInterval(rotateHero, 1000);
     setInterval(() => refreshRatings(), 3 * 60 * 1000);
+    initAppUpdates();
     loadFriends();
     // Раз в минуту, пока друзей видно и окно ModHub в фокусе: пока человек
     // играет, а ModHub где-то сзади, сервер не дёргаем. Вернулся — сразу.

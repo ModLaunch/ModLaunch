@@ -108,6 +108,19 @@ async function tour() {
   await shot('04-shaders', 3000);
   check('в «Шейдерах» — полоса ReShade', await js(`Boolean(document.querySelector('.rsbar'))`));
 
+  // Поиск из шапки со страницы игры, открытой на «Установленных»: должен
+  // показать каталог с найденным, а не остаться на прежнем экране.
+  await js(`openGame('subnautica', 'downloads')`);
+  await delay(800);
+  await js(`(() => { const i = document.getElementById('searchInput'); i.value = 'seamoth'; i.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+  const searched = await waitFor(
+    () => js(`state.gameTab === 'market' && [...document.querySelectorAll('.mrow h3, .card h3')].some((n) => /seamoth/i.test(n.textContent))`),
+    30000
+  );
+  await shot('04b-search', 800);
+  check('поиск из шапки открывает каталог с найденным', searched, await js(`[...document.querySelectorAll('.mrow h3, .card h3')].slice(0, 3).map((n) => n.textContent).join(' / ')`));
+  await js(`(() => { const i = document.getElementById('searchInput'); i.value = ''; state.query = ''; })()`);
+
   await js(`openMod('subnautica', '2800')`);
   await waitFor(() => js(`Boolean(document.querySelector('.product h1'))`), 20000);
   await shot('05-mod', 4000);

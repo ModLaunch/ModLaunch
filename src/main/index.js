@@ -29,6 +29,7 @@ const deps = require('./core/deps');
 const { ReShade } = require('./core/reshade');
 const { FriendsClient, FriendsError, BEAT_MS } = require('./core/friends');
 const { Overlay } = require('./overlay');
+const { Updater } = require('./core/updater');
 const watchdl = require('./core/watchdl');
 const winstate = require('./core/winstate');
 const { APP_ID, ICON_FILE } = require('./setup/core');
@@ -75,6 +76,8 @@ let overlay = null;
 let gameSession = null;
 /** Игра, для которой оверлей открыли кнопкой «Посмотреть» в настройках. */
 let overlayPreview = null;
+/** Обновления самой программы из GitHub Releases (3.0). */
+let updater = null;
 const registries = new Map();
 /** Ссылка nxm://, пришедшая до того, как окно успело открыться. */
 let pendingNxmLink = null;
@@ -148,6 +151,9 @@ function createWindow() {
     // Цвет фона заставки: окно появляется сразу тёмным, без белой вспышки.
     backgroundColor: '#0f1116',
     autoHideMenuBar: true,
+    // Своя рамка (3.0): без белой полосы Windows сверху. Свернуть,
+    // развернуть и закрыть — кнопки в шапке окна, тянуть — за шапку.
+    frame: process.platform === 'darwin',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -174,6 +180,10 @@ function createWindow() {
   mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
 
   winstate.track(mainWindow, stateFile);
+  const sendWindowState = () => {
+    if (!mainWindow.isDestroyed()) mainWindow.webContents.send('window-state', { maximized: mainWindow.isMaximized(), fullscreen: mainWindow.isFullScreen() });
+  };
+  for (const event of ['maximize', 'unmaximize', 'enter-full-screen', 'leave-full-screen']) mainWindow.on(event, sendWindowState);
   // Спрятанное окно оверлея тоже окно: без этого программа не закрылась бы.
   mainWindow.on('closed', () => overlay?.destroy());
 
@@ -298,6 +308,56 @@ function startReviews() {
   reshadeTool = new ReShade({ cacheDir: path.join(dataDir(), 'reshade') });
   friends = new FriendsClient({ config, account, dataDir: dataDir(), version: app.getVersion() });
   friends.setMode(settings.data.friendsStatus);
+  updater = new Updater({
+    config: readJson(path.join(__dirname, 'update.config.json')),
+    version: app.getVersion(),
+    // Сам себя обновляет только ModLaunch, поставленный установщиком: у него рядом с exe есть отметка.
+    installed: () => app.isPackaged && fs.existsSync(path.join(path.dirname(process.execPath), '.modhub-install.json')),
+    download: downloadFile,
+  });
+}
+
+function readJson(file) {
+  try {
+    return JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ *  Обновления самой программы (3.0)
+ * ------------------------------------------------------------------ */
+
+const UPDATE_EVERY_MS = 6 * 60 * 60 * 1000;
+
+function sendToWindow(channel, payload) {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, payload);
+}
+
+async function checkForUpdate({ quiet = true } = {}) {
+  try {
+    const status = await updater.check();
+    if (status.available) {
+      sendToWindow('app-update', status);
+      // «Скачивать обновления сами» — установщик готов к моменту, когда человек нажмёт кнопку.
+      if (status.canInstall && settings.data.autoUpdate !== false && !status.downloaded) {
+        await updater.fetchSetup((p) => sendToWindow('app-update-progress', p));
+        sendToWindow('app-update', updater.status());
+      }
+    }
+    return updater.status();
+  } catch (error) {
+    if (!quiet) throw error;
+    console.error('[updater]', error.message);
+    return updater.status();
+  }
+}
+
+function startUpdateChecks() {
+  if (!updater?.configured || !app.isPackaged) return;
+  setTimeout(() => checkForUpdate(), 8000);
+  setInterval(() => checkForUpdate(), UPDATE_EVERY_MS).unref?.();
 }
 
 /* ------------------------------------------------------------------ *
@@ -1601,6 +1661,31 @@ function registerIpc() {
     return { dir: path.join(dataDir(), 'backups'), games: out };
   });
 
+  /* --- обновления программы (3.0) --- */
+
+  handle('update:status', async () => updater.status());
+  handle('update:check', async () => checkForUpdate({ quiet: false }));
+  handle('update:install', async () => {
+    if (!updater.status().downloaded) await updater.fetchSetup((p) => sendToWindow('app-update-progress', p));
+    updater.launchSetup();
+    // Установщик сам дождётся, закроет остатки и откроет новую версию.
+    setTimeout(() => app.quit(), 400);
+    return true;
+  });
+
+  /* --- окно без рамки (3.0) --- */
+
+  handle('window:control', async (action) => {
+    if (!mainWindow || mainWindow.isDestroyed()) return false;
+    if (action === 'minimize') mainWindow.minimize();
+    else if (action === 'maximize') {
+      if (mainWindow.isMaximized()) mainWindow.unmaximize();
+      else mainWindow.maximize();
+    } else if (action === 'close') mainWindow.close();
+    return { maximized: mainWindow.isMaximized() };
+  });
+  handle('window:state', async () => ({ maximized: Boolean(mainWindow?.isMaximized()), frameless: process.platform !== 'darwin' }));
+
   /* --- друзья (2.1) --- */
 
   handle('friends:view', async () => friends.view());
@@ -2031,6 +2116,7 @@ async function bootstrap() {
   });
   createWindow();
   startPresence();
+  startUpdateChecks();
 
   // Закрывают ModHub — друзьям сразу «не в сети» (но не дольше пары секунд).
   let leaving = false;

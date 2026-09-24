@@ -22,7 +22,9 @@ try {
   fs = require('node:fs');
 }
 
-const EXE_NAME = 'ModHub.exe';
+const EXE_NAME = 'ModLaunch.exe';
+/** Прежние имена программы: такие папки — тоже наши, их обновляем. */
+const OLD_EXE_NAMES = ['ModHub.exe'];
 /**
  * Идентификатор приложения для Windows (AppUserModelID): по нему панель задач
  * связывает окно с ярлыком и берёт картинку ярлыка. До 1.6 он был
@@ -42,13 +44,19 @@ function codeError(code, extra = {}) {
 
 function defaultInstallDir(env = process.env) {
   const local = env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
-  return path.join(local, 'Programs', 'ModHub');
+  return path.join(local, 'Programs', 'ModLaunch');
 }
 
-/** Ставим всегда в папку ModHub: выбрали «D:\Games» — получится «D:\Games\ModHub». */
+/** Установка 2.x через NSIS: %LOCALAPPDATA%\Programs\modhub (по имени пакета). */
+function nsisInstallDir(env = process.env) {
+  const local = env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
+  return path.join(local, 'Programs', 'modhub');
+}
+
+/** Ставим всегда в свою папку: выбрали «D:\Games» — получится «D:\Games\ModLaunch». Прежняя «ModHub» тоже годится. */
 function normalizeTarget(dir) {
   const full = path.resolve(String(dir ?? '').trim() || defaultInstallDir());
-  return /^modhub$/i.test(path.basename(full)) ? full : path.join(full, 'ModHub');
+  return /^(modlaunch|modhub)$/i.test(path.basename(full)) ? full : path.join(full, 'ModLaunch');
 }
 
 function isInside(child, parent) {
@@ -79,7 +87,7 @@ function inspectTarget(dir) {
   }
   if (entries.length === 0) return { kind: 'empty' };
   if (entries.includes(MARKER)) return { kind: 'ours', version: readMarker(dir)?.version ?? null };
-  if (entries.includes(EXE_NAME) && fs.existsSync(path.join(dir, 'resources', 'app.asar'))) {
+  if ([EXE_NAME, ...OLD_EXE_NAMES].some((name) => entries.includes(name)) && fs.existsSync(path.join(dir, 'resources', 'app.asar'))) {
     return { kind: 'ours', version: null, legacy: true };
   }
   return { kind: 'foreign' };
@@ -176,7 +184,7 @@ async function install({ source, target, version, onStep = () => {}, onProgress,
 
 /** Ведёт ли ярлык на ModHub.exe — всё равно, какой версии и из какой папки. */
 function isModHubTarget(target) {
-  return /(^|[\\/])modhub\.exe$/i.test(String(target || '').trim());
+  return /(^|[\\/])(modhub|modlaunch)\.exe$/i.test(String(target || '').trim());
 }
 
 const sameLink = (a, b) => path.win32.normalize(String(a)).toLowerCase() === path.win32.normalize(String(b)).toLowerCase();
@@ -245,7 +253,7 @@ function registerScript({ target, exe, version, sizeKB }) {
     // «Установленных приложениях». Если она про эту же папку — убираем,
     // иначе в списке будет два ModHub, и один из них — нерабочий.
     `$d=${psDir(target)}`,
-    "foreach($r in 'HKCU:','HKLM:'){$b=\"$r\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\";if(Test-Path $b){Get-ChildItem $b -ErrorAction SilentlyContinue|ForEach-Object{$p=Get-ItemProperty $_.PSPath -ErrorAction SilentlyContinue;if($_.PSChildName -ne 'ModHub' -and \"$($p.DisplayName)\" -like 'ModHub*' -and \"$($p.UninstallString)\".IndexOf($d,[StringComparison]::OrdinalIgnoreCase) -ge 0){Remove-Item $_.PSPath -Recurse -Force -ErrorAction SilentlyContinue}}}}",
+    "foreach($r in 'HKCU:','HKLM:'){$b=\"$r\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\";if(Test-Path $b){Get-ChildItem $b -ErrorAction SilentlyContinue|ForEach-Object{$p=Get-ItemProperty $_.PSPath -ErrorAction SilentlyContinue;if($_.PSChildName -ne 'ModHub' -and (\"$($p.DisplayName)\" -like 'ModHub*' -or \"$($p.DisplayName)\" -like 'ModLaunch*') -and \"$($p.UninstallString)\".IndexOf($d,[StringComparison]::OrdinalIgnoreCase) -ge 0){Remove-Item $_.PSPath -Recurse -Force -ErrorAction SilentlyContinue}}}}",
   ].join('\n');
 }
 
@@ -267,7 +275,7 @@ function closeScript({ target, exceptPid = 0 }) {
     `$d=${psDir(target)}`,
     `$me=${Number(exceptPid) || 0}`,
     '$n=0',
-    `Get-CimInstance Win32_Process -Filter "Name='${EXE_NAME}'" -ErrorAction SilentlyContinue|Where-Object{$_.ExecutablePath -and $_.ExecutablePath.StartsWith($d,[StringComparison]::OrdinalIgnoreCase) -and $_.ProcessId -ne $me -and $_.ParentProcessId -ne $me}|ForEach-Object{Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue;$n++}`,
+    `Get-CimInstance Win32_Process -Filter "Name='${EXE_NAME}' OR ${OLD_EXE_NAMES.map((n) => `Name='${n}'`).join(' OR ')}" -ErrorAction SilentlyContinue|Where-Object{$_.ExecutablePath -and $_.ExecutablePath.StartsWith($d,[StringComparison]::OrdinalIgnoreCase) -and $_.ProcessId -ne $me -and $_.ParentProcessId -ne $me}|ForEach-Object{Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue;$n++}`,
     'if($n -gt 0){Start-Sleep -Milliseconds 900}',
     'Write-Output $n',
   ].join('\n');
@@ -290,6 +298,8 @@ function removalCommand(dirs) {
 
 module.exports = {
   EXE_NAME,
+  OLD_EXE_NAMES,
+  nsisInstallDir,
   APP_ID,
   ICON_FILE,
   MARKER,
