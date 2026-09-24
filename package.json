@@ -13,5 +13,14 @@
   "dependencies": {
     "adm-zip": "^0.5.16",
     "fast-xml-parser": "^4.5.0"
+  },
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win portable --x64"
+  },
+  "devDependencies": {
+    "electron": "^38.0.0",
+    "electron-builder": "^26.0.0",
+    "resedit": "^3.1.0"
   }
 }
