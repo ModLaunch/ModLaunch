@@ -9,14 +9,18 @@
 
 /* --- фон: медленно плывущие пятна света за содержимым ---------------- */
 
+/* Пятна света — отдельным слоем позади всего окна (isolation), чтобы
+   не менять порядок слоёв внутри: иначе панель загрузок из шапки
+   уходила под плитки и карточки. */
 .shell {
   position: relative;
+  isolation: isolate;
 }
 .shell::before,
 .shell::after {
   content: '';
   position: absolute;
-  z-index: 0;
+  z-index: -1;
   width: 520px;
   height: 520px;
   border-radius: 50%;
@@ -36,10 +40,6 @@
   background: #2bb3c0;
   animation-duration: 42s;
   animation-direction: alternate-reverse;
-}
-.shell > * {
-  position: relative;
-  z-index: 1;
 }
 @keyframes orb-drift {
   to {

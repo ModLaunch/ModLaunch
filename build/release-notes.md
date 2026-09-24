@@ -1,14 +1,15 @@
-**English:** download **ModLaunch-Setup-3.0.1.exe** below and run it. If Windows shows "Windows protected your PC", click **More info** → **Run anyway**. More in the [README](https://github.com/ModLaunch/ModLaunch#readme).
+**English:** download **ModLaunch-Setup-3.0.2.exe** below and run it. If Windows shows "Windows protected your PC", click **More info** → **Run anyway**. More in the [README](https://github.com/ModLaunch/ModLaunch#readme).
 
 ## Как скачать
 
-- **ModLaunch-Setup-3.0.1.exe** — установщик. Запустите, нажмите «Установить» — через минуту ModLaunch на рабочем столе и в «Пуске». ModHub 2.x обновится на месте: настройки, аккаунт, друзья и моды сохранятся.
-- **ModLaunch-3.0.1-win-x64.zip** — портативная версия одной папкой: распакуйте и запустите `ModLaunch.exe`.
+- **ModLaunch-Setup-3.0.2.exe** — установщик. Запустите, нажмите «Установить» — через минуту ModLaunch на рабочем столе и в «Пуске». ModHub 2.x обновится на месте: настройки, аккаунт, друзья и моды сохранятся.
+- **ModLaunch-3.0.2-win-x64.zip** — портативная версия одной папкой: распакуйте и запустите `ModLaunch.exe`.
 
 Если Windows покажет «Система Windows защитила ваш компьютер», нажмите «Подробнее» → «Выполнить в любом случае». Это нужно только один раз.
 
-## Что нового в 3.0.1
+## Что нового в 3.0.2
 
+- **Загрузки больше не уходят назад.** Панель загрузок из шапки снова открывается поверх плиток и карточек, а не под ними.
 - **Окна больше не выезжают снизу.** Подтверждения, ошибки, аккаунт и обновление плавно появляются прямо в центре, а экраны сменяются мягким проявлением без сдвига.
 
 ## Что нового в 3.0
