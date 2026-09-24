@@ -1,4 +1,4 @@
-**English:** download **ModLaunch-Setup-3.0.0.exe** below and run it. If Windows shows "Windows protected your PC", click **More info** → **Run anyway**. More in the [README](https://github.com/maksimuglou-spec/ModLaunch#readme).
+**English:** download **ModLaunch-Setup-3.0.0.exe** below and run it. If Windows shows "Windows protected your PC", click **More info** → **Run anyway**. More in the [README](https://github.com/ModLaunch/ModLaunch#readme).
 
 ## Как скачать
 
