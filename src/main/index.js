@@ -592,10 +592,23 @@ function registryFor(gameId, state) {
   return registries.get(key);
 }
 
+/**
+ * Прогресс скачивания приходит на каждый кусок файла — для большого архива
+ * это тысячи сообщений в окно. Глазу хватает десяти в секунду: одинаковый
+ * этап того же дела чаще не шлём, а смену этапа и конец — сразу (2.1).
+ */
+const progressSent = new Map();
 function sendProgress(payload) {
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('progress', payload);
-  }
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const key = `${payload?.scope ?? ''}|${payload?.gameId ?? ''}|${payload?.mod ?? payload?.detail ?? ''}`;
+  const stage = payload?.code ?? '';
+  const now = Date.now();
+  const last = progressSent.get(key);
+  const partial = typeof payload?.ratio === 'number' && payload.ratio < 1;
+  if (partial && last && last.stage === stage && now - last.at < 100) return;
+  progressSent.set(key, { stage, at: now });
+  if (progressSent.size > 200) progressSent.delete(progressSent.keys().next().value);
+  mainWindow.webContents.send('progress', payload);
 }
 
 /**

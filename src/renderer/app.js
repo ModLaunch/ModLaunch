@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Интерфейс ModHub 2.0.1.
+ * Интерфейс ModHub 2.1.
  *
  * Без сборщиков и фреймворков: обычный DOM, один файл на логику и один на
  * словарь. Для программы такого размера это осознанный выбор — нет шага
@@ -1737,7 +1737,7 @@ function downloadsBlock() {
 function homeAside() {
   // Игры с кнопкой «Играть» теперь прямо на главной — здесь их не дублируем.
   // Советов и рекламы премиума тоже нет (2.1).
-  return accountAsideBlock() + friendsAsideBlock() + downloadsBlock() + recentBlock(6);
+  return accountAsideBlock() + friendsAside() + downloadsBlock() + recentBlock(6);
 }
 
 /* --- каталог: сортировка и фильтры -------------------------------- */
@@ -3314,11 +3314,22 @@ function renderModPage() {
   // Галерея: все известные картинки мода и кадры из описания; ролики — отдельными плитками.
   // Квадратный значок Thunderstore уже стоит обложкой — в галерее он был бы единственным «кадром».
   const ownIcon = mod.iconShape === 'square' ? null : mod.icon;
-  const pictures = [...new Set([mod.picture, ownIcon, ...(mod.media?.images ?? []), ...rich.images].filter(Boolean))].filter(
-    (src) => shapes.get(src) !== 'broken' && !YT_THUMB.test(src)
-  );
+  // Один и тот же кадр часто приходит дважды: целиком и уменьшенным
+  // (…/images/2800/файл.png и …/images/thumbnails/2800/файл.png) — сравниваем по имени файла.
+  const seenFrames = new Set();
+  const pictures = [mod.picture, ownIcon, ...(mod.media?.images ?? []), ...rich.images].filter((src) => {
+    if (!src || shapes.get(src) === 'broken' || YT_THUMB.test(src)) return false;
+    const frame = String(src).split(/[?#]/)[0].split('/').pop().toLowerCase();
+    if (seenFrames.has(frame)) return false;
+    seenFrames.add(frame);
+    return true;
+  });
   const videos = [...new Set([...(mod.media?.videos ?? []), ...rich.videos])].slice(0, 4);
-  const gallery = [...pictures.slice(0, 12).map((src) => ({ src })), ...videos.map((id) => ({ src: ytThumb(id, 'hqdefault'), video: id }))];
+  // Единственный кадр, который и так стоит обложкой, галереей не считается.
+  const lonely = pictures.length === 1 && !videos.length && [mod.picture, mod.icon].includes(pictures[0]);
+  const gallery = lonely
+    ? []
+    : [...pictures.slice(0, 12).map((src) => ({ src })), ...videos.map((id) => ({ src: ytThumb(id, 'hqdefault'), video: id }))];
 
   // Своей картинки у мода нет, но в описании есть кадр или ролик — он и становится обложкой.
   const face =
@@ -4106,7 +4117,6 @@ function renderInstalled(game) {
     ? `<div class="mods">${state.mods.map((mod) => installedRow(game, mod)).join('')}</div>`
     : `<section class="empty">
          <h3>${esc(t('inst.empty'))}</h3>
-         <p>${esc(t('inst.empty.text'))}</p>
          <button class="btn btn--primary" data-action="tab" data-tab="market">${esc(t('games.market'))}</button>
        </section>`;
 
@@ -4804,11 +4814,6 @@ async function installKit(gameId, kitId) {
   for (const id of todo) await installMod(gameId, id);
   toast(t('pack.done'));
   softRender();
-}
-
-/** Друзья в правой панели главной — заполняется разделом «Друзья» (2.1). */
-function friendsAsideBlock() {
-  return typeof friendsAside === 'function' ? friendsAside() : '';
 }
 
 function renderLog(game) {
