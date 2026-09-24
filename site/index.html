@@ -9,27 +9,12 @@
     <meta property="og:title" content="ModLaunch — моды в один клик" />
     <meta property="og:description" content="Бесплатный лаунчер модов для Subnautica, Stardew Valley, Lethal Company, Hollow Knight и Below Zero." />
     <meta property="og:type" content="website" />
-    <meta property="og:image" content="https://modlaunch.github.io/ModLaunch/img/og.png" />
-    <meta name="twitter:card" content="summary_large_image" />
+    <meta property="og:image" content="https://modlaunch.github.io/ModLaunch/img/home.webp" />
     <link rel="icon" href="img/logo.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="style.css" />
-    <script>
-      // Обложки игр берутся из Steam. Если картинки нет по одному адресу — пробуем следующий, в конце — своя.
-      function nextArt(img) {
-        var id = img.dataset.steam, kind = img.dataset.kind, step = Number(img.dataset.step || 0) + 1;
-        var NEW = 'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/' + id + '/';
-        var OLD = 'https://cdn.akamai.steamstatic.com/steam/apps/' + id + '/';
-        var chain = kind === 'hero'
-          ? [OLD + 'library_hero.jpg', NEW + 'header.jpg', img.dataset.local]
-          : [NEW + 'library_600x900.jpg', OLD + 'library_600x900.jpg', NEW + 'header.jpg', img.dataset.local];
-        img.dataset.step = step;
-        if (step <= chain.length) img.src = chain[step - 1];
-        else img.onerror = null;
-      }
-    </script>
   </head>
   <body>
     <div class="bg" aria-hidden="true"><i></i><i></i><i></i></div>
@@ -98,32 +83,28 @@
         </div>
       </section>
 
-
-      <!-- Лента: арты игр плывут справа налево -->
-      <div class="strip" aria-hidden="true"><div class="strip__track"><img src="https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/264710/library_hero.jpg" data-steam="264710" data-kind="hero" data-local="img/game-subnautica.svg" onerror="nextArt(this)" alt="" loading="lazy" /><img src="https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/848450/library_hero.jpg" data-steam="848450" data-kind="hero" data-local="img/game-subnautica-below-zero.svg" onerror="nextArt(this)" alt="" loading="lazy" /><img src="https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/413150/library_hero.jpg" data-steam="413150" data-kind="hero" data-local="img/game-stardew-valley.webp" onerror="nextArt(this)" alt="" loading="lazy" /><img src="https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1966720/library_hero.jpg" data-steam="1966720" data-kind="hero" data-local="img/game-lethal-company.webp" onerror="nextArt(this)" alt="" loading="lazy" /><img src="https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/367520/library_hero.jpg" data-steam="367520" data-kind="hero" data-local="img/game-hollow-knight.webp" onerror="nextArt(this)" alt="" loading="lazy" /><img src="https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/264710/library_hero.jpg" data-steam="264710" data-kind="hero" data-local="img/game-subnautica.svg" onerror="nextArt(this)" alt="" loading="lazy" /><img src="https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/848450/library_hero.jpg" data-steam="848450" data-kind="hero" data-local="img/game-subnautica-below-zero.svg" onerror="nextArt(this)" alt="" loading="lazy" /><img src="https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/413150/library_hero.jpg" data-steam="413150" data-kind="hero" data-local="img/game-stardew-valley.webp" onerror="nextArt(this)" alt="" loading="lazy" /><img src="https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1966720/library_hero.jpg" data-steam="1966720" data-kind="hero" data-local="img/game-lethal-company.webp" onerror="nextArt(this)" alt="" loading="lazy" /><img src="https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/367520/library_hero.jpg" data-steam="367520" data-kind="hero" data-local="img/game-hollow-knight.webp" onerror="nextArt(this)" alt="" loading="lazy" /></div></div>
-
       <!-- Игры -->
       <section class="games wrap" id="games">
         <h2 class="reveal" data-t="games.title">Пять игр — один лаунчер</h2>
         <div class="games__row">
           <article class="game reveal">
-            <img src="https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/264710/library_600x900_2x.jpg" data-steam="264710" data-kind="cover" data-local="img/game-subnautica.svg" onerror="nextArt(this)" alt="Subnautica" loading="lazy" />
+            <img src="img/game-subnautica.svg" alt="" loading="lazy" />
             <div><h3>Subnautica</h3><p>BepInEx · Nexus Mods</p></div>
           </article>
           <article class="game reveal">
-            <img src="https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/848450/library_600x900_2x.jpg" data-steam="848450" data-kind="cover" data-local="img/game-subnautica-below-zero.svg" onerror="nextArt(this)" alt="Below Zero" loading="lazy" />
+            <img src="img/game-subnautica-below-zero.svg" alt="" loading="lazy" />
             <div><h3>Below Zero</h3><p>BepInEx · Nexus Mods</p></div>
           </article>
           <article class="game reveal">
-            <img src="https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/413150/library_600x900_2x.jpg" data-steam="413150" data-kind="cover" data-local="img/game-stardew-valley.webp" onerror="nextArt(this)" alt="Stardew Valley" loading="lazy" />
+            <img src="img/game-stardew-valley.webp" alt="" loading="lazy" />
             <div><h3>Stardew Valley</h3><p>SMAPI · Nexus Mods</p></div>
           </article>
           <article class="game reveal">
-            <img src="https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1966720/library_600x900_2x.jpg" data-steam="1966720" data-kind="cover" data-local="img/game-lethal-company.webp" onerror="nextArt(this)" alt="Lethal Company" loading="lazy" />
+            <img src="img/game-lethal-company.webp" alt="" loading="lazy" />
             <div><h3>Lethal Company</h3><p>BepInEx · Thunderstore</p></div>
           </article>
           <article class="game reveal">
-            <img src="https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/367520/library_600x900_2x.jpg" data-steam="367520" data-kind="cover" data-local="img/game-hollow-knight.webp" onerror="nextArt(this)" alt="Hollow Knight" loading="lazy" />
+            <img src="img/game-hollow-knight.webp" alt="" loading="lazy" />
             <div><h3>Hollow Knight</h3><p>Modding API · ModLinks</p></div>
           </article>
         </div>
@@ -179,34 +160,6 @@
         </div>
       </section>
 
-
-      <!-- Вручную и с ModLaunch -->
-      <section class="compare wrap">
-        <h2 class="reveal" data-t="cmp.title">Раньше — полчаса. Теперь — один клик</h2>
-        <div class="compare__grid">
-          <div class="cmp cmp--old reveal">
-            <h3 data-t="cmp.old">Вручную</h3>
-            <ul>
-              <li data-t="cmp.o1">Найти, какой загрузчик нужен игре, и поставить его</li>
-              <li data-t="cmp.o2">Скачать архив мода и распаковать в нужную папку</li>
-              <li data-t="cmp.o3">Выяснить, каких библиотек не хватает, и искать их по одной</li>
-              <li data-t="cmp.o4">Проверять обновления каждого мода самому</li>
-              <li data-t="cmp.o5">Гадать, почему игра вылетает</li>
-            </ul>
-          </div>
-          <div class="cmp cmp--new reveal">
-            <h3><img src="img/logo.svg" alt="" width="24" height="24" /> <span data-t="cmp.new">С ModLaunch</span></h3>
-            <ul>
-              <li data-t="cmp.n1">Загрузчик ставится сам при первой установке</li>
-              <li data-t="cmp.n2">Кнопка «Установить» — мод уже на месте</li>
-              <li data-t="cmp.n3">Зависимости подтягиваются вместе с модом</li>
-              <li data-t="cmp.n4">Обновления всех модов — одной кнопкой</li>
-              <li data-t="cmp.n5">Журнал игры и отключение модов в два клика</li>
-            </ul>
-          </div>
-        </div>
-      </section>
-
       <!-- Скриншоты -->
       <section class="screens wrap" id="screens">
         <h2 class="reveal" data-t="screens.title">Как это выглядит</h2>
@@ -214,9 +167,7 @@
           <button class="tab is-on" role="tab" data-shot="home" data-t="screens.home">Главная</button>
           <button class="tab" role="tab" data-shot="catalog" data-t="screens.catalog">Каталог</button>
           <button class="tab" role="tab" data-shot="mod" data-t="screens.mod">Страница мода</button>
-          <button class="tab" role="tab" data-shot="shaders" data-t="screens.shaders">Шейдеры</button>
           <button class="tab" role="tab" data-shot="overlay" data-t="screens.overlay">Оверлей в игре</button>
-          <button class="tab" role="tab" data-shot="setup" data-t="screens.setup">Установщик</button>
         </div>
         <figure class="stage reveal">
           <div class="window window--big">
@@ -225,14 +176,6 @@
           </div>
           <figcaption id="shotCap" data-t="cap.home">Все ваши игры, подборка модов и топ скачиваний — на одном экране.</figcaption>
         </figure>
-      </section>
-
-
-      <!-- Что нового: пункты из текста последнего выпуска на GitHub -->
-      <section class="news wrap" id="news" hidden>
-        <h2 class="reveal"><span data-t="news.title">Что нового в</span> <span class="js-version grad">3.0</span></h2>
-        <div class="news__grid" id="newsList"></div>
-        <p class="news__more reveal"><a class="js-notes" href="https://github.com/ModLaunch/ModLaunch/releases/latest" target="_blank" rel="noopener" data-t="news.all">Все изменения →</a></p>
       </section>
 
       <!-- Три шага -->
@@ -283,11 +226,6 @@
         <a class="final__zip js-zip" href="https://github.com/ModLaunch/ModLaunch/releases/latest" data-t="final.zip">Портативная версия (zip)</a>
       </section>
     </main>
-
-    <a class="dock js-setup" id="dock" href="https://github.com/ModLaunch/ModLaunch/releases/latest">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19h14" /></svg>
-      <span data-t="hero.download">Скачать для Windows</span>
-    </a>
 
     <footer class="foot">
       <div class="wrap foot__in">
