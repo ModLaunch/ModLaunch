@@ -305,6 +305,8 @@ function formatScore(avg) {
 /** Строка оценки под названием мода: ★★★★★ 4.50 · 3 отзыва / 0.00 · не оценено. */
 function ratingLine(gameId, modId, { compact = false } = {}) {
   const { avg, count } = ratingOf(gameId, modId);
+  // В плотных списках «0.00 ★★★★★» у каждого неоценённого мода — только шум.
+  if (compact && !count) return '';
   const note = count ? pluralN(count, 'rev.count') : t('rev.unrated');
   return `
     <span class="rate${count ? '' : ' is-empty'}${compact ? ' rate--compact' : ''}" title="${esc(`${formatScore(avg)} · ${note}`)}">
