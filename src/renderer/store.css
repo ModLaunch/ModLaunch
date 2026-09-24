@@ -1,0 +1,1416 @@
+/*
+ * ModHub 1.8 — шапка со стрелками и рекламой, главная как витрина магазина.
+ *
+ * Подключается после styles.css и переопределяет только то, что поменялось:
+ * шапку, рельс с артами игр и всю главную. Остальные экраны не трогает.
+ *
+ * Текст поверх картинок (баннер, мозаика) всегда светлый и на тёмной
+ * подложке — в любой теме: картинка под ним может быть какой угодно.
+ */
+
+/* ================================================================== *
+ *  Шапка: ← → | ModHub | поиск | реклама
+ * ================================================================== */
+
+.topbar {
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  gap: 16px;
+  padding: 12px 22px;
+}
+
+.navbtns {
+  display: flex;
+  gap: 6px;
+}
+
+.navbtn {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.12s, opacity 0.15s;
+}
+.navbtn svg {
+  width: 17px;
+  height: 17px;
+  display: block;
+}
+.navbtn:hover:not(:disabled) {
+  background: var(--surface-3);
+  border-color: var(--accent-line);
+}
+.navbtn:active:not(:disabled) {
+  transform: scale(0.92);
+}
+.navbtn:disabled {
+  opacity: 0.32;
+  cursor: default;
+}
+
+/* --- реклама ------------------------------------------------------- */
+
+.adslot {
+  position: relative;
+  justify-self: end;
+  display: flex;
+  width: 318px;
+  min-width: 0;
+}
+.adslot[hidden] {
+  display: none;
+}
+
+.ad {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 46px;
+  padding: 5px 10px 5px 5px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: linear-gradient(120deg, var(--surface-2), var(--surface));
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color 0.18s, box-shadow 0.18s, transform 0.12s;
+}
+.ad:hover {
+  border-color: var(--accent-line);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.25);
+}
+.ad:active {
+  transform: scale(0.99);
+}
+.ad.is-swap {
+  animation: ad-in 0.55s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes ad-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.ad__pic {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background-size: cover;
+  background-position: center;
+  color: #fff;
+}
+.ad__pic svg {
+  width: 20px;
+  height: 20px;
+}
+.ad__pic--img {
+  background-color: var(--surface-3);
+}
+.ad__pic--premium {
+  color: #241a05;
+  background: linear-gradient(145deg, var(--gold-2), var(--gold));
+}
+.ad__pic--games {
+  background: linear-gradient(145deg, #a893ff, #5b3fe0);
+}
+.ad__pic--donate {
+  background: linear-gradient(145deg, #ffb38a, #e0624a);
+}
+.ad__pic--advertise {
+  color: #06201d;
+  background: linear-gradient(145deg, #7ff0e1, #2aa597);
+}
+
+.ad__body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+.ad__title,
+.ad__text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ad__title {
+  font-size: 13px;
+  font-weight: 700;
+}
+.ad__text {
+  font-size: 12px;
+  color: var(--muted);
+}
+.ad__go {
+  margin-left: auto;
+  flex: 0 0 auto;
+  color: var(--muted);
+  display: grid;
+}
+.ad__go svg {
+  width: 15px;
+  height: 15px;
+}
+
+.ad__tag {
+  position: absolute;
+  top: -8px;
+  right: 10px;
+  padding: 0 6px;
+  border-radius: 5px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 15px;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.ad__tag:hover {
+  color: var(--gold-2);
+  border-color: rgba(231, 180, 74, 0.5);
+}
+
+@media (max-width: 1180px) {
+  .adslot {
+    width: 262px;
+  }
+}
+@media (max-width: 1060px) {
+  .adslot {
+    width: 208px;
+  }
+  .ad__text,
+  .ad__go {
+    display: none;
+  }
+}
+
+/* ================================================================== *
+ *  Рельс: игры — артом, как иконки приложений
+ * ================================================================== */
+
+.rail__btn--game {
+  padding: 0;
+  overflow: visible;
+}
+.rail__art {
+  position: absolute;
+  inset: 2px;
+  border-radius: 12px;
+  background-size: cover;
+  background-position: center;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+  transition: filter 0.2s, inset 0.15s;
+}
+.rail__btn--game .rail__initials {
+  opacity: 0;
+}
+.rail__btn--game.is-off .rail__art {
+  filter: grayscale(0.9) brightness(0.55);
+}
+.rail__btn--game:hover .rail__art {
+  filter: brightness(1.12);
+}
+.rail__btn--game.is-off:hover .rail__art {
+  filter: grayscale(0.4) brightness(0.8);
+}
+.rail__btn--game.is-active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+.rail__btn--game .dot {
+  z-index: 2;
+  right: -2px;
+  bottom: -2px;
+  width: 11px;
+  height: 11px;
+  border-width: 2.5px;
+}
+
+/* ================================================================== *
+ *  Главная
+ * ================================================================== */
+
+.page--home {
+  gap: 30px;
+  max-width: 1240px;
+}
+
+/* --- общие детали -------------------------------------------------- */
+
+.block {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.block__head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+}
+.block__head h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 19px;
+  min-width: 0;
+}
+.block__head h2 > span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.block__head h2 > svg {
+  width: 21px;
+  height: 21px;
+  flex: 0 0 auto;
+  color: var(--gold);
+}
+.block__head h2 small {
+  font-size: 12.5px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.block__head .muted {
+  margin-top: 2px;
+}
+
+.linkbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 6px 6px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--accent);
+  font-weight: 650;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.linkbtn svg {
+  width: 16px;
+  height: 16px;
+}
+.linkbtn:hover {
+  background: var(--accent-soft);
+}
+
+.roundbtn {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.12s;
+}
+.roundbtn svg {
+  width: 16px;
+  height: 16px;
+}
+.roundbtn:hover {
+  background: var(--surface-3);
+  border-color: var(--accent-line);
+}
+.roundbtn:active {
+  transform: scale(0.92);
+}
+
+/* Надписи: «Выбор ModHub», «Лучшее», «Хит», «Новое». */
+.tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.tagx {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px 3px 7px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 750;
+  line-height: 1.3;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  color: #fff;
+  background: rgba(12, 10, 24, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+.tagx svg {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
+}
+.tagx--pick {
+  color: #fff;
+  background: linear-gradient(135deg, rgba(124, 92, 255, 0.95), rgba(92, 60, 220, 0.95));
+  border-color: rgba(203, 188, 255, 0.45);
+}
+.tagx--best {
+  color: #2a1d02;
+  background: linear-gradient(135deg, #ffe39e, #e9b347);
+  border-color: rgba(255, 236, 180, 0.7);
+}
+.tagx--hit {
+  color: #fff;
+  background: linear-gradient(135deg, #ff8a4c, #e5484d);
+  border-color: rgba(255, 190, 160, 0.5);
+}
+.tagx--new {
+  color: #04221a;
+  background: linear-gradient(135deg, #7ff0c4, #35c48e);
+  border-color: rgba(190, 255, 225, 0.6);
+}
+.tagx--brand {
+  color: #fff;
+  background: rgba(124, 92, 255, 0.28);
+  border-color: rgba(203, 188, 255, 0.4);
+}
+.tagx--brand svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* Значок игры: кружок с артом. */
+.gchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 9px 2px 2px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 650;
+  color: #fff;
+  background: rgba(12, 10, 24, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(8px);
+  white-space: nowrap;
+  min-width: 0;
+  flex: 0 0 auto;
+}
+.gchip i {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background-size: cover;
+  background-position: center;
+  box-shadow: 0 0 0 1.5px var(--accent);
+}
+.gchip > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gchip--dot {
+  padding: 2px;
+  background: none;
+  border: 0;
+  backdrop-filter: none;
+}
+.gchip--dot i {
+  width: 20px;
+  height: 20px;
+}
+
+/* Кнопка «Установить» в плитках и топе. */
+.getbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink, #fff);
+  font-weight: 700;
+  font-size: 13.5px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: filter 0.18s, transform 0.12s, box-shadow 0.18s;
+}
+.getbtn svg {
+  width: 16px;
+  height: 16px;
+}
+button.getbtn:hover {
+  filter: brightness(1.15);
+  box-shadow: 0 8px 20px var(--accent-line);
+}
+button.getbtn:active {
+  transform: scale(0.96);
+}
+.getbtn.is-done {
+  color: var(--ok);
+  background: rgba(70, 192, 138, 0.16);
+  cursor: default;
+}
+.getbtn--lg {
+  padding: 12px 24px;
+  font-size: 15px;
+}
+.getbtn--lg svg {
+  width: 18px;
+  height: 18px;
+}
+.getbtn--sm {
+  padding: 6px 12px;
+  font-size: 12.5px;
+}
+.getbtn--sm svg {
+  width: 14px;
+  height: 14px;
+}
+.getbtn--icon {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+}
+.getbtn--icon svg {
+  width: 17px;
+  height: 17px;
+}
+.getbtn--ghost:not(.is-done) {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.getbtn--ghost:not(.is-done):hover {
+  color: var(--accent-ink, #fff);
+  background: var(--accent);
+}
+
+/* ================================================================== *
+ *  Большой баннер-карусель
+ * ================================================================== */
+
+.spot {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.spot__stage {
+  position: relative;
+  height: 350px;
+  border-radius: 22px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: #120f1f;
+  box-shadow: var(--shadow);
+}
+
+.spot__slide {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 28px;
+  padding: 34px 40px;
+  color: #f4f2ff;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.7s ease, visibility 0s linear 0.7s;
+}
+.spot__slide.is-active {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.7s ease, visibility 0s;
+  z-index: 1;
+}
+
+.spot__bg {
+  position: absolute;
+  inset: -60px;
+  background-size: cover;
+  background-position: center;
+  filter: blur(42px) saturate(1.5) brightness(0.7);
+  transform: scale(1.12);
+}
+.spot__bg--photo {
+  inset: 0;
+  filter: none;
+  transform: none;
+}
+.spot__slide::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(95deg, rgba(10, 8, 20, 0.92) 0%, rgba(10, 8, 20, 0.7) 45%, rgba(10, 8, 20, 0.25) 100%);
+}
+.spot__slide > *:not(.spot__bg) {
+  position: relative;
+  z-index: 1;
+}
+
+.spot__text {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.spot__text h1 {
+  font-size: 36px;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.spot__slide--brand h1 {
+  white-space: normal;
+}
+.spot__by {
+  margin-top: -4px;
+  color: color-mix(in srgb, var(--accent) 70%, #fff);
+  font-weight: 650;
+  font-size: 13.5px;
+}
+.spot__desc {
+  color: #d3cee8;
+  font-size: 15px;
+  max-width: 520px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.spot__meta {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.spot__meta .rate {
+  margin-top: 0;
+}
+.spot__meta .rate__note,
+.spot__meta .meta {
+  color: #c9c3df;
+}
+.spot__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 6px;
+}
+.spot__actions .btn--ghost {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(6px);
+}
+.spot__actions .btn--ghost:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+.spot__slide--brand .btn--primary {
+  background: var(--brand);
+  color: #fff;
+}
+
+.spot__art {
+  height: 100%;
+  max-height: 262px;
+  min-width: 0;
+  cursor: pointer;
+  border-radius: 18px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+  transform: translateX(18px) scale(0.98);
+  transition: transform 0.9s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.spot__slide.is-active .spot__art {
+  transform: none;
+}
+.spot__art .card__cover {
+  height: 100%;
+  border-radius: inherit;
+}
+.spot__art:hover .card__img {
+  transform: scale(1.05);
+}
+.spot__art .card__cover.is-icon .card__tile {
+  width: 150px;
+  height: 150px;
+  border-radius: 32px;
+}
+.spot__art .card__emblem {
+  width: 104px;
+  height: 104px;
+}
+.spot__art .card__emblem svg {
+  width: 54px;
+  height: 54px;
+}
+.spot__art .card__mark {
+  font-size: 72px;
+}
+
+/* Слайд ModHub: большой знак вместо картинки мода. */
+.spot__art--logo {
+  display: grid;
+  place-items: center;
+  box-shadow: none;
+  background: none;
+  cursor: default;
+  overflow: visible;
+}
+.spot__art--logo svg {
+  width: 210px;
+  height: 210px;
+  filter: drop-shadow(0 18px 50px rgba(124, 92, 255, 0.55));
+  animation: spot-float 6s ease-in-out infinite;
+}
+@keyframes spot-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0);
+  }
+  50% {
+    transform: translateY(-10px) rotate(-4deg);
+  }
+}
+
+.spot__nav {
+  position: absolute;
+  z-index: 3;
+  top: 50%;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(12, 10, 24, 0.5);
+  color: #fff;
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(-50%);
+  transition: opacity 0.2s, background 0.15s;
+}
+.spot__nav svg {
+  width: 18px;
+  height: 18px;
+}
+.spot__nav--prev {
+  left: 10px;
+}
+.spot__nav--next {
+  right: 10px;
+}
+.spot__stage:hover .spot__nav {
+  opacity: 1;
+}
+.spot__nav:hover {
+  background: rgba(124, 92, 255, 0.6);
+}
+
+/* Миниатюры под баннером: какой слайд, и полоска — сколько до следующего. */
+.spot__thumbs {
+  display: grid;
+  grid-template-columns: repeat(var(--n, 4), minmax(0, 1fr));
+  gap: 10px;
+}
+.spot__thumb {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 7px 10px 9px 7px;
+  border-radius: 13px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color 0.18s, background 0.18s, transform 0.12s;
+}
+.spot__thumb:hover {
+  background: var(--surface-2);
+  transform: translateY(-1px);
+}
+.spot__thumb.is-active {
+  border-color: var(--accent-line);
+  background: var(--surface-2);
+}
+.spot__thumbpic {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border-radius: 9px;
+  background-size: cover;
+  background-position: center;
+  background-color: var(--surface-3);
+}
+.spot__thumbtext {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+.spot__thumbtext b,
+.spot__thumbtext span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.spot__thumbtext b {
+  font-size: 13px;
+}
+.spot__thumbtext span {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.spot__timer {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  width: 0;
+  background: var(--brand);
+  border-radius: 0 3px 3px 0;
+}
+.spot__thumb.is-active .spot__timer {
+  animation: spot-timer var(--hero, 8s) linear forwards;
+}
+.spot:hover .spot__timer {
+  animation-play-state: paused;
+}
+@keyframes spot-timer {
+  to {
+    width: 100%;
+  }
+}
+
+/* ================================================================== *
+ *  «Ваши игры»
+ * ================================================================== */
+
+.gcards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 14px;
+}
+
+.gcard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 176px;
+  padding: 0;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  overflow: hidden;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s, transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.25s;
+}
+.gcard:hover {
+  border-color: var(--accent-line);
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35), 0 0 0 1px var(--accent-line);
+}
+.gcard__art {
+  /* Ширина явно: в Chromium 128 (Electron 32) дети кнопки-колонки не растягиваются сами. */
+  display: block;
+  width: 100%;
+  height: 104px;
+  background-size: cover;
+  background-position: center;
+  transition: transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1), filter 0.3s;
+}
+.gcard:hover .gcard__art {
+  transform: scale(1.06);
+}
+.gcard.is-off .gcard__art {
+  filter: grayscale(0.85) brightness(0.6);
+}
+.gcard__badge {
+  position: absolute;
+  top: 78px;
+  left: 14px;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 13px;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--accent-ink, #fff);
+  background: var(--accent);
+  border: 3px solid var(--surface);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.3);
+}
+.gcard__body {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 26px 16px 14px;
+  min-width: 0;
+}
+.gcard__name {
+  font-weight: 700;
+  font-size: 15.5px;
+}
+.gcard__line,
+.gcard__count {
+  font-size: 12.5px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gcard__count {
+  color: var(--accent);
+  font-weight: 600;
+}
+.gcard__go {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--accent);
+  background: var(--accent-soft);
+  opacity: 0;
+  transform: translateX(-6px);
+  transition: opacity 0.2s, transform 0.2s;
+}
+.gcard__go svg {
+  width: 15px;
+  height: 15px;
+}
+.gcard:hover .gcard__go {
+  opacity: 1;
+  transform: none;
+}
+
+.gcard--more {
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 18px;
+  text-align: center;
+  border-style: dashed;
+  background: transparent;
+}
+.gcard--more:hover {
+  background: var(--surface);
+}
+.gcard__plus {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 6px;
+  border-radius: 14px;
+  color: var(--brand-2);
+  background: rgba(124, 92, 255, 0.14);
+}
+.gcard__plus svg {
+  width: 24px;
+  height: 24px;
+}
+.gcard--more .gcard__line {
+  white-space: normal;
+}
+
+/* ================================================================== *
+ *  «Рекомендуем»: мозаика плиток разного размера
+ * ================================================================== */
+
+.mosaic {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-rows: 172px;
+  grid-auto-flow: row dense;
+  gap: 14px;
+}
+
+.mtile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-width: 0;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  overflow: hidden;
+  cursor: pointer;
+  color: #fff;
+  isolation: isolate;
+  transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.28s, border-color 0.2s;
+}
+.mtile:hover {
+  transform: translateY(-4px);
+  border-color: var(--accent-line);
+  box-shadow: 0 22px 46px rgba(0, 0, 0, 0.45), 0 0 0 1px var(--accent-line);
+}
+.mtile--L,
+.mtile--R {
+  grid-column: span 2;
+  grid-row: span 2;
+}
+.mtile--R {
+  grid-column: 3 / span 2;
+}
+.mtile--W {
+  grid-column: span 2;
+}
+
+.mtile .card__cover {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  height: auto;
+}
+.mtile:hover .card__img {
+  transform: scale(1.07);
+}
+.mtile .card__cover::after {
+  background: linear-gradient(180deg, rgba(10, 8, 20, 0.35) 0%, transparent 30%, rgba(10, 8, 20, 0.55) 58%, rgba(10, 8, 20, 0.94) 100%);
+}
+.mtile .card__cover.is-icon .card__tile {
+  margin-bottom: 34px;
+}
+.mtile--S .card__cover.is-icon .card__tile {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  margin-bottom: 44px;
+}
+.mtile--L .card__cover.is-icon .card__tile,
+.mtile--R .card__cover.is-icon .card__tile {
+  width: 132px;
+  height: 132px;
+  border-radius: 30px;
+  margin-bottom: 90px;
+}
+.mtile--L .card__emblem,
+.mtile--R .card__emblem {
+  width: 96px;
+  height: 96px;
+  margin-bottom: 80px;
+}
+.mtile--L .card__emblem svg,
+.mtile--R .card__emblem svg {
+  width: 50px;
+  height: 50px;
+}
+.mtile--S .card__emblem,
+.mtile--W .card__emblem {
+  margin-bottom: 40px;
+}
+.mtile .card__mark {
+  margin-bottom: 40px;
+}
+.mtile .card__play {
+  top: 12px;
+  right: 12px;
+  bottom: auto;
+}
+
+.mtile__top {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.mtile__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 16px 14px;
+  min-width: 0;
+}
+.mtile__body h3 {
+  font-size: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+}
+.mtile--L h3,
+.mtile--R h3 {
+  font-size: 26px;
+  letter-spacing: -0.02em;
+}
+.mtile--W h3 {
+  font-size: 18px;
+}
+.mtile__by {
+  font-size: 12.5px;
+  font-weight: 650;
+  color: color-mix(in srgb, var(--accent) 65%, #fff);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mtile__text {
+  margin-top: 4px;
+  font-size: 13.5px;
+  color: #d6d1ea;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.mtile__foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 6px;
+  min-width: 0;
+}
+.mtile__foot .rate {
+  margin-top: 0;
+}
+.mtile__foot .meta {
+  color: #cfc9e4;
+}
+.mtile__foot .getbtn {
+  margin-left: auto;
+}
+.mtile--S .tags .tagx:nth-child(n + 2) {
+  display: none;
+}
+
+/* Широкая плитка: картинка-значок справа, текст слева — не наезжают. */
+.mtile--W .card__cover {
+  justify-items: end;
+  padding-right: 34px;
+}
+.mtile--W .card__cover.is-icon .card__tile {
+  width: 74px;
+  height: 74px;
+  border-radius: 18px;
+  margin-bottom: 30px;
+}
+.mtile--W .card__emblem,
+.mtile--W .card__mark {
+  margin-bottom: 44px;
+}
+.mtile--W .card__mark {
+  font-size: 54px;
+  opacity: 0.9;
+}
+
+/* Поверх картинки оценка всегда в светлых тонах — и в светлой теме тоже. */
+:root .mtile .rate__stars,
+:root .spot .rate__stars,
+:root[data-theme='light'] .mtile .rate__stars,
+:root[data-theme='light'] .spot .rate__stars {
+  color: rgba(255, 255, 255, 0.22);
+}
+.mtile .rate.is-empty,
+.spot .rate.is-empty {
+  color: #c9c3df;
+}
+
+.mtile--ghost {
+  cursor: default;
+  background: linear-gradient(100deg, var(--surface) 20%, var(--surface-3) 40%, var(--surface) 60%);
+  background-size: 250% 100%;
+  animation: shimmer 1.3s infinite linear;
+}
+.mtile--ghost:hover {
+  transform: none;
+  box-shadow: none;
+  border-color: var(--line);
+}
+
+/* ================================================================== *
+ *  «Топ модов»
+ * ================================================================== */
+
+.seg {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  flex-wrap: wrap;
+}
+.seg__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 650;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+.seg__btn .gchip--dot {
+  padding: 0;
+}
+.seg__btn .gchip--dot i {
+  width: 16px;
+  height: 16px;
+}
+.seg__btn:hover {
+  color: var(--text);
+}
+.seg__btn.is-active {
+  color: #fff;
+  background: var(--brand);
+}
+
+.chart {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-flow: column;
+  grid-template-rows: repeat(3, auto);
+  gap: 8px 16px;
+}
+.chart__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 10px 12px 10px 8px;
+  border-radius: 14px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.chart__row:hover {
+  background: var(--surface);
+  border-color: var(--line);
+}
+.chart__row--ghost {
+  height: 74px;
+  background: linear-gradient(100deg, var(--surface) 20%, var(--surface-3) 40%, var(--surface) 60%);
+  background-size: 250% 100%;
+  animation: shimmer 1.3s infinite linear;
+}
+.chart__n {
+  flex: 0 0 26px;
+  text-align: center;
+  font-size: 19px;
+  font-weight: 800;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.chart__n.is-top {
+  background: linear-gradient(160deg, var(--gold-2), var(--gold));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.chart__pic {
+  flex: 0 0 auto;
+  width: 54px;
+  height: 54px;
+  border-radius: 13px;
+  background-size: cover;
+  background-position: center;
+  background-color: var(--surface-3);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+.chart__body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+  line-height: 1.3;
+}
+.chart__body b {
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chart__game {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.chart__game .gchip--dot {
+  padding: 0;
+}
+.chart__game .gchip--dot i {
+  width: 14px;
+  height: 14px;
+  box-shadow: none;
+}
+.chart__meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.chart__meta .rate {
+  margin-top: 0;
+}
+.chart__row .getbtn {
+  flex: 0 0 auto;
+  opacity: 0.85;
+}
+.chart__row:hover .getbtn {
+  opacity: 1;
+}
+
+/* ================================================================== *
+ *  Полки, которые листаются стрелками
+ * ================================================================== */
+
+.shelf__tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+.shelf__track {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 262px;
+  gap: 14px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  /* Место сверху и снизу — чтобы приподнятая при наведении карточка не обрезалась. */
+  margin: -10px -6px -16px;
+  padding: 10px 6px 16px;
+  scroll-snap-type: x proximity;
+  scroll-padding: 0 6px;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+.shelf__track::-webkit-scrollbar {
+  display: none;
+}
+.shelf__track > * {
+  scroll-snap-align: start;
+}
+.shelf__track .card--ghost {
+  min-height: 300px;
+}
+
+/* Надписи на карточке мода в каталоге и на полках. */
+.card__cover > .tags {
+  position: absolute;
+  z-index: 3;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+}
+.meta--fresh {
+  color: var(--ok);
+  white-space: nowrap;
+}
+.card__game {
+  position: absolute;
+  z-index: 3;
+  right: 10px;
+  bottom: 10px;
+}
+.card__game .gchip--dot i {
+  width: 24px;
+  height: 24px;
+  box-shadow: 0 0 0 2px var(--accent), 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+/* ================================================================== *
+ *  Узкое окно
+ * ================================================================== */
+
+@media (max-width: 1120px) {
+  .spot__slide {
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    padding: 28px 30px;
+  }
+  .spot__text h1 {
+    font-size: 30px;
+  }
+  .chart {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: repeat(5, auto);
+  }
+}
+
+@media (max-width: 1100px) {
+  .mtile--S .meta {
+    display: none;
+  }
+}
+
+@media (max-width: 980px) {
+  .mosaic {
+    grid-auto-rows: 158px;
+  }
+  .mtile--L h3,
+  .mtile--R h3 {
+    font-size: 22px;
+  }
+  .spot__thumbtext span {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spot__slide,
+  .spot__art,
+  .mtile,
+  .gcard,
+  .ad.is-swap {
+    transition: none;
+    animation: none;
+  }
+  .spot__art--logo svg {
+    animation: none;
+  }
+}

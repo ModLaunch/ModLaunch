@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'"
+    />
+    <title>ModHub</title>
+    <link rel="stylesheet" href="setup.css" />
+  </head>
+  <body data-mood="intro">
+    <div class="shell">
+      <!-- Слева — знак ModHub. Шарики-моды слетаются к центру, а во время
+           установки по линиям бегут «данные»: так видно, что работа идёт. -->
+      <aside class="art">
+        <div class="art__bg"></div>
+        <div class="art__glow"></div>
+        <svg class="hub" viewBox="96 96 320 320" aria-hidden="true">
+          <defs>
+            <linearGradient id="hubCore" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#b9a6ff" /><stop offset="1" stop-color="#6a4bf0" />
+            </linearGradient>
+            <linearGradient id="hubGold" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#ffe29a" /><stop offset="1" stop-color="#e7a93a" />
+            </linearGradient>
+          </defs>
+          <g class="hub__spin">
+            <line class="hub__link" pathLength="1" x1="256" y1="256" x2="164" y2="164" />
+            <line class="hub__link" pathLength="1" x1="256" y1="256" x2="348" y2="164" />
+            <line class="hub__link" pathLength="1" x1="256" y1="256" x2="164" y2="348" />
+            <line class="hub__link" pathLength="1" x1="256" y1="256" x2="348" y2="348" />
+            <circle class="hub__sat" style="--dx: -70px; --dy: -70px" cx="164" cy="164" r="36" fill="#cbbcff" />
+            <circle class="hub__sat" style="--dx: 70px; --dy: -70px" cx="348" cy="164" r="36" fill="url(#hubGold)" />
+            <circle class="hub__sat" style="--dx: -70px; --dy: 70px" cx="164" cy="348" r="36" fill="#8f73ff" />
+            <circle class="hub__sat" style="--dx: 70px; --dy: 70px" cx="348" cy="348" r="36" fill="#cbbcff" />
+          </g>
+          <circle class="hub__ring" cx="256" cy="256" r="68" />
+          <circle class="hub__core" cx="256" cy="256" r="68" fill="#fff" />
+          <circle class="hub__dot" cx="256" cy="256" r="32" fill="url(#hubCore)" />
+        </svg>
+        <div class="art__word">Mod<span>Hub</span></div>
+        <div class="art__ver" id="ver"></div>
+      </aside>
+
+      <main class="panel">
+        <header class="bar">
+          <span class="bar__title" id="title"></span>
+          <button class="bar__btn" data-act="min" id="btnMin" type="button">
+            <svg viewBox="0 0 12 12"><path d="M1.5 6h9" stroke="currentColor" stroke-width="1.2" /></svg>
+          </button>
+          <button class="bar__btn bar__btn--close" data-act="close" id="btnClose" type="button">
+            <svg viewBox="0 0 12 12"><path d="M2 2l8 8m0-8-8 8" stroke="currentColor" stroke-width="1.2" /></svg>
+          </button>
+        </header>
+        <section class="screen" id="screen"></section>
+      </main>
+    </div>
+
+    <div class="sheet" id="sheet" hidden>
+      <div class="sheet__panel" role="dialog" aria-modal="true">
+        <h2 id="sheetTitle"></h2>
+        <pre id="sheetText"></pre>
+        <button class="btn btn--primary" data-act="sheet-close" id="sheetBtn" type="button"></button>
+      </div>
+    </div>
+
+    <script src="setup.js"></script>
+  </body>
+</html>

@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; script-src 'self'; frame-src https://www.youtube-nocookie.com https://www.youtube.com"
+    />
+    <title>ModHub</title>
+    <link rel="stylesheet" href="hub.css" />
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="store.css" />
+    <link rel="stylesheet" href="design.css" />
+  </head>
+  <body class="is-booting">
+    <!--
+      Заставка при запуске: знак собирается, пока программа находит игры
+      и готовит главную. Исчезает, как только главная готова.
+    -->
+    <div class="splash" id="splash" aria-hidden="true">
+      <svg class="hub" viewBox="96 96 320 320">
+        <defs>
+          <linearGradient id="splashCore" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#b9a6ff" /><stop offset="1" stop-color="#6a4bf0" />
+          </linearGradient>
+          <linearGradient id="splashGold" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#ffe29a" /><stop offset="1" stop-color="#e7a93a" />
+          </linearGradient>
+        </defs>
+        <g class="hub__spin">
+          <line class="hub__link" pathLength="1" x1="256" y1="256" x2="164" y2="164" />
+          <line class="hub__link" pathLength="1" x1="256" y1="256" x2="348" y2="164" />
+          <line class="hub__link" pathLength="1" x1="256" y1="256" x2="164" y2="348" />
+          <line class="hub__link" pathLength="1" x1="256" y1="256" x2="348" y2="348" />
+          <circle class="hub__sat" style="--dx: -70px; --dy: -70px" cx="164" cy="164" r="36" fill="#cbbcff" />
+          <circle class="hub__sat" style="--dx: 70px; --dy: -70px" cx="348" cy="164" r="36" fill="url(#splashGold)" />
+          <circle class="hub__sat" style="--dx: -70px; --dy: 70px" cx="164" cy="348" r="36" fill="#8f73ff" />
+          <circle class="hub__sat" style="--dx: 70px; --dy: 70px" cx="348" cy="348" r="36" fill="#cbbcff" />
+        </g>
+        <circle class="hub__ring" cx="256" cy="256" r="68" />
+        <circle class="hub__core" cx="256" cy="256" r="68" fill="#fff" />
+        <circle class="hub__dot" cx="256" cy="256" r="32" fill="url(#splashCore)" />
+      </svg>
+      <div class="splash__word">Mod<span>Hub</span></div>
+      <div class="splash__bar"><i></i></div>
+    </div>
+    <div class="app">
+      <!--
+        Рельс. Сверху золотой премиум, под ним меню, дальше игры — сначала
+        найденные, потом добавленные руками. Внизу «на чай» и настройки.
+      -->
+      <nav class="rail" id="rail">
+        <button class="rail__btn rail__btn--premium" id="navPremium" type="button">
+          <span class="rail__icon" data-icon="crown"></span>
+          <span class="rail__tip"></span>
+        </button>
+
+        <button class="rail__btn rail__btn--home" id="navHome" type="button">
+          <span class="rail__icon" data-icon="logo"></span>
+          <span class="rail__tip"></span>
+        </button>
+
+        <div class="rail__divider"></div>
+
+        <div class="rail__games" id="railGames"></div>
+
+        <div class="rail__spacer"></div>
+
+        <!-- Аккаунт ModHub: «Войти» или кружок с буквами имени. -->
+        <button class="rail__btn rail__btn--account" id="navAccount" type="button" hidden>
+          <span class="rail__icon"></span>
+          <span class="rail__tip"></span>
+        </button>
+
+        <button class="rail__btn" id="navDonate" type="button">
+          <span class="rail__icon" data-icon="cup"></span>
+          <span class="rail__tip"></span>
+        </button>
+
+        <button class="rail__btn" id="navSettings" type="button">
+          <span class="rail__icon" data-icon="gear"></span>
+          <span class="rail__tip"></span>
+        </button>
+      </nav>
+
+      <div class="shell">
+        <header class="topbar">
+          <!-- Назад / вперёд по экранам, как в браузере. -->
+          <div class="navbtns">
+            <button class="navbtn" id="navBack" type="button" data-action="back" disabled>
+              <span data-icon="arrowLeft"></span>
+            </button>
+            <button class="navbtn" id="navForward" type="button" data-action="forward" disabled>
+              <span data-icon="arrowRight"></span>
+            </button>
+          </div>
+
+          <button class="brand" id="brand" type="button">
+            <span class="brand__logo" data-icon="logo"></span><span class="brand__word">Mod<span class="brand__hub">Hub</span></span>
+          </button>
+
+          <!-- Где я: «Главная», «Stardew Valley › Рынок», «Настройки › Внешний вид». -->
+          <nav class="crumbs" id="crumbs" aria-label="breadcrumbs"></nav>
+
+          <label class="search" id="searchBox">
+            <span class="search__icon" data-icon="search"></span>
+            <input id="searchInput" type="search" autocomplete="off" spellcheck="false" />
+            <kbd class="search__kbd">Ctrl K</kbd>
+          </label>
+
+          <!-- Показать или спрятать правую панель. -->
+          <button class="navbtn asidebtn" id="asideBtn" type="button" data-action="aside-toggle">
+            <span data-icon="panel"></span>
+          </button>
+
+          <!-- Загрузки: кольцо прогресса вокруг стрелки, по клику — окно со списком. -->
+          <div class="dlt">
+            <button class="dlt__btn" id="dlBtn" type="button" data-action="dl-toggle">
+              <svg class="dlt__ring" viewBox="0 0 40 40" aria-hidden="true">
+                <circle class="dlt__track" cx="20" cy="20" r="17" pathLength="100" />
+                <circle class="dlt__value" cx="20" cy="20" r="17" pathLength="100" />
+              </svg>
+              <span class="dlt__icon" data-icon="download"></span>
+              <span class="dlt__count"></span>
+            </button>
+            <div class="dlp" id="dlPanel" hidden></div>
+          </div>
+
+          <!-- Рекламное место. Что в нём крутится — src/renderer/ads.js и ads.config.json. -->
+          <div class="adslot" id="adSlot" aria-live="off"></div>
+        </header>
+
+        <!--
+          Рабочая область: лента экрана и правая панель, как в Modrinth App.
+          Панель подстраивается под экран: на главной — игры и загрузки,
+          в каталоге — фильтры, на странице мода — сведения о нём.
+        -->
+        <div class="workspace">
+          <main class="main" id="main">
+            <div class="loading">
+              <div class="spinner"></div>
+            </div>
+          </main>
+          <aside class="aside" id="aside" aria-label="panel"></aside>
+        </div>
+      </div>
+    </div>
+
+    <div class="toasts" id="toasts"></div>
+
+    <div class="dock" id="progressDock" hidden>
+      <div class="dock__head">
+        <span class="dock__step" id="progressStep"></span>
+        <span class="dock__detail" id="progressDetail"></span>
+      </div>
+      <div class="dock__track"><div class="dock__bar" id="progressBar"></div></div>
+    </div>
+
+    <div class="modal" id="modal" hidden>
+      <div class="modal__backdrop" data-close></div>
+      <div class="modal__panel" role="dialog" aria-modal="true" id="modalPanel"></div>
+    </div>
+
+    <script src="vendor/purify.min.js"></script>
+    <script src="vendor/marked.min.js"></script>
+    <script src="i18n.js"></script>
+    <script src="ads.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

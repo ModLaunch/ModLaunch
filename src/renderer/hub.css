@@ -1,0 +1,134 @@
+/*
+ * Знак ModHub в движении — общий для заставки программы и окна установки.
+ * Центр появляется первым, от него прорастают связи, к ним слетаются
+ * шарики-моды. Во время работы по связям бегут «данные» к центру.
+ */
+
+.hub {
+  overflow: visible;
+}
+
+.hub__spin {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: hub-spin 48s linear 1.3s infinite;
+}
+
+.hub__link {
+  stroke: #6f59c9;
+  stroke-width: 18;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: hub-draw 0.5s 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+.hub__sat {
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: 0;
+  animation: hub-sat 0.62s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+.hub__sat:nth-of-type(1) {
+  animation-delay: 0.34s;
+}
+.hub__sat:nth-of-type(2) {
+  animation-delay: 0.42s;
+}
+.hub__sat:nth-of-type(3) {
+  animation-delay: 0.5s;
+}
+.hub__sat:nth-of-type(4) {
+  animation-delay: 0.58s;
+}
+
+.hub__core,
+.hub__dot {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: hub-pop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.hub__dot {
+  animation-delay: 0.14s;
+}
+
+.hub__ring {
+  fill: none;
+  stroke: #9d85ff;
+  stroke-width: 6;
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: 0;
+  animation: hub-ring 2.6s 0.95s ease-out infinite;
+}
+
+[data-mood='working'] .hub__link {
+  stroke: #8f73ff;
+  stroke-dasharray: 0.16 0.08;
+  stroke-dashoffset: 0;
+  animation: hub-flow 0.7s linear infinite;
+}
+[data-mood='working'] .hub__ring {
+  animation-duration: 1.3s;
+}
+[data-mood='done'] .hub__ring {
+  stroke: #46c08a;
+}
+[data-mood='error'] .hub__ring {
+  stroke: #e4635c;
+}
+
+@keyframes hub-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes hub-sat {
+  from {
+    opacity: 0;
+    transform: translate(var(--dx, 0), var(--dy, 0)) scale(0.2);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes hub-pop {
+  from {
+    opacity: 0;
+    transform: scale(0);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes hub-ring {
+  0% {
+    opacity: 0.75;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2.4);
+  }
+}
+@keyframes hub-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes hub-flow {
+  to {
+    stroke-dashoffset: 0.48;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hub,
+  .hub * {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+  }
+}

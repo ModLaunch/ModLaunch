@@ -1,0 +1,17 @@
+{
+  "name": "modhub",
+  "productName": "ModHub",
+  "version": "1.9.7",
+  "description": "Установщик модов, который заменяет собой гайд по установке",
+  "main": "src/main/index.js",
+  "author": {
+    "name": "ModHub",
+    "email": "hello@modhub.local"
+  },
+  "license": "MIT",
+  "private": true,
+  "dependencies": {
+    "adm-zip": "^0.5.16",
+    "fast-xml-parser": "^4.5.0"
+  }
+}
