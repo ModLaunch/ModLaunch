@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Интерфейс ModHub 1.9.7.
+ * Интерфейс ModHub 1.10.0.
  *
  * Без сборщиков и фреймворков: обычный DOM, один файл на логику и один на
  * словарь. Для программы такого размера это осознанный выбор — нет шага
@@ -92,6 +92,19 @@ const state = {
   catalogSort: 'popular',
   catalogCategory: null,
   catalogCategories: {},
+  /* --- 1.10: функции из других лаунчеров --- */
+  /** Обновления модов: gameId -> [{ id, catalogId, name, current, latest, manual }] (null — ещё не проверяли). */
+  updates: {},
+  /** Какие игры сейчас проверяются на обновления и какие моды обновляются. */
+  updatesChecking: new Set(),
+  updating: new Set(),
+  /** Профили модов: gameId -> [{ name, count, active, updatedAt }]. */
+  profiles: {},
+  /** Резервные копии сохранений: gameId -> { supported, saves, folder, items }. */
+  backups: {},
+  backupSummary: null,
+  /** Игровое время: gameId -> { totalMs, sessions, lastPlayed, running }. */
+  playtime: {},
 };
 
 /* ================================================================== *
@@ -110,7 +123,7 @@ const PREF_DEFAULTS = {
   motion: 'full', // full | reduced | off
   startView: 'home', // home | last
   heroAutoplay: true,
-  homeSections: { recommend: true, chart: true, shelves: true, fresh: true },
+  homeSections: { recommend: true, chart: true, shelves: true, fresh: true, favorites: true },
   notifyDone: true,
   soundDone: false,
   dlAutoOpen: false,
@@ -118,6 +131,14 @@ const PREF_DEFAULTS = {
   aside: true, // правая панель
   catalogView: 'grid', // grid | list
   hideInstalled: false,
+  // 1.10 — «Запуск», «Резервные копии», «Обновления».
+  afterLaunch: 'stay', // stay | minimize
+  restoreAfterGame: true,
+  trackPlaytime: true,
+  backupOnLaunch: true,
+  backupKeep: 10, // 5 | 10 | 20 | 50
+  updatesOnStart: true,
+  updatesBadge: true,
 };
 
 const ACCENTS = {
@@ -462,6 +483,8 @@ const ART = {
     'stardew-valley': 'art/game-stardew-valley.jpg',
     'hollow-knight': 'art/game-hollow-knight.jpg',
     'lethal-company': 'art/game-lethal-company.jpg',
+    subnautica: 'art/game-subnautica.svg',
+    'subnautica-below-zero': 'art/game-subnautica-below-zero.svg',
   },
 };
 
@@ -622,6 +645,20 @@ const HELP = {
     links: [
       ['Каталог модов Thunderstore', 'https://thunderstore.io/c/lethal-company/'],
       ['BepInEx — загрузчик', 'https://thunderstore.io/c/lethal-company/p/BepInEx/BepInExPack/'],
+    ],
+  },
+  subnautica: {
+    links: [
+      ['Каталог модов Thunderstore', 'https://thunderstore.io/c/subnautica/'],
+      ['BepInExPack для Subnautica', 'https://thunderstore.io/c/subnautica/p/Subnautica_Modding/BepInExPack/'],
+      ['Моды Subnautica на Nexus', 'https://www.nexusmods.com/subnautica/mods'],
+    ],
+  },
+  'subnautica-below-zero': {
+    links: [
+      ['Каталог модов Thunderstore', 'https://thunderstore.io/c/subnautica-below-zero/'],
+      ['BepInExPack для Below Zero', 'https://thunderstore.io/c/subnautica-below-zero/p/Subnautica_Modding/BepInExPack/'],
+      ['Моды Below Zero на Nexus', 'https://www.nexusmods.com/subnauticabelowzero/mods'],
     ],
   },
 };
@@ -1004,6 +1041,17 @@ async function openGame(gameId, tab = 'downloads', { record = true } = {}) {
     await loadCatalog(gameId);
   }
   if (tab === 'log') await loadIssues(gameId);
+  await loadGameExtras(gameId, tab);
+}
+
+/** Данные вкладок 1.10: профили, резервные копии — с диска, быстро. */
+async function loadGameExtras(gameId, tab) {
+  if (!api.profiles) return;
+  await Promise.all([
+    loadProfiles(gameId),
+    tab === 'saves' || !state.backups[gameId] ? loadBackups(gameId) : null,
+  ]);
+  if (state.activeGameId === gameId) softRender();
 }
 
 /** Вкладка на экране игры — тоже шаг истории: «Назад» вернёт на прошлую. */
@@ -1016,6 +1064,7 @@ async function openTab(tab, { record = true } = {}) {
     await loadCatalog(state.activeGameId, state.query);
   }
   if (tab === 'log') await loadIssues(state.activeGameId);
+  if (tab === 'profiles' || tab === 'saves') await loadGameExtras(state.activeGameId, tab);
 }
 
 async function openPopular(gameId, query = '', { record = true } = {}) {
@@ -1738,6 +1787,8 @@ function gameAside(game) {
   const actions = [
     ['tab', 'market', 'shop', t('games.market')],
     ['install-file', null, 'folder', t('inst.fromFile')],
+    ['tab', 'profiles', 'list', t('games.profiles')],
+    ['tab', 'saves', 'shield', t('games.saves')],
     ['tab', 'log', 'warn', t('games.log')],
     ['rescan', null, 'refresh', t('games.detectAgain')],
   ]
@@ -2201,6 +2252,9 @@ const EDITORS = {
   'stardew-valley': ['lookupanything', 'npcmaplocations', 'automate', 'cjbcheatsmenu', 'chestsanywhere', 'uiinfosuite2'],
   'hollow-knight': ['customknight', 'benchwarp', 'palecourt', 'randomizer4', 'hkmp', 'qol'],
   'lethal-company': ['morecompany', 'shiploot', 'latecompany', 'moresuits', 'lethalthings', 'lategameupgrades'],
+  // Nautilus — общая библиотека, на которой стоят почти все моды Subnautica.
+  subnautica: ['nautilus', 'subnauticamoddingnautilus', 'configurationmanager'],
+  'subnautica-below-zero': ['nautilus', 'subnauticamoddingnautilus', 'configurationmanager'],
 };
 
 const HERO_SECONDS = 8;
@@ -2722,6 +2776,7 @@ function renderHome() {
       ${ready.length ? (show.recommend !== false ? recommendBlock(feed, loading) : '') : emptyGamesBlock()}
       ${ready.length && show.chart !== false ? chartBlock(feed, loading) : ''}
       ${show.shelves !== false ? gameShelves() : ''}
+      ${show.favorites !== false ? favoritesShelf() : ''}
       ${show.fresh !== false ? freshShelf() : ''}
     </div>`;
 }
@@ -3323,6 +3378,7 @@ function renderModPage() {
                   : ''
               }
               <button class="btn btn--ghost" data-action="goto-reviews">${icon('chat')}<span>${esc(t('rev.write'))}</span></button>
+              ${favButton(game, mod)}
             </div>
             ${nexusBrowser && !installed ? `<p class="product__hint">${icon('info')}<span>${esc(t('nexus.hint.browser'))}</span></p>` : ''}
           </div>
@@ -3855,15 +3911,23 @@ function renderGame() {
   const tabs = [
     ['downloads', t('games.downloads'), 'list', installedCount ? String(installedCount) : ''],
     ['market', t('games.market'), 'shop', catalogCount],
+    ['profiles', t('games.profiles'), 'list', (state.profiles[game.id] ?? []).length ? String(state.profiles[game.id].length) : ''],
+    ['saves', t('games.saves'), 'shield', state.backups[game.id]?.items?.length ? String(state.backups[game.id].items.length) : ''],
     ['log', t('games.log'), 'warn', state.problems.length ? String(state.problems.length) : '', true],
   ];
+  const updates = state.updates[game.id]?.length ?? 0;
+  if (updates && pref('updatesBadge')) tabs[0][3] = `${tabs[0][3]} · ↑${updates}`;
 
   const body =
     state.gameTab === 'market'
       ? renderMarket(game)
       : state.gameTab === 'log'
         ? renderLog(game)
-        : renderInstalled(game);
+        : state.gameTab === 'profiles'
+          ? renderProfiles(game)
+          : state.gameTab === 'saves'
+            ? renderSaves(game)
+            : renderInstalled(game);
 
   return `
     <div class="page page--game" style="${accentStyle(game.accent)}">
@@ -3883,6 +3947,7 @@ function renderGame() {
                 : t('games.loaderMissing', { loader: game.loader.name })
             )}
           </p>
+          ${playtimeLine(game.id)}
           <p class="ghero__path" title="${esc(game.path)}">${icon('folder')}<span>${esc(game.path)}</span><span class="muted">· ${esc(t('source.' + game.pathSource))}</span></p>
           <div class="ghero__actions">
             ${
@@ -3976,11 +4041,17 @@ function renderInstalled(game) {
     <div class="panel">
       <div class="panel__head">
         <h2>${esc(t('inst.title'))}</h2>
-        <button class="btn btn--ghost btn--sm" data-action="install-file" data-game="${esc(game.id)}">
-          ${icon('folder')}<span>${esc(t('inst.fromFile'))}</span>
-        </button>
+        <div class="panel__tail">
+          <button class="btn btn--ghost btn--sm" data-action="check-updates" data-game="${esc(game.id)}"${state.updatesChecking.has(game.id) ? ' disabled' : ''}>
+            ${icon('refresh')}<span>${esc(state.updatesChecking.has(game.id) ? t('upd.checking') : t('upd.check'))}</span>
+          </button>
+          <button class="btn btn--ghost btn--sm" data-action="install-file" data-game="${esc(game.id)}">
+            ${icon('folder')}<span>${esc(t('inst.fromFile'))}</span>
+          </button>
+        </div>
       </div>
       ${problems}
+      ${updatesBar(game)}
       ${list}
       ${unmanaged}
     </div>`;
@@ -4017,6 +4088,7 @@ function installedRow(game, mod) {
         </p>
       </div>
       <div class="modrow__actions">
+        ${updateButton(game, mod)}
         <button class="btn btn--ghost btn--sm" data-action="toggle-mod" data-game="${esc(game.id)}" data-mod="${esc(mod.id)}" data-enabled="${mod.enabled ? '0' : '1'}">
           ${esc(mod.enabled ? t('mod.disable') : t('mod.enable'))}
         </button>
@@ -4067,6 +4139,369 @@ function catalogTools(game) {
       <div class="cattools__sorts" role="radiogroup" aria-label="${esc(t('aside.sort'))}">${sortButtons}</div>
       <div class="cattools__view">${viewButton('grid', 'grid')}${viewButton('list', 'list')}</div>
     </div>`;
+}
+
+/* ================================================================== *
+ *  1.10 — то, что люди привыкли видеть в других лаунчерах
+ *
+ *  Профили модов (Vortex, r2modman, CurseForge), сборка в файле
+ *  (r2modman, Modrinth), обновления модов (CurseForge, Thunderstore Mod
+ *  Manager), резервные копии сохранений (GOG Galaxy, Playnite), игровое
+ *  время и параметры запуска (Steam, GOG Galaxy), избранное (Steam,
+ *  Modrinth). Всё хранится у человека на диске, без серверов.
+ * ================================================================== */
+
+/** 3 ч 25 мин / 12 мин / меньше минуты. */
+function formatDuration(ms) {
+  const minutes = Math.floor((Number(ms) || 0) / 60000);
+  if (minutes < 1) return t('time.lessMinute');
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (!h) return t('time.m', { m });
+  return m ? t('time.hm', { h, m }) : t('time.h', { h });
+}
+
+function formatWhen(value) {
+  const at = Date.parse(value ?? '');
+  if (!Number.isFinite(at)) return '';
+  return new Date(at).toLocaleString(window.I18N.lang === 'en' ? 'en-GB' : 'ru-RU', {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+/* --- игровое время ------------------------------------------------- */
+
+async function loadPlaytime() {
+  const all = await call(api.playtime?.all?.() ?? Promise.resolve({ ok: true, data: {} }), { silent: true }).catch(() => null);
+  if (all) state.playtime = all;
+}
+
+/** Строка в шапке игры: «Сыграно 12 ч · последний раз вчера». */
+function playtimeLine(gameId) {
+  if (!pref('trackPlaytime')) return '';
+  const p = state.playtime[gameId];
+  if (!p) return '';
+  if (p.running) return `<p class="ghero__time is-live">${icon('play')}<span>${esc(t('time.running'))}</span></p>`;
+  if (!p.totalMs && !p.lastPlayed) return '';
+  const parts = [];
+  if (p.totalMs) parts.push(t('time.total', { time: formatDuration(p.totalMs) }));
+  if (p.lastPlayed) parts.push(t('time.last', { when: formatWhen(p.lastPlayed) }));
+  return `<p class="ghero__time">${icon('cup')}<span>${esc(parts.join(' · '))}</span></p>`;
+}
+
+/* --- обновления модов ---------------------------------------------- */
+
+async function checkUpdates(gameId, { quiet = false } = {}) {
+  if (!api.mods.updates || state.updatesChecking.has(gameId)) return;
+  state.updatesChecking.add(gameId);
+  softRender();
+  try {
+    const list = await call(api.mods.updates(gameId), { silent: quiet });
+    state.updates[gameId] = list ?? [];
+    if (!quiet) {
+      toast(list?.length ? pluralN(list.length, 'upd.found') : t('upd.none'), list?.length ? 'ok' : 'ok');
+    }
+  } catch {
+    /* причина уже показана */
+  } finally {
+    state.updatesChecking.delete(gameId);
+    softRender();
+  }
+}
+
+/** Проверка при запуске — тихо и по очереди, чтобы не толкаться с витринами. */
+async function checkAllUpdates({ quiet = true } = {}) {
+  let total = 0;
+  for (const item of readyGames()) {
+    await checkUpdates(item.game.id, { quiet: true });
+    total += state.updates[item.game.id]?.length ?? 0;
+  }
+  if (!quiet || total) toast(total ? pluralN(total, 'upd.found') : t('upd.none'));
+  softRender();
+}
+
+function updateOf(gameId, modId) {
+  return (state.updates[gameId] ?? []).find((u) => u.id === modId) ?? null;
+}
+
+function updatesBar(game) {
+  const list = state.updates[game.id] ?? [];
+  if (!list.length) return '';
+  const auto = list.filter((u) => !u.manual).length;
+  return `
+    <div class="infobar">
+      ${icon('sparkle')}
+      <span>${esc(pluralN(list.length, 'upd.found'))}: ${esc(list.map((u) => `${u.name} ${u.current} → ${u.latest}`).join(', '))}</span>
+      ${auto ? `<button class="btn btn--sm btn--primary" data-action="update-all" data-game="${esc(game.id)}">${icon('download')}<span>${esc(t('upd.all'))}</span></button>` : ''}
+    </div>`;
+}
+
+function updateButton(game, mod) {
+  const upd = updateOf(game.id, mod.id);
+  if (!upd) return '';
+  if (upd.manual) {
+    return `<button class="btn btn--sm btn--primary" data-action="open-mod" data-game="${esc(game.id)}" data-mod="${esc(upd.catalogId)}" title="${esc(t('upd.manual'))}">${icon('external')}<span>${esc(upd.latest)}</span></button>`;
+  }
+  const busy = state.updating.has(`${game.id}|${mod.id}`);
+  return `<button class="btn btn--sm btn--primary" data-action="update-mod" data-game="${esc(game.id)}" data-mod="${esc(mod.id)}"${busy ? ' disabled' : ''} title="${esc(t('upd.to', { version: upd.latest }))}">
+      ${icon(busy ? 'refresh' : 'download')}<span>${esc(busy ? t('upd.updating') : t('upd.to', { version: upd.latest }))}</span>
+    </button>`;
+}
+
+async function updateMod(gameId, modId) {
+  const key = `${gameId}|${modId}`;
+  if (state.updating.has(key)) return false;
+  const upd = updateOf(gameId, modId);
+  state.updating.add(key);
+  softRender();
+  const job = startJob({ gameId, modId: `update:${modId}`, name: upd ? `${upd.name} ${upd.latest}` : modId });
+  try {
+    await call(api.mods.update(gameId, modId));
+    state.updates[gameId] = (state.updates[gameId] ?? []).filter((u) => u.id !== modId);
+    finishJob(job, { ok: true });
+    return true;
+  } catch (error) {
+    finishJob(job, { ok: false, error: error?.message ?? null });
+    return false;
+  } finally {
+    state.updating.delete(key);
+    if (state.activeGameId === gameId) await refreshMods();
+    softRender();
+  }
+}
+
+/* --- профили модов ------------------------------------------------- */
+
+async function loadProfiles(gameId) {
+  const list = await call(api.profiles.list(gameId), { silent: true }).catch(() => null);
+  if (list) state.profiles[gameId] = list;
+}
+
+function renderProfiles(game) {
+  const list = state.profiles[game.id] ?? [];
+  const rows = list.length
+    ? `<div class="mods">${list
+        .map(
+          (p) => `
+          <article class="modrow${p.active ? ' is-current' : ''}">
+            <div class="modrow__icon is-generated" style="${gradientStyle({ id: p.name, name: p.name })}">${esc(initials(p.name))}</div>
+            <div class="modrow__body">
+              <h4><span class="modrow__name">${esc(p.name)}</span>${p.active ? ` <span class="badge badge--ok">${esc(t('prof.active'))}</span>` : ''}</h4>
+              <p class="muted small">${esc(pluralN(p.count, 'prof.mods'))} · ${esc(t('prof.saved', { when: formatWhen(p.updatedAt) }))}</p>
+            </div>
+            <div class="modrow__actions">
+              <button class="btn btn--sm ${p.active ? 'btn--ghost' : 'btn--primary'}" data-action="profile-apply" data-game="${esc(game.id)}" data-name="${esc(p.name)}">${icon('check')}<span>${esc(t('prof.apply'))}</span></button>
+              <button class="btn btn--ghost btn--sm" data-action="profile-overwrite" data-game="${esc(game.id)}" data-name="${esc(p.name)}" title="${esc(t('prof.overwrite'))}">${icon('refresh')}</button>
+              <button class="btn btn--ghost btn--sm" data-action="profile-rename" data-game="${esc(game.id)}" data-name="${esc(p.name)}" title="${esc(t('prof.rename'))}">${icon('edit')}</button>
+              <button class="btn btn--ghost btn--sm btn--danger" data-action="profile-remove" data-game="${esc(game.id)}" data-name="${esc(p.name)}" title="${esc(t('prof.remove'))}">${icon('trash')}</button>
+            </div>
+          </article>`
+        )
+        .join('')}</div>`
+    : `<section class="empty"><h3>${esc(t('prof.empty'))}</h3><p>${esc(t('prof.empty.text'))}</p></section>`;
+
+  return `
+    <div class="panel">
+      <div class="panel__head">
+        <h2>${esc(t('prof.title'))}</h2>
+        <span class="muted small">${esc(t('prof.hint'))}</span>
+      </div>
+      <div class="field">
+        <input id="profileName" type="text" maxlength="40" placeholder="${esc(t('prof.placeholder'))}" />
+        <button class="btn btn--primary btn--sm" data-action="profile-save" data-game="${esc(game.id)}">${icon('check')}<span>${esc(t('prof.save'))}</span></button>
+      </div>
+      ${rows}
+    </div>
+    <div class="panel">
+      <div class="panel__head">
+        <h2>${esc(t('pack.title'))}</h2>
+        <span class="muted small">${esc(t('pack.hint'))}</span>
+      </div>
+      <div class="panel__tail">
+        <button class="btn btn--ghost btn--sm" data-action="pack-export" data-game="${esc(game.id)}">${icon('external')}<span>${esc(t('pack.export'))}</span></button>
+        <button class="btn btn--ghost btn--sm" data-action="pack-import">${icon('download')}<span>${esc(t('pack.import'))}</span></button>
+      </div>
+    </div>`;
+}
+
+/** Небольшое окно с одним полем — для имени профиля. */
+function promptModal({ title, value = '', confirmLabel }) {
+  return new Promise((resolve) => {
+    openModal(`
+      <div class="modal__head"><h3>${esc(title)}</h3></div>
+      <div class="field"><input id="promptValue" type="text" maxlength="40" value="${esc(value)}" /></div>
+      <div class="modal__foot">
+        <button class="btn btn--ghost" data-close>${esc(t('common.cancel'))}</button>
+        <button class="btn btn--primary" id="promptYes">${esc(confirmLabel ?? t('common.save'))}</button>
+      </div>`);
+    const input = $('#promptValue');
+    input.focus();
+    input.select();
+    const done = () => {
+      const text = input.value.trim();
+      closeModal();
+      resolve(text || null);
+    };
+    $('#promptYes').addEventListener('click', done);
+    input.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') done();
+    });
+    $('#modal')
+      .querySelectorAll('[data-close]')
+      .forEach((node) => node.addEventListener('click', () => resolve(null)));
+  });
+}
+
+/* --- сборка в файле ------------------------------------------------ */
+
+/**
+ * Открыли чужую сборку: показываем, что в ней, и ставим недостающее
+ * по одному — тем же путём, что и кнопка «Установить».
+ */
+function packModal(pack) {
+  const item = entry(pack.game);
+  const missing = pack.mods.filter((m) => !m.installed && m.catalogId);
+  const manual = pack.mods.filter((m) => !m.installed && !m.catalogId);
+  const row = (m) => `
+    <li><span>${esc(m.name)}${m.version ? ` <span class="muted">${esc(m.version)}</span>` : ''}</span>
+      <span class="badge${m.installed ? ' badge--ok' : ''}">${esc(m.installed ? t('pack.have') : m.catalogId ? t('pack.will') : t('pack.manual'))}</span></li>`;
+  openModal(`
+    <div class="modal__head"><h3>${esc(t('pack.import.title', { name: pack.name || pack.gameName }))}</h3></div>
+    <p class="modal__text">${esc(t('pack.import.text', { game: pack.gameName, n: pack.mods.length, missing: missing.length }))}</p>
+    <ul class="packlist">${pack.mods.map(row).join('')}</ul>
+    ${manual.length ? `<p class="muted small">${esc(t('pack.manual.hint'))}</p>` : ''}
+    ${item?.game?.found ? '' : `<p class="danger small">${esc(t('pack.noGame', { game: pack.gameName }))}</p>`}
+    <div class="modal__foot">
+      <button class="btn btn--ghost" data-close>${esc(t('common.close'))}</button>
+      ${
+        missing.length && item?.game?.found
+          ? `<button class="btn btn--primary" id="packGo">${icon('download')}<span>${esc(pluralN(missing.length, 'pack.installN'))}</span></button>`
+          : ''
+      }
+    </div>`);
+  document.getElementById('packGo')?.addEventListener('click', async () => {
+    closeModal();
+    await openGame(pack.game, 'downloads');
+    for (const mod of missing) {
+      // installMod сама ставит загрузчик, если его нет, и показывает прогресс.
+      await installMod(pack.game, mod.catalogId);
+    }
+    toast(t('pack.done'));
+  });
+}
+
+/* --- резервные копии сохранений ------------------------------------ */
+
+async function loadBackups(gameId) {
+  const data = await call(api.backups.list(gameId), { silent: true }).catch(() => null);
+  if (data) state.backups[gameId] = data;
+}
+
+function renderSaves(game) {
+  const data = state.backups[game.id];
+  if (!data) return `<div class="panel"><div class="loading"><div class="spinner"></div></div></div>`;
+  if (!data.supported) {
+    return `<div class="panel"><section class="empty"><h3>${esc(t('bak.title'))}</h3><p>${esc(t('bak.unsupported'))}</p></section></div>`;
+  }
+  const saves = data.saves;
+  const reason = (r) => t('bak.reason.' + r);
+  const rows = data.items.length
+    ? `<div class="mods">${data.items
+        .map(
+          (b) => `
+          <article class="modrow">
+            <div class="modrow__icon is-generated" style="${gradientStyle({ id: b.reason, name: b.reason })}">${icon(b.reason === 'launch' ? 'play' : b.reason === 'restore' ? 'refresh' : 'shield')}</div>
+            <div class="modrow__body">
+              <h4><span class="modrow__name">${esc(formatWhen(b.at))}</span></h4>
+              <p class="muted small">${esc(reason(b.reason))} · ${esc(formatBytes(b.size))}</p>
+            </div>
+            <div class="modrow__actions">
+              <button class="btn btn--ghost btn--sm" data-action="backup-restore" data-game="${esc(game.id)}" data-name="${esc(b.name)}">${icon('refresh')}<span>${esc(t('bak.restore'))}</span></button>
+              <button class="btn btn--ghost btn--sm btn--danger" data-action="backup-remove" data-game="${esc(game.id)}" data-name="${esc(b.name)}" title="${esc(t('bak.remove'))}">${icon('trash')}</button>
+            </div>
+          </article>`
+        )
+        .join('')}</div>`
+    : `<section class="empty"><h3>${esc(t('bak.empty'))}</h3><p>${esc(t('bak.empty.text'))}</p></section>`;
+
+  return `
+    <div class="panel">
+      <div class="panel__head">
+        <h2>${esc(t('bak.title'))}</h2>
+        <div class="panel__tail">
+          <button class="btn btn--primary btn--sm" data-action="backup-create" data-game="${esc(game.id)}"${saves.exists ? '' : ' disabled'}>${icon('shield')}<span>${esc(t('bak.create'))}</span></button>
+          ${saves.exists ? `<button class="btn btn--ghost btn--sm" data-action="open-folder" data-path="${esc(saves.path)}">${icon('folder')}<span>${esc(t('bak.savesFolder'))}</span></button>` : ''}
+        </div>
+      </div>
+      <p class="muted small">${esc(
+        saves.exists
+          ? t('bak.saves', { files: saves.files, size: formatBytes(saves.bytes), path: saves.path })
+          : t('bak.noSaves', { path: saves.path ?? '' })
+      )}</p>
+      <p class="muted small">${esc(pref('backupOnLaunch') ? t('bak.auto.on', { n: pref('backupKeep') }) : t('bak.auto.off'))}</p>
+      ${rows}
+    </div>`;
+}
+
+/* --- избранное ----------------------------------------------------- */
+
+function favorites() {
+  return Array.isArray(state.settings.favorites) ? state.settings.favorites : [];
+}
+
+function isFavorite(gameId, modId) {
+  return favorites().some((f) => f.gameId === gameId && f.modId === modId);
+}
+
+function favButton(game, mod) {
+  const on = isFavorite(game.id, mod.id);
+  return `<button class="btn btn--ghost${on ? ' is-fav' : ''}" data-action="fav-toggle" data-game="${esc(game.id)}" data-mod="${esc(mod.id)}" aria-pressed="${on}">
+      ${icon('heart')}<span>${esc(on ? t('fav.remove') : t('fav.add'))}</span>
+    </button>`;
+}
+
+async function toggleFavorite(gameId, modId) {
+  const list = favorites();
+  let next;
+  if (isFavorite(gameId, modId)) {
+    next = list.filter((f) => !(f.gameId === gameId && f.modId === modId));
+  } else {
+    const mod = knownMod(gameId, modId) ?? (state.modView?.mod?.id === modId ? state.modView.mod : null);
+    next = [
+      {
+        gameId,
+        modId,
+        name: mod?.name ?? modId,
+        author: mod?.author ?? '',
+        icon: mod?.icon ?? mod?.picture ?? null,
+        iconShape: mod?.iconShape ?? null,
+        description: mod?.description ?? '',
+        at: new Date().toISOString(),
+      },
+      ...list,
+    ].slice(0, 200);
+  }
+  state.settings.favorites = next;
+  await call(api.settings.write({ favorites: next }), { silent: true }).catch(() => {});
+  toast(isFavorite(gameId, modId) ? t('fav.added') : t('fav.removed'));
+}
+
+/** Полка «Избранное» на главной — как список желаемого в Steam. */
+function favoritesShelf() {
+  const list = favorites().filter((f) => entry(f.gameId));
+  if (!list.length) return '';
+  const cards = list
+    .slice(0, 20)
+    .map((f, i) => {
+      const game = entry(f.gameId)?.game ?? { id: f.gameId, ...entry(f.gameId)?.info, catalog: {} };
+      const mod = { id: f.modId, name: f.name, author: f.author, icon: f.icon, iconShape: f.iconShape, description: f.description };
+      return modCard(mod, game, i, { showGame: true });
+    })
+    .join('');
+  return shelfBlock({ id: 'shelf-favorites', title: t('home.favorites'), sub: t('home.favorites.text'), chip: icon('heart'), cards });
 }
 
 function renderLog(game) {
@@ -4237,6 +4672,10 @@ function renderSettings() {
     ['images', 'image'],
     ['accounts', 'key'],
     ['games', 'grid'],
+    ['launch', 'play'],
+    ['backups', 'shield'],
+    ['updates', 'refresh'],
+    ['library', 'heart'],
     ['keys', 'keyboard'],
     ['about', 'info'],
   ];
@@ -4249,6 +4688,10 @@ function renderSettings() {
     images: settingsImages,
     accounts: settingsAccounts,
     games: settingsGames,
+    launch: settingsLaunch,
+    backups: settingsBackups,
+    updates: settingsUpdates,
+    library: settingsLibrary,
     keys: settingsKeys,
     about: settingsAbout,
   }[state.settingsTab]();
@@ -4391,7 +4834,7 @@ function settingsHome() {
     ) +
     settingsCard(
       t('settings.sections'),
-      ['recommend', 'chart', 'shelves', 'fresh']
+      ['recommend', 'chart', 'shelves', 'favorites', 'fresh']
         .map((id) => settingRow(t('settings.section.' + id), t('settings.section.' + id + '.hint'), toggle('homeSections.' + id, sections[id] !== false)))
         .join(''),
       t('settings.sections.hint')
@@ -4508,6 +4951,173 @@ function settingsGames() {
   );
 }
 
+/* --- 1.10: новые разделы настроек ----------------------------------- */
+
+/** «Запуск»: что делать с окном, параметры запуска, игровое время — как в Steam. */
+function settingsLaunch() {
+  const found = readyGames();
+  const args = state.settings.launchArgs ?? {};
+  const argRows = found.length
+    ? found
+        .map(
+          (item) => `
+          <div class="picks">
+            <span class="picks__label">${esc(item.game.name)}</span>
+            <div class="field">
+              <input id="args-${esc(item.game.id)}" type="text" maxlength="400" placeholder="${esc(t('launch.args.placeholder'))}" value="${esc(args[item.game.id] ?? '')}" />
+              <button class="btn btn--ghost btn--sm" data-action="save-args" data-game="${esc(item.game.id)}">${esc(t('common.save'))}</button>
+            </div>
+          </div>`
+        )
+        .join('')
+    : `<p class="muted small">${esc(t('launch.noGames'))}</p>`;
+
+  const times = state.order
+    .map((id) => {
+      const p = state.playtime[id];
+      if (!p || (!p.totalMs && !p.sessions)) return '';
+      return `<dt>${esc(entry(id)?.info?.name ?? id)}</dt><dd>${esc(formatDuration(p.totalMs))} · ${esc(pluralN(p.sessions, 'time.sessions'))}</dd>`;
+    })
+    .join('');
+
+  return (
+    settingsCard(
+      t('settings.tab.launch'),
+      settingRow(
+        t('launch.after'),
+        t('launch.after.hint'),
+        segmented('afterLaunch', [
+          ['stay', t('launch.after.stay')],
+          ['minimize', t('launch.after.minimize')],
+        ], pref('afterLaunch'))
+      ) +
+        settingRow(t('launch.restore'), t('launch.restore.hint'), toggle('restoreAfterGame', pref('restoreAfterGame'))) +
+        settingRow(t('launch.track'), t('launch.track.hint'), toggle('trackPlaytime', pref('trackPlaytime')))
+    ) +
+    settingsCard(t('launch.args'), argRows, t('launch.args.hint')) +
+    settingsCard(
+      t('launch.time'),
+      (times ? `<dl class="facts">${times}</dl>` : `<p class="muted small">${esc(t('launch.time.none'))}</p>`) +
+        settingRow(
+          t('launch.time.reset'),
+          t('launch.time.reset.hint'),
+          `<button class="btn btn--ghost btn--sm btn--danger" data-action="playtime-reset"${times ? '' : ' disabled'}>${icon('trash')}<span>${esc(t('launch.time.reset.go'))}</span></button>`
+        )
+    )
+  );
+}
+
+/** «Резервные копии»: когда копировать сохранения и сколько копий держать. */
+function settingsBackups() {
+  const summary = state.backupSummary;
+  const rows = state.order
+    .map((id) => {
+      const info = entry(id)?.info;
+      if (!info?.hasSaves) return '';
+      const g = summary?.games?.[id];
+      const text = g?.count
+        ? t('bak.summary', { n: pluralN(g.count, 'bak.copies'), size: formatBytes(g.bytes), when: formatWhen(g.last) })
+        : t('bak.summary.none');
+      const found = entry(id)?.game?.found;
+      return settingRow(
+        info.name,
+        text,
+        found ? `<button class="btn btn--ghost btn--sm" data-action="open-saves" data-game="${esc(id)}">${icon('shield')}<span>${esc(t('common.open'))}</span></button>` : ''
+      );
+    })
+    .join('');
+  return (
+    settingsCard(
+      t('settings.tab.backups'),
+      settingRow(t('bak.onLaunch'), t('bak.onLaunch.hint'), toggle('backupOnLaunch', pref('backupOnLaunch'))) +
+        settingRow(
+          t('bak.keep'),
+          t('bak.keep.hint'),
+          segmented('backupKeep', [
+            [5, '5'],
+            [10, '10'],
+            [20, '20'],
+            [50, '50'],
+          ], pref('backupKeep'))
+        ) +
+        (summary?.dir
+          ? settingRow(
+              t('bak.folder'),
+              summary.dir,
+              `<button class="btn btn--ghost btn--sm" data-action="open-folder" data-path="${esc(summary.dir)}">${icon('folder')}<span>${esc(t('common.open'))}</span></button>`
+            )
+          : '')
+    ) + settingsCard(t('bak.games'), rows || `<p class="muted small">${esc(t('bak.summary.none'))}</p>`, t('bak.games.hint'))
+  );
+}
+
+/** «Обновления»: проверять ли моды при запуске и что нашлось. */
+function settingsUpdates() {
+  const checking = readyGames().some((item) => state.updatesChecking.has(item.game.id));
+  const found = readyGames().flatMap((item) => (state.updates[item.game.id] ?? []).map((u) => ({ ...u, game: item.game })));
+  const list = found.length
+    ? `<div class="mods">${found
+        .map(
+          (u) => `
+          <article class="modrow">
+            ${u.icon ? `<div class="modrow__icon has-img" style="background-image:url('${esc(u.icon)}')"></div>` : `<div class="modrow__icon is-generated" style="${gradientStyle(u)}">${esc(initials(u.name))}</div>`}
+            <div class="modrow__body">
+              <h4><span class="modrow__name">${esc(u.name)}</span> <span class="muted">${esc(u.current)} → ${esc(u.latest)}</span></h4>
+              <p class="muted small">${esc(u.game.name)}${u.manual ? ` · ${esc(t('upd.manual'))}` : ''}</p>
+            </div>
+            <div class="modrow__actions">${updateButton(u.game, u)}</div>
+          </article>`
+        )
+        .join('')}</div>`
+    : `<p class="muted small">${esc(Object.keys(state.updates).length ? t('upd.none') : t('upd.never'))}</p>`;
+  return (
+    settingsCard(
+      t('settings.tab.updates'),
+      settingRow(t('upd.onStart'), t('upd.onStart.hint'), toggle('updatesOnStart', pref('updatesOnStart'))) +
+        settingRow(t('upd.badge'), t('upd.badge.hint'), toggle('updatesBadge', pref('updatesBadge'))) +
+        settingRow(
+          t('upd.checkAll'),
+          t('upd.checkAll.hint'),
+          `<button class="btn btn--ghost btn--sm" data-action="check-all-updates"${checking ? ' disabled' : ''}>${icon('refresh')}<span>${esc(checking ? t('upd.checking') : t('upd.check'))}</span></button>`
+        )
+    ) + settingsCard(t('upd.list'), list)
+  );
+}
+
+/** «Библиотека»: избранные моды и сборки из файла. */
+function settingsLibrary() {
+  const list = favorites();
+  const rows = list.length
+    ? `<div class="mods">${list
+        .map(
+          (f) => `
+          <article class="modrow">
+            ${f.icon ? `<div class="modrow__icon has-img" style="background-image:url('${esc(f.icon)}')"></div>` : `<div class="modrow__icon is-generated" style="${gradientStyle({ id: f.modId, name: f.name })}">${esc(initials(f.name))}</div>`}
+            <div class="modrow__body">
+              <h4><button class="modrow__name" data-action="open-mod" data-game="${esc(f.gameId)}" data-mod="${esc(f.modId)}">${esc(f.name)}</button></h4>
+              <p class="muted small">${esc(entry(f.gameId)?.info?.name ?? f.gameId)} · ${esc(t('fav.since', { when: formatWhen(f.at) }))}</p>
+            </div>
+            <div class="modrow__actions">
+              <button class="btn btn--ghost btn--sm" data-action="install-mod" data-game="${esc(f.gameId)}" data-mod="${esc(f.modId)}">${icon('download')}</button>
+              <button class="btn btn--ghost btn--sm btn--danger" data-action="fav-toggle" data-game="${esc(f.gameId)}" data-mod="${esc(f.modId)}" title="${esc(t('fav.remove'))}">${icon('trash')}</button>
+            </div>
+          </article>`
+        )
+        .join('')}</div>`
+    : `<p class="muted small">${esc(t('fav.empty'))}</p>`;
+  return (
+    settingsCard(t('fav.title'), rows, t('fav.hint')) +
+    settingsCard(
+      t('pack.title'),
+      settingRow(
+        t('pack.import'),
+        t('pack.hint'),
+        `<button class="btn btn--ghost btn--sm" data-action="pack-import">${icon('download')}<span>${esc(t('pack.import'))}</span></button>`
+      )
+    )
+  );
+}
+
 function settingsKeys() {
   const keys = [
     ['Ctrl K', 'keys.search'],
@@ -4516,7 +5126,7 @@ function settingsKeys() {
     ['Ctrl J', 'keys.downloads'],
     ['Ctrl ,', 'keys.settings'],
     ['Ctrl 0', 'keys.home'],
-    ['Ctrl 1–3', 'keys.games'],
+    ['Ctrl 1–5', 'keys.games'],
     ['Esc', 'keys.close'],
   ];
   return settingsCard(
@@ -5206,6 +5816,7 @@ function applyTheme() {
 /** Значение из data-value кнопки настройки — с правильным типом. */
 function prefValue(key, raw) {
   if (key === 'zoom') return Number(raw) || 1;
+  if (key === 'backupKeep') return Number(raw) || 10;
   if (raw === 'true') return true;
   if (raw === 'false') return false;
   return raw;
@@ -5235,6 +5846,128 @@ async function resetPrefs() {
 
 const ACTIONS = {
   'nav-games': () => go('games'),
+  /* --- 1.10 --- */
+  'check-updates': (node) => checkUpdates(node.dataset.game),
+  'check-all-updates': () => checkAllUpdates({ quiet: false }),
+  'update-mod': (node) => updateMod(node.dataset.game, node.dataset.mod),
+  'update-all': async (node) => {
+    const gameId = node.dataset.game;
+    let done = 0;
+    for (const upd of (state.updates[gameId] ?? []).filter((u) => !u.manual)) {
+      if (await updateMod(gameId, upd.id)) done += 1;
+    }
+    if (done) toast(pluralN(done, 'upd.done'));
+  },
+  'profile-save': async (node) => {
+    const name = $('#profileName')?.value ?? '';
+    const list = await call(api.profiles.save(node.dataset.game, name)).catch(() => null);
+    if (!list) return;
+    state.profiles[node.dataset.game] = list;
+    toast(t('prof.savedToast', { name: name.trim() }));
+    render();
+  },
+  'profile-overwrite': async (node) => {
+    const ok = await confirmModal({
+      title: t('prof.overwrite.title', { name: node.dataset.name }),
+      text: t('prof.overwrite.text'),
+      confirmLabel: t('prof.overwrite'),
+    });
+    if (!ok) return;
+    const list = await call(api.profiles.save(node.dataset.game, node.dataset.name)).catch(() => null);
+    if (list) state.profiles[node.dataset.game] = list;
+    render();
+  },
+  'profile-apply': async (node) => {
+    const gameId = node.dataset.game;
+    const result = await call(api.profiles.apply(gameId, node.dataset.name)).catch(() => null);
+    if (!result) return;
+    state.profiles[gameId] = result.profiles;
+    await refreshMods();
+    toast(
+      result.missing.length
+        ? t('prof.applied.missing', { name: node.dataset.name, n: result.missing.length })
+        : t('prof.applied', { name: node.dataset.name, on: result.enabled, off: result.disabled }),
+      result.missing.length ? 'warn' : 'ok'
+    );
+    render();
+  },
+  'profile-rename': async (node) => {
+    const to = await promptModal({ title: t('prof.rename'), value: node.dataset.name });
+    if (!to) return;
+    const list = await call(api.profiles.rename(node.dataset.game, node.dataset.name, to)).catch(() => null);
+    if (list) state.profiles[node.dataset.game] = list;
+    render();
+  },
+  'profile-remove': async (node) => {
+    const ok = await confirmModal({
+      title: t('prof.remove.title', { name: node.dataset.name }),
+      text: t('prof.remove.text'),
+      confirmLabel: t('prof.remove'),
+      danger: true,
+    });
+    if (!ok) return;
+    const list = await call(api.profiles.remove(node.dataset.game, node.dataset.name)).catch(() => null);
+    if (list) state.profiles[node.dataset.game] = list;
+    render();
+  },
+  'pack-export': async (node) => {
+    const active = (state.profiles[node.dataset.game] ?? []).find((p) => p.active);
+    const result = await call(api.pack.export(node.dataset.game, active?.name ?? '')).catch(() => null);
+    if (result) toast(t('pack.exported', { n: result.count }));
+  },
+  'pack-import': async () => {
+    const pack = await call(api.pack.import()).catch(() => null);
+    if (pack) packModal(pack);
+  },
+  'backup-create': async (node) => {
+    const made = await call(api.backups.create(node.dataset.game)).catch(() => null);
+    if (!made) return;
+    await loadBackups(node.dataset.game);
+    toast(t('bak.created'));
+    render();
+  },
+  'backup-restore': async (node) => {
+    const ok = await confirmModal({
+      title: t('bak.restore.title'),
+      text: t('bak.restore.text'),
+      confirmLabel: t('bak.restore'),
+      danger: true,
+    });
+    if (!ok) return;
+    const result = await call(api.backups.restore(node.dataset.game, node.dataset.name)).catch(() => null);
+    if (!result) return;
+    await loadBackups(node.dataset.game);
+    toast(t('bak.restored'));
+    render();
+  },
+  'backup-remove': async (node) => {
+    const ok = await confirmModal({ title: t('bak.remove.title'), text: t('bak.remove.text'), confirmLabel: t('bak.remove'), danger: true });
+    if (!ok) return;
+    await call(api.backups.remove(node.dataset.game, node.dataset.name)).catch(() => {});
+    await loadBackups(node.dataset.game);
+    render();
+  },
+  'open-saves': (node) => openGame(node.dataset.game, 'saves'),
+  'save-args': async (node) => {
+    const gameId = node.dataset.game;
+    const value = document.getElementById(`args-${gameId}`)?.value.trim() ?? '';
+    const next = { ...(state.settings.launchArgs ?? {}), [gameId]: value };
+    if (!value) delete next[gameId];
+    state.settings.launchArgs = next;
+    await call(api.settings.write({ launchArgs: next }), { silent: true }).catch(() => {});
+    toast(t('launch.args.saved'));
+  },
+  'playtime-reset': async () => {
+    const ok = await confirmModal({ title: t('launch.time.reset'), text: t('launch.time.reset.hint'), confirmLabel: t('launch.time.reset.go'), danger: true });
+    if (!ok) return;
+    const all = await call(api.playtime.reset()).catch(() => null);
+    if (all) state.playtime = all;
+    render();
+  },
+  'fav-toggle': async (node) => {
+    await toggleFavorite(node.dataset.game, node.dataset.mod);
+    render();
+  },
   'nav-settings': () => go('settings'),
   'custom-art': async (node) => {
     const next = { ...(state.settings.customArt ?? {}) };
@@ -5299,6 +6032,15 @@ const ACTIONS = {
     render();
     renderRail();
     if (node.dataset.tab === 'accounts') loadAccount();
+    if (node.dataset.tab === 'backups') {
+      call(api.backups.summary(), { silent: true })
+        .then((summary) => {
+          state.backupSummary = summary;
+          if (state.settingsTab === 'backups') render();
+        })
+        .catch(() => {});
+    }
+    if (node.dataset.tab === 'launch') loadPlaytime().then(() => state.settingsTab === 'launch' && render());
   },
   'set-pref': async (node) => {
     const key = node.dataset.key;
@@ -5374,7 +6116,9 @@ const ACTIONS = {
   'install-file': (node) => installFromFile(node.dataset.game),
   play: async (node) => {
     try {
-      await call(api.games.launch(node.dataset.game));
+      const launched = await call(api.games.launch(node.dataset.game));
+      loadPlaytime().then(softRender);
+      if (launched?.backup && state.backups[node.dataset.game]) loadBackups(node.dataset.game);
       // Запуск с модом открывает его оценку — говорим об этом сразу.
       const unlocked = state.modView?.gameId === node.dataset.game && (await refreshGate());
       toast(t(unlocked ? 'rev.gate.unlocked' : 'toast.launched'));
@@ -5800,6 +6544,16 @@ api.onProgress((payload) => {
 
 api.onElevationCancelled?.(() => toast(t('toast.elevationCancelled'), 'warn'));
 
+// Игра, запущенная из ModHub, закрылась: время сеанса и свежая копия сохранений.
+api.onGameExit?.(({ gameId, counted, ms, playtime }) => {
+  if (playtime) state.playtime = playtime;
+  if (counted && pref('trackPlaytime')) {
+    toast(t('time.session', { game: entry(gameId)?.info?.name ?? gameId, time: formatDuration(ms) }));
+  }
+  if (state.backups[gameId]) loadBackups(gameId).then(softRender);
+  softRender();
+});
+
 api.onNxmLink(async ({ link }) => {
   let job = null;
   try {
@@ -5883,6 +6637,9 @@ setTimeout(hideSplash, SPLASH_MAX);
     await loadHomeRows();
     render();
     hideSplash();
+    loadPlaytime().then(softRender);
+    // Обновления модов — как в CurseForge: тихо, после того как всё показалось.
+    if (pref('updatesOnStart')) setTimeout(() => checkAllUpdates({ quiet: true }), 4000);
     setInterval(rotateHero, 1000);
     setInterval(() => refreshRatings(), 3 * 60 * 1000);
   } catch (error) {

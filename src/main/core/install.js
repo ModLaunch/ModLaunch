@@ -27,8 +27,10 @@ const { t } = require('../i18n');
  * @param {import('./registry').ModRegistry} ctx.registry
  * @param {object} mod запись мода из каталога
  * @param {(stage: object) => void} [onProgress]
+ * @param {{reinstall?: Set<string>}} [options] reinstall — моды, которые надо
+ *   поставить заново, даже если они уже стоят (обновление до новой версии)
  */
-async function installFromCatalog(ctx, mod, onProgress = () => {}) {
+async function installFromCatalog(ctx, mod, onProgress = () => {}, options = {}) {
   const { game, state, registry } = ctx;
 
   onProgress({ code: 'install.deps', mod: mod.name });
@@ -44,7 +46,8 @@ async function installFromCatalog(ctx, mod, onProgress = () => {}) {
   const total = plan.order.length;
 
   for (const [index, entry] of plan.order.entries()) {
-    if (registry.has(entry.id) && !registry.get(entry.id).missing) {
+    const reinstall = options.reinstall?.has(entry.id) ?? false;
+    if (!reinstall && registry.has(entry.id) && !registry.get(entry.id).missing) {
       onProgress({ code: 'install.exists', mod: entry.name, index: index + 1, total });
       continue;
     }

@@ -1,6 +1,7 @@
 'use strict';
 
 const path = require('node:path');
+const os = require('node:os');
 const { findGameExecutable } = require('../core/executable');
 
 /**
@@ -72,6 +73,12 @@ module.exports = {
     } catch {
       return { id: fallbackName, name: fallbackName, version: '', dependencies: [] };
     }
+  },
+
+  /** Сохранения (LCSaveFile1…) — в LocalLow у Unity. */
+  savesDir() {
+    if (process.platform === 'win32') return path.join(os.homedir(), 'AppData', 'LocalLow', 'ZeekerssRBLX', 'Lethal Company');
+    return path.join(os.homedir(), '.config', 'unity3d', 'ZeekerssRBLX', 'Lethal Company');
   },
 
   launch(gamePath) {

@@ -16,11 +16,31 @@ const { t } = require('../i18n');
  */
 
 /**
+ * Строка параметров запуска («-novid -windowed "-log file.txt"») → список.
+ * Кавычки держат пробелы внутри одного параметра, как в Steam.
+ */
+function splitArgs(text) {
+  const out = [];
+  for (const match of String(text ?? '').matchAll(/"([^"]*)"|'([^']*)'|(\S+)/g)) {
+    out.push(match[1] ?? match[2] ?? match[3]);
+  }
+  return out.slice(0, 40).map((arg) => arg.slice(0, 400));
+}
+
+/**
  * Запускает игру через нужный исполняемый файл.
  * Процесс отвязывается от ModHub: закрытие лаунчера не должно убивать игру.
+ *
+ * @param {object} game адаптер
+ * @param {string} gamePath папка игры
+ * @param {{extraArgs?: string, onExit?: () => void}} [options]
+ *   extraArgs — параметры запуска из настроек (1.10);
+ *   onExit — игра закрылась (для учёта игрового времени)
  */
-function launchGame(game, gamePath) {
-  const { command, args, cwd } = game.launch(gamePath);
+function launchGame(game, gamePath, options = {}) {
+  const launch = game.launch(gamePath);
+  const { command, cwd } = launch;
+  const args = [...launch.args, ...splitArgs(options.extraArgs)];
 
   if (!fs.existsSync(command)) {
     // Разделяем два разных случая: не стоит загрузчик — и не найдена сама игра.
@@ -45,9 +65,14 @@ function launchGame(game, gamePath) {
     stdio: 'ignore',
     windowsHide: false,
   });
+  // unref не мешает узнать о выходе игры, пока ModHub открыт.
+  if (typeof options.onExit === 'function') {
+    child.once('exit', () => options.onExit());
+    child.once('error', () => options.onExit());
+  }
   child.unref();
 
-  return { pid: child.pid, command };
+  return { pid: child.pid, command, args };
 }
 
 /**
@@ -129,4 +154,4 @@ function bisectStep(suspects, lastResult = null) {
   };
 }
 
-module.exports = { launchGame, readIssues, bisectStep };
+module.exports = { launchGame, readIssues, bisectStep, splitArgs };

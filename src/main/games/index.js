@@ -22,6 +22,8 @@ const ADAPTERS = [
   require('./stardew-valley'),
   require('./hollow-knight'),
   require('./lethal-company'),
+  require('./subnautica'),
+  require('./subnautica-below-zero'),
 ];
 
 const LOADERS = { smapi, bepinex, hkapi };
@@ -58,6 +60,13 @@ function validatePath(game, candidate) {
     return { ok: false, reason: t('err.pathNotExists') };
   }
 
+  // Папка другой поддерживаемой игры — это точно не эта игра. Иначе
+  // Subnautica приняла бы папку Below Zero по похожему имени exe.
+  const other = ADAPTERS.find((g) => g !== game && matchesSignature(g, candidate));
+  if (other && !matchesSignature(game, candidate)) {
+    return { ok: false, reason: t('err.notGameFolder', { game: game.name }) };
+  }
+
   const expected = game.launch(candidate).command;
   if (fs.existsSync(expected)) return { ok: true };
 
@@ -89,6 +98,8 @@ function describe(game) {
     loaderKind: game.loader.kind,
     catalogKind: game.catalog.kind,
     browseUrl: game.catalog.browseUrl ?? null,
+    steamAppId: game.steamAppId ?? null,
+    hasSaves: typeof game.savesDir === 'function',
   };
 }
 

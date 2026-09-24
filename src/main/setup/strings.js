@@ -10,7 +10,7 @@ const STRINGS = {
 
     'welcome.title': 'Установка ModHub',
     'welcome.titleUpdate': 'Обновление ModHub',
-    'welcome.lead': 'Моды для Stardew Valley, Hollow Knight и Lethal Company — в один клик.',
+    'welcome.lead': 'Моды для Stardew Valley, Hollow Knight, Lethal Company, Subnautica и Below Zero — в один клик.',
     'welcome.update': 'Сейчас стоит версия {from}. Она обновится до {version}, настройки и моды останутся на месте.',
     'welcome.updateLegacy': 'Здесь уже стоит ModHub. Он обновится до {version}, настройки и моды останутся на месте.',
     'welcome.folder': 'Папка установки',
@@ -75,7 +75,7 @@ const STRINGS = {
 
     'welcome.title': 'Install ModHub',
     'welcome.titleUpdate': 'Update ModHub',
-    'welcome.lead': 'Mods for Stardew Valley, Hollow Knight and Lethal Company — in one click.',
+    'welcome.lead': 'Mods for Stardew Valley, Hollow Knight, Lethal Company, Subnautica and Below Zero — in one click.',
     'welcome.update': 'Version {from} is installed. It will be updated to {version}; your settings and mods stay put.',
     'welcome.updateLegacy': 'ModHub is already here. It will be updated to {version}; your settings and mods stay put.',
     'welcome.folder': 'Install folder',

@@ -64,8 +64,41 @@ contextBridge.exposeInMainWorld('modhub', {
     browserFile: (gameId, modId, filePath) => invoke('mods:browserFile', { gameId, modId, filePath }),
     installFromFile: (gameId, filePath) => invoke('mods:installFromFile', { gameId, filePath }),
     problems: (gameId) => invoke('mods:problems', gameId),
+    /** Какие моды обновились в каталоге и обновить один (1.10). */
+    updates: (gameId) => invoke('mods:updates', gameId),
+    update: (gameId, modId) => invoke('mods:update', { gameId, modId }),
     /** Картинки установленных модов: { id: адрес }. */
     media: (gameId) => invoke('mods:media', gameId),
+  },
+
+  /** Профили модов: запомнить, что включено, и переключаться (1.10). */
+  profiles: {
+    list: (gameId) => invoke('profiles:list', gameId),
+    save: (gameId, name) => invoke('profiles:save', { gameId, name }),
+    apply: (gameId, name) => invoke('profiles:apply', { gameId, name }),
+    rename: (gameId, from, to) => invoke('profiles:rename', { gameId, from, to }),
+    remove: (gameId, name) => invoke('profiles:remove', { gameId, name }),
+  },
+
+  /** Сборка модов в файле: поделиться с другом и поставить чужую (1.10). */
+  pack: {
+    export: (gameId, name) => invoke('pack:export', { gameId, name }),
+    import: () => invoke('pack:import'),
+  },
+
+  /** Резервные копии сохранений (1.10). */
+  backups: {
+    list: (gameId) => invoke('backups:list', gameId),
+    create: (gameId) => invoke('backups:create', gameId),
+    restore: (gameId, name) => invoke('backups:restore', { gameId, name }),
+    remove: (gameId, name) => invoke('backups:remove', { gameId, name }),
+    summary: () => invoke('backups:summary'),
+  },
+
+  /** Игровое время по играм (1.10). */
+  playtime: {
+    all: () => invoke('playtime:all'),
+    reset: (gameId) => invoke('playtime:reset', gameId),
   },
 
   /** Настоящие картинки игр из Steam: { [gameId]: { hero, logo, cover, header, shots } }. */
@@ -133,6 +166,13 @@ contextBridge.exposeInMainWorld('modhub', {
     const listener = () => handler();
     ipcRenderer.on('elevation-cancelled', listener);
     return () => ipcRenderer.removeListener('elevation-cancelled', listener);
+  },
+
+  /** Игра, запущенная из ModHub, закрылась: { gameId, counted, ms, playtime }. */
+  onGameExit: (handler) => {
+    const listener = (_event, payload) => handler(payload);
+    ipcRenderer.on('game-exit', listener);
+    return () => ipcRenderer.removeListener('game-exit', listener);
   },
 
   /** Пришла ссылка nxm:// из браузера. */

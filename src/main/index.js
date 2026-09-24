@@ -19,6 +19,11 @@ const { ReviewsClient, ReviewsError, statsKey } = require('./core/reviews');
 const { PlayLog, catalogIdOf } = require('./core/playlog');
 const { Account, AccountError } = require('./core/account');
 const { AdsClient, loadAdsConfig } = require('./core/ads');
+const { Profiles } = require('./core/profiles');
+const { Backups } = require('./core/backups');
+const { PlayTime } = require('./core/playtime');
+const { buildPack, parsePack } = require('./core/modpack');
+const { isNewer } = require('./core/updates');
 const watchdl = require('./core/watchdl');
 const winstate = require('./core/winstate');
 const { APP_ID, ICON_FILE } = require('./setup/core');
@@ -45,6 +50,10 @@ let ads = null;
 let steamMedia = null;
 /** Картинки установленных модов, найденные по сети: чтобы не искать их при каждом открытии. */
 let installedMedia = null;
+/** Профили модов, резервные копии сохранений и игровое время (1.10). */
+let profiles = null;
+let backups = null;
+let playtime = null;
 const registries = new Map();
 /** Ссылка nxm://, пришедшая до того, как окно успело открыться. */
 let pendingNxmLink = null;
@@ -259,6 +268,43 @@ function startReviews() {
     lang: () => (getLang() === 'en' ? 'english' : 'russian'),
   });
   installedMedia = new JsonStore(path.join(dataDir(), 'media-cache.json'), { items: {} });
+  profiles = new Profiles({ file: path.join(dataDir(), 'profiles.json') });
+  backups = new Backups({ dir: path.join(dataDir(), 'backups') });
+  playtime = new PlayTime({ file: path.join(dataDir(), 'playtime.json') });
+}
+
+/** Сколько резервных копий держать на игру (настройка «Резервные копии»). */
+function backupKeep() {
+  const keep = Number(settings.data.backupKeep);
+  return Number.isFinite(keep) && keep > 0 ? keep : 10;
+}
+
+/** Папка сохранений игры или null, если адаптер её не знает. */
+function savesDirFor(game, state) {
+  if (typeof game.savesDir !== 'function') return null;
+  try {
+    return game.savesDir(state.path) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Ошибки новых функций 1.10 — текстом из словаря, как всё остальное. */
+function explainCode(error) {
+  if (error?.code && /^(PROFILE|BACKUP|PACK)_/.test(error.code)) {
+    const explained = new Error(t('err.' + error.code));
+    explained.alreadyExplained = true;
+    return explained;
+  }
+  return error;
+}
+
+async function coded(fn) {
+  try {
+    return await fn();
+  } catch (error) {
+    throw explainCode(error);
+  }
 }
 
 /** Ошибка сервера отзывов — человеческим языком и на языке интерфейса. */
@@ -665,7 +711,33 @@ function registerIpc() {
   handle('games:launch', async (gameId) => {
     const { game, state } = await stateFor(gameId, undefined, { scan: false });
     if (!state.found) throw new Error(t('err.gameNotFound'));
-    const launched = diagnostics.launchGame(game, state.path);
+    // Резервная копия сохранений перед запуском — если это не выключено.
+    // Не получилась — игру всё равно запускаем: копия не должна мешать играть.
+    let backup = null;
+    if (settings.data.backupOnLaunch !== false) {
+      try {
+        backup = backups.create(gameId, savesDirFor(game, state), 'launch', { keep: backupKeep() });
+      } catch (error) {
+        console.error('[backup]', error);
+      }
+    }
+
+    const track = settings.data.trackPlaytime !== false;
+    const launched = diagnostics.launchGame(game, state.path, {
+      extraArgs: settings.data.launchArgs?.[gameId] ?? '',
+      onExit: () => {
+        const session = track ? playtime.stop(gameId) : { counted: false, ms: 0 };
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          // Игру закрыли — вернуть окно ModHub, если его сворачивали.
+          if (settings.data.afterLaunch === 'minimize' && settings.data.restoreAfterGame !== false && mainWindow.isMinimized()) {
+            mainWindow.restore();
+          }
+          mainWindow.webContents.send('game-exit', { gameId, ...session, playtime: playtime.all() });
+        }
+      },
+    });
+    if (track) playtime.start(gameId);
+    if (settings.data.afterLaunch === 'minimize' && mainWindow && !mainWindow.isDestroyed()) mainWindow.minimize();
     // Всё, что сейчас стоит и включено, поехало в игру вместе с ней:
     // такие моды теперь можно оценить.
     let played = [];
@@ -675,7 +747,7 @@ function registerIpc() {
     } catch (error) {
       console.error('[playlog]', error);
     }
-    return { ...launched, played };
+    return { ...launched, played, backup };
   });
 
   /* --- моды --- */
@@ -1046,6 +1118,224 @@ function registerIpc() {
       return account.deleteAccount(password);
     })
   );
+
+  /* --- профили модов (1.10) --- */
+
+  handle('profiles:list', async (gameId) => profiles.list(gameId));
+
+  handle('profiles:save', async ({ gameId, name }) =>
+    coded(async () => {
+      const { state } = await stateFor(gameId, undefined, { scan: false });
+      const registry = registryFor(gameId, state);
+      if (!registry) throw new Error(t('err.gameNotFound'));
+      profiles.save(gameId, name, registry.reconcile());
+      return profiles.list(gameId);
+    })
+  );
+
+  handle('profiles:apply', async ({ gameId, name }) =>
+    coded(async () => {
+      const { state } = await stateFor(gameId, undefined, { scan: false });
+      const registry = registryFor(gameId, state);
+      if (!registry) throw new Error(t('err.gameNotFound'));
+      registry.reconcile();
+      const result = profiles.apply(gameId, name, registry);
+      return { ...result, profiles: profiles.list(gameId) };
+    })
+  );
+
+  handle('profiles:rename', async ({ gameId, from, to }) => {
+    profiles.rename(gameId, from, to);
+    return profiles.list(gameId);
+  });
+
+  handle('profiles:remove', async ({ gameId, name }) => {
+    profiles.remove(gameId, name);
+    return profiles.list(gameId);
+  });
+
+  /* --- сборка в файле: экспорт и импорт (1.10) --- */
+
+  handle('pack:export', async ({ gameId, name }) => {
+    const { game, state } = await stateFor(gameId, undefined, { scan: false });
+    const registry = registryFor(gameId, state);
+    if (!registry) throw new Error(t('err.gameNotFound'));
+    const pack = buildPack(game, registry.reconcile(), { name, app: app.getVersion() });
+    const safe = String(pack.name).replace(/[<>:"/\\|?*\x00-\x1f]/g, '').trim() || game.id;
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: t('dialog.packExport'),
+      defaultPath: path.join(app.getPath('documents'), `${safe}.modhub.json`),
+      filters: [{ name: t('dialog.pack'), extensions: ['json'] }],
+    });
+    if (result.canceled || !result.filePath) return null;
+    fs.writeFileSync(result.filePath, JSON.stringify(pack, null, 2), 'utf8');
+    return { file: result.filePath, count: pack.mods.length };
+  });
+
+  /** Прочитать файл сборки и сказать, что в нём есть и чего нет у вас. */
+  handle('pack:import', async () =>
+    coded(async () => {
+      const result = await dialog.showOpenDialog(mainWindow, {
+        title: t('dialog.packImport'),
+        properties: ['openFile'],
+        filters: [{ name: t('dialog.pack'), extensions: ['json'] }],
+      });
+      if (result.canceled || !result.filePaths[0]) return null;
+      const stat = fs.statSync(result.filePaths[0]);
+      if (stat.size > 2 * 1024 * 1024) throw Object.assign(new Error('too big'), { code: 'PACK_FORMAT' });
+      const pack = parsePack(fs.readFileSync(result.filePaths[0], 'utf8'));
+      const game = games.byId(pack.game);
+      if (!game) throw Object.assign(new Error('unknown game'), { code: 'PACK_GAME' });
+
+      let installed = new Set();
+      try {
+        const { state } = await stateFor(pack.game, undefined, { scan: false });
+        const registry = registryFor(pack.game, state);
+        if (registry) installed = new Set(registry.reconcile().map((r) => r.id));
+      } catch {
+        /* игры нет — значит, ничего и не стоит */
+      }
+      const mods = pack.mods.map((m) => {
+        const nexusId = /^nexus:[^:]+:(\d+)$/.exec(m.id);
+        // Номер для каталога: у Nexus в реестре он с приставкой.
+        const catalogId = m.source === 'file' ? null : nexusId ? nexusId[1] : m.id;
+        return { ...m, catalogId, installed: installed.has(m.id) };
+      });
+      return { ...pack, gameName: game.name, mods };
+    })
+  );
+
+  /* --- обновления модов (1.10) --- */
+
+  /**
+   * Какие установленные моды обновились в каталоге.
+   * Nexus отдаёт версию, но файл — только через сайт: такие обновления
+   * помечаются manual, и кнопка ведёт на страницу мода.
+   */
+  handle('mods:updates', async (gameId) => {
+    const { game, state } = await stateFor(gameId, undefined, { scan: false });
+    const registry = registryFor(gameId, state);
+    if (!registry) return [];
+    const out = [];
+    const records = registry.reconcile().filter((r) => !r.missing && r.source !== 'file');
+    await Promise.all(
+      records.map(async (record) => {
+        let latest = null;
+        let catalogId = record.id;
+        try {
+          if (game.catalog.kind === 'nexus') {
+            const match = /^nexus:[^:]+:(\d+)$/.exec(record.id);
+            if (!match) return;
+            catalogId = match[1];
+            latest = (await lookupCatalogMod(game, catalogId))?.version ?? null;
+          } else {
+            latest = (await lookupCatalogMod(game, record.id))?.version ?? null;
+          }
+        } catch {
+          return; // нет сети или мод убрали из каталога — просто не знаем
+        }
+        if (isNewer(latest, record.version)) {
+          out.push({
+            id: record.id,
+            catalogId,
+            name: record.name,
+            current: record.version,
+            latest,
+            icon: record.icon ?? null,
+            manual: game.catalog.kind === 'nexus',
+          });
+        }
+      })
+    );
+    return out.sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+  });
+
+  /** Поставить новую версию поверх старой (Thunderstore и ModLinks). */
+  handle('mods:update', async ({ gameId, modId }) => {
+    const { game, state } = await stateFor(gameId, undefined, { scan: false });
+    if (game.catalog.kind === 'nexus') throw new Error(t('err.updateManual'));
+    const registry = registryFor(gameId, state);
+    const old = registry?.get(modId);
+    if (!old) throw new Error(t('err.modNotFound', { id: modId }));
+    const mod = await lookupCatalogMod(game, modId);
+    if (!mod) throw new Error(t('err.modNotInCatalog'));
+
+    // Новая версия ставится в Mods: выключенный мод сперва возвращаем на место.
+    const wasEnabled = old.enabled !== false;
+    if (!wasEnabled) registry.setEnabled(modId, true);
+    const oldFolder = registry.folderFor(registry.get(modId));
+
+    let result;
+    try {
+      result = await install.installFromCatalog(
+        { game, state, registry },
+        mod,
+        (stage) => sendProgress({ scope: 'install', gameId, ...stage }),
+        { reinstall: new Set([modId]) }
+      );
+      // Новая версия легла в другую папку — старую убираем, иначе загрузятся обе.
+      const fresh = registry.get(modId);
+      if (fresh && registry.folderFor(fresh) !== oldFolder && fs.existsSync(oldFolder)) {
+        fs.rmSync(oldFolder, { recursive: true, force: true });
+      }
+    } finally {
+      // Мод был выключен — таким и остаётся, с новой версией или со старой.
+      if (!wasEnabled && registry.has(modId)) registry.setEnabled(modId, false);
+    }
+    return result;
+  });
+
+  /* --- резервные копии сохранений (1.10) --- */
+
+  handle('backups:list', async (gameId) => {
+    const { game, state } = await stateFor(gameId, undefined, { scan: false });
+    const savesDir = state.found ? savesDirFor(game, state) : null;
+    return {
+      supported: typeof game.savesDir === 'function',
+      saves: backups.describe(savesDir),
+      folder: backups.folderFor(gameId),
+      items: backups.list(gameId),
+    };
+  });
+
+  handle('backups:create', async (gameId) =>
+    coded(async () => {
+      const { game, state } = await stateFor(gameId, undefined, { scan: false });
+      const savesDir = state.found ? savesDirFor(game, state) : null;
+      const made = backups.create(gameId, savesDir, 'manual', { keep: backupKeep() });
+      if (!made) throw Object.assign(new Error('no saves'), { code: 'BACKUP_NO_SAVES' });
+      return made;
+    })
+  );
+
+  handle('backups:restore', async ({ gameId, name }) =>
+    coded(async () => {
+      if (playtime.isRunning(gameId)) throw Object.assign(new Error('game running'), { code: 'BACKUP_RUNNING' });
+      const { game, state } = await stateFor(gameId, undefined, { scan: false });
+      if (!state.found) throw new Error(t('err.gameNotFound'));
+      return backups.restore(gameId, name, savesDirFor(game, state), { keep: backupKeep() });
+    })
+  );
+
+  handle('backups:remove', async ({ gameId, name }) => coded(async () => backups.remove(gameId, name)));
+
+  /** Все игры сразу — для раздела настроек. */
+  handle('backups:summary', async () => {
+    const out = {};
+    for (const game of games.all()) {
+      const items = backups.list(game.id);
+      out[game.id] = { count: items.length, last: items[0]?.at ?? null, bytes: items.reduce((n, b) => n + b.size, 0) };
+    }
+    return { dir: path.join(dataDir(), 'backups'), games: out };
+  });
+
+  /* --- игровое время (1.10) --- */
+
+  handle('playtime:all', async () => playtime.all());
+  handle('playtime:reset', async (gameId) => {
+    playtime.reset(gameId || null);
+    return playtime.all();
+  });
 
   /* --- диагностика --- */
 

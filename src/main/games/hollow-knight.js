@@ -76,6 +76,12 @@ module.exports = {
     return { command: found?.path ?? path.join(gamePath, 'hollow_knight.exe'), args: [], cwd: gamePath };
   },
 
+  /** Сохранения (user1.dat…) лежат в LocalLow рядом с логом Modding API. */
+  savesDir() {
+    if (process.platform === 'win32') return path.join(os.homedir(), 'AppData', 'LocalLow', 'Team Cherry', 'Hollow Knight');
+    return path.join(os.homedir(), '.config', 'unity3d', 'Team Cherry', 'Hollow Knight');
+  },
+
   logPath() {
     if (process.platform === 'win32') {
       return path.join(

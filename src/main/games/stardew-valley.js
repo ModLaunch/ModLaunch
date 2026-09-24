@@ -94,6 +94,12 @@ module.exports = {
     };
   },
 
+  /** Сохранения: в профиле пользователя, общие для всех изданий игры. */
+  savesDir() {
+    if (process.platform === 'win32') return path.join(os.homedir(), 'AppData', 'Roaming', 'StardewValley', 'Saves');
+    return path.join(os.homedir(), '.config', 'StardewValley', 'Saves');
+  },
+
   launch(gamePath) {
     const exe = process.platform === 'win32' ? 'StardewModdingAPI.exe' : 'StardewModdingAPI';
     return { command: path.join(gamePath, exe), args: [], cwd: gamePath };
