@@ -39,6 +39,9 @@ module.exports = {
     browseUrl: 'https://www.nexusmods.com/stardewvalley/mods',
   },
 
+  // Шейдеры (2.1): OpenGL: ReShade встаёт как opengl32.dll рядом с exe (и с SMAPI тоже).
+  reshade: { api: 'opengl' },
+
   sections: pick('all', 'picks', 'buildings', 'content', 'gameplay', 'items', 'cosmetics', 'ui', 'tools', 'visuals', 'packs'),
   // Точные названия категорий Nexus (проверены на сайте, tools/probe.js).
   nexusCategories: {

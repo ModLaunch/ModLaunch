@@ -21,12 +21,14 @@ class ModRegistry {
   /**
    * @param {string} dataDir папка данных ModHub
    * @param {string} gameId идентификатор игры
-   * @param {{modsDir: string, storageDir: string}} paths
+   * @param {{modsDir: string, storageDir: string, presetDir?: string}} paths
+   *   presetDir — папка exe игры: туда ложатся пресеты ReShade (2.1)
    */
   constructor(dataDir, gameId, paths) {
     this.gameId = gameId;
     this.modsDir = paths.modsDir;
     this.storageDir = paths.storageDir;
+    this.presetDir = paths.presetDir ?? path.dirname(paths.storageDir);
     this.store = new JsonStore(path.join(dataDir, 'games', `${gameId}.json`), { mods: {} });
   }
 
@@ -59,10 +61,17 @@ class ModRegistry {
     return this.store.data.mods[record.id];
   }
 
-  /** Каталог мода в текущем его состоянии (включён — в Mods, выключен — в хранилище). */
+  /**
+   * Каталог мода в текущем его состоянии (включён — в Mods, выключен — в хранилище).
+   * Пресет ReShade (kind: preset) — это файл в папке игры, а не папка в Mods.
+   */
   folderFor(mod) {
-    const base = mod.enabled ? this.modsDir : path.join(this.storageDir, 'disabled');
-    return path.join(base, mod.folder);
+    return path.join(this.baseFor(mod, mod.enabled), mod.folder);
+  }
+
+  baseFor(mod, enabled) {
+    if (mod.kind === 'preset') return enabled ? this.presetDir : path.join(this.storageDir, 'disabled-presets');
+    return enabled ? this.modsDir : path.join(this.storageDir, 'disabled');
   }
 
   /**
@@ -76,8 +85,7 @@ class ModRegistry {
     if (mod.enabled === enabled) return mod;
 
     const from = this.folderFor(mod);
-    const toBase = enabled ? this.modsDir : path.join(this.storageDir, 'disabled');
-    const to = path.join(toBase, mod.folder);
+    const to = path.join(this.baseFor(mod, enabled), mod.folder);
 
     if (!fs.existsSync(from)) {
       // Папку унесли мимо ModHub — не падаем, а честно отмечаем расхождение.
@@ -135,7 +143,7 @@ class ModRegistry {
     if (!fs.existsSync(this.modsDir)) return [];
     const known = new Set(
       Object.values(this.store.data.mods)
-        .filter((m) => m.enabled)
+        .filter((m) => m.enabled && m.kind !== 'preset')
         .map((m) => m.folder.toLowerCase())
     );
     return fs

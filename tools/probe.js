@@ -198,7 +198,54 @@ async function checkInstall() {
   }
 }
 
+async function checkShaders() {
+  console.log('\n=== Шейдеры: ReShade по-настоящему ===');
+  const AdmZip = require('adm-zip');
+  const { ReShade, looksLikePreset } = require('../src/main/core/reshade');
+  const install = require('../src/main/core/install');
+  const { ModRegistry } = require('../src/main/core/registry');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'modhub-shaders-'));
+  const game = games.byId('subnautica');
+  const dir = path.join(root, 'Subnautica');
+  fs.mkdirSync(path.join(dir, 'Subnautica_Data'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'Subnautica.exe'), '');
+  const tool = new ReShade({ cacheDir: path.join(root, 'cache') });
+  const zip = new AdmZip();
+  zip.addFile('Cinematic/Cinematic.ini', Buffer.from('Techniques=LumaSharpen@LumaSharpen.fx,Vibrance@Vibrance.fx,Deband@Deband.fx\r\n\r\n[LumaSharpen.fx]\r\nsharp_strength=0.65\r\n'));
+  zip.addFile('Cinematic/readme.txt', Buffer.from('preset'));
+  const archive = path.join(root, 'Cinematic.zip');
+  zip.writeZip(archive);
+  report(looksLikePreset(archive), 'шейдеры: архив пресета узнаётся');
+  const state = { path: dir, modsDir: game.modsDir(dir) };
+  const registry = new ModRegistry(path.join(root, 'data'), game.id, { modsDir: state.modsDir, storageDir: path.join(dir, 'ModHub'), presetDir: dir });
+  try {
+    const record = await install.installAny({ game, state, registry, reshade: tool }, archive, { id: 'nexus:subnautica:1', name: 'Cinematic' }, (p) => console.log('   ', p.code, p.detail ?? ''));
+    const detect = tool.detect(dir);
+    const dll = path.join(dir, 'dxgi.dll');
+    const size = fs.existsSync(dll) ? fs.statSync(dll).size : 0;
+    report(detect.installed && detect.dll === 'dxgi.dll' && size > 1024 * 1024, 'шейдеры: ReShade скачан с reshade.me и встал как dxgi.dll', `${Math.round(size / 1024)} КБ, ${JSON.stringify(detect)}`);
+    const fx = ['LumaSharpen.fx', 'Vibrance.fx', 'Deband.fx'].map((f) => [f, tool.presentEffects(dir).has(f.toLowerCase())]);
+    report(fx.every(([, ok]) => ok), 'шейдеры: эффекты пресета поставлены', JSON.stringify(fx));
+    report(record.kind === 'preset' && fs.existsSync(path.join(dir, 'Cinematic.ini')) && /PresetPath=\.\\Cinematic\.ini/.test(fs.readFileSync(path.join(dir, 'ReShade.ini'), 'utf8')), 'шейдеры: пресет в папке игры и выбран в ReShade.ini');
+  } catch (error) {
+    report(false, 'шейдеры: установка', error.stack);
+  }
+}
+
+async function checkDeps() {
+  console.log('\n=== Зависимости ===');
+  const deps = require('../src/main/core/deps');
+  const details = await nexus.getDetails('subnautica', 1155, '2800');
+  const reqs = (details?.requirements ?? []).map((r) => `${r.id}:${r.name}`);
+  report(reqs.some((r) => r.startsWith('1262:')), 'зависимости: у Decorations Mod в требованиях Nautilus', reqs.join(', '));
+  const index = new deps.SmapiIndex({ file: path.join(os.tmpdir(), 'smapi-index-probe.json') });
+  const found = await index.lookup(['Pathoschild.ContentPatcher', 'spacechase0.SpaceCore']);
+  report(found['Pathoschild.ContentPatcher']?.nexusId === '1915', 'зависимости: SMAPI знает номер Content Patcher на Nexus', JSON.stringify(found));
+}
+
 (async () => {
+  await checkShaders().catch((e) => report(false, 'шейдеры упали', e.stack));
+  await checkDeps().catch((e) => report(false, 'зависимости упали', e.stack));
   await schema().catch((e) => console.log('schema error', e.message));
   for (const game of games.all()) {
     try {

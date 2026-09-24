@@ -863,6 +863,12 @@ const STRINGS = {
     'cset.gameTab.hint': 'Что открывать, когда вы нажимаете на игру',
     'cset.confirm': 'Спрашивать перед удалением мода',
     'cset.confirm.hint': 'Выключите, если удаляете часто и уверенно',
+    'deps.first': 'Сначала поставлю то, без чего мод не работает: {list}',
+    'deps.after': 'Моду не хватает — ставлю следом: {list}',
+    'deps.none': 'Недостающее не нашлось в каталоге — поставьте его вручную',
+    'deps.install': 'Поставить недостающее',
+    'cset.deps': 'Ставить зависимости сами',
+    'cset.deps.hint': 'Требования мода со страницы Nexus и из его манифеста ставятся вместе с ним',
   },
 
   en: {
@@ -1717,6 +1723,12 @@ const STRINGS = {
     'cset.gameTab.hint': 'What opens when you click a game',
     'cset.confirm': 'Ask before removing a mod',
     'cset.confirm.hint': 'Turn off if you remove mods often and know what you do',
+    'deps.first': 'Installing what the mod needs first: {list}',
+    'deps.after': 'The mod is missing something — installing it next: {list}',
+    'deps.none': 'The missing mods were not found in the catalogue — install them by hand',
+    'deps.install': 'Install what is missing',
+    'cset.deps': 'Install dependencies automatically',
+    'cset.deps.hint': 'Requirements from the Nexus page and the mod manifest are installed with the mod',
   },
 };
 

@@ -71,6 +71,12 @@ contextBridge.exposeInMainWorld('modhub', {
     media: (gameId) => invoke('mods:media', gameId),
   },
 
+  /** Шейдеры: ReShade в папке игры (2.1). */
+  reshade: {
+    status: (gameId) => invoke('reshade:status', gameId),
+    install: (gameId) => invoke('reshade:install', gameId),
+  },
+
   /** Профили модов: запомнить, что включено, и переключаться (1.10). */
   profiles: {
     list: (gameId) => invoke('profiles:list', gameId),
@@ -117,6 +123,8 @@ contextBridge.exposeInMainWorld('modhub', {
     get: (gameId, modId) => invoke('catalog:get', { gameId, modId }),
     /** Несколько модов по номерам: «Нужные моды» и наборы (2.0). */
     many: (gameId, ids) => invoke('catalog:many', { gameId, ids }),
+    /** Что поставить до мода: его требования, которых ещё нет (2.1). */
+    plan: (gameId, modId) => invoke('catalog:plan', { gameId, modId }),
     details: (gameId, modId) => invoke('catalog:details', { gameId, modId }),
     /** Досмотреть картинки модов, которых нет во встроенном указателе. */
     media: (gameId, ids) => invoke('catalog:media', { gameId, ids }),

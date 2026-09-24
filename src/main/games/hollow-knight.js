@@ -35,6 +35,9 @@ module.exports = {
     browseUrl: 'https://github.com/hk-modding/modlinks',
   },
 
+  // Шейдеры (2.1): DirectX 11: ReShade встаёт как dxgi.dll рядом с exe.
+  reshade: { api: 'dx11' },
+
   sections: pick('all', 'picks', 'content', 'gameplay', 'cosmetics', 'tools', 'packs'),
   featured: {
     picks: ['Custom Knight', 'Benchwarp', 'Pale Court', 'Randomizer 4', 'HKMP', 'QoL', 'DebugMod'],

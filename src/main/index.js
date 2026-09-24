@@ -25,6 +25,8 @@ const { PlayTime } = require('./core/playtime');
 const { buildPack, parsePack } = require('./core/modpack');
 const { isNewer } = require('./core/updates');
 const { sectionOf } = require('./games/sections');
+const deps = require('./core/deps');
+const { ReShade } = require('./core/reshade');
 const watchdl = require('./core/watchdl');
 const winstate = require('./core/winstate');
 const { APP_ID, ICON_FILE } = require('./setup/core');
@@ -55,6 +57,10 @@ let installedMedia = null;
 let profiles = null;
 let backups = null;
 let playtime = null;
+/** UniqueID Stardew → номер на Nexus (сайт SMAPI), с запасом на неделю. */
+let smapiIndex = null;
+/** ReShade и пресеты шейдеров (2.1). */
+let reshadeTool = null;
 const registries = new Map();
 /** Ссылка nxm://, пришедшая до того, как окно успело открыться. */
 let pendingNxmLink = null;
@@ -272,6 +278,36 @@ function startReviews() {
   profiles = new Profiles({ file: path.join(dataDir(), 'profiles.json') });
   backups = new Backups({ dir: path.join(dataDir(), 'backups') });
   playtime = new PlayTime({ file: path.join(dataDir(), 'playtime.json') });
+  smapiIndex = new deps.SmapiIndex({ file: path.join(dataDir(), 'smapi-index.json'), version: app.getVersion() });
+  reshadeTool = new ReShade({ cacheDir: path.join(dataDir(), 'reshade') });
+}
+
+/**
+ * Чего не хватает включённым модам игры, и откуда это поставить (2.1).
+ * Загрузчик (SMAPI, BepInExPack) сюда не попадает — он ставится своей кнопкой.
+ */
+async function missingDependencies(game, state, registry) {
+  const records = registry.reconcile();
+  const loaderIds = [game.loader?.thunderstorePackage].filter(Boolean);
+  const missing = deps.findMissing(records, { modsDir: state.modsDir, loaderIds, hide: game.catalog.hide ?? [] });
+  const manifest = missing.filter((m) => m.kind === 'manifest');
+  if (manifest.length) {
+    if (game.catalog.kind === 'nexus') {
+      // UniqueID Stardew → номер на Nexus.
+      const found = await smapiIndex.lookup(manifest.map((m) => m.missingId)).catch(() => ({}));
+      for (const m of manifest) {
+        const hit = found[m.missingId] ?? Object.entries(found).find(([k]) => k.toLowerCase() === m.missingId.toLowerCase())?.[1];
+        if (hit?.nexusId && !(game.catalog.hide ?? []).includes(hit.nexusId)) {
+          m.resolve = { id: hit.nexusId };
+          if (hit.name) m.missing = hit.name;
+        }
+      }
+    } else {
+      // Thunderstore и ModLinks: зависимость и есть номер в каталоге.
+      for (const m of manifest) m.resolve = { id: m.missingId };
+    }
+  }
+  return missing;
 }
 
 /** Сколько резервных копий держать на игру (настройка «Резервные копии»). */
@@ -440,6 +476,7 @@ function registryFor(gameId, state) {
       new ModRegistry(dataDir(), gameId, {
         modsDir: state.modsDir,
         storageDir: path.join(state.path, 'ModHub'),
+        presetDir: ReShade.dirOf(games.byId(gameId), state.path),
       })
     );
   }
@@ -761,15 +798,38 @@ function registerIpc() {
   });
 
   handle('mods:setEnabled', async ({ gameId, modId, enabled }) => {
-    const { state } = await stateFor(gameId, undefined, { scan: false });
+    const { game, state } = await stateFor(gameId, undefined, { scan: false });
     const registry = registryFor(gameId, state);
-    return registry.setEnabled(modId, enabled);
+    const record = registry.setEnabled(modId, enabled);
+    // Пресет шейдеров: включили — он становится текущим в ReShade, выключили — пустой.
+    if (record?.kind === 'preset') syncPreset(game, state, registry, enabled ? record : null);
+    return record;
   });
 
   handle('mods:remove', async ({ gameId, modId }) => {
-    const { state } = await stateFor(gameId, undefined, { scan: false });
+    const { game, state } = await stateFor(gameId, undefined, { scan: false });
     const registry = registryFor(gameId, state);
-    return registry.remove(modId);
+    const record = registry.get(modId);
+    const removed = registry.remove(modId);
+    if (record?.kind === 'preset') syncPreset(game, state, registry, null);
+    return removed;
+  });
+
+  /* --- шейдеры: ReShade (2.1) --- */
+
+  handle('reshade:status', async (gameId) => {
+    const { game, state } = await stateFor(gameId, undefined, { scan: false });
+    if (!game.reshade || !state.found) return { supported: Boolean(game.reshade), installed: false };
+    const dir = ReShade.dirOf(game, state.path);
+    return { supported: true, api: game.reshade.api, dir, ...reshadeTool.detect(dir) };
+  });
+
+  handle('reshade:install', async (gameId) => {
+    const { game, state } = await stateFor(gameId, undefined, { scan: false });
+    if (!game.reshade) throw new Error(t('err.presetUnsupported'));
+    if (!state.found) throw new Error(t('err.gameNotFound'));
+    const dir = ReShade.dirOf(game, state.path);
+    return reshadeTool.install(dir, game.reshade.api, (stage) => sendProgress({ scope: 'loader', gameId, ...stage }));
   });
 
   handle('mods:installFromCatalog', async ({ gameId, modId }) => {
@@ -784,7 +844,7 @@ function registerIpc() {
     const mod = await lookupCatalogMod(game, modId);
     if (!mod) throw new Error(t('err.modNotInCatalog'));
 
-    return install.installFromCatalog({ game, state, registry }, mod, (stage) =>
+    return install.installFromCatalog({ game, state, registry, reshade: reshadeTool }, mod, (stage) =>
       sendProgress({ scope: 'install', gameId, ...stage })
     );
   });
@@ -807,17 +867,50 @@ function registerIpc() {
         index: index + 1,
         total: paths.length,
       });
-      results.push(install.installArchive({ game, state, registry }, file, { source: 'file' }));
+      results.push(
+        await install.installAny({ game, state, registry, reshade: reshadeTool }, file, { source: 'file', name: path.parse(file).name }, (stage) =>
+          sendProgress({ scope: 'install', gameId, ...stage })
+        )
+      );
     }
     sendProgress({ scope: 'install', gameId, code: 'install.done', installed: results.length });
     return results;
   });
 
   handle('mods:problems', async (gameId) => {
-    const { state } = await stateFor(gameId, undefined, { scan: false });
+    const { game, state } = await stateFor(gameId, undefined, { scan: false });
     const registry = registryFor(gameId, state);
     if (!registry) return [];
-    return install.checkDependencies(registry);
+    return missingDependencies(game, state, registry);
+  });
+
+  /**
+   * Что поставить до мода (2.1): требования со страницы Nexus, и их
+   * требования тоже, — только то, чего ещё нет. Порядок — сначала самые
+   * глубокие: библиотека раньше мода, который на ней стоит.
+   */
+  handle('catalog:plan', async ({ gameId, modId }) => {
+    const { game, state } = await stateFor(gameId, undefined, { scan: false });
+    if (game.catalog.kind !== 'nexus' || !state.found) return { missing: [] };
+    const registry = registryFor(gameId, state);
+    const present = deps.presentKeys(registry ? registry.reconcile() : [], { modsDir: state.modsDir });
+    const hidden = new Set((game.catalog.hide ?? []).map(String));
+    const order = [];
+    const visited = new Set([String(modId)]);
+    const visit = async (id, depth) => {
+      if (depth > 3 || order.length >= 12) return;
+      const details = await nexus.getDetails(game.catalog.nexusDomain, game.catalog.nexusGameId, id).catch(() => null);
+      for (const req of details?.requirements ?? []) {
+        const rid = String(req.id);
+        if (req.sameGame === false || hidden.has(rid) || visited.has(rid)) continue;
+        visited.add(rid);
+        if (present.ids.has(`nexus#${rid}`) || present.names.has(deps.norm(req.name))) continue;
+        await visit(rid, depth + 1);
+        order.push({ id: rid, name: req.name });
+      }
+    };
+    await visit(String(modId), 0);
+    return { missing: order };
   });
 
   /**
@@ -1301,7 +1394,7 @@ function registerIpc() {
     let result;
     try {
       result = await install.installFromCatalog(
-        { game, state, registry },
+        { game, state, registry, reshade: reshadeTool },
         mod,
         (stage) => sendProgress({ scope: 'install', gameId, ...stage }),
         { reinstall: new Set([modId]) }
@@ -1404,7 +1497,7 @@ function registerIpc() {
     });
 
     sendProgress({ scope: 'install', gameId, code: 'install.extract', mod: info.name });
-    const record = install.installArchive({ game, state, registry }, archive, {
+    const record = await install.installAny({ game, state, registry, reshade: reshadeTool }, archive, {
       id: info.id,
       name: info.name,
       version: info.version,
@@ -1450,6 +1543,20 @@ function registerIpc() {
 
     return step;
   });
+}
+
+/**
+ * Текущий пресет ReShade: включённый пресет — он, иначе последний
+ * включённый из остальных, иначе пустой (эффекты выключены).
+ */
+function syncPreset(game, state, registry, preferred) {
+  try {
+    const dir = ReShade.dirOf(game, state.path);
+    const active = preferred ?? registry.list().filter((m) => m.kind === 'preset' && m.enabled && !m.missing).pop() ?? null;
+    reshadeTool.activate(dir, active ? path.join(dir, active.folder) : null);
+  } catch (error) {
+    console.error('[reshade]', error);
+  }
 }
 
 async function lookupCatalogMod(game, modId) {
@@ -1543,6 +1650,7 @@ async function installFromNexus(game, state, registry, modId, gameId) {
   const { mod, mainFile } = details;
   if (!mainFile) throw new Error(t('err.nexus.noFiles'));
 
+  const hidden = new Set((game.catalog.hide ?? []).map(String));
   const meta = {
     id: `nexus:${domain}:${modId}`,
     name: mod.name,
@@ -1551,6 +1659,10 @@ async function installFromNexus(game, state, registry, modId, gameId) {
     source: 'nexus',
     url: mod.url,
     icon: mod.icon ?? null,
+    // Требования со страницы мода — чтобы проверка зависимостей их знала.
+    requires: (details.requirements ?? [])
+      .filter((r) => r.sameGame !== false && !hidden.has(String(r.id)))
+      .map((r) => ({ id: String(r.id), name: r.name })),
   };
 
   let archive;
@@ -1605,7 +1717,9 @@ async function installFromNexus(game, state, registry, modId, gameId) {
 
   sendProgress({ scope: 'install', gameId, code: 'install.extract', mod: mod.name });
   try {
-    const record = install.installArchive({ game, state, registry }, archive, meta);
+    const record = await install.installAny({ game, state, registry, reshade: reshadeTool }, archive, meta, (stage) =>
+      sendProgress({ scope: 'install', gameId, ...stage })
+    );
     sendProgress({ scope: 'install', gameId, code: 'install.done', mod: mod.name, installed: 1 });
     return { installed: [record], missing: [] };
   } finally {

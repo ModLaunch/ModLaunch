@@ -171,7 +171,7 @@ function readEntryText(zipPath, entryName) {
   const wanted = normalise(entryName).toLowerCase();
   const entry = zip.getEntries().find((e) => normalise(e.entryName).toLowerCase() === wanted);
   if (!entry) return null;
-  return entry.getData().toString('utf8').replace(/^﻿/, '');
+  return entry.getData().toString('utf8').replace(/^\uFEFF/, '');
 }
 
 /**

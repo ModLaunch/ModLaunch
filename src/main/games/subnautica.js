@@ -43,6 +43,9 @@ module.exports = {
     browseUrl: 'https://www.nexusmods.com/subnautica/mods',
   },
 
+  // Шейдеры (2.1): DirectX 11: ReShade встаёт как dxgi.dll рядом с exe.
+  reshade: { api: 'dx11' },
+
   sections: pick('all', 'picks', 'buildings', 'vehicles', 'items', 'gameplay', 'ui', 'tools', 'visuals', 'packs'),
   // Точные названия категорий Nexus (проверены на сайте, tools/probe.js).
   nexusCategories: {

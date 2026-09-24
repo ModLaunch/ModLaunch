@@ -7,6 +7,7 @@ const { downloadFile } = require('./download');
 const { findModRoots, extractModRoot, readEntryText, toZip } = require('./archive');
 const thunderstore = require('./sources/thunderstore');
 const modlinks = require('./sources/modlinks');
+const { ReShade, looksLikePreset, presetEffects } = require('./reshade');
 const { t } = require('../i18n');
 
 /**
@@ -73,7 +74,7 @@ async function installFromCatalog(ctx, mod, onProgress = () => {}, options = {})
     });
 
     onProgress({ code: 'install.extract', mod: entry.name, index: index + 1, total });
-    const record = installArchive(ctx, archive, {
+    const record = await installAny(ctx, archive, {
       id: entry.id,
       name: entry.name,
       version: entry.version,
@@ -117,6 +118,77 @@ async function buildPlan(game, mod) {
   }
   // Каталога нет (Nexus) — ставим ровно то, что попросили.
   return { order: [mod], missing: [] };
+}
+
+/**
+ * Архив с модом или с шейдер-пресетом (2.1): пресет ReShade ставится в папку
+ * игры вместе с самим ReShade и нужными эффектами, всё остальное — как раньше.
+ * @param {object} ctx { game, state, registry, reshade }
+ */
+async function installAny(ctx, sourcePath, meta = {}, onProgress = () => {}) {
+  let converted;
+  try {
+    converted = toZip(sourcePath);
+  } catch (error) {
+    if (error.code === 'ARCHIVE_FORMAT') throw new Error(t('err.archiveFormat', { file: path.basename(sourcePath) }));
+    throw error;
+  }
+  try {
+    if (ctx.game.reshade && looksLikePreset(converted.path)) {
+      return await installPreset(ctx, converted.path, meta, onProgress);
+    }
+    return installZip(ctx, converted.path, meta);
+  } finally {
+    if (converted.temporary) fs.rmSync(converted.path, { force: true });
+  }
+}
+
+/**
+ * Шейдер-пресет: ReShade (если его нет) → пресет в папку игры → нужные ему
+ * эффекты → пресет становится текущим. В реестре — запись kind: preset.
+ */
+async function installPreset(ctx, zipPath, meta, onProgress) {
+  const { game, state, registry } = ctx;
+  const reshade = ctx.reshade ?? new ReShade({ cacheDir: path.join(require('node:os').tmpdir(), 'modhub-reshade') });
+  const dir = ReShade.dirOf(game, state.path);
+
+  if (!reshade.detect(dir).dll) {
+    onProgress({ code: 'reshade.install', mod: meta.name });
+    await reshade.install(dir, game.reshade.api, onProgress);
+  }
+  const presets = reshade.extractPreset(dir, zipPath);
+  if (!presets.length) throw new Error(t('err.presetEmpty'));
+
+  const wanted = new Set();
+  for (const file of presets) {
+    for (const fx of presetEffects(fs.readFileSync(path.join(dir, file), 'utf8'))) wanted.add(fx);
+  }
+  const effects = await reshade.ensureEffects(dir, [...wanted], onProgress);
+  reshade.activate(dir, path.join(dir, presets[0]));
+
+  let primary = null;
+  for (const file of presets) {
+    const saved = registry.add({
+      id: primary && meta.id ? `${meta.id}#${file}` : meta.id ?? `preset:${file}`,
+      name: primary ? file.replace(/\.ini$/i, '') : meta.name ?? file.replace(/\.ini$/i, ''),
+      version: meta.version ?? '',
+      author: meta.author ?? '',
+      source: meta.source ?? 'file',
+      url: meta.url ?? null,
+      icon: meta.icon ?? null,
+      kind: 'preset',
+      folder: file,
+      fileCount: 1,
+      dependencies: [],
+      requires: [],
+      missingEffects: effects.missing,
+      requestedBy: primary && meta.id ? meta.id : null,
+      enabled: true,
+      missing: false,
+    });
+    if (!primary) primary = saved;
+  }
+  return primary;
 }
 
 /**
@@ -188,7 +260,14 @@ function installZip(ctx, archivePath, meta = {}) {
       icon: meta.icon ?? null,
       folder: folderName,
       fileCount: files.length,
-      dependencies: (fileMeta.dependencies ?? []).map((d) => d.id),
+      // Зависимости из манифеста; пакет контента (Stardew) зависит и от того,
+      // для кого он сделан (ContentPackFor) — это тоже обязательный мод.
+      dependencies: [...(fileMeta.dependencies ?? []).map((d) => d.id), fileMeta.contentPackFor].filter(Boolean),
+      // Как мод знает себя сам: UniqueID из manifest.json (2.1). По нему
+      // другие моды и ищут его в своих зависимостях.
+      uniqueId: fileMeta.id && root.marker && /manifest\.json$/i.test(root.marker) ? String(fileMeta.id) : null,
+      // Требования со страницы мода на Nexus (2.1): у модов Subnautica это Nautilus.
+      requires: primary ? [] : (meta.requires ?? []),
       requestedBy: primary && meta.id ? meta.id : meta.requestedBy ?? null,
       enabled: true,
       missing: false,
@@ -231,4 +310,4 @@ function checkDependencies(registry) {
   return problems;
 }
 
-module.exports = { installFromCatalog, installArchive, checkDependencies, buildPlan, isLoaderPackage, GENERIC_FOLDER };
+module.exports = { installFromCatalog, installArchive, installAny, installPreset, checkDependencies, buildPlan, isLoaderPackage, GENERIC_FOLDER };

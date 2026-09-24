@@ -39,6 +39,9 @@ module.exports = {
     browseUrl: 'https://thunderstore.io/c/lethal-company/',
   },
 
+  // Шейдеры (2.1): DirectX 11: ReShade встаёт как dxgi.dll рядом с exe.
+  reshade: { api: 'dx11' },
+
   sections: pick('all', 'picks', 'content', 'items', 'gameplay', 'cosmetics', 'audio', 'tools', 'visuals', 'modpacks'),
   featured: {
     picks: ['notnotnotswipez-MoreCompany', 'tinyhoot-ShipLoot', 'anormaltwig-LateCompany', 'x753-More_Suits', 'Evaisa-LethalThings', 'malco-Lategame_Upgrades'],

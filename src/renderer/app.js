@@ -152,6 +152,7 @@ const PREF_DEFAULTS = {
   showTags: true,
   confirmRemove: true,
   gameDefaultTab: 'downloads', // downloads | market | profiles
+  autoDeps: true, // ставить требования мода вместе с ним (2.1)
   compactHero: true, // шапка игры полосой во всех вкладках, кроме «Загрузок»
 };
 
@@ -4096,10 +4097,14 @@ function gameShotsBlock(gameId) {
 }
 
 function renderInstalled(game) {
+  const fixable = state.problems.filter((p) => p.resolve?.id);
+  const names = [...new Set(state.problems.map((p) => p.missing))];
   const problems = state.problems.length
-    ? `<div class="warnbar">${icon('warn')}<span>${esc(
-        t('inst.problems', { list: state.problems.map((p) => p.missing).join(', ') })
-      )}</span></div>`
+    ? `<div class="warnbar">${icon('warn')}<span>${esc(t('inst.problems', { list: names.join(', ') }))}</span>${
+        fixable.length
+          ? `<button class="btn btn--sm btn--primary" data-action="deps-install" data-game="${esc(game.id)}">${icon('download')}<span>${esc(t('deps.install'))}</span></button>`
+          : ''
+      }</div>`
     : '';
 
   const unmanaged = state.unmanaged.length
@@ -5298,7 +5303,9 @@ function settingsCatalog() {
         t('cset.gameTab'),
         t('cset.gameTab.hint'),
         segmented('gameDefaultTab', [['downloads', t('games.downloads')], ['market', t('games.market')], ['profiles', t('games.profiles')]], pref('gameDefaultTab'))
-      ) + settingRow(t('cset.confirm'), t('cset.confirm.hint'), toggle('confirmRemove', pref('confirmRemove')))
+      ) +
+        settingRow(t('cset.deps'), t('cset.deps.hint'), toggle('autoDeps', pref('autoDeps'))) +
+        settingRow(t('cset.confirm'), t('cset.confirm.hint'), toggle('confirmRemove', pref('confirmRemove')))
     )
   );
 }
@@ -6034,7 +6041,57 @@ async function elevate() {
   await call(api.app.relaunchAsAdmin()).catch(() => toast(t('toast.elevateFailed'), 'error'));
 }
 
-async function installMod(gameId, modId) {
+/**
+ * Установка с зависимостями (2.1).
+ *
+ * Перед модом с Nexus ставятся его требования (и их требования), которых
+ * ещё нет, — сначала самые глубокие. После установки ModHub смотрит
+ * манифест мода: чего не хватает и что можно найти (Stardew — через сайт
+ * SMAPI), ставит следом. Каждая зависимость — своя строка в загрузках.
+ */
+const depsTried = new Set();
+async function installMod(gameId, modId, { deps = true } = {}) {
+  const item = entry(gameId);
+  const nexus = item?.game?.catalog?.kind === 'nexus';
+  if (deps && pref('autoDeps') && nexus && item?.game?.found && item.game.loader.installed) {
+    const plan = await call(api.catalog.plan(gameId, modId), { silent: true }).catch(() => null);
+    const missing = plan?.missing ?? [];
+    if (missing.length) {
+      toast(t('deps.first', { list: missing.map((m) => m.name).join(', ') }));
+      for (const dep of missing) {
+        depsTried.add(`${gameId}|${dep.id}`);
+        await installModOnce(gameId, dep.id, { name: dep.name });
+      }
+    }
+  }
+  const ok = await installModOnce(gameId, modId);
+  if (ok && deps && pref('autoDeps')) await installMissingDeps(gameId, { quiet: true });
+  return ok;
+}
+
+/** Поставить то, чего не хватает установленным модам и что нашлось в каталоге. */
+async function installMissingDeps(gameId, { quiet = false } = {}) {
+  if (state.activeGameId !== gameId) return;
+  const todo = [];
+  for (const p of state.problems) {
+    const id = p.resolve?.id;
+    if (!id || depsTried.has(`${gameId}|${id}`) || todo.some((x) => x.id === id)) continue;
+    todo.push({ id, name: p.missing });
+  }
+  if (!todo.length) {
+    if (!quiet) toast(t('deps.none'), 'warn');
+    return;
+  }
+  toast(t('deps.after', { list: todo.map((m) => m.name).join(', ') }));
+  for (const dep of todo) {
+    depsTried.add(`${gameId}|${dep.id}`);
+    await installModOnce(gameId, dep.id, { name: dep.name });
+  }
+  await refreshMods();
+  render();
+}
+
+async function installModOnce(gameId, modId, { name = null } = {}) {
   const item = entry(gameId);
   if (!item?.game?.found) {
     go('notfound', { gameId });
@@ -6056,7 +6113,8 @@ async function installMod(gameId, modId) {
 
   // Кнопка сама станет прогрессом: отдельная полоса внизу окна не нужна.
   const known = knownMod(gameId, modId) ?? (state.modView?.mod?.id === modId ? state.modView.mod : null);
-  const job = startJob({ gameId, modId, name: known?.name ?? modId, mod: known });
+  const job = startJob({ gameId, modId, name: known?.name ?? name ?? modId, mod: known });
+  let installedOk = false;
   try {
     const result = await call(api.mods.installFromCatalog(gameId, modId));
     if (result?.cancelled) {
@@ -6067,6 +6125,7 @@ async function installMod(gameId, modId) {
     await refreshMods();
     finishJob(job, { ok: true });
     render();
+    installedOk = true;
 
     const count = result?.installed?.length ?? 0;
     if (result?.missing?.length) {
@@ -6082,6 +6141,7 @@ async function installMod(gameId, modId) {
   } finally {
     closeBrowserWait();
   }
+  return installedOk;
 }
 
 /**
@@ -6197,6 +6257,11 @@ async function resetPrefs() {
 
 const ACTIONS = {
   'nav-games': () => go('games'),
+  'deps-install': (node) => {
+    // Кнопку нажал человек — пробуем заново и то, что уже не получилось раньше.
+    for (const key of [...depsTried]) if (key.startsWith(`${node.dataset.game}|`)) depsTried.delete(key);
+    installMissingDeps(node.dataset.game);
+  },
   /* --- 2.0 --- */
   'cat-section': (node) => setSection(node.dataset.game, node.dataset.section),
   'kit-install': (node) => installKit(node.dataset.game, node.dataset.kit),

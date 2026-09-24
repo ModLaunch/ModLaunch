@@ -140,6 +140,8 @@ const DICT = {
     'err.PACK_FORMAT': 'Это не файл сборки ModHub.',
     'err.PACK_NEWER': 'Сборка сделана в более новой версии ModHub — обновите программу.',
     'err.PACK_GAME': 'Сборка сделана для игры, которую эта версия ModHub не поддерживает.',
+    'err.presetEmpty': 'В архиве нет пресета ReShade (файла .ini со списком эффектов).',
+    'err.presetUnsupported': 'Для этой игры ModHub пока не умеет ставить шейдеры.',
     'err.updateManual': 'Моды с Nexus обновляются через сайт: откройте страницу мода.',
   },
 
@@ -265,6 +267,8 @@ const DICT = {
     'err.PACK_FORMAT': 'This is not a ModHub modpack file.',
     'err.PACK_NEWER': 'This modpack was made by a newer ModHub — please update.',
     'err.PACK_GAME': 'This modpack is for a game this ModHub version does not support.',
+    'err.presetEmpty': 'The archive has no ReShade preset (an .ini file with a list of effects).',
+    'err.presetUnsupported': 'ModHub cannot install shaders for this game yet.',
     'err.updateManual': 'Nexus mods update through the website: open the mod page.',
   },
 };
