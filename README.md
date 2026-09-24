@@ -7,7 +7,7 @@
 **Mods in one click, no guide needed.**
 ModLaunch finds your game, installs the mod loader and downloads mods together with their dependencies.
 
-[![Latest release](https://img.shields.io/github/v/release/maksimuglou-spec/ModLaunch?label=download&color=7c5cff)](https://github.com/maksimuglou-spec/ModLaunch/releases/latest)
+[![Latest release](https://img.shields.io/github/v/release/ModLaunch/ModLaunch?label=download&color=7c5cff)](https://github.com/ModLaunch/ModLaunch/releases/latest)
 ![Windows 10/11](https://img.shields.io/badge/Windows-10%20%7C%2011-0078d4)
 ![Languages](https://img.shields.io/badge/UI-English%20%7C%20%D0%A0%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9-555)
 
@@ -31,7 +31,7 @@ Steam, Epic, GOG and standalone copies are found automatically. If a game isn't 
 
 ## Download and install
 
-1. Open the [latest release](https://github.com/maksimuglou-spec/ModLaunch/releases/latest).
+1. Open the [latest release](https://github.com/ModLaunch/ModLaunch/releases/latest).
 2. Under **Assets**, download **`ModLaunch-Setup-<version>.exe`**.
 3. Run it and press **Install**. ModLaunch appears on the desktop and in the Start menu.
 
@@ -88,11 +88,11 @@ Nexus Mods gives files to free accounts only from its own website. ModLaunch ope
 Windows Settings → Apps → ModLaunch → Uninstall.
 
 **Something broke. What do I do?**
-Open an [issue](https://github.com/maksimuglou-spec/ModLaunch/issues) and describe what happened. A screenshot of the *Log* tab on the game page helps a lot.
+Open an [issue](https://github.com/ModLaunch/ModLaunch/issues) and describe what happened. A screenshot of the *Log* tab on the game page helps a lot.
 
 ## License
 
-Copyright © 2026 maksimuglou-spec. All rights reserved. See [LICENSE](LICENSE).
+Copyright © 2026 the ModLaunch author. All rights reserved. See [LICENSE](LICENSE).
 You're welcome to download and use ModLaunch for free. The source code is published for transparency, not for reuse.
 
 Developer notes: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) (in Russian).
