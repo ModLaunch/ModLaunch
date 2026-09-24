@@ -188,8 +188,12 @@ async function tour() {
     check('DXVK: своя DLL игры сохранена', files.includes('dxgi.dll.modlaunch-backup'));
     // После закрытия игры программа сама возвращается на главную — ждём этого и уходим в «Графику».
     await delay(2000);
-    await js(`state.settingsTab = 'graphics'; state.dxvkGames = null; go('settings')`);
-    await waitFor(() => js(`Boolean(document.querySelector('.dxvk__row'))`), 8000);
+    const opened = await waitFor(
+      () => js(`(() => { if (state.view !== 'settings' || state.settingsTab !== 'graphics') { state.settingsTab = 'graphics'; go('settings'); } return Boolean(document.querySelector('.dxvk__row')); })()`),
+      10000,
+      700
+    );
+    check('экран «Графика» с DXVK открывается', opened, await js(`state.view + '/' + state.settingsTab + ' строк: ' + document.querySelectorAll('.dxvk__row').length`));
     await shot('11-dxvk', 1200);
     const off = await js(`window.modhub.dxvk.remove(${JSON.stringify(oldExe)})`);
     const left = fs.readdirSync(OLD).sort();
