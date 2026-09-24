@@ -70,6 +70,7 @@ const EN = {
   'faq.5a': 'Tell us in GitHub Issues which game to add next.',
   'final.title': 'Ready to try it?',
   'final.zip': 'Portable version (zip)',
+  'final.nexus': 'Also on Nexus Mods',
   'foot.releases': 'All versions',
   'foot.issues': 'Report a bug',
   'foot.note': 'Subnautica, Stardew Valley, Lethal Company and Hollow Knight are trademarks of their owners. ModLaunch is an unofficial project.',

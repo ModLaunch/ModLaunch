@@ -8,6 +8,7 @@
 ModLaunch finds your game, installs the mod loader and downloads mods together with their dependencies.
 
 [![Latest release](https://img.shields.io/github/v/release/ModLaunch/ModLaunch?label=download&color=7c5cff)](https://github.com/ModLaunch/ModLaunch/releases/latest)
+[![Nexus Mods](https://img.shields.io/badge/Nexus%20Mods-ModLaunch-d98f40)](https://www.nexusmods.com/subnautica/mods/4223)
 ![Windows 10/11](https://img.shields.io/badge/Windows-10%20%7C%2011-0078d4)
 ![Languages](https://img.shields.io/badge/UI-English%20%7C%20%D0%A0%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9-555)
 
