@@ -1,0 +1,33 @@
+ModLaunch
+Copyright (c) 2026 maksimuglou-spec (https://github.com/maksimuglou-spec)
+All rights reserved.
+
+1. Using the app. You may download the official builds of ModLaunch published
+   on this repository's Releases page and use them free of charge on your own
+   computers.
+
+2. Source code. The source code is published for transparency. Except for
+   viewing and forking this repository on GitHub as allowed by the GitHub
+   Terms of Service, you may not copy, modify, redistribute, sublicense or
+   sell the source code, the builds, or any part of them, and you may not
+   publish modified versions, without prior written permission from the
+   copyright holder.
+
+3. Third-party components. Components included with ModLaunch (for example
+   Electron, marked and DOMPurify) remain under their own licenses, which are
+   shipped with them. Mods downloaded through ModLaunch belong to their authors
+   and are governed by the authors' terms.
+
+4. No warranty. ModLaunch is provided "as is", without warranty of any kind.
+   The copyright holder is not liable for any damage to game files, lost saves
+   or any other loss arising from the use of ModLaunch.
+
+For permission requests, open an issue on this repository.
+
+---
+
+Все права защищены. Скачивать официальные сборки ModLaunch со страницы
+«Релизы» и пользоваться ими можно бесплатно. Копировать, изменять,
+распространять и продавать исходный код и сборки без письменного разрешения
+автора нельзя (кроме просмотра и форка на GitHub по правилам GitHub).
+Программа предоставляется «как есть», без гарантий.

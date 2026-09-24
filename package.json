@@ -8,7 +8,7 @@
     "name": "ModHub",
     "email": "hello@modhub.local"
   },
-  "license": "MIT",
+  "license": "UNLICENSED",
   "private": true,
   "dependencies": {
     "adm-zip": "^0.5.16",

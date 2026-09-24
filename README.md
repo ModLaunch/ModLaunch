@@ -1,71 +1,98 @@
+<div align="center">
+
+<img src="src/assets/icon.png" width="96" alt="ModLaunch logo">
+
 # ModLaunch
 
-Установщик модов, который заменяет собой гайд по установке: сам находит игру,
-ставит загрузчик модов, скачивает моды с зависимостями и раскладывает их
-по нужным папкам.
+**Mods in one click, no guide needed.**
+ModLaunch finds your game, installs the mod loader and downloads mods together with their dependencies.
 
-**Игры:** Stardew Valley, Hollow Knight, Lethal Company, Subnautica,
-Subnautica: Below Zero.
+[![Latest release](https://img.shields.io/github/v/release/maksimuglou-spec/ModLaunch?label=download&color=7c5cff)](https://github.com/maksimuglou-spec/ModLaunch/releases/latest)
+![Windows 10/11](https://img.shields.io/badge/Windows-10%20%7C%2011-0078d4)
+![Languages](https://img.shields.io/badge/UI-English%20%7C%20%D0%A0%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9-555)
 
-## Скачать
+**English** · [Русский](README.ru.md)
 
-Последняя версия — на странице
-[«Релизы»](https://github.com/maksimuglou-spec/owner-of-ModHub/releases/latest):
+</div>
 
-- `ModLaunch-Setup-<версия>.exe` — установщик (своё окно, ярлыки, удаление через «Приложения», автообновление);
-- `ModLaunch-<версия>-win-x64.zip` — портативная версия одной папкой.
+![ModLaunch home screen](docs/screenshots/home.jpg)
 
-## Что умеет
+## Supported games
 
-- каталог модов по разделам: «Нужные», «Моды» (постройки, транспорт,
-  предметы, геймплей, интерфейс, библиотеки…), «Шейдеры и графика», «Сборки»;
-- установка в один клик с зависимостями, включение и выключение модов;
-- профили модов, сборки в файле, готовые наборы;
-- проверка и установка обновлений модов;
-- резервные копии сохранений перед запуском игры;
-- игровое время, параметры запуска, избранное;
-- шейдеры: ReShade ставится сам, пресеты — в папку игры, с нужными эффектами;
-- друзья: код друга, запросы, кто в сети и во что играет;
-- оверлей в игре (Ctrl+Shift+M): время сеанса, друзья, копия сохранений,
-  заметки к игре.
+| Game | Mod loader (installed automatically) | Where mods come from |
+| --- | --- | --- |
+| Stardew Valley | SMAPI | Nexus Mods |
+| Hollow Knight | Modding API | Hollow Knight community mod list |
+| Lethal Company | BepInEx | Thunderstore |
+| Subnautica | BepInEx | Thunderstore, Nexus Mods |
+| Subnautica: Below Zero | BepInEx | Thunderstore, Nexus Mods |
 
-## Обновления и статистика
+Steam, Epic, GOG and standalone copies are found automatically. If a game isn't found, point ModLaunch to its folder once.
 
-- Новые версии ModLaunch берёт из «Релизов» репозитория, указанного в
-  [`src/main/update.config.json`](src/main/update.config.json). Переедет
-  репозиторий — поменяйте там `owner` и `repo`.
-- Выпуск: **Actions → release → Run workflow**. Установленные копии увидят
-  новую версию в течение нескольких часов (или сразу — «Настройки →
-  Обновления → Проверить»).
-- Статистика скачиваний и оценок: пять щелчков по номеру версии в
-  «Настройки → О программе» — в левой панели появится кнопка «Статистика».
+## Download and install
 
-## Друзья: один раз включить на сервере
+1. Open the [latest release](https://github.com/maksimuglou-spec/ModLaunch/releases/latest).
+2. Under **Assets**, download **`ModLaunch-Setup-<version>.exe`**.
+3. Run it and press **Install**. ModLaunch appears on the desktop and in the Start menu.
 
-Друзья живут в той же базе Firebase, что отзывы и аккаунты
-(`src/main/reviews.config.json`). Чтобы база пускала их запросы, правила
-из [`firebase/friends.rules`](firebase/friends.rules) нужно один раз
-вставить в консоли Firebase:
+Prefer no installation? Download **`ModLaunch-<version>-win-x64.zip`**, unzip it anywhere and run `ModLaunch.exe`.
 
-1. [console.firebase.google.com](https://console.firebase.google.com) →
-   проект → **Firestore Database → Правила**;
-2. вставить содержимое `firebase/friends.rules` внутрь блока
-   `match /databases/{database}/documents { … }`, рядом с правилами отзывов;
-3. **Опубликовать**.
+### "Windows protected your PC"
 
-Правила отзывов эти строки не трогают. Пока правила не вставлены, ModLaunch
-на экране «Друзья» так и пишет: сервер отклонил запрос.
+ModLaunch is a free project and isn't signed with a paid code-signing certificate yet, so Windows SmartScreen may show a blue warning the first time you run it. This is normal for small indie apps.
 
-## Для разработки
+1. Click **More info**.
+2. Click **Run anyway**.
 
-```
-npm install
-npm start          # запустить из исходников
-npm run dist       # собрать установщик и zip в dist/ (код обфусцируется)
-node tools/probe.js  # проверить каталоги и установку на живых сайтах
-node tools/friends-check.js  # друзья на правилах базы в эмуляторе Firebase
-                             # (нужны firebase-tools и Java 21)
-```
+You only need to do this once. Updates are installed by ModLaunch itself.
 
-Выпуск: вкладка **Actions → release → Run workflow** — GitHub соберёт
-установщик и портативную версию и выложит их в «Релизы».
+## Features
+
+- **One-click installs.** Pick a mod and press *Install*. The loader and all required dependencies are installed with it.
+- **Catalogue with sections:** Essentials, Mods (buildings, vehicles, items, gameplay, UI, libraries…), Shaders & graphics, Modpacks.
+- **Mod management:** turn mods on and off without deleting them, check for mod updates, mod profiles and modpacks you can share as a file.
+- **Save backups** before every game launch.
+- **Shaders:** ReShade is installed for you, presets go straight into the game folder.
+- **Friends:** add friends by code and see who is online and what they're playing.
+- **In-game overlay** (Ctrl+Shift+M): session time, friends, save backup and notes for the game.
+- **Reviews and ratings** for mods, shared between all ModLaunch users.
+- **Auto-update:** new versions of ModLaunch download and install themselves.
+- **Interface in English and Russian.**
+
+## Screenshots
+
+| Mod catalogue | Mod page |
+| --- | --- |
+| ![Mod catalogue](docs/screenshots/catalog.jpg) | ![Mod page](docs/screenshots/mod.jpg) |
+
+| Game page | Shaders & graphics |
+| --- | --- |
+| ![Game page](docs/screenshots/game.jpg) | ![Shaders](docs/screenshots/shaders.jpg) |
+
+| In-game overlay | Installer |
+| --- | --- |
+| ![In-game overlay](docs/screenshots/overlay.jpg) | ![Installer](docs/screenshots/setup.jpg) |
+
+## FAQ
+
+**Is it free?**
+Yes.
+
+**Does ModLaunch host mods?**
+No. Files are downloaded directly from where their authors published them: Thunderstore, the Hollow Knight community mod list, Nexus Mods and GitHub. All rights to each mod belong to its author.
+
+**Why does Nexus Mods need an extra click?**
+Nexus Mods gives files to free accounts only from its own website. ModLaunch opens the mod's page, you press *Slow download* there, and ModLaunch picks the file up from your Downloads folder and installs it by itself. No API key needed.
+
+**How do I uninstall it?**
+Windows Settings → Apps → ModLaunch → Uninstall.
+
+**Something broke. What do I do?**
+Open an [issue](https://github.com/maksimuglou-spec/ModLaunch/issues) and describe what happened. A screenshot of the *Log* tab on the game page helps a lot.
+
+## License
+
+Copyright © 2026 maksimuglou-spec. All rights reserved. See [LICENSE](LICENSE).
+You're welcome to download and use ModLaunch for free. The source code is published for transparency, not for reuse.
+
+Developer notes: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) (in Russian).
