@@ -432,6 +432,7 @@ public static class SelfCheck
             var nxAuthor = await Extras.ByAuthor(sn, naut);
             if (tsVersions.Count < 2 || nxVersions.Count < 2) throw new Exception($"versions ts {tsVersions.Count} nexus {nxVersions.Count}");
             if (tsVersions.Any(v => v.Url is null)) throw new Exception("ts version without url");
+            if (tsVersions[0].Version != mc.Version) throw new Exception($"latest is {tsVersions[0].Version}, catalog says {mc.Version}");
             return $"MoreCompany {tsVersions.Count} versions (latest {tsVersions[0].Version}); FlipMods {tsAuthor.Count} more mods; Nautilus {nxVersions.Count} files, changelog lines {nxVersions.Sum(v => v.Changelog.Split('\n').Length)}; author {nxAuthor.Count} more";
         });
         await Check("blocklist + tracking", () =>

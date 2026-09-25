@@ -23,7 +23,8 @@ public static class Extras
                 var data = await Http.GetJson($"https://thunderstore.io/api/cyberstorm/package/{Uri.EscapeDataString(ns)}/{Uri.EscapeDataString(name)}/versions/", ct, 20);
                 return (data as JsonArray ?? []).OfType<JsonObject>().Select(v => new VersionInfo(
                     v.Str("version_number") ?? "", DateTime.TryParse(v.Str("datetime_created"), out var d) ? d.ToUniversalTime() : null,
-                    v.Long("download_count"), "", v.Str("download_url"), 0, 0, null)).Take(40).ToList();
+                    v.Long("download_count"), "", v.Str("download_url"), 0, 0, null))
+                    .OrderByDescending(v => v.Date).Take(40).ToList();
             }
             case "nexus":
             {
