@@ -78,6 +78,8 @@ public static class GameCatalog
             LoaderSite = "https://thunderstore.io/c/subnautica/p/Subnautica_Modding/BepInExPack/",
             ThunderstorePackage = "Subnautica_Modding-BepInExPack", ThunderstoreCommunity = "subnautica",
             Catalog = CatalogKind.Nexus, NexusDomain = "subnautica", NexusGameId = 1155,
+            // Tobey's BepInEx Pack — это загрузчик: его ставит кнопка загрузчика, в каталоге и требованиях он лишний.
+            NexusHide = ["1108"],
             LegacyBefore = new DateTime(2022, 12, 1), BrowseUrl = "https://www.nexusmods.com/subnautica/mods",
             Sections = Section.Pick("all", "picks", "buildings", "vehicles", "items", "gameplay", "ui", "tools", "visuals", "packs"),
             NexusCategories = new()
