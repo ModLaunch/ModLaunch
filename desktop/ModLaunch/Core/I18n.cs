@@ -19,11 +19,22 @@ public static class I18n
         try
         {
             // JsonNode, а не JsonSerializer: в урезанной сборке сериализация через отражение выключена.
-            using var stream = AssetLoader.Open(new Uri("avares://ModLaunch/Assets/strings.json"));
-            var root = JsonNode.Parse(stream) as JsonObject ?? new JsonObject();
-            return root.ToDictionary(
-                lang => lang.Key,
-                lang => (lang.Value as JsonObject ?? new JsonObject()).ToDictionary(kv => kv.Key, kv => kv.Value?.GetValue<string>() ?? ""));
+            // strings.json — основной словарь, strings5.json — строки версии 5 (дополняют его).
+            var tables = new Dictionary<string, Dictionary<string, string>> { ["ru"] = new(), ["en"] = new() };
+            foreach (var file in new[] { "strings.json", "strings5.json" })
+            {
+                try
+                {
+                    using var stream = AssetLoader.Open(new Uri($"avares://ModLaunch/Assets/{file}"));
+                    foreach (var (lang, table) in JsonNode.Parse(stream) as JsonObject ?? new JsonObject())
+                    {
+                        var target = tables.TryGetValue(lang, out var t) ? t : tables[lang] = new();
+                        foreach (var (k, v) in table as JsonObject ?? new JsonObject()) target[k] = v?.GetValue<string>() ?? "";
+                    }
+                }
+                catch { }
+            }
+            return tables;
         }
         catch
         {

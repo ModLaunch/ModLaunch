@@ -1,12 +1,12 @@
 namespace ModLaunch.Games;
 
-/// <summary>Все поддерживаемые игры — те же восемь, что и в версии 3.x.</summary>
+/// <summary>Встроенные игры и свои игры, добавленные кнопкой «+».</summary>
 public static class GameCatalog
 {
     static string Home => Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
     static string LocalLow(params string[] parts) => Path.Combine([Home, "AppData", "LocalLow", .. parts]);
 
-    public static readonly GameDef[] All =
+    public static readonly GameDef[] Builtin =
     [
         new()
         {
@@ -229,7 +229,98 @@ public static class GameCatalog
             SavesDir = _ => LocalLow("semiwork", "Repo", "saves"),
             ModMarker = "dll",
         },
+        new()
+        {
+            Id = "peak", Name = "PEAK", ShortName = "PEAK", SteamAppId = 3527290,
+            FolderNames = ["PEAK"], Accent = "#E8743B", ArtUrl = GameDef.SteamArt(3527290),
+            Loader = LoaderKind.Bepinex, LoaderName = "BepInEx",
+            LoaderSite = "https://thunderstore.io/c/peak/p/BepInEx/BepInExPack_PEAK/",
+            ThunderstorePackage = "BepInEx-BepInExPack_PEAK", ThunderstoreCommunity = "peak",
+            Catalog = CatalogKind.Thunderstore, BrowseUrl = "https://thunderstore.io/c/peak/",
+            NexusDomain = "peak", NexusGameId = 7867,
+            Sections = Section.Pick("all", "picks", "best", "items", "content", "gameplay", "cosmetics", "audio", "tools", "modpacks"),
+            Picks = ["glarmer-PEAK_Unlimited", "Roose-Piggyback", "cretapark-More_Customizations", "nickklmao-EasyBackpack", "TeddyBRB-Too_Many_Hats", "figgies-SmoreSkinColors", "Steven-Everest", "MonAmiral-MoreCustomHats", "PEAKModding-PEAKLib_Items", "loaforc-loaforcsSoundAPI"],
+            SignatureDirs = ["PEAK_Data"], SignatureExes = ["PEAK.exe"],
+            Executables = ["PEAK.exe"],
+            ModMarker = "dll",
+        },
+        new()
+        {
+            Id = "h3vr", Name = "Hot Dogs, Horseshoes & Hand Grenades", ShortName = "H3VR", SteamAppId = 450540,
+            FolderNames = ["H3VR"], Accent = "#D9A441", ArtUrl = GameDef.SteamArt(450540),
+            Loader = LoaderKind.Bepinex, LoaderName = "BepInEx",
+            LoaderSite = "https://thunderstore.io/c/h3vr/p/BepInEx/BepInExPack_H3VR/",
+            ThunderstorePackage = "BepInEx-BepInExPack_H3VR", ThunderstoreCommunity = "h3vr",
+            Catalog = CatalogKind.Thunderstore, BrowseUrl = "https://thunderstore.io/c/h3vr/",
+            Sections = Section.Pick("all", "picks", "best", "items", "content", "gameplay", "cosmetics", "audio", "tools", "modpacks"),
+            Picks = ["cityrobo-OpenScripts", "Andrew_FTW-FTW_Arms_AFCL", "nrgill28-Sodalite", "cityrobo-OpenScripts2", "WFIOST-H3VRUtilities", "devyndamonster-OtherLoader", "VIP-H3MP", "cityrobo-ModularWorkshop", "nrgill28-Atlas", "Meat_banono-Meats_ModulAR"],
+            SignatureDirs = ["h3vr_Data"], SignatureExes = ["h3vr.exe"],
+            Executables = ["h3vr.exe"],
+            ModMarker = "dll",
+        },
+        new()
+        {
+            Id = "content-warning", Name = "Content Warning", ShortName = "Content Warning", SteamAppId = 2881650,
+            FolderNames = ["Content Warning"], Accent = "#F5D90A", ArtUrl = GameDef.SteamArt(2881650),
+            Loader = LoaderKind.Bepinex, LoaderName = "BepInEx",
+            LoaderSite = "https://thunderstore.io/c/content-warning/p/BepInEx/BepInExPack/",
+            ThunderstorePackage = "BepInEx-BepInExPack", ThunderstoreCommunity = "content-warning",
+            Catalog = CatalogKind.Thunderstore, BrowseUrl = "https://thunderstore.io/c/content-warning/",
+            NexusDomain = "contentwarning", NexusGameId = 6301,
+            Sections = Section.Pick("all", "picks", "best", "items", "content", "gameplay", "cosmetics", "audio", "tools", "modpacks"),
+            Picks = ["MaxWasUnavailable-Virality", "ViViKo-MoreColors", "CommanderCat101-ContentSettings", "RamuneNeptune-MakeMeRagdoll", "cw_qwbarch-Mirage", "loaforc-Flashcard", "hyydsz-ShopUtils", "hyydsz-Boombox", "GamingFrame-More_Comments", "Clementinise-DeathStatus"],
+            SignatureDirs = ["Content Warning_Data"], SignatureExes = ["Content Warning.exe"],
+            Executables = ["Content Warning.exe"],
+            ModMarker = "dll",
+        },
+        new()
+        {
+            Id = "ultrakill", Name = "ULTRAKILL", ShortName = "ULTRAKILL", SteamAppId = 1229490,
+            FolderNames = ["ULTRAKILL"], Accent = "#E03C31", ArtUrl = GameDef.SteamArt(1229490),
+            Loader = LoaderKind.Bepinex, LoaderName = "BepInEx",
+            LoaderSite = "https://thunderstore.io/c/ultrakill/p/BepInEx/BepInExPack/",
+            ThunderstorePackage = "BepInEx-BepInExPack", ThunderstoreCommunity = "ultrakill",
+            Catalog = CatalogKind.Thunderstore, BrowseUrl = "https://thunderstore.io/c/ultrakill/",
+            NexusDomain = "ultrakill", NexusGameId = 3515,
+            Sections = Section.Pick("all", "picks", "best", "items", "content", "gameplay", "cosmetics", "audio", "tools", "modpacks"),
+            Picks = ["EternalsTeam-PluginConfigurator", "EternalsTeam-AngryLevelLoader", "Hydraxous-Configgy", "xzxADIxzx-Jaket", "Hydraxous-UltraFunGuns", "ZedDev-USTManager", "Waff1e-UltraTweaker", "GalvinVoltag-The_Timestopper", "bobthecorn-ULTRASKINS_GC", "Flazhik-CybergrindMusicExplorer"],
+            SignatureDirs = ["ULTRAKILL_Data"], SignatureExes = ["ULTRAKILL.exe"],
+            Executables = ["ULTRAKILL.exe"],
+            ModMarker = "dll",
+        },
+        new()
+        {
+            Id = "rounds", Name = "ROUNDS", ShortName = "ROUNDS", SteamAppId = 1557740,
+            FolderNames = ["ROUNDS"], Accent = "#F2C14E", ArtUrl = GameDef.SteamArt(1557740),
+            Loader = LoaderKind.Bepinex, LoaderName = "BepInEx",
+            LoaderSite = "https://thunderstore.io/c/rounds/p/BepInEx/BepInExPack_ROUNDS/",
+            ThunderstorePackage = "BepInEx-BepInExPack_ROUNDS", ThunderstoreCommunity = "rounds",
+            Catalog = CatalogKind.Thunderstore, BrowseUrl = "https://thunderstore.io/c/rounds/",
+            Sections = Section.Pick("all", "picks", "best", "items", "content", "gameplay", "cosmetics", "audio", "tools", "modpacks"),
+            Picks = ["olavim-RoundsWithFriends", "willis81808-UnboundLib", "Root-RarityLib", "Pykess-ModdingUtils", "XAngelMoonX-CR", "Root-Classes_Manager_Reborn", "olavim-MapsExtended", "willuwontu-WillsWackyManagers", "CrazyCoders-RarityBundle", "Root-CardThemeLib"],
+            SignatureDirs = ["Rounds_Data"], SignatureExes = ["Rounds.exe"],
+            Executables = ["Rounds.exe"],
+            ModMarker = "dll",
+        },
+        new()
+        {
+            Id = "dyson-sphere-program", Name = "Dyson Sphere Program", ShortName = "Dyson Sphere", SteamAppId = 1366540,
+            FolderNames = ["Dyson Sphere Program"], Accent = "#3FA7F5", ArtUrl = GameDef.SteamArt(1366540),
+            Loader = LoaderKind.Bepinex, LoaderName = "BepInEx",
+            LoaderSite = "https://thunderstore.io/c/dyson-sphere-program/p/xiaoye97/BepInEx/",
+            ThunderstorePackage = "xiaoye97-BepInEx", ThunderstoreCommunity = "dyson-sphere-program",
+            Catalog = CatalogKind.Thunderstore, BrowseUrl = "https://thunderstore.io/c/dyson-sphere-program/",
+            NexusDomain = "dysonsphereprogram", NexusGameId = 3641,
+            Sections = Section.Pick("all", "picks", "best", "items", "content", "gameplay", "cosmetics", "audio", "tools", "modpacks"),
+            Picks = ["CommonAPI-CommonAPI", "xiaoye97-LDBTool", "nebula-NebulaMultiplayerMod", "blacksnipebiu-Auxilaryfunction", "starfi5h-BulletTime", "Galactic_Scale-GalacticScale", "soarqin-UXAssist", "kremnev8-BlueprintTweaks", "jinxOAO-MoreMegaStructure", "hetima-SplitterOverBelt"],
+            SignatureDirs = ["DSPGAME_Data"], SignatureExes = ["DSPGAME.exe"],
+            Executables = ["DSPGAME.exe"],
+            ModMarker = "dll",
+        },
     ];
+
+    /// <summary>Все игры: встроенные и свои (свои живут в AppState.Games).</summary>
+    public static GameDef[] All => Core.AppState.Games.Select(g => g.Def).ToArray();
 
     public static GameDef? ById(string id) => All.FirstOrDefault(g => g.Id == id);
 

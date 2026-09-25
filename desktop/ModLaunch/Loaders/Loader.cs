@@ -12,6 +12,7 @@ public static class Loader
     {
         LoaderKind.Smapi => File.Exists(Path.Combine(gamePath, "StardewModdingAPI.exe")) || File.Exists(Path.Combine(gamePath, "StardewModdingAPI.dll")),
         LoaderKind.HkApi => HkApi.IsInstalled(gamePath),
+        LoaderKind.None => true,
         _ => Directory.Exists(Path.Combine(gamePath, "BepInEx", "core")) && (!OperatingSystem.IsWindows() || File.Exists(Path.Combine(gamePath, "winhttp.dll"))),
     };
 
@@ -19,6 +20,7 @@ public static class Loader
     {
         LoaderKind.Smapi => Smapi.Install(gamePath, progress, ct),
         LoaderKind.HkApi => HkApi.Install(gamePath, progress, ct),
+        LoaderKind.None => Task.FromResult(""),
         _ => BepInEx.Install(game, gamePath, progress, ct),
     };
 }
@@ -28,7 +30,9 @@ public static class BepInEx
     public static async Task<string> Install(GameDef game, string gamePath, IProgress<InstallStep> progress, CancellationToken ct)
     {
         progress.Report(new InstallStep("loader.lookup", "BepInEx"));
-        var (version, url) = await Thunderstore.Latest(game.ThunderstoreCommunity!, game.ThunderstorePackage!, ct);
+        var (version, url) = game.ThunderstoreCommunity is not null && game.ThunderstorePackage is not null
+            ? await Thunderstore.Latest(game.ThunderstoreCommunity, game.ThunderstorePackage, ct)
+            : await FromGitHub(Path.Combine(gamePath, game.Executables[0]), ct);
         var label = $"BepInEx {version}";
         var archive = await Http.Download(url, "BepInExPack.zip", new Progress<double>(r => progress.Report(new InstallStep("loader.download", label, Ratio: r))), ct: ct);
         try
@@ -40,6 +44,34 @@ public static class BepInEx
         Directory.CreateDirectory(Path.Combine(gamePath, "BepInEx", "plugins"));
         progress.Report(new InstallStep("loader.done", "BepInEx"));
         return version;
+    }
+
+    /// <summary>
+    /// Для своих игр без сообщества на Thunderstore — BepInEx 5 с GitHub,
+    /// разрядность по заголовку exe (у старых Unity-игр бывает 32 бита).
+    /// </summary>
+    static async Task<(string Version, string Url)> FromGitHub(string exe, CancellationToken ct)
+    {
+        var release = await Http.GetJson("https://api.github.com/repos/BepInEx/BepInEx/releases/latest", ct, 20, "application/vnd.github+json");
+        var arch = Is32Bit(exe) ? "win_x86" : "win_x64";
+        var asset = release.Arr("assets").FirstOrDefault(a => (a.Str("name") ?? "").Contains(arch, StringComparison.OrdinalIgnoreCase) && (a.Str("name") ?? "").EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+            ?? throw new InvalidOperationException("BepInEx: " + arch);
+        return ((release.Str("tag_name") ?? "").TrimStart('v'), asset.Str("browser_download_url")!);
+    }
+
+    /// <summary>Машина в заголовке PE: 0x14c — 32 бита.</summary>
+    public static bool Is32Bit(string exe)
+    {
+        try
+        {
+            using var f = File.OpenRead(exe);
+            using var r = new BinaryReader(f);
+            f.Position = 0x3C;
+            var pe = r.ReadInt32();
+            f.Position = pe + 4;
+            return r.ReadUInt16() == 0x14c;
+        }
+        catch { return false; }
     }
 
     /// <summary>

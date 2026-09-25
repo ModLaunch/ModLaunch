@@ -27,6 +27,17 @@ public static class Images
         });
     }
 
+    /// <summary>Обложка игры: из ресурсов или из сети (пока грузится — null, потом перерисовка).</summary>
+    public static Bitmap? Game(Games.GameDef def, int width)
+    {
+        if (def.Art is not null) return Asset(def.Art, width);
+        if (def.ArtUrl is null) return null;
+        var task = FromUrl(def.ArtUrl, width);
+        if (task.IsCompleted) return task.Result;
+        task.ContinueWith(t => { if (t.Result is not null) AppState.Notify(); });
+        return null;
+    }
+
     public static Task<Bitmap?> FromUrl(string? url, int decodeWidth = 160)
     {
         if (string.IsNullOrEmpty(url)) return Task.FromResult<Bitmap?>(null);

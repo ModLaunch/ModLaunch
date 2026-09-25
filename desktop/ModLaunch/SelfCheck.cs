@@ -274,8 +274,8 @@ public static class SelfCheck
                 lines.Add($"{g.Id}={total} ({string.Join(", ", parts)})");
                 if (total < 1000) small.Add(g.Id);
             }
-            // Hollow Knight и Below Zero: на всех сайтах вместе меньше 1000 модов — больше просто нет.
-            var unexpected = small.Where(id => id is not ("hollow-knight" or "subnautica-below-zero")).ToList();
+            // Hollow Knight, Below Zero, ROUNDS и Dyson Sphere Program: на всех сайтах вместе меньше 1000 модов — больше просто нет.
+            var unexpected = small.Where(id => id is not ("hollow-knight" or "subnautica-below-zero" or "rounds" or "dyson-sphere-program")).ToList();
             if (unexpected.Count > 0) throw new Exception("under 1000: " + string.Join(", ", unexpected) + " | " + string.Join("; ", lines));
             return string.Join("; ", lines);
         });
@@ -326,6 +326,67 @@ public static class SelfCheck
             Features.Notes.Set("valheim", "x-ModA", "note");
             if (Features.Notes.Get("valheim", "x-ModA") != "note") throw new Exception("notes");
             return Task.FromResult($"{conflicts[0].A} vs {conflicts[0].B}; archive ok; notes ok");
+        });
+
+        await Check("modscript: all examples compile", () =>
+        {
+            var bad = Creator.Templates.All.Select(t => (t.Id, B: Creator.ModScript.Compile(t.Code))).Where(x => !x.B.Ok)
+                .Select(x => $"{x.Id}: {string.Join("; ", x.B.Diags.Select(d => $"{d.Line} {d.Message}"))}").ToList();
+            if (bad.Count > 0) throw new Exception(string.Join(" | ", bad));
+            var seeds = Creator.ModScript.Compile(Creator.Templates.ById("sdv-seeds")!.Code);
+            if (seeds.Changes.Count != 6) throw new Exception($"for loop gave {seeds.Changes.Count} changes");
+            if (seeds.Changes[0]["Fields"]?["472"]?["Price"]?.GetValue<long>() != 20) throw new Exception("arithmetic: " + seeds.Changes[0].ToJsonString());
+            var dlg = Creator.ModScript.Compile(Creator.Templates.ById("sdv-dialogue")!.Code);
+            if (dlg.Changes[0]["When"]?["Season"]?.GetValue<string>() != "spring") throw new Exception("when missing");
+            var broken = Creator.ModScript.Compile("mod \"x\"\ngame valheim\nfor i in 1 2 {\nnope 1\n");
+            if (broken.Ok || broken.Diags.Count < 2) throw new Exception("errors not reported");
+            return Task.FromResult($"{Creator.Templates.All.Length} examples ok; errors: {string.Join(", ", broken.Diags.Select(d => d.Message))}");
+        });
+        await Check("creator: pack Content Patcher + Thunderstore", async () =>
+        {
+            var cp = await Creator.Projects.Pack(Creator.ModScript.Compile(Creator.Templates.ById("sdv-seeds")!.Code), null);
+            if (!cp.Files.Any(f => f.EndsWith("content.json")) || cp.Format != "Content Patcher") throw new Exception("cp: " + string.Join(",", cp.Files));
+            var ts = await Creator.Projects.Pack(Creator.ModScript.Compile(Creator.Templates.ById("valheim-builder")!.Code), null);
+            using var zip = System.IO.Compression.ZipFile.OpenRead(ts.Zip);
+            var manifest = JsonNode.Parse(zip.GetEntry("manifest.json")!.Open())!;
+            var deps = manifest.Arr("dependencies").Select(d => d!.GetValue<string>()).ToList();
+            if (deps.Count != 5 || !deps[0].StartsWith("denikson-BepInExPack_Valheim-")) throw new Exception("deps: " + string.Join(", ", deps) + " warn: " + string.Join("; ", ts.Warnings));
+            if (zip.GetEntry("config/BepInEx.cfg") is null) throw new Exception("config missing");
+            return $"{cp.Files.Count} + {ts.Files.Count} files; deps {string.Join(", ", deps)}";
+        });
+        await Check("creator: install into game", () =>
+        {
+            var def = GameCatalog.ById("risk-of-rain-2")!;
+            var dir = Path.Combine(root, "CreatorGame");
+            Directory.CreateDirectory(Path.Combine(dir, "Risk of Rain 2_Data"));
+            Directory.CreateDirectory(Path.Combine(dir, "BepInEx", "core"));
+            Directory.CreateDirectory(Path.Combine(dir, "BepInEx", "config"));
+            File.WriteAllText(Path.Combine(dir, "BepInEx", "config", "BepInEx.cfg"), "[Logging.Console]\n\n## Enables showing a console\nEnabled = false\n\n[Logging.Disk]\nWriteUnityLog = false\n");
+            var g = new GameState { Def = def, Path = dir, Status = Detect.Found };
+            var b = Creator.ModScript.Compile(Creator.Templates.ById("bepinex-debug")!.Code);
+            var packed = Creator.Projects.Pack(b, null).Result;
+            var record = Creator.Projects.Install(g, b, packed);
+            var ini = Features.Ini.Parse(File.ReadAllText(Path.Combine(dir, "BepInEx", "config", "BepInEx.cfg")));
+            if (ini.Get("Logging.Console", "Enabled") != "true" || ini.Get("Logging.Disk", "WriteUnityLog") != "true") throw new Exception("cfg not patched");
+            if (!g.Registry!.Has(record.Str("id")!)) throw new Exception("not registered");
+            return Task.FromResult($"{record.Str("id")} installed, BepInEx.cfg patched");
+        });
+        await Check("custom games: engine + sources", async () =>
+        {
+            var dir = Path.Combine(root, "SomeUnityGame");
+            Directory.CreateDirectory(Path.Combine(dir, "SomeUnityGame_Data", "Managed"));
+            File.WriteAllText(Path.Combine(dir, "UnityPlayer.dll"), "");
+            File.WriteAllText(Path.Combine(dir, "SomeUnityGame.exe"), "MZ");
+            var found = CustomGames.FromExe(Path.Combine(dir, "SomeUnityGame.exe"));
+            if (found.Engine != "unity") throw new Exception("engine " + found.Engine);
+            var ue = Path.Combine(root, "UeGame");
+            Directory.CreateDirectory(Path.Combine(ue, "Engine"));
+            Directory.CreateDirectory(Path.Combine(ue, "UeGame", "Content", "Paks"));
+            if (CustomGames.DetectEngine(ue) != "unreal") throw new Exception("unreal not detected");
+            var paks = CustomGames.ModsFolderFor(ue, "unreal");
+            var (community, package, domain, nexusId) = await CustomGames.FindSources("Lethal Company");
+            if (community != "lethal-company" || domain != "lethalcompany") throw new Exception($"sources {community} {domain}");
+            return $"unity ok, unreal mods → {paks}; Lethal Company → {community} ({package}), nexus {domain} #{nexusId}";
         });
 
         await Check("locator", async () =>

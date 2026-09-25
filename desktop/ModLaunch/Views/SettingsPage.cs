@@ -30,7 +30,9 @@ public sealed class SettingsPage : Page
         var tabs = new StackPanel { Spacing = 4, Width = 230 };
         foreach (var (id, key, icon) in new[]
         {
-            ("look", "settings.tab.look", Icons.Globe),
+            ("look", "settings.tab.look", Icons.Palette),
+            ("interface", "look.tab.interface", Icons.Layers),
+            ("system", "sys.tab", Icons.Settings),
             ("games", "settings.tab.games", Icons.Folder),
             ("launch", "settings.tab.launch", Icons.Play),
             ("backups", "settings.tab.backups", Icons.Shield),
@@ -58,6 +60,8 @@ public sealed class SettingsPage : Page
             "updates" => UpdatesTab(),
             "accounts" => AccountsTab(),
             "about" => AboutTab(),
+            "interface" => InterfaceTab(),
+            "system" => SystemTab(),
             _ => LookTab(),
         };
 
@@ -103,8 +107,208 @@ public sealed class SettingsPage : Page
             Settings.Language = value;
             I18n.Set(value);
         };
-        return Section(I18n.T("settings.language"), null, lang);
+        var col = new StackPanel { Spacing = 16 };
+        col.Children.Add(Section(I18n.T("settings.language"), null, lang));
+
+        // Тема: три карточки-образца.
+        var themes = Ui.Row(12);
+        foreach (var theme in Look.Themes)
+        {
+            var (bg, surface, text) = theme switch { "black" => ("#000000", "#131419", "#ECEEF3"), "light" => ("#F4F5F8", "#FFFFFF", "#161922"), _ => ("#0F1116", "#1E222B", "#E8EBF2") };
+            var sample = new Border
+            {
+                Width = 150, Height = 84, CornerRadius = new CornerRadius(12), Background = Ui.Hex(bg), Padding = new Thickness(10),
+                BorderThickness = new Thickness(2), BorderBrush = Look.Theme == theme ? Ui.Res("Brand") : Ui.Res("Line"),
+                Child = Ui.Col(6,
+                    new Border { Height = 10, Width = 70, CornerRadius = new CornerRadius(5), Background = Ui.Hex(Look.Accent), HorizontalAlignment = HorizontalAlignment.Left },
+                    new Border { Height = 22, CornerRadius = new CornerRadius(6), Background = Ui.Hex(surface) },
+                    new TextBlock { Text = I18n.T("look.theme." + theme), Foreground = Ui.Hex(text), FontSize = 12, FontWeight = FontWeight.SemiBold }),
+            };
+            var t = theme;
+            var b = new Button { Padding = new Thickness(0), Background = Brushes.Transparent, BorderThickness = new Thickness(0), Content = sample };
+            b.Click += (_, _) => { Look.SetTheme(t); Build(); };
+            themes.Children.Add(b);
+        }
+        col.Children.Add(Section(I18n.T("look.theme"), I18n.T("look.theme.hint"), themes));
+
+        // Цвет акцента.
+        var accents = Ui.Row(10);
+        foreach (var hex in Look.Accents)
+        {
+            var h = hex;
+            var dot = new Button
+            {
+                Width = 36, Height = 36, CornerRadius = new CornerRadius(18), Padding = new Thickness(0), Background = Ui.Hex(hex),
+                BorderThickness = new Thickness(3), BorderBrush = Look.Accent.Equals(hex, StringComparison.OrdinalIgnoreCase) ? Ui.Res("Text") : Brushes.Transparent,
+            };
+            dot.Click += (_, _) => { Look.SetAccent(h); Build(); };
+            accents.Children.Add(dot);
+        }
+        var custom = new TextBox { Width = 120, Text = Look.Accents.Contains(Look.Accent) ? "" : Look.Accent, Watermark = "#RRGGBB" };
+        custom.LostFocus += (_, _) =>
+        {
+            var v = (custom.Text ?? "").Trim();
+            if (System.Text.RegularExpressions.Regex.IsMatch(v, "^#[0-9a-fA-F]{6}$")) { Look.SetAccent(v.ToUpperInvariant()); Build(); }
+        };
+        accents.Children.Add(custom);
+        col.Children.Add(Section(I18n.T("look.accent"), null, accents));
+
+        // Масштаб интерфейса.
+        var scales = Ui.Row(6);
+        foreach (var k in Look.Scales)
+        {
+            var kk = k;
+            var chip = Ui.Button($"{k * 100:0}%", () => { Look.SetScale(kk); Build(); }, "chip");
+            if (Math.Abs(Look.Scale - k) < 0.001) chip.Classes.Add("active");
+            scales.Children.Add(chip);
+        }
+        col.Children.Add(Section(I18n.T("look.scale"), I18n.T("look.scale.hint"), scales,
+            Toggle(I18n.T("look.anim"), I18n.T("look.anim.hint"), Look.Animations, v => Settings.Data["animations"] = v),
+            Toggle(I18n.T("look.compact"), I18n.T("look.compact.hint"), Settings.Data.Bool("compactLists"), v => Settings.Data["compactLists"] = v)));
+        return col;
     }
+
+    // ---------------------------------------------------------------- интерфейс: что показывать
+
+    Control InterfaceTab()
+    {
+        var col = new StackPanel { Spacing = 16 };
+        void Chrome() => MainWindow.Current?.Refresh();
+
+        var start = new ComboBox { Width = 240 };
+        var starts = new[] { "home", "lastGame", "creator", "add" };
+        foreach (var st in starts) start.Items.Add(I18n.T("look.start." + st));
+        start.SelectedIndex = Math.Max(0, Array.IndexOf(starts, Settings.Data.Str("startPage") ?? "home"));
+        start.SelectionChanged += (_, _) => { Settings.Data["startPage"] = starts[Math.Max(0, start.SelectedIndex)]; Settings.Save(); };
+        var startRow = new DockPanel();
+        DockPanel.SetDock(start, Dock.Right);
+        startRow.Children.Add(start);
+        startRow.Children.Add(Ui.Col(3, Ui.Text(I18n.T("look.start"), "h3"), Ui.Text(I18n.T("look.start.hint"), "small muted")));
+        col.Children.Add(Section(I18n.T("look.start"), null, startRow));
+
+        col.Children.Add(Section(I18n.T("look.chrome"), I18n.T("look.chrome.hint"),
+            Toggle(I18n.T("look.brand"), I18n.T("look.brand.hint"), Settings.Data.Bool("showBrand"), v => { Settings.Data["showBrand"] = v; Chrome(); }),
+            Toggle(I18n.T("look.creator"), I18n.T("look.creator.hint"), Settings.Data.Bool("showCreator", true), v => { Settings.Data["showCreator"] = v; Chrome(); }),
+            Toggle(I18n.T("look.rail"), I18n.T("look.rail.hint"), !Settings.Data.Bool("railHidden"), v => { Settings.Data["railHidden"] = !v; Chrome(); }),
+            Toggle(I18n.T("look.railFound"), I18n.T("look.railFound.hint"), Settings.Data.Bool("railFoundOnly"), v => { Settings.Data["railFoundOnly"] = v; Chrome(); }),
+            Toggle(I18n.T("look.railFriends"), I18n.T("look.railFriends.hint"), Settings.Data.Bool("railFriends", true), v => { Settings.Data["railFriends"] = v; Chrome(); }),
+            Toggle(I18n.T("look.railDonate"), I18n.T("look.railDonate.hint"), Settings.Data.Bool("railDonate", true), v => { Settings.Data["railDonate"] = v; Chrome(); })));
+
+        col.Children.Add(Section(I18n.T("look.home"), I18n.T("look.home.hint"),
+            Toggle(I18n.T("v4.continue"), I18n.T("v4.continue.text"), Settings.Data.Bool("homeContinue", true), v => Settings.Data["homeContinue"] = v),
+            Toggle(I18n.T("look.home.hero"), I18n.T("look.home.hero.hint"), Settings.Data.Bool("homeHero", true), v => Settings.Data["homeHero"] = v),
+            Toggle(I18n.T("home.favorites"), I18n.T("home.favorites.text"), Settings.Data.Bool("homeFavorites", true), v => Settings.Data["homeFavorites"] = v),
+            Toggle(I18n.T("look.home.popular"), I18n.T("look.home.popular.hint"), Settings.Data.Bool("homePopular", true), v => Settings.Data["homePopular"] = v),
+            Toggle(I18n.T("look.home.missing"), I18n.T("look.home.missing.hint"), Settings.Data.Bool("homeFoundOnly"), v => Settings.Data["homeFoundOnly"] = v)));
+
+        // Какие игры показывать и в каком порядке.
+        var list = new StackPanel { Spacing = 6 };
+        var order = MainWindow.OrderedGames().ToList();
+        var hidden = Settings.Data.Arr("hiddenGames").Select(x => x?.ToString()).ToHashSet();
+        for (var i = 0; i < order.Count; i++)
+        {
+            var g = order[i];
+            var id = g.Def.Id;
+            var index = i;
+            var sw = new ToggleSwitch { IsChecked = !hidden.Contains(id), OnContent = "", OffContent = "", MinWidth = 0, VerticalAlignment = VerticalAlignment.Center };
+            sw.IsCheckedChanged += (_, _) =>
+            {
+                var set = Settings.Data.Arr("hiddenGames").Select(x => x?.ToString()).OfType<string>().ToHashSet();
+                if (sw.IsChecked == true) set.Remove(id); else set.Add(id);
+                Settings.Data["hiddenGames"] = new System.Text.Json.Nodes.JsonArray(set.Select(x => (System.Text.Json.Nodes.JsonNode)x).ToArray());
+                Settings.Save();
+                Chrome();
+            };
+            var move = Ui.Row(2,
+                Ui.Button("", () => { MainWindow.MoveGame(id, -1); Chrome(); Build(); }, "icon ghost", Icons.ArrowUp, I18n.T("look.up")),
+                Ui.Button("", () => { MainWindow.MoveGame(id, 1); Chrome(); Build(); }, "icon ghost", Icons.Download, I18n.T("look.down")));
+            move.Children[0].IsEnabled = index > 0;
+            move.Children[1].IsEnabled = index < order.Count - 1;
+            var right = Ui.Row(8, move, sw);
+            var row = new DockPanel();
+            DockPanel.SetDock(right, Dock.Right);
+            row.Children.Add(right);
+            var name = Ui.Row(10, Ui.Thumb(g.Def.ArtUrl, g.Def.Name, 28, 7), Ui.Text(g.Def.Name + (g.Status == Detect.Found ? "" : "  · " + I18n.T("games.notDetected")), g.Status == Detect.Found ? "" : "muted"));
+            name.VerticalAlignment = VerticalAlignment.Center;
+            row.Children.Add(name);
+            list.Children.Add(row);
+        }
+        col.Children.Add(Section(I18n.T("look.games"), I18n.T("look.games.hint"), list,
+            Ui.Button(I18n.T("add.title"), () => MainWindow.Current?.Navigate(() => new AddGamePage()), "", Icons.Plus)));
+        return col;
+    }
+
+    // ---------------------------------------------------------------- система
+
+    Control SystemTab()
+    {
+        var col = new StackPanel { Spacing = 16 };
+        col.Children.Add(Section(I18n.T("sys.tab"), null,
+            Toggle(I18n.T("sys.tray"), I18n.T("sys.tray.hint"), Settings.Data.Bool("closeToTray"), v => { Settings.Data["closeToTray"] = v; Settings.Save(); MainWindow.Current?.UpdateTray(); }),
+            Toggle(I18n.T("sys.autostart"), I18n.T("sys.autostart.hint"), Features.Autostart.Enabled, v => Features.Autostart.Set(v)),
+            Toggle(I18n.T("sys.minimized"), I18n.T("sys.minimized.hint"), Settings.Data.Bool("startMinimized"), v => Settings.Data["startMinimized"] = v),
+            Toggle(I18n.T("sys.confirm"), I18n.T("sys.confirm.hint"), Settings.Data.Bool("confirmRemove", true), v => Settings.Data["confirmRemove"] = v)));
+
+        var toast = new NumericUpDown { Minimum = 2, Maximum = 30, Value = (decimal)Math.Clamp(Settings.Data.Long("toastSeconds") is var t && t > 0 ? t : 4, 2, 30), Width = 140, FormatString = "0" };
+        toast.ValueChanged += (_, _) => { Settings.Data["toastSeconds"] = (int)(toast.Value ?? 4); Settings.Save(); };
+        var toastRow = new DockPanel();
+        DockPanel.SetDock(toast, Dock.Right);
+        toastRow.Children.Add(toast);
+        toastRow.Children.Add(Ui.Col(3, Ui.Text(I18n.T("sys.toast"), "h3"), Ui.Text(I18n.T("sys.toast.hint"), "small muted")));
+        col.Children.Add(Section(I18n.T("sys.notify"), null, toastRow,
+            Toggle(I18n.T("sys.toastDone"), I18n.T("sys.toastDone.hint"), Settings.Data.Bool("toastOnDone", true), v => Settings.Data["toastOnDone"] = v)));
+
+        col.Children.Add(Section(I18n.T("sys.transfer"), I18n.T("sys.transfer.hint"),
+            Ui.Row(10,
+                Ui.Button(I18n.T("sys.export"), async () =>
+                {
+                    var file = await MainWindow.Current!.PickSaveFile(I18n.T("sys.export"), "modlaunch-settings.json");
+                    if (file is null) return;
+                    File.WriteAllText(file, Features.SettingsTransfer.Export());
+                    MainWindow.Current.Toast(I18n.T("sys.exported"));
+                }, "", Icons.Upload),
+                Ui.Button(I18n.T("sys.import"), async () =>
+                {
+                    var file = await MainWindow.Current!.PickFile(I18n.T("sys.import"), json: true);
+                    if (file is null) return;
+                    try
+                    {
+                        var n = Features.SettingsTransfer.Import(File.ReadAllText(file));
+                        Look.Apply();
+                        MainWindow.Current.Toast(I18n.T("sys.imported", ("n", n)));
+                        Build();
+                    }
+                    catch (Exception e) { MainWindow.Current.Toast(Jobs.Explain(e), bad: true); }
+                }, "", Icons.Download),
+                Ui.Button(I18n.T("keys.title"), () => MainWindow.Current?.Shortcuts(), "ghost", Icons.Key))));
+        return col;
+    }
+
+    /// <summary>Поиск по настройкам: открыть вкладку, где встречается слово.</summary>
+    public override void Search(string text)
+    {
+        var q = text.Trim();
+        if (q == "") return;
+        var map = new (string Tab, string[] Keys)[]
+        {
+            ("look", ["settings.language", "look.theme", "look.accent", "look.scale", "look.anim", "look.compact"]),
+            ("interface", ["look.start", "look.chrome", "look.home", "look.games", "look.brand", "look.creator", "look.rail"]),
+            ("system", ["sys.tray", "sys.autostart", "sys.toast", "sys.transfer", "sys.confirm"]),
+            ("games", ["settings.games", "games.deep"]),
+            ("launch", ["settings.tab.launch", "ov.title", "launch.args", "launch.time"]),
+            ("backups", ["settings.tab.backups", "bak.keep"]),
+            ("downloads", ["v4.archive"]),
+            ("graphics", ["settings.tab.graphics"]),
+            ("updates", ["settings.tab.updates"]),
+            ("accounts", ["settings.tab.accounts", "acc.title"]),
+        };
+        var hit = map.FirstOrDefault(m => m.Keys.Any(k => I18n.T(k).Contains(q, StringComparison.OrdinalIgnoreCase) || k.Contains(q, StringComparison.OrdinalIgnoreCase)));
+        if (hit.Tab is null) { MainWindow.Current?.Toast(I18n.T("sys.search.none", ("q", q))); return; }
+        _tab = hit.Tab;
+        Build();
+    }
+
+    public override string SearchHint => I18n.T("sys.search");
 
     Control GamesTab()
     {
@@ -128,7 +332,7 @@ public sealed class SettingsPage : Page
             buttons.VerticalAlignment = VerticalAlignment.Center;
 
             var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"), ColumnSpacing = 14 };
-            var art = g.Def.Art is null ? null : Images.Asset(g.Def.Art, 120);
+            var art = Images.Game(g.Def, 120);
             grid.Children.Add(new Border
             {
                 Width = 56, Height = 40, CornerRadius = new CornerRadius(8), ClipToBounds = true,

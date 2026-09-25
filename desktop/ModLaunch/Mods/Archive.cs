@@ -41,9 +41,12 @@ public static partial class Archive
             var parts = entry.Split('/');
             var file = parts[^1];
             if (parts.Length - 1 > maxDepth) continue;
-            var isMarker = marker == "manifest"
-                ? file.Equals("manifest.json", StringComparison.OrdinalIgnoreCase)
-                : file.EndsWith(".dll", StringComparison.OrdinalIgnoreCase);
+            var isMarker = marker switch
+            {
+                "manifest" => file.Equals("manifest.json", StringComparison.OrdinalIgnoreCase),
+                "dll" => file.EndsWith(".dll", StringComparison.OrdinalIgnoreCase),
+                _ => false, // «any»: мод своей игры кладём целиком
+            };
             if (!isMarker) continue;
             var prefix = string.Join('/', parts[..^1]);
             if (roots.Any(r => r.Prefix == prefix)) continue;

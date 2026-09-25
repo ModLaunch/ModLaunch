@@ -20,41 +20,9 @@ public static class CatalogReport
         ("valheim", "valheim", "valheim"),
         ("risk-of-rain-2", "riskofrain2", "riskofrain2"),
         ("repo", "repo", "repo"),
+        ("peak", "peak", "peak"), ("h3vr", "h3vr", null), ("content-warning", "content-warning", "contentwarning"),
+        ("ultrakill", "ultrakill", "ultrakill"), ("rounds", "rounds", null), ("dyson-sphere-program", "dyson-sphere-program", "dysonsphereprogram"),
     ];
-
-    /// <summary>Кандидаты в новые игры: сообщество Thunderstore и раздел Nexus.</summary>
-    static readonly (string Community, string Domain)[] Candidates =
-    [
-        ("content-warning", "contentwarning"), ("peak", "peak"), ("inscryption", "inscryption"), ("ultrakill", "ultrakill"),
-        ("rounds", "rounds"), ("dyson-sphere-program", "dysonsphereprogram"), ("cult-of-the-lamb", "cultofthelamb"),
-        ("outward", "outward"), ("timberborn", "timberborn"), ("gorilla-tag", "gorillatag"), ("among-us", "amongus"),
-        ("schedule-i", "schedule1"), ("straftat", "straftat"), ("sunkenland", "sunkenland"), ("webfishing", "webfishing"),
-        ("h3vr", "h3vr"), ("boneworks", "boneworks"), ("dredge", "dredge"), ("muck", "muck"), ("lethal-league-blaze", "lethalleagueblaze"),
-        ("mage-arena", "magearena"), ("atlyss", "atlyss"), ("erenshor", "erenshor"), ("nuclear-option", "nuclearoption"),
-    ];
-
-    static async Task Probe()
-    {
-        foreach (var (community, domain) in Candidates)
-        {
-            Console.WriteLine($"=== candidate {community}");
-            try
-            {
-                var page = await Thunderstore.Search(community, new Query(), []);
-                Console.WriteLine($"thunderstore {community}: {page.Total}");
-                Console.WriteLine("  top downloads: " + string.Join(" | ", page.Mods.Take(30).Select(m => $"{m.Id} ({m.Downloads})")));
-                var packs = await Thunderstore.Search(community, new Query(Text: "BepInEx"), []);
-                Console.WriteLine("  loaders: " + string.Join(" | ", packs.Mods.Take(6).Select(m => $"{m.Id} ({m.Downloads})")));
-            }
-            catch (Exception e) { Console.WriteLine($"thunderstore {community}: ERROR {e.Message}"); }
-            try
-            {
-                var q = await Nexus.Query("query($d: String!) { game(domainName: $d) { id name modCount } }", new JsonObject { ["d"] = domain }, default);
-                Console.WriteLine($"nexus game {domain}: {q["game"]?.ToJsonString()}");
-            }
-            catch (Exception e) { Console.WriteLine($"nexus game {domain}: ERROR {e.Message}"); }
-        }
-    }
 
     public static async Task<int> Run()
     {
@@ -65,7 +33,6 @@ public static class CatalogReport
             Console.WriteLine("thunderstore communities: " + string.Join(", ", slugs));
         }
         catch (Exception e) { Console.WriteLine("communities: ERROR " + e.Message); }
-        await Probe();
         var modlinks = (await ModLinks.Load()).Count;
         Console.WriteLine($"modlinks hollow-knight: {modlinks}");
         foreach (var (game, community, domain) in Targets)

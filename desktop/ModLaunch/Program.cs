@@ -27,6 +27,9 @@ public static class Program
     /// <summary>Ссылка nxm://, с которой программу запустили.</summary>
     public static string? StartupLink { get; private set; }
 
+    /// <summary>Запущена вместе с Windows (--autostart).</summary>
+    public static bool Autostarted { get; private set; }
+
     [STAThread]
     public static int Main(string[] args)
     {
@@ -45,6 +48,7 @@ public static class Program
 
         // Один экземпляр: второй запуск (в том числе по ссылке nxm://) передаёт ссылку первому.
         if (!Features.Nxm.Claim(args)) return 0;
+        Autostarted = args.Contains("--autostart");
         StartupLink = args.FirstOrDefault(a => a.StartsWith("nxm://", StringComparison.OrdinalIgnoreCase));
         try { if (!Features.Nxm.IsRegistered()) Features.Nxm.Register(); } catch { }
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
@@ -136,6 +140,48 @@ public static class Program
         Save("9e-about");
         window.Navigate(() => new SettingsPage("downloads"));
         Save("9h-downloads");
+
+        // 5.0: Creator Hub, «+», новые настройки, светлая тема, быстрый переход.
+        var seeds = Creator.Projects.Create("Дешёвые семена", Creator.Templates.ById("sdv-seeds")!.Code);
+        window.Navigate(() => new CreatorPage("mine", seeds.Id));
+        Save("10a-creator-editor");
+        window.Navigate(() => new CreatorPage("mine"));
+        Save("10b-creator-mine");
+        window.Navigate(() => new CreatorPage("examples"));
+        Save("10c-creator-examples");
+        window.Navigate(() => new CreatorPage("docs"));
+        Save("10d-creator-docs");
+        AddGamePage.Demo(
+        [
+            new Games.FoundGame("Hades", @"D:\SteamLibrary\steamapps\common\Hades", @"x64\Hades.exe", 1145360, "steam", "other"),
+            new Games.FoundGame("Muck", @"D:\SteamLibrary\steamapps\common\Muck", "Muck.exe", 1625450, "steam", "unity"),
+            new Games.FoundGame("Deep Rock Galactic", @"D:\SteamLibrary\steamapps\common\Deep Rock Galactic", "FSD.exe", 548430, "steam", "unreal"),
+            new Games.FoundGame("Outward Definitive Edition", @"C:\Program Files (x86)\Steam\steamapps\common\Outward", "Outward Definitive Edition.exe", 1758860, "steam", "unity"),
+            new Games.FoundGame("Terraria", @"C:\GOG Games\Terraria", "Terraria.exe", 0, "gog", "xna"),
+        ]);
+        window.Navigate(() => new AddGamePage());
+        Save("10e-add-game");
+        window.Navigate(() => new SettingsPage("look"));
+        Save("10f-look");
+        window.Navigate(() => new SettingsPage("interface"));
+        Save("10g-interface");
+        window.Navigate(() => new SettingsPage("system"));
+        Save("10h-system");
+        window.Navigate(() => new GamePage("peak", "catalog"));
+        Save("10i-peak");
+        Look.SetTheme("light");
+        window.Navigate(() => new HomePage());
+        Save("10j-home-light");
+        Look.SetTheme("black");
+        Look.SetAccent("#22C55E");
+        window.Navigate(() => new CreatorPage("examples"));
+        Save("10k-black-green");
+        Look.SetTheme("dark");
+        Look.SetAccent(Look.Accents[0]);
+        window.Navigate(() => new HomePage());
+        window.CommandPalette();
+        Save("10l-palette");
+        window.CloseDialog();
 
         var setup = new SetupWindow(ModLaunch.Setup.SetupMode.Install);
         setup.Show();

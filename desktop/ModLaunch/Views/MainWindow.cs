@@ -34,7 +34,10 @@ public sealed class MainWindow : Window
     readonly StackPanel _railGames = new() { Spacing = 10, HorizontalAlignment = HorizontalAlignment.Center };
     readonly TextBlock _title = new() { FontWeight = FontWeight.SemiBold, VerticalAlignment = VerticalAlignment.Center, FontSize = 14 };
     readonly TextBox _search = new() { Width = 320, Height = 40 };
-    readonly Button _back, _forward, _downloads, _homeButton, _settingsButton, _friendsButton, _statsButton, _donateButton;
+    readonly Button _back, _forward, _downloads, _homeButton, _settingsButton, _friendsButton, _statsButton, _donateButton, _creatorButton;
+    readonly LayoutTransformControl _scale = new();
+    Control? _railHost;
+    Control? _brandWord;
     readonly Button _updatePill = new() { Classes = { "chip" }, IsVisible = false, VerticalAlignment = VerticalAlignment.Center };
     readonly Border _friendsBadge = new() { IsVisible = false };
     readonly Panel _overlay = new() { IsVisible = false };
@@ -68,6 +71,9 @@ public sealed class MainWindow : Window
         _friendsButton = RailIcon(Icons.Users, () => Navigate(() => new FriendsPage()), I18n.T("friends.title"));
         _statsButton = RailIcon(Icons.Chart, () => Navigate(() => new StatsPage()), I18n.T("stats.title"));
         _donateButton = RailIcon(Icons.Coffee, () => Navigate(() => new DonatePage()), I18n.T("nav.donate"));
+        _creatorButton = new Button { Classes = { "chip" }, VerticalAlignment = VerticalAlignment.Center, Content = Ui.Row(6, Ui.Icon(Icons.Code, 15), new TextBlock { Text = "Creator Hub", VerticalAlignment = VerticalAlignment.Center }) };
+        _creatorButton.Click += (_, _) => Navigate(() => new CreatorPage());
+        ToolTip.SetTip(_creatorButton, I18n.T("cr.tip"));
         _friendsBadge.Width = 10; _friendsBadge.Height = 10; _friendsBadge.CornerRadius = new CornerRadius(5);
         _friendsBadge.Background = Ui.Res("Good"); _friendsBadge.HorizontalAlignment = HorizontalAlignment.Right; _friendsBadge.VerticalAlignment = VerticalAlignment.Top;
         _friendsBadge.Margin = new Thickness(0, 6, 6, 0);
@@ -101,7 +107,10 @@ public sealed class MainWindow : Window
             Child = Ui.Col(12, Ui.Text(I18n.T("dl.title"), "h3"), new ScrollViewer { Content = _downloadsList, MaxHeight = 440 }),
         };
 
-        Content = BuildLayout();
+        _scale.Child = BuildLayout();
+        Content = _scale;
+        ApplyScale();
+        Look.Changed += () => { ApplyScale(); RenderRail(); _current?.Build(); };
 
         I18n.Changed += () => { RebuildChrome(); _current?.Build(); };
         AppState.Changed += OnStateChanged;
@@ -111,10 +120,16 @@ public sealed class MainWindow : Window
         Features.Launcher.Exited += OnGameExit;
         Features.Nxm.Received += OnExternal;
 
-        Navigate(() => new HomePage());
+        Navigate(StartPage());
         RenderRail();
+        SetupTray();
         RenderDownloads();
         if (!Program.Screenshot) _ = StartUp();
+        if (Program.Autostarted && Settings.Data.Bool("startMinimized"))
+        {
+            if (Settings.Data.Bool("closeToTray")) Opened += (_, _) => Dispatcher.UIThread.Post(Hide);
+            else WindowState = WindowState.Minimized;
+        }
     }
 
     Control BuildLayout()
@@ -146,21 +161,22 @@ public sealed class MainWindow : Window
         rail.Children.Add(bottom);
         rail.Children.Add(new ScrollViewer { Content = _railGames, VerticalScrollBarVisibility = ScrollBarVisibility.Hidden });
         var railBorder = new Border { Child = rail, BorderBrush = Ui.Res("Line"), BorderThickness = new Thickness(0, 0, 1, 0) };
+        _railHost = railBorder;
+        railBorder.IsVisible = !Settings.Data.Bool("railHidden");
 
         // Верхняя строка: тянется за неё всё окно.
         _search.Watermark = I18n.T("search.home");
         _search.InnerLeftContent = new Border { Padding = new Thickness(12, 0, 0, 0), Child = Ui.Icon(Icons.Search, 16, Ui.Res("Muted")) };
         _search.KeyDown += (_, e) => { if (e.Key == Key.Enter) _current?.Search(_search.Text ?? ""); };
 
-        var brand = Ui.Row(10,
-            new Image { Source = Images.Asset("icon.png", 64), Width = 28, Height = 28 },
-            new TextBlock
+        _brandWord = new TextBlock
             {
                 VerticalAlignment = VerticalAlignment.Center, FontSize = 20, FontWeight = FontWeight.Bold,
                 Inlines = { new Avalonia.Controls.Documents.Run("Mod"), new Avalonia.Controls.Documents.Run("Launch") { Foreground = Ui.Res("Brand2") } },
-            },
-            new Border { Width = 1, Height = 24, Background = Ui.Res("Line"), Margin = new Thickness(6, 0) },
-            _title);
+            };
+        // Минимализм: по умолчанию в шапке только название экрана, логотип — на боковой панели.
+        var brand = Ui.Row(10, _brandWord, _title);
+        _brandWord.IsVisible = Settings.Data.Bool("showBrand");
 
         var winButtons = Ui.Row(2,
             WinButton(Icons.Minimize, () => WindowState = WindowState.Minimized, I18n.T("win.minimize")),
@@ -180,7 +196,7 @@ public sealed class MainWindow : Window
         _search.VerticalAlignment = VerticalAlignment.Center;
         Grid.SetColumn(_search, 2);
         topbar.Children.Add(_search);
-        var dlWrap = new Border { Child = Ui.Row(10, _updatePill, _downloads), Margin = new Thickness(12, 0, 16, 0), VerticalAlignment = VerticalAlignment.Center };
+        var dlWrap = new Border { Child = Ui.Row(10, _updatePill, _creatorButton, _downloads), Margin = new Thickness(12, 0, 16, 0), VerticalAlignment = VerticalAlignment.Center };
         Grid.SetColumn(dlWrap, 3);
         topbar.Children.Add(dlWrap);
         winButtons.VerticalAlignment = VerticalAlignment.Center;
@@ -250,9 +266,9 @@ public sealed class MainWindow : Window
     void RenderRail()
     {
         _railGames.Children.Clear();
-        foreach (var g in AppState.Games)
+        foreach (var g in RailGames())
         {
-            var art = g.Def.Art is null ? null : Images.Asset(g.Def.Art, 120);
+            var art = Images.Game(g.Def, 120);
             Control face = art is not null
                 ? new Image { Source = art, Stretch = Stretch.UniformToFill }
                 : new Border { Background = Ui.Hex(g.Def.Accent), Child = new TextBlock { Text = g.Def.ShortName[..1], FontWeight = FontWeight.Bold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Foreground = Brushes.Black } };
@@ -271,6 +287,15 @@ public sealed class MainWindow : Window
             ToolTip.SetTip(b, g.Def.Name);
             _railGames.Children.Add(b);
         }
+        var plus = RailIcon(Icons.Plus, () => Navigate(() => new AddGamePage()), I18n.T("add.title"));
+        plus.Classes.Set("active", _current is AddGamePage);
+        plus.BorderBrush = _current is AddGamePage ? Ui.Res("Brand") : Ui.Res("Line");
+        plus.BorderThickness = new Thickness(1.5);
+        _railGames.Children.Add(plus);
+        _creatorButton.Classes.Set("active", _current is CreatorPage);
+        _creatorButton.IsVisible = Settings.Data.Bool("showCreator", true);
+        _friendsButton.IsVisible = Settings.Data.Bool("railFriends", true);
+        _donateButton.IsVisible = Settings.Data.Bool("railDonate", true);
         _homeButton.Classes.Set("active", _current is HomePage);
         _settingsButton.Classes.Set("active", _current is SettingsPage);
         _friendsButton.Classes.Set("active", _current is FriendsPage);
@@ -282,6 +307,194 @@ public sealed class MainWindow : Window
         _friendsBadge.Background = view.Incoming.Count > 0 ? Ui.Res("Warn") : Ui.Res("Good");
         _updatePill.IsVisible = Setup.Updater.Available;
         if (Setup.Updater.Latest is { } latest) _updatePill.Content = Ui.Row(6, Ui.Icon(Icons.Sparkles, 14), new TextBlock { Text = I18n.T("upd.app.pill", ("version", latest.Version)), VerticalAlignment = VerticalAlignment.Center });
+    }
+
+    /// <summary>Игры на боковой панели: без скрытых, по желанию — только найденные, свой порядок.</summary>
+    public static IEnumerable<GameState> RailGames()
+    {
+        var hidden = Settings.Data.Arr("hiddenGames").Select(x => x?.ToString()).ToHashSet();
+        var foundOnly = Settings.Data.Bool("railFoundOnly");
+        return OrderedGames().Where(g => !hidden.Contains(g.Def.Id) && (!foundOnly || g.Status == Detect.Found));
+    }
+
+    /// <summary>Все игры в порядке, заданном в настройках (остальные — как в программе).</summary>
+    public static IEnumerable<GameState> OrderedGames()
+    {
+        var order = Settings.Data.Arr("gameOrder").Select(x => x?.ToString()).ToList();
+        return AppState.Games.Select((g, i) => (g, i))
+            .OrderBy(x => order.IndexOf(x.g.Def.Id) is var k && k >= 0 ? k : 10000 + x.i)
+            .Select(x => x.g);
+    }
+
+    public static void MoveGame(string id, int delta)
+    {
+        var ids = OrderedGames().Select(g => g.Def.Id).ToList();
+        var at = ids.IndexOf(id);
+        var to = at + delta;
+        if (at < 0 || to < 0 || to >= ids.Count) return;
+        (ids[at], ids[to]) = (ids[to], ids[at]);
+        Settings.Data["gameOrder"] = new System.Text.Json.Nodes.JsonArray(ids.Select(x => (System.Text.Json.Nodes.JsonNode)x).ToArray());
+        Settings.Save();
+    }
+
+    /// <summary>Перерисовать рамку окна после смены настроек интерфейса.</summary>
+    public void Refresh()
+    {
+        Settings.Save();
+        ApplyScale();
+        RenderRail();
+    }
+
+    void ApplyScale()
+    {
+        var k = Look.Scale;
+        _scale.LayoutTransform = Math.Abs(k - 1) < 0.001 ? null : new ScaleTransform(k, k);
+        if (_brandWord is not null) _brandWord.IsVisible = Settings.Data.Bool("showBrand");
+        if (_railHost is not null) _railHost.IsVisible = !Settings.Data.Bool("railHidden");
+    }
+
+    /// <summary>С чего начинать: главная, последняя игра, Creator Hub или библиотека.</summary>
+    static Func<Page> StartPage()
+    {
+        switch (Settings.Data.Str("startPage"))
+        {
+            case "lastGame" when Settings.Data.Str("lastGame") is string id && AppState.Games.Any(g => g.Def.Id == id):
+                return () => new GamePage(id);
+            case "creator": return () => new CreatorPage();
+            case "add": return () => new AddGamePage();
+            default: return () => new HomePage();
+        }
+    }
+
+    /// <summary>Скрыть или показать боковую панель (Ctrl+B) — «дзен-режим».</summary>
+    public void ToggleRail()
+    {
+        Settings.Data["railHidden"] = !Settings.Data.Bool("railHidden");
+        Settings.Save();
+        ApplyScale();
+    }
+
+    // ---------------------------------------------------------------- значок в трее
+
+    TrayIcon? _tray;
+    bool _quitting;
+
+    void SetupTray()
+    {
+        if (Program.Screenshot) return;
+        Closing += (_, e) =>
+        {
+            if (_quitting || !Settings.Data.Bool("closeToTray")) return;
+            e.Cancel = true;
+            Hide();
+        };
+        UpdateTray();
+    }
+
+    public void UpdateTray()
+    {
+        if (Program.Screenshot || Application.Current is null) return;
+        var want = Settings.Data.Bool("closeToTray");
+        if (!want) { if (_tray is not null) { _tray.IsVisible = false; _tray.Dispose(); _tray = null; } return; }
+        if (_tray is not null) return;
+        var menu = new NativeMenu();
+        var open = new NativeMenuItem(I18n.T("tray.open"));
+        open.Click += (_, _) => ShowFromTray();
+        menu.Items.Add(open);
+        foreach (var g in AppState.Games.Where(g => g.Status == Detect.Found).Take(8))
+        {
+            var item = new NativeMenuItem(I18n.T("tray.play", ("game", g.Def.Name)));
+            var gs = g;
+            item.Click += (_, _) => Actions.Play(gs);
+            menu.Items.Add(item);
+        }
+        menu.Items.Add(new NativeMenuItemSeparator());
+        var quit = new NativeMenuItem(I18n.T("tray.quit"));
+        quit.Click += (_, _) => { _quitting = true; Close(); };
+        menu.Items.Add(quit);
+        _tray = new TrayIcon { ToolTipText = "ModLaunch", Menu = menu, IsVisible = true };
+        try { _tray.Icon = new WindowIcon(Images.Asset("icon.png")); } catch { }
+        _tray.Clicked += (_, _) => ShowFromTray();
+        TrayIcon.SetIcons(Application.Current, [_tray]);
+    }
+
+    void ShowFromTray()
+    {
+        Show();
+        if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
+        Activate();
+    }
+
+    // ---------------------------------------------------------------- быстрый переход (Ctrl+P)
+
+    public void CommandPalette()
+    {
+        var box = new TextBox { Watermark = I18n.T("cmd.hint") };
+        var list = new StackPanel { Spacing = 2 };
+        var commands = new List<(string Title, string Icon, Action Run)>
+        {
+            (I18n.T("nav.menu"), Icons.Home, () => Navigate(() => new HomePage())),
+            ("Creator Hub", Icons.Code, () => Navigate(() => new CreatorPage())),
+            (I18n.T("add.title"), Icons.Plus, () => Navigate(() => new AddGamePage())),
+            (I18n.T("nav.settings"), Icons.Settings, () => Navigate(() => new SettingsPage())),
+            (I18n.T("look.title"), Icons.Palette, () => Navigate(() => new SettingsPage("look"))),
+            (I18n.T("friends.title"), Icons.Users, () => Navigate(() => new FriendsPage())),
+            (I18n.T("cmd.rail"), Icons.Layers, () => ToggleRail()),
+            (I18n.T("cmd.theme"), Icons.Eye, () => Look.SetTheme(Look.Themes[(Array.IndexOf(Look.Themes, Look.Theme) + 1) % Look.Themes.Length])),
+            (I18n.T("keys.title"), Icons.Key, () => Shortcuts()),
+        };
+        foreach (var g in AppState.Games)
+        {
+            var gs = g;
+            commands.Add((gs.Def.Name, Icons.Folder, () => Navigate(() => new GamePage(gs.Def.Id))));
+            if (gs.Status == Detect.Found) commands.Add((I18n.T("tray.play", ("game", gs.Def.Name)), Icons.Play, () => Actions.Play(gs)));
+        }
+        var shown = new List<(string Title, string Icon, Action Run)>();
+        var selected = 0;
+        void Render()
+        {
+            var q = (box.Text ?? "").Trim();
+            shown = commands.Where(c => q == "" || c.Title.Contains(q, StringComparison.OrdinalIgnoreCase)).Take(9).ToList();
+            selected = Math.Clamp(selected, 0, Math.Max(0, shown.Count - 1));
+            list.Children.Clear();
+            for (var i = 0; i < shown.Count; i++)
+            {
+                var c = shown[i];
+                var b = Ui.Button(c.Title, () => { CloseDialog(); c.Run(); }, i == selected ? "tab active" : "tab", c.Icon);
+                b.HorizontalAlignment = HorizontalAlignment.Stretch;
+                b.HorizontalContentAlignment = HorizontalAlignment.Left;
+                list.Children.Add(b);
+            }
+        }
+        box.TextChanged += (_, _) => { selected = 0; Render(); };
+        box.KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Down) { selected++; Render(); e.Handled = true; }
+            else if (e.Key == Key.Up) { selected--; Render(); e.Handled = true; }
+            else if (e.Key == Key.Enter && shown.Count > 0) { var c = shown[selected]; CloseDialog(); c.Run(); e.Handled = true; }
+        };
+        Render();
+        Dialog(I18n.T("cmd.title"), Ui.Col(10, box, list));
+        Dispatcher.UIThread.Post(() => box.Focus(), DispatcherPriority.Background);
+    }
+
+    public void Shortcuts()
+    {
+        var rows = new StackPanel { Spacing = 8 };
+        foreach (var (keys, what) in new[]
+        {
+            ("Ctrl+P", "keys.palette"), ("Ctrl+K", "keys.search"), ("Ctrl+J", "keys.downloads"), ("Ctrl+B", "keys.rail"),
+            ("Ctrl+,", "keys.settings"), ("Ctrl+Shift+C", "keys.creator"), ("Alt+← / Alt+→", "keys.history"), ("F1", "keys.help"), ("Esc", "keys.close"),
+        })
+        {
+            var row = new DockPanel();
+            var k = new Border { Background = Ui.Res("Surface3"), CornerRadius = new CornerRadius(6), Padding = new Thickness(8, 3), Child = Ui.Text(keys, "small") };
+            DockPanel.SetDock(k, Dock.Right);
+            row.Children.Add(k);
+            row.Children.Add(Ui.Text(I18n.T(what)));
+            rows.Children.Add(row);
+        }
+        Dialog(I18n.T("keys.title"), rows, Ui.Button(I18n.T("common.close"), CloseDialog, "primary"));
     }
 
     // ---------------------------------------------------------------- навигация
@@ -300,6 +513,7 @@ public sealed class MainWindow : Window
     void Show(Page page)
     {
         _current = page;
+        if (page.GameId is string gid) { Settings.Data["lastGame"] = gid; Settings.Save(); }
         page.Build();
         _page.Content = page;
         _title.Text = page.Title;
@@ -317,6 +531,11 @@ public sealed class MainWindow : Window
         else if (e.KeyModifiers == KeyModifiers.Alt && e.Key == Key.Right) GoForward();
         else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.K) _search.Focus();
         else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.J) _downloadsPanel.IsVisible = !_downloadsPanel.IsVisible;
+        else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.P) CommandPalette();
+        else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.B) ToggleRail();
+        else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.OemComma) Navigate(() => new SettingsPage());
+        else if (e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift) && e.Key == Key.C) Navigate(() => new CreatorPage());
+        else if (e.Key == Key.F1) Shortcuts();
         else if (e.Key == Key.Escape) { if (_overlay.IsVisible) CloseDialog(); else _downloadsPanel.IsVisible = false; }
     }
 
@@ -345,8 +564,10 @@ public sealed class MainWindow : Window
             });
             return true;
         }, TimeSpan.FromMinutes(5));
-        Closing += (_, _) =>
+        Closing += (_, e) =>
         {
+            if (e.Cancel) return;
+            _tray?.Dispose();
             Features.Hotkey.Disarm();
             try { Social.Friends.GoOffline().Wait(1500); } catch { }
         };
@@ -438,7 +659,7 @@ public sealed class MainWindow : Window
 
     void OnJobFinished(Job job)
     {
-        if (job.Status == JobStatus.Done) Toast($"{job.Title} — {I18n.T("dl.done").ToLowerInvariant()}");
+        if (job.Status == JobStatus.Done && Settings.Data.Bool("toastOnDone", true)) Toast($"{job.Title} — {I18n.T("dl.done").ToLowerInvariant()}");
         else if (job.Status == JobStatus.Failed) Toast($"{job.Title}: {job.Error}", bad: true);
         foreach (var g in AppState.Games) if (g.Path is not null) g.Refresh();
         AppState.Notify();
@@ -458,7 +679,8 @@ public sealed class MainWindow : Window
             Child = Ui.Text(text, wrap: true),
         };
         _toasts.Children.Add(t);
-        DispatcherTimer.RunOnce(() => _toasts.Children.Remove(t), TimeSpan.FromSeconds(bad ? 8 : 4));
+        var seconds = Settings.Data.Long("toastSeconds") is var ts && ts > 0 ? ts : 4;
+        DispatcherTimer.RunOnce(() => _toasts.Children.Remove(t), TimeSpan.FromSeconds(bad ? Math.Max(8, seconds) : seconds));
     }
 
     // ---------------------------------------------------------------- окна поверх
@@ -476,7 +698,7 @@ public sealed class MainWindow : Window
             VerticalAlignment = VerticalAlignment.Center,
             BoxShadow = BoxShadows.Parse("0 24 70 0 #99000000"),
             Child = Ui.Col(16, Ui.Text(title, "h2", wrap: true), body, buttons),
-            RenderTransform = new ScaleTransform(0.96, 0.96),
+            RenderTransform = Look.Animations ? new ScaleTransform(0.96, 0.96) : null,
             Transitions = new Avalonia.Animation.Transitions { new Avalonia.Animation.TransformOperationsTransition { Property = RenderTransformProperty, Duration = TimeSpan.FromMilliseconds(160) } },
         };
         var shade = new Border { Background = new SolidColorBrush(Color.Parse("#99000000")) };

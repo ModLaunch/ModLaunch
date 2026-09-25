@@ -318,21 +318,24 @@ public sealed partial class GamePage
         var w = MainWindow.Current!;
         var id = mod.Str("id")!;
         var name = mod.Str("name") ?? id;
+        void Remove()
+        {
+            w.CloseDialog();
+            try
+            {
+                registry.Remove(id);
+                if (mod.Str("kind") == "preset") Installer.SyncPreset(registry, null);
+                w.Toast(I18n.T("toast.removed"));
+            }
+            catch (Exception e) { w.Toast(Jobs.Explain(e), bad: true); }
+            _missing = null;
+            AppState.Notify();
+        }
+        // «Спрашивать перед удалением» можно выключить в Настройки → Система.
+        if (!Settings.Data.Bool("confirmRemove", true)) { Remove(); return; }
         w.Dialog(I18n.T("mod.removeConfirm", ("name", name)),
             Ui.Text(I18n.T("mod.removeConfirm.text"), "muted", wrap: true),
             Ui.Button(I18n.T("common.cancel"), w.CloseDialog),
-            Ui.Button(I18n.T("mod.remove"), () =>
-            {
-                w.CloseDialog();
-                try
-                {
-                    registry.Remove(id);
-                    if (mod.Str("kind") == "preset") Installer.SyncPreset(registry, null);
-                    w.Toast(I18n.T("toast.removed"));
-                }
-                catch (Exception e) { w.Toast(Jobs.Explain(e), bad: true); }
-                _missing = null;
-                AppState.Notify();
-            }, "primary", Icons.Trash));
+            Ui.Button(I18n.T("mod.remove"), Remove, "primary", Icons.Trash));
     }
 }

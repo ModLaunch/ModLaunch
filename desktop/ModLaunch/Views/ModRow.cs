@@ -22,7 +22,8 @@ public static class ModRow
                 new Avalonia.Controls.Documents.Run("  " + (mod.Author == "" ? "" : I18n.T("mod.by", ("author", mod.Author)))) { FontSize = 13, Foreground = Ui.Res("Brand2") },
             },
         };
-        var desc = new TextBlock { Text = mod.Description, Foreground = Ui.Res("Muted"), TextWrapping = TextWrapping.Wrap, MaxLines = 2, TextTrimming = TextTrimming.CharacterEllipsis };
+        var compact = Settings.Data.Bool("compactLists");
+        var desc = new TextBlock { Text = mod.Description, Foreground = Ui.Res("Muted"), TextWrapping = TextWrapping.Wrap, MaxLines = compact ? 1 : 2, TextTrimming = TextTrimming.CharacterEllipsis };
 
         var tags = Ui.Row(6);
         if (pick) tags.Children.Add(Tag(I18n.T("badge.pick"), Ui.Res("BrandSoft"), Ui.Res("Brand2")));
@@ -53,14 +54,14 @@ public static class ModRow
         stats.MinWidth = 150;
 
         var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"), ColumnSpacing = 18 };
-        var thumb = Ui.Thumb(mod.Icon, mod.Name, 88, 14, 200);
+        var thumb = Ui.Thumb(mod.Icon, mod.Name, compact ? 52 : 88, compact ? 10 : 14, 200);
         grid.Children.Add(thumb);
         Grid.SetColumn(middle, 1);
         grid.Children.Add(middle);
         Grid.SetColumn(stats, 2);
         grid.Children.Add(stats);
 
-        var card = new Border { Classes = { "card" }, Padding = new Thickness(14), Child = grid, Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand) };
+        var card = new Border { Classes = { "card" }, Padding = new Thickness(compact ? 9 : 14), Child = grid, Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand) };
         card.PointerPressed += (s, e) =>
         {
             if (e.Source is Visual v && Avalonia.VisualTree.VisualExtensions.FindAncestorOfType<Button>(v, true) is not null) return;

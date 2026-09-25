@@ -21,7 +21,7 @@ public sealed class HomePage : Page
         DetachedFromVisualTree += (_, _) => _timer?.Dispose();
         AttachedToVisualTree += (_, _) =>
         {
-            if (Program.Screenshot) return;
+            if (Program.Screenshot || !Look.Animations) return;
             _timer = DispatcherTimer.Run(() => { _hero = (_hero + 1) % 3; Build(); return true; }, TimeSpan.FromSeconds(8));
         };
     }
@@ -50,19 +50,22 @@ public sealed class HomePage : Page
             .Select(g => (Game: g, Played: Features.PlayTime.Get(g.Def.Id)))
             .Where(x => x.Game.Status == Detect.Found && x.Played.LastPlayed is not null)
             .OrderByDescending(x => x.Played.LastPlayed).Take(3).ToList();
-        if (recent.Count > 0) content.Children.Add(Continue(recent));
+        if (recent.Count > 0 && Settings.Data.Bool("homeContinue", true)) content.Children.Add(Continue(recent));
 
         var grid = new UniformGrid { Columns = 4 };
-        foreach (var g in AppState.Games) grid.Children.Add(Tile(g));
+        var foundOnly = Settings.Data.Bool("homeFoundOnly");
+        var hidden = Settings.Data.Arr("hiddenGames").Select(x => x?.ToString()).ToHashSet();
+        foreach (var g in MainWindow.OrderedGames().Where(g => !hidden.Contains(g.Def.Id) && (!foundOnly || g.Status == Detect.Found))) grid.Children.Add(Tile(g));
+        grid.Children.Add(AddTile());
         content.Children.Add(grid);
 
-        content.Children.Add(Hero());
+        if (Settings.Data.Bool("homeHero", true)) content.Children.Add(Hero());
 
-        var favorites = Favorites.All().Where(f => AppState.Game(f.GameId).Status == Detect.Found).Take(20).ToList();
-        if (favorites.Count > 0) content.Children.Add(Shelf(I18n.T("home.favorites"), I18n.T("home.favorites.text"), favorites));
+        var favorites = Favorites.All().Where(f => AppState.Games.Any(g => g.Def.Id == f.GameId && g.Status == Detect.Found)).Take(20).ToList();
+        if (favorites.Count > 0 && Settings.Data.Bool("homeFavorites", true)) content.Children.Add(Shelf(I18n.T("home.favorites"), I18n.T("home.favorites.text"), favorites));
 
         var first = AppState.Games.FirstOrDefault(g => g.Status == Detect.Found && g.LoaderInstalled) ?? AppState.Games.FirstOrDefault(g => g.Status == Detect.Found);
-        if (first is not null)
+        if (first is not null && Settings.Data.Bool("homePopular", true))
         {
             if (_popularFor != first.Def.Id) { _popularFor = first.Def.Id; _popular = null; _ = LoadPopular(first); }
             if (_popular is { Count: > 0 }) content.Children.Add(Shelf(I18n.T("home.popular", ("game", first.Def.Name)), null, _popular.Select(m => (first.Def.Id, m)).ToList()));
@@ -77,7 +80,7 @@ public sealed class HomePage : Page
         foreach (var (g, played) in recent)
         {
             var running = Features.Launcher.IsRunning(g.Def.Id);
-            var art = g.Def.Art is null ? null : Images.Asset(g.Def.Art, 160);
+            var art = Images.Game(g.Def, 160);
             var thumb = new Border { Width = 64, Height = 64, CornerRadius = new CornerRadius(12), ClipToBounds = true, Background = Ui.Hex(g.Def.Accent), Child = art is null ? null : new Image { Source = art, Stretch = Stretch.UniformToFill } };
             var info = Ui.Col(3, Ui.Text(g.Def.Name, "h3"),
                 Ui.Text(running ? I18n.T("time.running") : I18n.T("time.last", ("when", Ui.Ago(played.LastPlayed))), "small", color: running ? Ui.Res("Good") : Ui.Res("Muted")),
@@ -151,9 +154,26 @@ public sealed class HomePage : Page
         _ => I18n.T("games.notSearched"),
     };
 
+    /// <summary>Плитка «+»: найти на компьютере другие игры и добавить их.</summary>
+    static Control AddTile()
+    {
+        var b = new Button
+        {
+            Classes = { "tile" }, Height = 136, Margin = new Thickness(0, 0, 14, 14), HorizontalAlignment = HorizontalAlignment.Stretch,
+            Background = Brushes.Transparent, BorderBrush = Ui.Res("Line"),
+            Content = Ui.Col(8,
+                new Border { Width = 40, Height = 40, CornerRadius = new CornerRadius(20), Background = Ui.Res("BrandSoft"), Child = Ui.Icon(Icons.Plus, 20, Ui.Res("Brand2")), HorizontalAlignment = HorizontalAlignment.Center },
+                new TextBlock { Text = I18n.T("add.tile"), HorizontalAlignment = HorizontalAlignment.Center, FontWeight = FontWeight.SemiBold },
+                new TextBlock { Text = I18n.T("add.tile.text"), HorizontalAlignment = HorizontalAlignment.Center, FontSize = 12, Foreground = Ui.Res("Muted") }),
+        };
+        if (b.Content is Control c) { c.VerticalAlignment = VerticalAlignment.Center; c.HorizontalAlignment = HorizontalAlignment.Center; }
+        b.Click += (_, _) => MainWindow.Current?.Navigate(() => new AddGamePage());
+        return b;
+    }
+
     static Control Tile(GameState g)
     {
-        var art = g.Def.Art is null ? null : Images.Asset(g.Def.Art, 520);
+        var art = Images.Game(g.Def, 520);
         Control face = art is not null
             ? new Image { Source = art, Stretch = Stretch.UniformToFill }
             : new Border

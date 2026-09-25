@@ -1,7 +1,7 @@
 namespace ModLaunch.Games;
 
-public enum LoaderKind { Bepinex, Smapi, HkApi }
-public enum CatalogKind { Nexus, Thunderstore, ModLinks }
+public enum LoaderKind { Bepinex, Smapi, HkApi, None }
+public enum CatalogKind { Nexus, Thunderstore, ModLinks, None }
 
 /// <summary>Раздел каталога и его фильтры для каждого источника.</summary>
 public sealed record Section(string Id, string[]? Thunderstore = null, string[]? ModLinks = null, string? Special = null)
@@ -44,6 +44,14 @@ public sealed class GameDef
     public required string[] FolderNames { get; init; }
     public required string Accent { get; init; }
     public string? Art { get; init; }
+    /// <summary>Обложка из сети (у своих и новых игр — картинка из Steam).</summary>
+    public string? ArtUrl { get; init; }
+    /// <summary>Игра добавлена человеком кнопкой «+», а не встроена в программу.</summary>
+    public bool Custom { get; init; }
+    /// <summary>Движок своей игры: unity, unity-il2cpp, unreal, godot, …</summary>
+    public string? Engine { get; init; }
+    /// <summary>Папка модов для игр без загрузчика (относительно папки игры).</summary>
+    public string ModsFolder { get; init; } = "Mods";
 
     public required LoaderKind Loader { get; init; }
     public required string LoaderName { get; init; }
@@ -82,6 +90,7 @@ public sealed class GameDef
     {
         LoaderKind.Smapi => Path.Combine(gamePath, "Mods"),
         LoaderKind.HkApi => Path.Combine(Loaders.HkApi.ManagedDir(gamePath), "Mods"),
+        LoaderKind.None => Path.Combine(gamePath, ModsFolder),
         _ => Path.Combine(gamePath, "BepInEx", "plugins"),
     };
 
@@ -123,7 +132,12 @@ public sealed class GameDef
     public string SourceOf(string recordId, string? recorded = null) =>
         recordId.StartsWith("nexus:", StringComparison.Ordinal) ? "nexus" : recorded is "thunderstore" or "modlinks" ? recorded : PrimarySource == "nexus" ? "thunderstore" : PrimarySource;
 
-    public string PrimarySource => Catalog switch { CatalogKind.Nexus => "nexus", CatalogKind.Thunderstore => "thunderstore", _ => "modlinks" };
+    public string PrimarySource => Catalog switch { CatalogKind.Nexus => "nexus", CatalogKind.Thunderstore => "thunderstore", CatalogKind.ModLinks => "modlinks", _ => "none" };
+
+    /// <summary>Есть ли у игры хоть один каталог модов.</summary>
+    public bool HasCatalog => Sources.Length > 0;
+
+    public static string SteamArt(int appId) => $"https://cdn.akamai.steamstatic.com/steam/apps/{appId}/header.jpg";
 
     /// <summary>
     /// Все каталоги игры: основной и дополнительные (как в Vortex — моды с разных
@@ -134,7 +148,8 @@ public sealed class GameDef
     {
         get
         {
-            var list = new List<string> { PrimarySource };
+            var list = new List<string>();
+            if (PrimarySource != "none") list.Add(PrimarySource);
             if (NexusDomain is not null && !list.Contains("nexus")) list.Add("nexus");
             if (ThunderstoreCommunity is not null && ExtraThunderstore && !list.Contains("thunderstore")) list.Add("thunderstore");
             return list.ToArray();

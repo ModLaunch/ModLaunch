@@ -1,0 +1,41 @@
+    // ── Creator Hub ModLaunch 5.0 ────────────────────────────────────────
+    // Вставить в консоли Firebase: Firestore Database → Правила, внутрь
+    // блока match /databases/{database}/documents { … }, рядом с правилами
+    // отзывов и друзей, и нажать «Опубликовать». Остальное эти строки не трогают.
+    //
+    // Галерея модов сообщества: исходник на ModScript (до 20 000 знаков).
+    // Читать могут все, писать — только автор и только свой документ
+    // (имя документа начинается с его uid).
+
+    function creatorMember() {
+      return request.auth != null && request.auth.token.get('email', '') != '';
+    }
+    function creatorText(value, max) {
+      return value is string && value.size() <= max;
+    }
+    function creatorValid(data) {
+      return data.keys().hasOnly(['uid', 'author', 'name', 'about', 'game', 'version', 'code', 'app', 'created', 'updated'])
+        && data.uid == request.auth.uid
+        && creatorText(data.author, 32) && data.author.size() > 0
+        && creatorText(data.name, 60) && data.name.size() > 0
+        && creatorText(data.about, 300)
+        && creatorText(data.game, 40) && data.game.size() > 0
+        && creatorText(data.version, 20) && data.version.matches('^[0-9]+[.][0-9]+[.][0-9]+$')
+        && creatorText(data.code, 20000) && data.code.size() > 0
+        && creatorText(data.app, 20)
+        && data.updated == request.time;
+    }
+
+    match /creations/{id} {
+      allow get, list: if true;
+      allow create: if creatorMember()
+        && id.matches('^' + request.auth.uid.lower() + '_[a-z0-9_]{1,60}$')
+        && creatorValid(request.resource.data)
+        && request.resource.data.created == request.time;
+      allow update: if creatorMember()
+        && resource.data.uid == request.auth.uid
+        && creatorValid(request.resource.data)
+        && request.resource.data.created == resource.data.created;
+      allow delete: if creatorMember() && resource.data.uid == request.auth.uid;
+    }
+    // ── конец правил Creator Hub ─────────────────────────────────────────

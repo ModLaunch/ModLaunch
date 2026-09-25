@@ -13,6 +13,7 @@ public partial class App : Application
     public override void OnFrameworkInitializationCompleted()
     {
         I18n.Set(Settings.Language);
+        Look.Apply();
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             desktop.MainWindow = Program.SetupMode == ModLaunch.Setup.SetupMode.None

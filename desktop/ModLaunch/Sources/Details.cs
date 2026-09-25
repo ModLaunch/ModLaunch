@@ -27,7 +27,7 @@ public static partial class Details
                 {
                     try { html = (await Http.GetJson($"https://thunderstore.io/api/cyberstorm/package/{Uri.EscapeDataString(ns)}/{Uri.EscapeDataString(name)}/latest/readme/", ct, 20)).Str("html") ?? ""; } catch { }
                 }
-                var reqs = mod.Dependencies.Where(d => !d.EndsWith("BepInExPack", StringComparison.OrdinalIgnoreCase) && !d.Contains("BepInExPack_"))
+                var reqs = mod.Dependencies.Where(d => !d.EndsWith("BepInExPack", StringComparison.OrdinalIgnoreCase) && !d.Contains("BepInExPack_") && !d.StartsWith("xiaoye97-BepInEx", StringComparison.OrdinalIgnoreCase))
                     .Select(d => new Requirement(d, d[(d.LastIndexOf('-') + 1)..].Replace('_', ' '), true)).ToList();
                 return new ModDetails(mod, Html(html), Pictures(html, "https://thunderstore.io/"), reqs);
             }

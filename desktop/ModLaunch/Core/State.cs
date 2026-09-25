@@ -38,7 +38,7 @@ public sealed class GameState
 /// <summary>Всё состояние программы и событие «что-то поменялось — перерисуй».</summary>
 public static class AppState
 {
-    public static readonly List<GameState> Games = GameCatalog.All.Select(d => new GameState { Def = d }).ToList();
+    public static readonly List<GameState> Games = GameCatalog.Builtin.Concat(CustomGames.Defs).Select(d => new GameState { Def = d }).ToList();
     public static event Action? Changed;
 
     public static GameState Game(string id) => Games.First(g => g.Def.Id == id);

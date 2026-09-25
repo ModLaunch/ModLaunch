@@ -22,6 +22,7 @@ public static partial class Catalog
         var section = Section.All.GetValueOrDefault(q.SectionId) ?? Section.All["all"];
         // «Лучшие» — весь каталог по оценкам.
         if (section.Special == "best") { q = q with { Sort = SortBy.Rating }; section = Section.All["all"]; }
+        if (source == "none" || !game.Sources.Contains(source)) return new Page([], 0, false, q.Page);
         var primary = source == game.PrimarySource;
         var page = source switch
         {

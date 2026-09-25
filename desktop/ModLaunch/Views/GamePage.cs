@@ -35,9 +35,11 @@ public sealed partial class GamePage : Page
 
     public GamePage(string gameId, string tab = "", string query = "")
     {
-        _g = AppState.Game(gameId);
+        // Своя игра могла быть убрана — тогда «назад» ведёт на первую игру.
+        _g = AppState.Games.FirstOrDefault(g => g.Def.Id == gameId) ?? AppState.Games[0];
         _query = query;
-        _tab = tab != "" ? tab : _g.ModCount > 0 ? "installed" : "catalog";
+        _tab = tab != "" ? tab : _g.ModCount > 0 || !_g.Def.HasCatalog ? "installed" : "catalog";
+        if (_tab == "catalog" && !_g.Def.HasCatalog) _tab = "installed";
         if (_g.Def.Picks.Length > 0 && _query == "") _section = "picks";
         if (_tab == "catalog") _ = Load(reset: true);
     }
@@ -80,9 +82,10 @@ public sealed partial class GamePage : Page
 
     Control Header()
     {
-        var art = _g.Def.Art is null ? null : Images.Asset(_g.Def.Art, 900);
+        var art = Images.Game(_g.Def, 900);
         var status = _g.Status switch
         {
+            Detect.Found when _g.Def.Loader == LoaderKind.None => (Ui.Res("Good"), I18n.T("add.noLoader", ("folder", _g.Def.ModsFolder))),
             Detect.Found when _g.LoaderInstalled => (Ui.Res("Good"), I18n.T("games.loaderReady", ("loader", _g.Def.LoaderName))),
             Detect.Found => (Ui.Res("Warn"), I18n.T("games.loaderMissing", ("loader", _g.Def.LoaderName))),
             Detect.Searching => (Ui.Res("Muted"), _g.SearchingWhere is null ? I18n.T("games.searching") : I18n.T("games.searchingWhere", ("where", _g.SearchingWhere))),
@@ -107,6 +110,7 @@ public sealed partial class GamePage : Page
         if (_g.Status == Detect.Found)
         {
             buttons.Children.Add(Ui.Button(I18n.T("games.openFolder"), () => Actions.OpenFolder(_g.Path), "", Icons.Folder));
+            buttons.Children.Add(Ui.Button("", () => MainWindow.Current?.Navigate(() => new CreatorPage()), "icon", Icons.Code, I18n.T("cr.forGame")));
             if (_g.LoaderInstalled)
             {
                 var running = Features.Launcher.IsRunning(_g.Def.Id);
@@ -178,7 +182,7 @@ public sealed partial class GamePage : Page
         var saves = Features.Backups.List(_g.Def.Id).Count;
         var bar = Ui.Row(4,
             Tab("installed", I18n.T("games.downloads"), Icons.List, _g.ModCount + updates),
-            Tab("catalog", I18n.T("games.market"), Icons.Bag, _total > 0 ? I18n.Compact(_total) : null),
+            _g.Def.HasCatalog ? Tab("catalog", I18n.T("games.market"), Icons.Bag, _total > 0 ? I18n.Compact(_total) : null) : new Control { IsVisible = false },
             Tab("profiles", I18n.T("games.profiles"), Icons.Layers, profiles > 0 ? profiles.ToString() : null),
             Tab("saves", I18n.T("games.saves"), Icons.Shield, saves > 0 ? saves.ToString() : null),
             Tab("tools", I18n.T("v4.tools"), Icons.Settings, Features.Tools.For(_g.Def.Id).Count is > 0 and var t ? t.ToString() : null),
