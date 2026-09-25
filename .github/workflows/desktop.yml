@@ -1,0 +1,51 @@
+name: desktop
+
+# ModLaunch 4 на Avalonia: сборка одним exe под Windows и снимки экранов.
+on:
+  push:
+    paths:
+      - 'desktop/**'
+      - '.github/workflows/desktop.yml'
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Publish
+        working-directory: desktop/ModLaunch
+        run: dotnet publish -c Release -r win-x64 -o ../../out
+
+      - name: Size
+        shell: pwsh
+        run: Get-ChildItem out | Format-Table Name, @{n='MB';e={[math]::Round($_.Length/1MB,1)}}
+
+      - name: Self-check (live catalogs, install into a test folder)
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath out/ModLaunch.exe -ArgumentList '--selfcheck' -PassThru -Wait -NoNewWindow -RedirectStandardOutput selfcheck.txt
+          Get-Content selfcheck.txt
+          if ($p.ExitCode -ne 0) { throw "self-check failed" }
+
+      - name: Screenshots
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath out/ModLaunch.exe -ArgumentList '--screenshot', 'shots' -PassThru -Wait -NoNewWindow
+          if ($p.ExitCode -ne 0) { throw "exit $($p.ExitCode)" }
+          Get-ChildItem shots
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ModLaunch-win-x64
+          path: out/ModLaunch.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: shots/
