@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ModScript — язык модов ModLaunch</title>
+    <meta name="description" content="ModScript — простой язык модов ModLaunch: переменные, циклы, условия. Попробуйте прямо в браузере: скрипт собирается в пакет Content Patcher или Thunderstore." />
+    <meta name="theme-color" content="#0b0c12" />
+    <link rel="canonical" href="https://modlaunch.github.io/ModLaunch/modscript.html" />
+    <meta property="og:title" content="ModScript — язык модов ModLaunch" />
+    <meta property="og:description" content="Сделайте свой мод за пять минут — прямо в браузере." />
+    <meta property="og:image" content="https://modlaunch.github.io/ModLaunch/img/og.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="icon" href="img/logo.svg" type="image/svg+xml" />
+    <link rel="manifest" href="site.webmanifest" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="bg" aria-hidden="true"><i></i><i></i><i></i></div>
+
+    <header class="nav" id="nav">
+      <div class="wrap nav__in">
+        <a class="brand" href="./" aria-label="ModLaunch">
+          <svg class="logo" viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><g class="logo__orbit"><path d="M4.3 4.3 19.7 19.7M19.7 4.3 4.3 19.7" stroke="#7a62d6" stroke-width="1.5"/><circle cx="4.3" cy="4.3" r="3" fill="#cbbcff"/><circle cx="19.7" cy="4.3" r="3" fill="#f2c25c"/><circle cx="4.3" cy="19.7" r="3" fill="#8f73ff"/><circle cx="19.7" cy="19.7" r="3" fill="#cbbcff"/></g><circle cx="12" cy="12" r="5.6" fill="#fff" stroke="#b9a6ff" stroke-width=".6"/><circle cx="12" cy="12" r="2.6" fill="#7c5cff"/></svg>
+          <span>Mod<b>Launch</b></span>
+        </a>
+        <nav class="nav__links">
+          <a href="./#features" data-t="nav.features">Возможности</a>
+          <a href="./#games" data-t="nav.games">Игры</a>
+          <a href="hub.html" data-t="nav.hub">Hub</a>
+          <a href="modscript.html" class="is-here" data-t="nav.creator">ModScript</a>
+          <a href="./#faq" data-t="nav.faq">Вопросы</a>
+        </nav>
+        <div class="nav__end">
+          <button class="icon-btn" id="theme" type="button" aria-label="Тема"><svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+          <button class="lang" id="lang" type="button" aria-label="Language">EN</button>
+          <a class="btn btn--sm btn--primary js-setup" href="https://github.com/ModLaunch/ModLaunch/releases/latest" data-t="nav.download">Скачать</a>
+          <button class="icon-btn burger" id="burger" type="button" aria-label="Меню"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="page-head wrap">
+        <span class="chip reveal"><span class="chip__dot"></span><span data-t="s.chip">Creator Hub · ModLaunch 5.5</span></span>
+        <h1 class="reveal"><span class="grad">ModScript</span></h1>
+        <p class="sub reveal" data-t="s.sub">Язык модов ModLaunch. Одна команда на строку, понятные слова, ошибки видны сразу — а на выходе настоящий мод. Попробуйте прямо здесь.</p>
+      </section>
+
+      <section class="wrap" id="play" style="padding-top:10px">
+        <div class="play">
+          <div class="editor">
+            <div class="editor__bar">
+              <select id="example" aria-label="Примочка"></select>
+              <span style="flex:1"></span>
+              <button class="btn btn--sm" id="share" type="button" data-t="s.share">Поделиться</button>
+              <button class="btn btn--sm" id="saveMls" type="button" data-t="s.mls">Скачать .mls</button>
+            </div>
+            <div class="editor__area">
+              <div class="gutter" id="gutter"></div>
+              <pre id="hl" aria-hidden="true"></pre>
+              <textarea id="src" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="ModScript"></textarea>
+            </div>
+          </div>
+          <div class="result">
+            <div class="result__head"><span class="dot" id="dot"></span><span id="status"></span></div>
+            <div class="diags" id="diags"></div>
+            <div class="logs" id="logs"></div>
+            <div class="result__tabs" id="files"></div>
+            <pre id="file"></pre>
+            <div style="padding:12px 16px;border-top:1px solid var(--line);display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+              <button class="btn btn--sm btn--primary" id="zip" type="button" data-t="s.zip">Скачать мод (zip)</button>
+              <span class="hash" id="zipHint" data-t="s.zipHint">Готовый пакет — положите в игру или установите через ModLaunch.</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="wrap" id="ref">
+        <span class="eyebrow" data-t="s.refEyebrow">Справка</span>
+        <h2 class="reveal" data-t="s.refTitle">Все команды ModScript</h2>
+        <p class="sub reveal" data-t="s.refSub">Текст — в кавычках, блоки — в фигурных скобках, # — комментарий. Переменные: let цена = 10, дальше $цена. Считать тоже можно: $цена * 2.</p>
+        <div class="ref" id="docs"></div>
+      </section>
+
+      <section class="final wrap reveal">
+        <h2 data-t="s.finalTitle">В программе — ещё больше</h2>
+        <p class="sub" style="margin-top:0" data-t="s.finalSub">Редактор с подсказками, 29 примочек, установка мода в игру одной кнопкой и публикация в ModLaunch Hub.</p>
+        <a class="btn btn--primary btn--lg js-setup" href="https://github.com/ModLaunch/ModLaunch/releases/latest">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19h14" /></svg>
+          <span><span data-t="hero.download">Скачать для Windows</span><small class="js-meta">Windows 10 / 11 · бесплатно</small></span>
+        </a>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <div class="wrap foot__in">
+        <span>© 2026 ModLaunch</span>
+        <a href="./">ModLaunch</a>
+        <a href="hub.html" data-t="foot.hub">ModLaunch Hub</a>
+        <a href="https://github.com/ModLaunch/ModLaunch" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/ModLaunch/ModLaunch/issues" target="_blank" rel="noopener" data-t="foot.issues">Сообщить об ошибке</a>
+        <span class="foot__note" data-t="foot.note">Названия и обложки игр принадлежат их владельцам. ModLaunch — неофициальный проект фанатов.</span>
+      </div>
+    </footer>
+
+    <script src="js/core.js"></script>
+    <script src="js/examples.js"></script>
+    <script src="js/modscript.js"></script>
+    <script src="js/playground.js"></script>
+  </body>
+</html>
