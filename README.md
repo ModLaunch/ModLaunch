@@ -29,6 +29,7 @@ ModLaunch finds your game, installs the mod loader and downloads mods together w
 | Subnautica: Below Zero | BepInEx | Thunderstore, Nexus Mods |
 | Valheim | BepInEx | Thunderstore |
 | Risk of Rain 2 | BepInEx | Thunderstore |
+| R.E.P.O. | BepInEx | Thunderstore |
 
 Steam, Epic, GOG and standalone copies are found automatically. If a game isn't found, point ModLaunch to its folder once.
 

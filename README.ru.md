@@ -28,6 +28,7 @@ ModLaunch сам находит игру, ставит загрузчик мод
 | Subnautica: Below Zero | BepInEx | Thunderstore, Nexus Mods |
 | Valheim | BepInEx | Thunderstore |
 | Risk of Rain 2 | BepInEx | Thunderstore |
+| R.E.P.O. | BepInEx | Thunderstore |
 
 Игры из Steam, Epic, GOG и отдельные копии находятся сами. Если игра не нашлась, один раз укажите её папку.
 

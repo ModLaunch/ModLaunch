@@ -1,11 +1,17 @@
-**English:** download **ModLaunch-Setup-3.1.0.exe** below and run it. If Windows shows "Windows protected your PC", click **More info** → **Run anyway**. More in the [README](https://github.com/ModLaunch/ModLaunch#readme).
+**English:** download **ModLaunch-Setup-3.2.0.exe** below and run it. If Windows shows "Windows protected your PC", click **More info** → **Run anyway**. More in the [README](https://github.com/ModLaunch/ModLaunch#readme).
 
 ## Как скачать
 
-- **ModLaunch-Setup-3.1.0.exe** — установщик. Запустите, нажмите «Установить» — через минуту ModLaunch на рабочем столе и в «Пуске». ModHub 2.x обновится на месте: настройки, аккаунт, друзья и моды сохранятся.
-- **ModLaunch-3.1.0-win-x64.zip** — портативная версия одной папкой: распакуйте и запустите `ModLaunch.exe`.
+- **ModLaunch-Setup-3.2.0.exe** — установщик. Запустите, нажмите «Установить» — через минуту ModLaunch на рабочем столе и в «Пуске». ModHub 2.x обновится на месте: настройки, аккаунт, друзья и моды сохранятся.
+- **ModLaunch-3.2.0-win-x64.zip** — портативная версия одной папкой: распакуйте и запустите `ModLaunch.exe`.
 
 Если Windows покажет «Система Windows защитила ваш компьютер», нажмите «Подробнее» → «Выполнить в любом случае». Это нужно только один раз.
+
+## Что нового в 3.2
+
+- **R.E.P.O.** Восьмая игра: BepInEx ставится сам, почти пять тысяч модов с Thunderstore, «Нужные» моды и сборки.
+- **Больше модов для Subnautica.** «Нужные» выросли с 17 до 45 — самые скачиваемые и самые одобряемые моды последнего года на Nexus: Configuration Manager, Radial tabs, Quick Slots Plus, De-Extinction, Alien Rifle, новые подлодки и другие. Два новых набора: «Новые подлодки» и «Существа и сюжет».
+- **Значок «Устарел».** Моды Subnautica, которые не обновлялись с перехода игры на BepInEx и Nautilus (эпоха QModManager), помечены — они, скорее всего, не заработают на текущей версии.
 
 ## Что нового в 3.1
 

@@ -27,9 +27,9 @@ const S = {
   // и они отбрасываются (Valheim — building, Lethal Company — furniture…).
   buildings: { id: 'buildings', thunderstore: ['furniture', 'building'] },
   vehicles: { id: 'vehicles', thunderstore: ['vehicles', 'transportation'] },
-  items: { id: 'items', thunderstore: ['items', 'equipment', 'gear', 'crafting'] },
-  gameplay: { id: 'gameplay', thunderstore: ['tweaks-and-quality-of-life', 'performance', 'bug-fixes', 'tweaks', 'utility', 'gamemodes', 'artifacts'], modlinks: ['Gameplay'] },
-  content: { id: 'content', thunderstore: ['moons', 'interiors', 'monsters', 'weather', 'hazards', 'enemies', 'npcs', 'world-generation', 'player-characters', 'maps', 'skills'], modlinks: ['Expansion', 'Boss'] },
+  items: { id: 'items', thunderstore: ['items', 'equipment', 'gear', 'crafting', 'valuables', 'upgrades', 'weapons', 'drones'] },
+  gameplay: { id: 'gameplay', thunderstore: ['tweaks-and-quality-of-life', 'performance', 'bug-fixes', 'tweaks', 'utility', 'gamemodes', 'artifacts', 'quality-of-life'], modlinks: ['Gameplay'] },
+  content: { id: 'content', thunderstore: ['moons', 'interiors', 'monsters', 'weather', 'hazards', 'enemies', 'npcs', 'world-generation', 'player-characters', 'maps', 'skills', 'levels'], modlinks: ['Expansion', 'Boss'] },
   visuals: { id: 'visuals', thunderstore: ['asset-replacements'] },
   cosmetics: { id: 'cosmetics', thunderstore: ['cosmetics', 'suits', 'emotes', 'skins'], modlinks: ['Cosmetic'] },
   audio: { id: 'audio', thunderstore: ['audio', 'boombox'] },

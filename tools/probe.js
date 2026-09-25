@@ -177,7 +177,7 @@ async function checkInstall() {
   const { ModRegistry } = require('../src/main/core/registry');
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'modhub-probe-'));
 
-  const DATA = { 'lethal-company': 'Lethal Company_Data', subnautica: 'Subnautica_Data', 'subnautica-below-zero': 'SubnauticaZero_Data', valheim: 'valheim_Data', 'risk-of-rain-2': 'Risk of Rain 2_Data' };
+  const DATA = { 'lethal-company': 'Lethal Company_Data', subnautica: 'Subnautica_Data', 'subnautica-below-zero': 'SubnauticaZero_Data', valheim: 'valheim_Data', 'risk-of-rain-2': 'Risk of Rain 2_Data', repo: 'REPO_Data' };
   for (const id of Object.keys(DATA)) {
     const game = games.byId(id);
     const dir = path.join(root, id);

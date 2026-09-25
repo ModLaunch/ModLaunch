@@ -719,6 +719,13 @@ const HELP = {
       ['Jötunn — библиотека для модов Valheim', 'https://valheim-modding.github.io/Jotunn/'],
     ],
   },
+  repo: {
+    links: [
+      ['Каталог модов Thunderstore', 'https://thunderstore.io/c/repo/'],
+      ['BepInExPack для R.E.P.O.', 'https://thunderstore.io/c/repo/p/BepInEx/BepInExPack/'],
+      ['REPOLib — библиотека для модов', 'https://thunderstore.io/c/repo/p/Zehs/REPOLib/'],
+    ],
+  },
   'risk-of-rain-2': {
     links: [
       ['Каталог модов Thunderstore', 'https://thunderstore.io/c/riskofrain2/'],
@@ -2282,10 +2289,11 @@ const EDITORS = {
   'hollow-knight': ['customknight', 'benchwarp', 'palecourt', 'randomizer4', 'hkmp', 'qol'],
   'lethal-company': ['morecompany', 'shiploot', 'latecompany', 'moresuits', 'lethalthings', 'lategameupgrades'],
   // Nautilus — общая библиотека, на которой стоят почти все моды Subnautica.
-  subnautica: ['nautilus', 'subnauticamoddingnautilus', 'configurationmanager'],
+  subnautica: ['nautilus', 'subnauticamoddingnautilus', 'configurationmanager', 'configurationmanagerforbepinex', 'radialtabsbepinex', 'quickslotsplusbepinex', 'dextinction20newcreatures', 'odysseyvehicle', 'belugasubmarineatlasconcept'],
   'subnautica-below-zero': ['nautilus', 'subnauticamoddingnautilus', 'configurationmanager'],
   valheim: ['planteverything', 'equipmentandquickslots', 'extraslots', 'teleporteverything', 'multiuserchest', 'betterarchery'],
   'risk-of-rain-2': ['starstorm2', 'propersave', 'lookingglass', 'scrollablelobbyui', 'enforcer', 'vanillavoid'],
+  repo: ['morehead', 'moreupgrades', 'extractionpointconfirmbutton', 'wesleysenemies', 'deathheadhopper', 'moreshopitemsupdated'],
 };
 
 const HERO_SECONDS = 8;
@@ -2331,6 +2339,10 @@ function mostLiked(gameId) {
  */
 function modBadges(mod, gameId, { rank = -1 } = {}) {
   const out = [];
+  // «Устарел» (3.2): мод не обновлялся с перехода игры на новый загрузчик —
+  // у Subnautica это моды эпохи QModManager. Предупреждение важнее похвалы.
+  const legacy = entry(gameId)?.info?.legacyBefore;
+  if (legacy && mod.updatedAt && Date.parse(mod.updatedAt) < Date.parse(legacy)) return ['old'];
   const score = ratingOf(gameId, mod.id);
   if (isEditorsPick(gameId, mod)) out.push('pick');
   if ((score.count > 0 && score.avg >= 4.5) || (score.count === 0 && mostLiked(gameId) === mod.id)) out.push('best');
@@ -2339,7 +2351,7 @@ function modBadges(mod, gameId, { rank = -1 } = {}) {
   return out.slice(0, 2);
 }
 
-const BADGE_ICON = { pick: 'logo', best: 'trophy', hit: 'flame', new: 'sparkle' };
+const BADGE_ICON = { pick: 'logo', best: 'trophy', hit: 'flame', new: 'sparkle', old: 'warn' };
 
 function badgeRow(badges) {
   if (!badges.length) return '';
@@ -2347,7 +2359,8 @@ function badgeRow(badges) {
 }
 
 function badgeTag(kind) {
-  return `<span class="tagx tagx--${kind}">${icon(BADGE_ICON[kind])}<span>${esc(t('badge.' + kind))}</span></span>`;
+  const hint = kind === 'old' ? ` title="${esc(t('badge.old.hint'))}"` : '';
+  return `<span class="tagx tagx--${kind}"${hint}>${icon(BADGE_ICON[kind])}<span>${esc(t('badge.' + kind))}</span></span>`;
 }
 
 /** Значок игры: кружок с её артом и, если нужно, название. */

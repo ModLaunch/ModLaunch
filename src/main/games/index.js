@@ -26,6 +26,7 @@ const ADAPTERS = [
   require('./subnautica-below-zero'),
   require('./valheim'),
   require('./risk-of-rain-2'),
+  require('./repo'),
 ];
 
 const LOADERS = { smapi, bepinex, hkapi };
@@ -100,6 +101,7 @@ function describe(game) {
     loaderKind: game.loader.kind,
     catalogKind: game.catalog.kind,
     browseUrl: game.catalog.browseUrl ?? null,
+    legacyBefore: game.catalog.legacyBefore ?? null,
     steamAppId: game.steamAppId ?? null,
     hasSaves: typeof game.savesDir === 'function',
     sections: (game.sections ?? []).map((s) => s.id),

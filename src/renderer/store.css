@@ -1410,3 +1410,10 @@ button.getbtn:active {
     animation: none;
   }
 }
+/* «Устарел» (3.2): мод эпохи старого загрузчика — янтарное предупреждение. */
+.tagx--old {
+  color: #2a1d02;
+  background: linear-gradient(135deg, #ffd27a, #e0a33e);
+  border-color: rgba(255, 220, 150, 0.6);
+  cursor: help;
+}

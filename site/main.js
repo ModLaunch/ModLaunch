@@ -26,7 +26,7 @@ const EN = {
   'float.a2': 'together with BepInEx',
   'float.b1': 'Update ready',
   'float.b2': '3 mods · 1 click',
-  'games.title': 'Seven games — one launcher',
+  'games.title': 'Eight games — one launcher',
   'feat.title': 'Everything you need for mods',
   'feat.sub': 'No copying files by hand, no unpacking archives, no guessing why the game won’t start.',
   'feat.1t': 'One-click install',
