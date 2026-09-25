@@ -1,0 +1,45 @@
+# Настоящие обложки игр из Steam — в desktop/ModLaunch/Assets/art/ (запуск вручную).
+# Для каждой игры: cover (600×900, как в библиотеке Steam), hero (широкий фон
+# для Big Picture) и logo, если есть. Картинки ужимаются и коммитятся в ветку.
+name: art
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download Steam art
+        shell: bash
+        run: |
+          set -u
+          sudo apt-get install -y -qq webp >/dev/null 2>&1 || true
+          dir=desktop/ModLaunch/Assets/art
+          mkdir -p "$dir"
+          ids="413150 367520 1966720 264710 848450 892970 632360 3241660 3527290 450540 2881650 1229490 1557740 1366540 1030300 493520 794260"
+          get() { # $1 appid, $2 kind, $3 out
+            for base in "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/$1" "https://cdn.akamai.steamstatic.com/steam/apps/$1" "https://cdn.cloudflare.steamstatic.com/steam/apps/$1"; do
+              if curl -sfL -A "Mozilla/5.0" -o "$3" "$base/$2"; then echo "ok $1 $2"; return 0; fi
+            done
+            # Новые игры: ссылка с хэшем — берём из appdetails.
+            url=$(curl -sf "https://store.steampowered.com/api/appdetails?appids=$1&filters=basic" | python3 -c "import json,sys;d=json.load(sys.stdin)['$1']['data'];print(d.get('header_image',''))" 2>/dev/null)
+            if [ "$2" = "header.jpg" ] && [ -n "$url" ] && curl -sfL -o "$3" "$url"; then echo "ok $1 header(api)"; return 0; fi
+            echo "MISS $1 $2"; return 1
+          }
+          for id in $ids; do
+            get $id library_600x900.jpg /tmp/c.jpg && convert /tmp/c.jpg -resize 400x600^ -gravity center -extent 400x600 -quality 82 "$dir/$id-cover.jpg"
+            get $id library_hero.jpg /tmp/h.jpg && convert /tmp/h.jpg -resize 1600x -quality 78 "$dir/$id-hero.jpg"
+            get $id header.jpg /tmp/w.jpg && convert /tmp/w.jpg -quality 85 "$dir/$id-header.jpg"
+            get $id logo.png /tmp/l.png && convert /tmp/l.png -resize 640x\> "$dir/$id-logo.png"
+          done
+          ls -la "$dir"; du -sh "$dir"
+      - name: Commit
+        run: |
+          git config user.name "$(git log -1 --format=%an)"
+          git config user.email "$(git log -1 --format=%ae)"
+          git add desktop/ModLaunch/Assets/art
+          git diff --cached --quiet && exit 0
+          git commit -m "Обложки игр из Steam (cover, hero, header, logo)"
+          git push
