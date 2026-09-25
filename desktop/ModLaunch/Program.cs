@@ -12,6 +12,18 @@ public static class Program
     public static bool Screenshot { get; private set; }
     public static bool Demo { get; private set; }
 
+    public static ModLaunch.Setup.SetupMode SetupMode { get; private set; }
+
+    /// <summary>Из окна установки — «Запустить без установки»: открыть обычное окно в этом же процессе.</summary>
+    public static void StartMain(string[] args)
+    {
+        SetupMode = ModLaunch.Setup.SetupMode.None;
+        Features.Nxm.Claim(args);
+        var window = new MainWindow();
+        if (Avalonia.Application.Current?.ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop) desktop.MainWindow = window;
+        window.Show();
+    }
+
     /// <summary>Ссылка nxm://, с которой программу запустили.</summary>
     public static string? StartupLink { get; private set; }
 
@@ -21,6 +33,14 @@ public static class Program
         if (args.Contains("--selfcheck")) return SelfCheck.Run().GetAwaiter().GetResult();
         var shot = Array.IndexOf(args, "--screenshot");
         if (shot >= 0 && shot + 1 < args.Length) return Screenshots(args[shot + 1]);
+
+        // Установка, обновление, удаление — та же программа в другом режиме.
+        SetupMode = ModLaunch.Setup.Installer.Detect(args);
+        if (SetupMode != ModLaunch.Setup.SetupMode.None)
+        {
+            BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+            return 0;
+        }
 
         // Один экземпляр: второй запуск (в том числе по ссылке nxm://) передаёт ссылку первому.
         if (!Features.Nxm.Claim(args)) return 0;
@@ -100,6 +120,34 @@ public static class Program
         Save("7c-graphics");
         window.Navigate(() => new SettingsPage("backups"));
         Save("7d-backups");
+        window.Navigate(() => new ModPage("subnautica", Core.Demo.Many(Games.GameCatalog.ById("subnautica")!, ["2800"])[0]));
+        Save("9a-mod");
+        window.Navigate(() => new FriendsPage());
+        Save("9b-friends");
+        window.Navigate(() => new SettingsPage("accounts"));
+        Save("9c-account");
+        Settings.Data["ownerStats"] = true;
+        window.Navigate(() => new StatsPage());
+        Save("9d-stats");
+        window.Navigate(() => new SettingsPage("about"));
+        Save("9e-about");
+
+        var setup = new SetupWindow(ModLaunch.Setup.SetupMode.Install);
+        setup.Show();
+        Pump();
+        setup.CaptureRenderedFrame()?.Save(Path.Combine(outDir, "9f-setup.png"));
+        Console.WriteLine("saved 9f-setup");
+        setup.Close();
+
+        OverlayWindow.GameId = "subnautica";
+        OverlayWindow.StartedAt = DateTime.UtcNow.AddMinutes(-42);
+        var overlay = new OverlayWindow { Width = 1366, Height = 800 };
+        OverlayWindow.Toggle();
+        Pump();
+        overlay.CaptureRenderedFrame()?.Save(Path.Combine(outDir, "9g-overlay.png"));
+        Console.WriteLine("saved 9g-overlay");
+        overlay.Hide();
+
         I18n.Set("en");
         window.Navigate(() => new HomePage());
         Save("8-home-en");

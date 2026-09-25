@@ -155,6 +155,22 @@ public static partial class Nexus
         return (mod, PickMainFile(data.Arr("modFiles")), reqs);
     }
 
+    /// <summary>То же, что Details, плюс описание мода (BBCode) — для страницы мода.</summary>
+    public static async Task<(ModInfo? Mod, NexusFile? MainFile, List<(string Id, string Name)> Requirements, string Description)> DetailsFull(string domain, int gameId, string modId, CancellationToken ct = default)
+    {
+        if (!long.TryParse(modId, out var mid)) return (null, null, [], "");
+        var data = await GraphQl($@"query {{
+            mod(modId: {mid}, gameId: {gameId}) {{ {ModFields} description modRequirements {{ nexusRequirements {{ nodes {{ modId modName gameId }} }} }} }}
+            modFiles(modId: {mid}, gameId: {gameId}) {{ fileId name version category primary sizeInBytes date uri }}
+        }}", ct: ct);
+        var mod = FromNode(data["mod"], domain);
+        var reqs = data["mod"]?["modRequirements"]?["nexusRequirements"].Arr("nodes")
+            .Where(r => r.Long("modId") > 0 && (r.Long("gameId") == 0 || r.Long("gameId") == gameId))
+            .Select(r => (r.Long("modId").ToString(), Plain(r.Str("modName"))))
+            .ToList() ?? [];
+        return (mod, PickMainFile(data.Arr("modFiles")), reqs, data["mod"].Str("description") ?? "");
+    }
+
     static NexusFile? PickMainFile(JsonArray files)
     {
         var usable = files.Where(f => f is not null && f.Str("category") is not ("OLD_VERSION" or "ARCHIVED" or "DELETED")).ToList();

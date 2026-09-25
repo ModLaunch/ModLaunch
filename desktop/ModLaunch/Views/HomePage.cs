@@ -51,7 +51,57 @@ public sealed class HomePage : Page
 
         content.Children.Add(Hero());
 
+        var favorites = Favorites.All().Where(f => AppState.Game(f.GameId).Status == Detect.Found).Take(20).ToList();
+        if (favorites.Count > 0) content.Children.Add(Shelf(I18n.T("home.favorites"), I18n.T("home.favorites.text"), favorites));
+
+        var first = AppState.Games.FirstOrDefault(g => g.Status == Detect.Found && g.LoaderInstalled) ?? AppState.Games.FirstOrDefault(g => g.Status == Detect.Found);
+        if (first is not null)
+        {
+            if (_popularFor != first.Def.Id) { _popularFor = first.Def.Id; _popular = null; _ = LoadPopular(first); }
+            if (_popular is { Count: > 0 }) content.Children.Add(Shelf(I18n.T("home.popular", ("game", first.Def.Name)), null, _popular.Select(m => (first.Def.Id, m)).ToList()));
+        }
+
         Content = new ScrollViewer { Content = content, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+    }
+
+    string? _popularFor;
+    List<Sources.ModInfo>? _popular;
+
+    async Task LoadPopular(GameState g)
+    {
+        try
+        {
+            var page = Program.Demo ? Demo.Catalog(g.Def, new Sources.Query()) : await Sources.Catalog.Browse(g.Def, new Sources.Query());
+            _popular = page.Mods.Take(12).ToList();
+        }
+        catch { _popular = []; }
+        Build();
+    }
+
+    /// <summary>Полка модов: карточки в ряд с прокруткой.</summary>
+    static Control Shelf(string title, string? hint, List<(string GameId, Sources.ModInfo Mod)> mods)
+    {
+        var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
+        foreach (var (gameId, mod) in mods)
+        {
+            var card = new Button
+            {
+                Classes = { "tile" },
+                Width = 180,
+                Content = Ui.Col(8,
+                    Ui.Thumb(mod.Icon, mod.Name, 156, 12, 320),
+                    Ui.Text(mod.Name, "h3"),
+                    Ui.Text(mod.Author == "" ? AppState.Game(gameId).Def.ShortName : mod.Author, "small muted")),
+                Padding = new Thickness(12),
+            };
+            var id = gameId;
+            var m = mod;
+            card.Click += (_, _) => MainWindow.Current?.Navigate(() => new ModPage(id, m));
+            row.Children.Add(card);
+        }
+        var head = Ui.Col(2, Ui.Text(title, "h2"));
+        if (hint is not null) head.Children.Add(Ui.Text(hint, "small muted"));
+        return Ui.Col(12, head, new ScrollViewer { Content = row, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled });
     }
 
     static string StatusText(GameState g) => g.Status switch

@@ -286,7 +286,7 @@ public sealed partial class GamePage : Page
 
         var picks = _g.Def.Picks.ToHashSet();
         foreach (var mod in _mods)
-            _listHost.Children.Add(ModRow.Build(_g.Def, mod, IsInstalled(mod), IsInstalling(mod), picks.Contains(mod.Id), () => _ = Actions.Install(_g, mod)));
+            _listHost.Children.Add(ModRow.Build(_g.Def, mod, IsInstalled(mod), IsInstalling(mod), picks.Contains(mod.Id), () => _ = Actions.Install(_g, mod), () => MainWindow.Current?.Navigate(() => new ModPage(_g.Def.Id, mod))));
 
         if (_hasMore)
         {
@@ -354,7 +354,7 @@ public sealed partial class GamePage : Page
         var byId = _picks.ToDictionary(m => m.Id, StringComparer.OrdinalIgnoreCase);
         foreach (var id in _g.Def.Picks)
             if (byId.TryGetValue(id, out var mod))
-                _listHost!.Children.Add(ModRow.Build(_g.Def, mod, IsInstalled(mod), IsInstalling(mod), true, () => _ = Actions.Install(_g, mod)));
+                _listHost!.Children.Add(ModRow.Build(_g.Def, mod, IsInstalled(mod), IsInstalling(mod), true, () => _ = Actions.Install(_g, mod), () => MainWindow.Current?.Navigate(() => new ModPage(_g.Def.Id, mod))));
         if (_listHost!.Children.Count == 0)
             _listHost.Children.Add(Ui.Card(Ui.Text(_error ?? I18n.T("catalog.error"), "muted", wrap: true), 22));
     }

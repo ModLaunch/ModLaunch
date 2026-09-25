@@ -34,7 +34,9 @@ public sealed class MainWindow : Window
     readonly StackPanel _railGames = new() { Spacing = 10, HorizontalAlignment = HorizontalAlignment.Center };
     readonly TextBlock _title = new() { FontWeight = FontWeight.SemiBold, VerticalAlignment = VerticalAlignment.Center, FontSize = 14 };
     readonly TextBox _search = new() { Width = 320, Height = 40 };
-    readonly Button _back, _forward, _downloads, _homeButton, _settingsButton;
+    readonly Button _back, _forward, _downloads, _homeButton, _settingsButton, _friendsButton, _statsButton, _donateButton;
+    readonly Button _updatePill = new() { Classes = { "chip" }, IsVisible = false, VerticalAlignment = VerticalAlignment.Center };
+    readonly Border _friendsBadge = new() { IsVisible = false };
     readonly Panel _overlay = new() { IsVisible = false };
     readonly StackPanel _toasts = new() { Spacing = 8, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 24, 24) };
     readonly Border _downloadsPanel;
@@ -63,6 +65,16 @@ public sealed class MainWindow : Window
         _forward = Ui.Button("", GoForward, "icon ghost", Icons.Forward, I18n.T("nav.forward"));
         _homeButton = RailIcon(Icons.Home, () => Navigate(() => new HomePage()), I18n.T("nav.menu"));
         _settingsButton = RailIcon(Icons.Settings, () => Navigate(() => new SettingsPage()), I18n.T("nav.settings"));
+        _friendsButton = RailIcon(Icons.Users, () => Navigate(() => new FriendsPage()), I18n.T("friends.title"));
+        _statsButton = RailIcon(Icons.Chart, () => Navigate(() => new StatsPage()), I18n.T("stats.title"));
+        _donateButton = RailIcon(Icons.Coffee, () => Navigate(() => new DonatePage()), I18n.T("nav.donate"));
+        _friendsBadge.Width = 10; _friendsBadge.Height = 10; _friendsBadge.CornerRadius = new CornerRadius(5);
+        _friendsBadge.Background = Ui.Res("Good"); _friendsBadge.HorizontalAlignment = HorizontalAlignment.Right; _friendsBadge.VerticalAlignment = VerticalAlignment.Top;
+        _friendsBadge.Margin = new Thickness(0, 6, 6, 0);
+        var friendsIcon = (Control)_friendsButton.Content!;
+        _friendsButton.Content = null;
+        _friendsButton.Content = new Panel { Children = { friendsIcon, _friendsBadge } };
+        _updatePill.Click += (_, _) => ShowUpdate();
 
         _downloads = new Button
         {
@@ -126,7 +138,7 @@ public sealed class MainWindow : Window
         top.Margin = new Thickness(0, 14, 0, 10);
         top.HorizontalAlignment = HorizontalAlignment.Center;
         DockPanel.SetDock(top, Dock.Top);
-        var bottom = Ui.Col(10, _settingsButton);
+        var bottom = Ui.Col(10, _friendsButton, _statsButton, _donateButton, _settingsButton);
         bottom.Margin = new Thickness(0, 10, 0, 16);
         bottom.HorizontalAlignment = HorizontalAlignment.Center;
         DockPanel.SetDock(bottom, Dock.Bottom);
@@ -168,7 +180,7 @@ public sealed class MainWindow : Window
         _search.VerticalAlignment = VerticalAlignment.Center;
         Grid.SetColumn(_search, 2);
         topbar.Children.Add(_search);
-        var dlWrap = new Border { Child = _downloads, Margin = new Thickness(12, 0, 16, 0), VerticalAlignment = VerticalAlignment.Center };
+        var dlWrap = new Border { Child = Ui.Row(10, _updatePill, _downloads), Margin = new Thickness(12, 0, 16, 0), VerticalAlignment = VerticalAlignment.Center };
         Grid.SetColumn(dlWrap, 3);
         topbar.Children.Add(dlWrap);
         winButtons.VerticalAlignment = VerticalAlignment.Center;
@@ -261,6 +273,15 @@ public sealed class MainWindow : Window
         }
         _homeButton.Classes.Set("active", _current is HomePage);
         _settingsButton.Classes.Set("active", _current is SettingsPage);
+        _friendsButton.Classes.Set("active", _current is FriendsPage);
+        _statsButton.Classes.Set("active", _current is StatsPage);
+        _donateButton.Classes.Set("active", _current is DonatePage);
+        _statsButton.IsVisible = Settings.Data.Bool("ownerStats");
+        var view = Social.Friends.View();
+        _friendsBadge.IsVisible = view.Incoming.Count > 0 || view.Friends.Any(f => f.State != "offline");
+        _friendsBadge.Background = view.Incoming.Count > 0 ? Ui.Res("Warn") : Ui.Res("Good");
+        _updatePill.IsVisible = Setup.Updater.Available;
+        if (Setup.Updater.Latest is { } latest) _updatePill.Content = Ui.Row(6, Ui.Icon(Icons.Sparkles, 14), new TextBlock { Text = I18n.T("upd.app.pill", ("version", latest.Version)), VerticalAlignment = VerticalAlignment.Center });
     }
 
     // ---------------------------------------------------------------- навигация
@@ -301,6 +322,34 @@ public sealed class MainWindow : Window
 
     async Task StartUp()
     {
+        Setup.Updater.Changed += () => Dispatcher.UIThread.Post(RenderRail);
+        Social.Account.Changed += () => Dispatcher.UIThread.Post(() => { RenderRail(); _current?.Build(); });
+        _ = Task.Run(async () =>
+        {
+            try { await Setup.Updater.Check(); } catch { }
+            try { await Social.Reviews.Sync(); } catch { }
+            if (Social.Account.SignedIn)
+            {
+                try { await Social.Account.RefreshProfile(); } catch { }
+                try { await Social.Friends.BeatNow(); await Social.Friends.Refresh(); } catch { }
+                Dispatcher.UIThread.Post(RenderRail);
+            }
+        });
+        // «В сети» для друзей — отметка раз в пять минут, пока программа открыта.
+        DispatcherTimer.Run(() =>
+        {
+            if (Social.Account.SignedIn) _ = Task.Run(async () =>
+            {
+                try { await Social.Friends.BeatNow(); await Social.Friends.Refresh(); } catch { }
+                Dispatcher.UIThread.Post(RenderRail);
+            });
+            return true;
+        }, TimeSpan.FromMinutes(5));
+        Closing += (_, _) =>
+        {
+            Features.Hotkey.Disarm();
+            try { Social.Friends.GoOffline().Wait(1500); } catch { }
+        };
         await AppState.DetectAll();
         if (Program.StartupLink is string link) Actions.InstallNxm(link);
         if (Features.ModUpdates.OnStart)
@@ -315,6 +364,8 @@ public sealed class MainWindow : Window
 
     void OnGameExit(string gameId, bool counted, long ms)
     {
+        OverlayWindow.OnGameExited();
+        Social.Friends.SetActivity("online");
         var game = AppState.Game(gameId);
         if (Settings.Data.Str("afterLaunch") == "minimize" && Settings.Data.Bool("restoreAfterGame", true) && WindowState == WindowState.Minimized)
             WindowState = WindowState.Normal;
@@ -328,6 +379,37 @@ public sealed class MainWindow : Window
         if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
         Activate();
         if (line.StartsWith("nxm://", StringComparison.OrdinalIgnoreCase)) Actions.InstallNxm(line);
+    }
+
+    /// <summary>Окно «Вышел ModLaunch X»: что нового и кнопка обновления.</summary>
+    public void ShowUpdate()
+    {
+        if (Setup.Updater.Latest is not { } latest) return;
+        var notes = new SelectableTextBlock { Text = latest.Notes, TextWrapping = TextWrapping.Wrap, Foreground = Ui.Res("Muted") };
+        var body = Ui.Col(10, Ui.Text(I18n.T("upd.app.now", ("version", Http.Version)), "small muted"), new ScrollViewer { Content = notes, MaxHeight = 300 });
+        var actions = new List<Control> { Ui.Button(I18n.T("upd.app.later"), CloseDialog) };
+        if (latest.Page is string page) actions.Add(Ui.Button(I18n.T("upd.app.page"), () => Ui.OpenUrl(page), "", Icons.External));
+        if (Setup.Updater.CanInstall)
+        {
+            var bar = new ProgressBar { Minimum = 0, Maximum = 1, IsVisible = false };
+            body.Children.Add(bar);
+            Button? go = null;
+            go = Ui.Button(I18n.T("upd.app.install"), async () =>
+            {
+                go!.IsEnabled = false;
+                go.Content = I18n.T("upd.app.installing");
+                bar.IsVisible = true;
+                try
+                {
+                    await Setup.Updater.Fetch(new Progress<double>(r => bar.Value = r));
+                    Setup.Updater.Launch();
+                    Close();
+                }
+                catch (Exception e) { Toast(Jobs.Explain(e), bad: true); CloseDialog(); }
+            }, "primary", Icons.Download);
+            actions.Add(go);
+        }
+        Dialog(I18n.T("upd.app.title", ("version", latest.Version)), body, actions.ToArray());
     }
 
     // ---------------------------------------------------------------- загрузки и уведомления

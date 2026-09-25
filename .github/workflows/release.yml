@@ -1,5 +1,10 @@
-# Выпуск: установщик и портативная версия — на страницу «Релизы» GitHub.
+# Выпуск ModLaunch 4 (Avalonia): установщик и портативная версия — на страницу «Релизы» GitHub.
 # Запуск: вкладка Actions → release → Run workflow, или тег vX.Y.Z.
+#
+# ModLaunch-Setup-<версия>.exe — та же программа: по слову «Setup» в имени файла
+# она открывает окно установки, а с ключом --update тихо обновляет установленную
+# копию (так её запускает автообновление, и 3.x на Electron тоже).
+# ModLaunch-<версия>-win-x64.zip — ModLaunch.exe без установки.
 name: release
 on:
   workflow_dispatch:
@@ -13,14 +18,31 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-dotnet@v4
         with:
-          node-version: 22
-      - run: npm ci
+          dotnet-version: '8.0.x'
       - id: v
-        shell: bash
-        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
-      - run: node build/build.js
+        shell: pwsh
+        run: |
+          $v = ([xml](Get-Content desktop/ModLaunch/ModLaunch.csproj)).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
+          "version=$v" >> $env:GITHUB_OUTPUT
+      - name: Publish
+        working-directory: desktop/ModLaunch
+        run: dotnet publish -c Release -r win-x64 -o ../../out
+      - name: Self-check before release
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath out/ModLaunch.exe -ArgumentList '--selfcheck' -PassThru -Wait -NoNewWindow -RedirectStandardOutput selfcheck.txt
+          Get-Content selfcheck.txt
+          if ($p.ExitCode -ne 0) { throw "self-check failed" }
+      - name: Package
+        shell: pwsh
+        run: |
+          $v = '${{ steps.v.outputs.version }}'
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item out/ModLaunch.exe "dist/ModLaunch-Setup-$v.exe"
+          Compress-Archive -Path out/ModLaunch.exe -DestinationPath "dist/ModLaunch-$v-win-x64.zip" -Force
+          Get-ChildItem dist
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.v.outputs.version }}

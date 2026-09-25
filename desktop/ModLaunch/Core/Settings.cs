@@ -21,7 +21,8 @@ public static class Settings
         set { Data["language"] = value; Save(); }
     }
 
-    public static string? GamePath(string gameId) => Data.Obj("gamePaths").Str(gameId);
+    /// <summary>Путь к игре: указанный человеком, иначе найденный сами (в 3.x — поле detected).</summary>
+    public static string? GamePath(string gameId) => Data.Obj("gamePaths").Str(gameId) ?? (Data["detected"] as System.Text.Json.Nodes.JsonObject).Str(gameId);
 
     public static void SetGamePath(string gameId, string? path)
     {

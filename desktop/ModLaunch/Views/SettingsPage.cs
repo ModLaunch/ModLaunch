@@ -15,6 +15,10 @@ public sealed class SettingsPage : Page
     string _tab;
     string? _keyStatus;
     ExeInfo? _dxvkPicked;
+    string _accMode = "signin";
+    bool _accBusy;
+    int _versionClicks;
+    DateTime _versionAt;
     string? _dxvkApi;
 
     public SettingsPage(string tab = "look") => _tab = tab;
@@ -162,6 +166,30 @@ public sealed class SettingsPage : Page
             rows.Add(Toggle(I18n.T("launch.restore"), I18n.T("launch.restore.hint"), Settings.Data.Bool("restoreAfterGame", true), v => Settings.Data["restoreAfterGame"] = v));
         rows.Add(Toggle(I18n.T("launch.track"), I18n.T("launch.track.hint"), PlayTime.Track, v => Settings.Data["trackPlaytime"] = v));
         col.Children.Add(Section(I18n.T("settings.tab.launch"), null, rows.ToArray()));
+
+        // Оверлей в игре.
+        var key = new ComboBox { Width = 200 };
+        foreach (var k in Hotkey.Keys) key.Items.Add(Hotkey.Display(k));
+        key.SelectedIndex = Array.IndexOf(Hotkey.Keys, Hotkey.KeyOf(Settings.Data.Str("overlayKey")));
+        key.SelectionChanged += (_, _) => { if (key.SelectedIndex >= 0) { Settings.Data["overlayKey"] = Hotkey.Keys[key.SelectedIndex]; Settings.Save(); } };
+        var keyRow = new DockPanel();
+        DockPanel.SetDock(key, Dock.Right);
+        keyRow.Children.Add(key);
+        keyRow.Children.Add(Ui.Col(3, Ui.Text(I18n.T("ov.key"), "h3"), Ui.Text(I18n.T("ov.key.hint"), "small muted")));
+        var preview = new DockPanel();
+        var go = Ui.Button(I18n.T("ov.preview.go"), () =>
+        {
+            OverlayWindow.GameId = AppState.Games.FirstOrDefault(g => g.Status == Detect.Found)?.Def.Id;
+            OverlayWindow.StartedAt ??= DateTime.UtcNow;
+            OverlayWindow.Preview = true;
+            OverlayWindow.Toggle();
+        }, "", Icons.Play);
+        DockPanel.SetDock(go, Dock.Right);
+        preview.Children.Add(go);
+        preview.Children.Add(Ui.Col(3, Ui.Text(I18n.T("ov.preview"), "h3"), Ui.Text(I18n.T("ov.preview.hint"), "small muted")));
+        col.Children.Add(Section(I18n.T("ov.title"), null,
+            Toggle(I18n.T("ov.on"), I18n.T("ov.on.hint"), Settings.Data.Bool("overlay", true), v => Settings.Data["overlay"] = v),
+            keyRow, preview));
 
         // Параметры запуска по играм.
         var found = AppState.Games.Where(g => g.Status == Detect.Found).ToList();
@@ -431,16 +459,179 @@ public sealed class SettingsPage : Page
         nxm.Children.Add(Ui.Col(3, Ui.Text(I18n.T("settings.nxm"), "h3"),
             Ui.Text(registered ? I18n.T("settings.nxm.yes") : I18n.T("settings.nxm.no"), "small", color: registered ? Ui.Res("Good") : Ui.Res("Muted"))));
         rows.Add(nxm);
-        return Section(I18n.T("settings.nexus"), I18n.T("settings.nexus.hint"), rows.ToArray());
+        return Ui.Col(16, AccountSection(), Section(I18n.T("settings.nexus"), I18n.T("settings.nexus.hint"), rows.ToArray()));
     }
 
-    static Control AboutTab()
+    // ---------------------------------------------------------------- аккаунт ModLaunch
+
+    Control AccountSection()
+    {
+        var p = Social.Account.Get();
+        if (!p.Configured) return Section(I18n.T("acc.title"), I18n.T("acc.off"));
+        return p.SignedIn ? SignedIn(p) : SignForm();
+    }
+
+    async void AccountCall(Func<Task> action, string? ok = null)
+    {
+        _accBusy = true;
+        Build();
+        try
+        {
+            await action();
+            if (ok is not null) MainWindow.Current?.Toast(ok);
+        }
+        catch (Exception e) { MainWindow.Current?.Toast(Social.Account.Explain(e), bad: true); }
+        _accBusy = false;
+        Build();
+    }
+
+    Control SignForm()
+    {
+        var tabs = Ui.Row(6);
+        foreach (var (id, key) in new[] { ("signin", "acc.tab.signin"), ("signup", "acc.tab.signup") })
+        {
+            var b = Ui.Button(I18n.T(key), () => { _accMode = id; Build(); }, "chip");
+            if (_accMode == id) b.Classes.Add("active");
+            tabs.Children.Add(b);
+        }
+        var name = new TextBox { Watermark = I18n.T("acc.name"), MaxLength = 32 };
+        var email = new TextBox { Watermark = I18n.T("acc.email") };
+        var password = new TextBox { Watermark = I18n.T("acc.password"), PasswordChar = '•', MaxLength = 128 };
+        var strength = Ui.Text(I18n.T("acc.pass.0"), "small muted");
+        password.TextChanged += (_, _) =>
+        {
+            var t = password.Text ?? "";
+            var score = t.Length < Social.Account.MinPassword ? 0 : (t.Length >= 12 ? 1 : 0) + (t.Any(char.IsDigit) && t.Any(char.IsLetter) ? 1 : 0) + (t.Any(c => !char.IsLetterOrDigit(c)) ? 1 : 0);
+            strength.Text = I18n.T($"acc.pass.{Math.Clamp(score, 0, 3)}");
+        };
+
+        var col = Ui.Col(12);
+        if (_accMode == "reset")
+        {
+            col.Children.Add(Ui.Text(I18n.T("acc.reset.title"), "h2"));
+            col.Children.Add(Ui.Text(I18n.T("acc.reset.lead"), "muted", wrap: true));
+            col.Children.Add(email);
+            col.Children.Add(Ui.Row(10,
+                Ui.Button(_accBusy ? I18n.T("acc.reset.busy") : I18n.T("acc.reset.go"), () => AccountCall(() => Social.Account.ResetPassword(email.Text), I18n.T("acc.reset.sent", ("email", email.Text ?? ""))), "primary"),
+                Ui.Button(I18n.T("acc.backToSignin"), () => { _accMode = "signin"; Build(); }, "ghost")));
+            return Ui.Card(col, 24);
+        }
+        col.Children.Add(Ui.Text(I18n.T("acc.out.title"), "h2"));
+        col.Children.Add(Ui.Col(4, Ui.Text("✓ " + I18n.T("acc.perk.1"), "small muted"), Ui.Text("✓ " + I18n.T("acc.perk.2"), "small muted"), Ui.Text("✓ " + I18n.T("acc.perk.3"), "small muted")));
+        col.Children.Add(tabs);
+        if (_accMode == "signup") col.Children.Add(Ui.Col(4, name, Ui.Text(I18n.T("acc.name.hint"), "small muted")));
+        col.Children.Add(email);
+        col.Children.Add(password);
+        if (_accMode == "signup") col.Children.Add(strength);
+        var go = _accMode == "signup"
+            ? Ui.Button(_accBusy ? I18n.T("acc.signup.busy") : I18n.T("acc.signup.go"), () => AccountCall(async () =>
+              {
+                  var p = await Social.Account.SignUp(name.Text ?? "", email.Text ?? "", password.Text ?? "");
+                  MainWindow.Current?.Toast(I18n.T("acc.welcomeNew", ("name", p.Name ?? "")));
+              }), "primary", Icons.User)
+            : Ui.Button(_accBusy ? I18n.T("acc.signin.busy") : I18n.T("acc.signin.go"), () => AccountCall(async () =>
+              {
+                  var p = await Social.Account.SignIn(email.Text ?? "", password.Text ?? "");
+                  MainWindow.Current?.Toast(I18n.T("acc.welcome", ("name", p.Name ?? "")));
+              }), "primary", Icons.Key);
+        go.IsEnabled = !_accBusy;
+        var buttons = Ui.Row(10, go);
+        if (_accMode == "signin") buttons.Children.Add(Ui.Button(I18n.T("acc.forgot"), () => { _accMode = "reset"; Build(); }, "ghost"));
+        col.Children.Add(buttons);
+        col.Children.Add(Ui.Text(I18n.T("acc.note"), "small muted", wrap: true));
+        return Ui.Card(col, 24);
+    }
+
+    Control SignedIn(Social.Profile p)
+    {
+        var col = Ui.Col(14);
+        var who = Ui.Row(12,
+            new Border { Width = 48, Height = 48, CornerRadius = new CornerRadius(24), Background = Ui.Res("BrandSoft"), Child = new TextBlock { Text = (p.Name ?? "?")[..1].ToUpperInvariant(), FontSize = 22, FontWeight = FontWeight.Bold, Foreground = Ui.Res("Brand2"), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center } },
+            Ui.Col(3, Ui.Text(p.Name ?? "", "h2"), Ui.Text(p.Email ?? "", "small muted"),
+                Ui.Text(p.Verified ? "✓ " + I18n.T("acc.verified") : I18n.T("acc.unverified"), "small", color: p.Verified ? Ui.Res("Good") : Ui.Res("Warn"))));
+        col.Children.Add(Ui.Text(I18n.T("acc.title"), "h2"));
+        col.Children.Add(who);
+        if (p.Admin) col.Children.Add(Ui.Col(3, Ui.Text("👑 " + I18n.T("acc.admin.title"), "h3"), Ui.Text(I18n.T("acc.admin.text"), "small muted", wrap: true)));
+        else if (p.AdminPending) col.Children.Add(Ui.Text(I18n.T("acc.admin.pending"), "small muted", wrap: true));
+        if (!p.Verified)
+        {
+            col.Children.Add(Ui.Text(I18n.T("acc.verify.text", ("email", p.Email ?? "")), "small muted", wrap: true));
+            col.Children.Add(Ui.Row(8,
+                Ui.Button(I18n.T("acc.verify.again"), () => AccountCall(Social.Account.SendVerification, I18n.T("acc.verify.sent", ("email", p.Email ?? "")))),
+                Ui.Button(I18n.T("acc.verify.check"), () => AccountCall(async () =>
+                {
+                    var fresh = await Social.Account.RefreshProfile();
+                    MainWindow.Current?.Toast(fresh.Verified ? I18n.T("acc.verify.done") : I18n.T("acc.verify.notYet"), bad: !fresh.Verified);
+                }), "primary")));
+        }
+        var rename = new TextBox { Text = p.Name, MaxLength = 32, Width = 260 };
+        col.Children.Add(Ui.Col(6, Ui.Text(I18n.T("acc.rename"), "h3"), Ui.Text(I18n.T("acc.rename.hint"), "small muted"),
+            Ui.Row(8, rename, Ui.Button(I18n.T("common.save"), () => AccountCall(() => Social.Account.Rename(rename.Text ?? ""), I18n.T("acc.renamed"))))));
+        col.Children.Add(Ui.Col(6, Ui.Text(I18n.T("acc.password.change"), "h3"), Ui.Text(I18n.T("acc.password.hint", ("email", p.Email ?? "")), "small muted"),
+            Ui.Button(I18n.T("acc.password.send"), () => AccountCall(() => Social.Account.ResetPassword(p.Email), I18n.T("acc.password.sent", ("email", p.Email ?? ""))))));
+        col.Children.Add(Ui.Row(10,
+            Ui.Button(I18n.T("acc.signout"), () => { Social.Account.SignOut(); MainWindow.Current?.Toast(I18n.T("acc.signedOut")); Build(); }, "", Icons.Close),
+            Ui.Button(I18n.T("acc.delete.title"), DeleteAccount, "ghost", Icons.Trash)));
+        col.Children.Add(Ui.Text(p.Since is DateTime since ? I18n.T("acc.delete.hint", ("since", since.ToString("d"))) : I18n.T("acc.delete.hintPlain"), "small muted"));
+        return Ui.Card(col, 24);
+    }
+
+    void DeleteAccount()
+    {
+        var w = MainWindow.Current!;
+        var password = new TextBox { Watermark = I18n.T("acc.password"), PasswordChar = '•' };
+        w.Dialog(I18n.T("acc.delete.title"), Ui.Col(10, Ui.Text(I18n.T("acc.delete.text"), "muted", wrap: true), password),
+            Ui.Button(I18n.T("common.cancel"), w.CloseDialog),
+            Ui.Button(I18n.T("acc.delete.go"), () =>
+            {
+                var pass = password.Text ?? "";
+                w.CloseDialog();
+                AccountCall(async () =>
+                {
+                    try { await Social.Friends.Forget(); } catch { }
+                    await Social.Account.Delete(pass);
+                }, I18n.T("acc.deleted"));
+            }, "primary", Icons.Trash));
+    }
+
+    Control AboutTab()
     {
         var logo = new Image { Source = Images.Asset("icon.png", 128), Width = 64, Height = 64 };
-        var name = Ui.Col(4, Ui.Text("ModLaunch", "h2"), Ui.Text($"{Http.Version} · Avalonia UI · .NET {Environment.Version.ToString(2)}", "muted small"));
+        var version = new Button { Classes = { "ghost" }, Padding = new Thickness(0), Content = Ui.Text($"{I18n.T("upd.app.version", ("version", Http.Version))} · Avalonia UI · .NET {Environment.Version.ToString(2)}", "muted small") };
+        version.Click += (_, _) =>
+        {
+            // Пять щелчков по версии — включить или спрятать «Статистику» (для владельца), как в 3.x.
+            if (DateTime.UtcNow - _versionAt > TimeSpan.FromSeconds(1.5)) _versionClicks = 0;
+            _versionAt = DateTime.UtcNow;
+            if (++_versionClicks < 5) return;
+            _versionClicks = 0;
+            var on = !Settings.Data.Bool("ownerStats");
+            Settings.Data["ownerStats"] = on;
+            Settings.Save();
+            MainWindow.Current?.Toast(I18n.T(on ? "stats.enabled" : "stats.disabled"));
+            AppState.Notify();
+        };
+        var name = Ui.Col(4, Ui.Text("ModLaunch", "h2"), version);
         name.VerticalAlignment = VerticalAlignment.Center;
+
+        var latest = Setup.Updater.Latest;
+        var status = !Setup.Updater.Configured ? I18n.T("upd.app.off")
+            : latest is null ? I18n.T("upd.never")
+            : Setup.Updater.Available ? I18n.T("upd.app.available", ("version", latest.Version))
+            : I18n.T("upd.app.latest", ("version", Http.Version));
+        var updates = Ui.Col(10, Ui.Text(status, "h3"), Ui.Text(I18n.T("upd.app.hint"), "small muted", wrap: true),
+            Ui.Row(10,
+                Ui.Button(I18n.T("upd.check"), async () =>
+                {
+                    try { await Setup.Updater.Check(); } catch (Exception e) { MainWindow.Current?.Toast(Jobs.Explain(e), bad: true); }
+                    Build();
+                }, "", Icons.Refresh),
+                Setup.Updater.Available ? Ui.Button(I18n.T("upd.app.open"), () => MainWindow.Current?.ShowUpdate(), "primary", Icons.Sparkles) : new Panel()),
+            Toggle(I18n.T("upd.app.auto"), I18n.T("upd.app.auto.hint"), Setup.Updater.AutoDownload, v => Settings.Data["autoDownloadUpdates"] = v));
+
         return Section(I18n.T("settings.tab.about"), null,
             Ui.Row(16, logo, name),
+            updates,
             Ui.Row(10,
                 Ui.Button("GitHub", () => Ui.OpenUrl("https://github.com/ModLaunch/ModLaunch"), "", Icons.External),
                 Ui.Button(I18n.T("games.openFolder"), () => Actions.OpenFolder(Paths.DataDir), "", Icons.Folder)));

@@ -11,7 +11,7 @@ namespace ModLaunch.Views;
 /// <summary>Строка мода в каталоге: картинка, название, описание, цифры и кнопка.</summary>
 public static class ModRow
 {
-    public static Control Build(GameDef game, ModInfo mod, bool installed, bool installing, bool pick, Action install)
+    public static Control Build(GameDef game, ModInfo mod, bool installed, bool installing, bool pick, Action install, Action? open = null)
     {
         var name = new TextBlock
         {
@@ -45,6 +45,7 @@ public static class ModRow
         action.HorizontalAlignment = HorizontalAlignment.Right;
 
         var stats = Ui.Col(4, action);
+        if (Social.Reviews.Stats().GetValueOrDefault($"{game.Id}|{mod.Id}") is { } rating) stats.Children.Add(Stat(Icons.Star, $"{rating.Avg:0.0} ({rating.Count})"));
         if (mod.Downloads > 0) stats.Children.Add(Stat(Icons.Download, I18n.Compact(mod.Downloads)));
         if (mod.UpdatedAt is not null) stats.Children.Add(Stat(Icons.Refresh, Ui.Ago(mod.UpdatedAt)));
         stats.VerticalAlignment = VerticalAlignment.Center;
@@ -62,7 +63,8 @@ public static class ModRow
         card.PointerPressed += (s, e) =>
         {
             if (e.Source is Visual v && Avalonia.VisualTree.VisualExtensions.FindAncestorOfType<Button>(v, true) is not null) return;
-            if (mod.Url is not null) Ui.OpenUrl(mod.Url);
+            if (open is not null) open();
+            else if (mod.Url is not null) Ui.OpenUrl(mod.Url);
         };
         return card;
     }

@@ -12,6 +12,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <AssemblyName>ModLaunch</AssemblyName>
     <RootNamespace>ModLaunch</RootNamespace>
     <Version>4.0.0</Version>
@@ -47,7 +48,8 @@
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.*" />
     <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.*" />
     <PackageReference Include="Avalonia.Headless" Version="11.3.*" />
-    <PackageReference Include="SharpCompress" Version="0.38.*" />
+    <PackageReference Include="SharpCompress" Version="1.0.*" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.*" />
   </ItemGroup>
 
 </Project>

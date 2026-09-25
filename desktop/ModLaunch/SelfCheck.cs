@@ -220,6 +220,41 @@ public static class SelfCheck
             return issues.Count == 1 ? Task.FromResult(issues[0].Mod) : throw new Exception($"{issues.Count}");
         });
 
+        await Check("reviews sync (read-only)", async () =>
+        {
+            await Social.Reviews.Sync(force: true);
+            var all = Social.Reviews.List();
+            return $"{all.Count} reviews, {Social.Reviews.Stats().Count} rated mods";
+        });
+        await Check("app update check", async () =>
+        {
+            var latest = await Setup.Updater.Check() ?? throw new Exception("not configured");
+            return $"latest {latest.Version}, setup asset: {latest.SetupName ?? "none"}, newer than us: {Setup.Updater.Available}";
+        });
+        await Check("installer", async () =>
+        {
+            if (!OperatingSystem.IsWindows()) return "skipped (not Windows)";
+            var target = Path.Combine(root, "Programs", "ModLaunch");
+            var result = await Setup.Installer.Install(target, desktop: false, new Progress<(string, double)>(_ => { }));
+            if (!File.Exists(result.Exe) || !File.Exists(Path.Combine(target, Setup.Installer.Marker))) throw new Exception("files missing");
+            var inspected = Setup.Installer.Inspect(target);
+            if (inspected.Kind != Setup.Installer.TargetKind.Ours) throw new Exception("not recognised as ours");
+            var again = await Setup.Installer.Install(target, desktop: false, new Progress<(string, double)>(_ => { }));
+            if (!again.Updated) throw new Exception("second install should be an update");
+            using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\ModHub");
+            var uninstall = key?.GetValue("UninstallString") as string ?? throw new Exception("no uninstall entry");
+            var link = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "ModLaunch.lnk");
+            if (!File.Exists(link)) throw new Exception("no start menu shortcut");
+            return $"installed {new FileInfo(result.Exe).Length / 1048576} MB, updated in place, uninstall: {uninstall}";
+        });
+        await Check("pe + hotkey parse", () =>
+        {
+            if (!OperatingSystem.IsWindows()) return Task.FromResult("skipped (not Windows)");
+            var ok = Features.Hotkey.Arm("Shift+F1", () => { });
+            Features.Hotkey.Disarm();
+            return Task.FromResult(ok ? "Shift+F1 registered and released" : "could not register (another app holds it)");
+        });
+
         await Check("locator", async () =>
         {
             var found = new List<string>();

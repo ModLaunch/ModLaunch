@@ -114,5 +114,15 @@ public static class Demo
         (new CollectionInfo("demo0", "Строитель баз", "Всё для красивых баз: декорации, новые постройки и удобства.", null, "Player0", 900, 40000, 7, "https://www.nexusmods.com/"),
          game.Picks.Take(7).Select((id, i) => new CollectionMod(id, 1000 + i, Names.GetValueOrDefault(id) ?? id, "1.0", null, null, i == 6)).ToList());
 
+    public static ModDetails Details(GameDef game, ModInfo mod) => new(mod,
+        [
+            new Block("h", "Возможности"),
+            new Block("p", mod.Description + " Работает с последней версией игры и не ломает старые сохранения."),
+            new Block("li", "Новые постройки в меню строителя"),
+            new Block("li", "Настройки в Configuration Manager"),
+            new Block("h", "Установка"),
+            new Block("p", "Нажмите «Установить» — ModLaunch сам поставит загрузчик и зависимости."),
+        ], [], game.Catalog == CatalogKind.Nexus ? [new Requirement("1262", "Nautilus", true)] : []);
+
     public static List<ModInfo> Many(GameDef game, IEnumerable<string> ids) => ids.Distinct().Select((id, i) => Mod(game, id, i)).ToList();
 }

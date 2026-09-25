@@ -284,6 +284,9 @@ public static class Actions
         try
         {
             var backup = Launcher.Launch(g.Def, g.Path);
+            if (g.Registry is not null) try { Social.PlayLog.NoteLaunch(g.Def, g.Registry); } catch { }
+            Social.Friends.SetActivity("playing", g.Def.Id, g.Def.Name);
+            OverlayWindow.OnGameStarted(g.Def.Id);
             W.Toast(I18n.T("toast.launched") + (backup is null ? "" : " · " + I18n.T("bak.created")));
             if (Settings.Data.Str("afterLaunch") == "minimize") W.WindowState = WindowState.Minimized;
             AppState.Notify();
