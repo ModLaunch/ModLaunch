@@ -32,6 +32,7 @@ public static class ModRow
             ToolTip.SetTip(old, I18n.T("badge.old.hint"));
             tags.Children.Add(old);
         }
+        if (mod.Source != game.PrimarySource) tags.Children.Add(Tag(Catalog.Title(mod.Source), Ui.Hex("#1B2A3A"), Ui.Hex("#7FB4E6")));
         foreach (var c in mod.Categories.Take(2)) tags.Children.Add(Tag(c, Ui.Res("Surface3"), Ui.Res("Muted")));
 
         var middle = Ui.Col(6, name, desc, tags);

@@ -6,6 +6,7 @@ using Avalonia.Media;
 using ModLaunch.Core;
 using ModLaunch.Features;
 using ModLaunch.Mods;
+using ModLaunch.Sources;
 
 namespace ModLaunch.Views;
 
@@ -14,6 +15,7 @@ public sealed partial class GamePage
     List<Missing>? _missing;
     bool _checkingUpdates, _missingLoading;
     readonly HashSet<string> _updating = [];
+    string _instQuery = "", _instFilter = "all", _instSort = "name";
 
     Control InstalledView()
     {
@@ -55,7 +57,19 @@ public sealed partial class GamePage
         if (unmanaged.Count > 0)
             col.Children.Add(Notice(Icons.Package, I18n.T("inst.unmanaged", ("list", string.Join(", ", unmanaged.Take(6)))), Ui.Res("Muted")));
 
+        var conflicts = Features.Conflicts.Find(registry);
+        if (conflicts.Count > 0)
+        {
+            var list = string.Join("; ", conflicts.Take(4).Select(c => I18n.T("v4.conflict.pair", ("a", c.A), ("b", c.B), ("n", c.Files))));
+            var notice = Notice(Icons.Alert, I18n.T("v4.conflicts", ("list", list)), Ui.Res("Warn"));
+            ToolTip.SetTip(notice, I18n.T("v4.conflict.hint"));
+            col.Children.Add(notice);
+        }
+
         var mods = registry.List();
+        if (mods.Count > 0) col.Children.Add(InstalledToolbar());
+        mods = FilterInstalled(registry, mods, updates);
+        if (mods.Count == 0 && registry.List().Count > 0) { col.Children.Add(Ui.Card(Ui.Text(I18n.T("catalog.nothingFound", ("query", _instQuery)), "muted"), 18)); return col; }
         if (mods.Count == 0)
         {
             col.Children.Add(Ui.Card(Ui.Col(10,
@@ -68,6 +82,108 @@ public sealed partial class GamePage
         var byRecord = updates?.ToDictionary(u => u.RecordId) ?? [];
         foreach (var mod in mods) col.Children.Add(InstalledRow(registry, mod, byRecord.GetValueOrDefault(mod.Str("id")!)));
         return col;
+    }
+
+    /// <summary>Поиск, фильтр и сортировка установленных (как в Vortex и Modrinth App).</summary>
+    Control InstalledToolbar()
+    {
+        var search = new TextBox { Text = _instQuery, Watermark = I18n.T("v4.search.installed"), Height = 38 };
+        search.InnerLeftContent = new Border { Padding = new Thickness(12, 0, 0, 0), Child = Ui.Icon(Icons.Search, 15, Ui.Res("Muted")) };
+        // Поиск по Enter: перерисовка на каждую букву сбивала бы курсор.
+        search.KeyDown += (_, e) => { if (e.Key == Avalonia.Input.Key.Enter) { _instQuery = search.Text ?? ""; Build(); } };
+        var filters = Ui.Row(6);
+        foreach (var f in new[] { "all", "enabled", "disabled", "updates", "problems" })
+        {
+            var id = f;
+            var b = Ui.Button(I18n.T("v4.filter." + f), () => { _instFilter = id; Build(); }, "chip");
+            if (_instFilter == f) b.Classes.Add("active");
+            filters.Children.Add(b);
+        }
+        var sorts = new[] { "name", "date", "size" };
+        var sort = new ComboBox { Width = 190, Height = 38 };
+        foreach (var x in sorts) sort.Items.Add(I18n.T("v4.sort." + x));
+        sort.SelectedIndex = Array.IndexOf(sorts, _instSort);
+        sort.SelectionChanged += (_, _) => { if (sort.SelectedIndex >= 0 && sorts[sort.SelectedIndex] != _instSort) { _instSort = sorts[sort.SelectedIndex]; Build(); } };
+        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), ColumnSpacing = 10 };
+        grid.Children.Add(search);
+        Grid.SetColumn(sort, 1);
+        grid.Children.Add(sort);
+        return Ui.Col(8, grid, filters);
+    }
+
+    List<JsonObject> FilterInstalled(ModRegistry registry, IReadOnlyList<JsonObject> mods, List<ModUpdate>? updates)
+    {
+        var withUpdate = updates?.Select(u => u.RecordId).ToHashSet() ?? [];
+        var problemMods = (_missing ?? Deps.Find(registry)).Select(m => m.ModId).ToHashSet();
+        IEnumerable<JsonObject> q = mods;
+        if (_instQuery.Trim() != "")
+            q = q.Where(m => (m.Str("name") ?? "").Contains(_instQuery.Trim(), StringComparison.CurrentCultureIgnoreCase) || (m.Str("author") ?? "").Contains(_instQuery.Trim(), StringComparison.CurrentCultureIgnoreCase));
+        q = _instFilter switch
+        {
+            "enabled" => q.Where(m => m.Bool("enabled", true)),
+            "disabled" => q.Where(m => !m.Bool("enabled", true)),
+            "updates" => q.Where(m => withUpdate.Contains(m.Str("id") ?? "")),
+            "problems" => q.Where(m => m.Bool("missing") || problemMods.Contains(m.Str("id") ?? "")),
+            _ => q,
+        };
+        q = _instSort switch
+        {
+            "date" => q.OrderByDescending(m => m.Str("installedAt")),
+            "size" => q.OrderByDescending(m => Features.Conflicts.FolderSize(registry.FolderFor(m))),
+            _ => q,
+        };
+        return q.ToList();
+    }
+
+    /// <summary>Окно мода: заметка, папка, версии из архива, одобрение на Nexus.</summary>
+    void ModDialog(ModRegistry registry, JsonObject mod)
+    {
+        var w = MainWindow.Current!;
+        var id = mod.Str("id")!;
+        var name = mod.Str("name") ?? id;
+        var note = new TextBox { Text = Notes.Get(_g.Def.Id, id), Watermark = I18n.T("v4.note.placeholder"), AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, Height = 90, MaxLength = 2000 };
+        var body = Ui.Col(14);
+        var facts = new List<string>();
+        if (mod.Str("version") is { Length: > 0 } v) facts.Add(I18n.T("mod.version", ("version", v)));
+        facts.Add(GamePage.Size(Features.Conflicts.FolderSize(registry.FolderFor(mod))));
+        facts.Add(Catalog.Title(_g.Def.SourceOf(id, mod.Str("source"))));
+        body.Children.Add(Ui.Text(string.Join(" · ", facts), "small muted"));
+        body.Children.Add(Ui.Col(6, Ui.Text(I18n.T("v4.note"), "h3"), note));
+
+        var archive = DownloadArchive.For(_g.Def.Id, id);
+        var versions = Ui.Col(6, Ui.Text(I18n.T("v4.archive.versions"), "h3"));
+        if (archive.Count == 0) versions.Children.Add(Ui.Text(I18n.T("v4.archive.empty"), "small muted"));
+        foreach (var file in archive.Take(6))
+        {
+            var row = new DockPanel();
+            var f = file;
+            var go = Ui.Button(I18n.T("v4.archive.reinstall"), () => { w.CloseDialog(); Actions.ReinstallFromArchive(_g, mod, f); }, "", Icons.Refresh);
+            DockPanel.SetDock(go, Dock.Right);
+            row.Children.Add(go);
+            row.Children.Add(Ui.Text($"{(f.Version == "" ? "—" : f.Version)} · {Ui.Ago(f.At)} · {GamePage.Size(f.Size)}", "small"));
+            versions.Children.Add(row);
+        }
+        body.Children.Add(versions);
+
+        var actions = new List<Control>
+        {
+            Ui.Button(I18n.T("v4.folder"), () => Actions.OpenFolder(registry.FolderFor(mod)), "", Icons.Folder),
+        };
+        if (_g.Def.SourceOf(id, mod.Str("source")) == "nexus" && _g.Def.CatalogId(id) is string nexusId)
+        {
+            var endorsed = Actions.IsEndorsed(_g, nexusId);
+            var endorse = Ui.Button(endorsed ? "✓ " + I18n.T("v4.endorsed") : I18n.T("v4.endorse"), async () => { await Actions.Endorse(_g, nexusId, mod.Str("version") ?? ""); w.CloseDialog(); }, "", Icons.Heart);
+            endorse.IsEnabled = !endorsed;
+            actions.Add(endorse);
+        }
+        actions.Add(Ui.Button(I18n.T("common.save"), () =>
+        {
+            Notes.Set(_g.Def.Id, id, note.Text ?? "");
+            w.CloseDialog();
+            w.Toast(I18n.T("v4.note.saved"));
+            Build();
+        }, "primary", Icons.Save));
+        w.Dialog(name, body, actions.ToArray());
     }
 
     async Task LoadMissing()
@@ -149,6 +265,7 @@ public sealed partial class GamePage
         else if (!enabled) title.Children.Add(ModRow.Tag(I18n.T("inst.off"), Ui.Res("Surface3"), Ui.Res("Muted")));
         if (mod.Str("requestedBy") is not null) title.Children.Add(ModRow.Tag(I18n.T("mod.stat.deps.one").ToLowerInvariant(), Ui.Res("Surface3"), Ui.Res("Muted")));
         var middle = Ui.Col(4, title, Ui.Text(string.Join(" · ", sub), "small muted"));
+        if (Notes.Get(_g.Def.Id, id) is { Length: > 0 } note) middle.Children.Add(Ui.Text("✎ " + note.Split('\n')[0], "small brand"));
         middle.VerticalAlignment = VerticalAlignment.Center;
 
         var toggle = new ToggleSwitch { IsChecked = enabled, OnContent = "", OffContent = "", VerticalAlignment = VerticalAlignment.Center, IsEnabled = !missing, MinWidth = 0 };
@@ -181,6 +298,7 @@ public sealed partial class GamePage
         }
         if (mod.Str("url") is string url) right.Children.Add(Ui.Button("", () => Ui.OpenUrl(url), "icon ghost", Icons.External, I18n.T("mod.page")));
         right.Children.Add(toggle);
+        right.Children.Add(Ui.Button("", () => ModDialog(registry, mod), "icon ghost", Icons.Edit, I18n.T("v4.note")));
         right.Children.Add(Ui.Button("", () => ConfirmRemove(registry, mod), "icon ghost", Icons.Trash, I18n.T("mod.remove")));
         right.VerticalAlignment = VerticalAlignment.Center;
 

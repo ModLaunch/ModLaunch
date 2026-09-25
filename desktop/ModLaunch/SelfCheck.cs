@@ -256,6 +256,78 @@ public static class SelfCheck
             return Task.FromResult(ok ? "Shift+F1 registered and released" : "could not register (another app holds it)");
         });
 
+        await Check("catalog size per game (all sources)", async () =>
+        {
+            var lines = new List<string>();
+            var small = new List<string>();
+            foreach (var g in GameCatalog.All)
+            {
+                long total = 0;
+                var parts = new List<string>();
+                foreach (var src in g.Sources)
+                {
+                    long n = 0;
+                    try { n = (await Catalog.Browse(g, new Query(), source: src)).Total; } catch { }
+                    parts.Add($"{src} {n}");
+                    total += n;
+                }
+                lines.Add($"{g.Id}={total} ({string.Join(", ", parts)})");
+                if (total < 1000) small.Add(g.Id);
+            }
+            // Hollow Knight и Below Zero: на всех сайтах вместе меньше 1000 модов — больше просто нет.
+            var unexpected = small.Where(id => id is not ("hollow-knight" or "subnautica-below-zero")).ToList();
+            if (unexpected.Count > 0) throw new Exception("under 1000: " + string.Join(", ", unexpected) + " | " + string.Join("; ", lines));
+            return string.Join("; ", lines);
+        });
+        await Check("best section + hidden tools", async () =>
+        {
+            var page = await Catalog.Browse(GameCatalog.ById("lethal-company")!, new Query(SectionId: "best"));
+            if (page.Mods.Any(m => m.Id is "ebkr-r2modman" or "BepInEx-BepInExPack")) throw new Exception("mod managers not hidden");
+            return "top: " + string.Join(", ", page.Mods.Take(5).Select(m => m.Name));
+        });
+        await Check("extra source (Nexus for Valheim)", async () =>
+        {
+            var g = GameCatalog.ById("valheim")!;
+            var page = await Catalog.Browse(g, new Query(), source: "nexus");
+            var first = page.Mods.First();
+            var details = await Sources.Details.Load(g, first.Id, source: "nexus");
+            return $"{page.Total} on Nexus; {first.Name}: {details.Blocks.Count} text blocks, {details.Images.Count} images";
+        });
+        await Check("picks resolve", async () =>
+        {
+            var bad = new List<string>();
+            foreach (var g in GameCatalog.All)
+            {
+                var found = await Catalog.Many(g, g.Picks);
+                var ids = found.Select(m => m.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                bad.AddRange(g.Picks.Where(p => !ids.Contains(p)).Select(p => $"{g.Id}:{p}"));
+            }
+            if (bad.Count > 0) throw new Exception("not found: " + string.Join(", ", bad));
+            return $"{GameCatalog.All.Sum(g => g.Picks.Length)} picks, all found";
+        });
+        await Check("conflicts + archive + notes", () =>
+        {
+            var game = GameCatalog.ById("valheim")!;
+            var dir = Path.Combine(root, "ConflictGame");
+            Directory.CreateDirectory(Path.Combine(dir, "valheim_Data"));
+            var registry = new ModRegistry(game, dir);
+            foreach (var n in new[] { "ModA", "ModB" })
+            {
+                Directory.CreateDirectory(Path.Combine(registry.ModsDir, n));
+                File.WriteAllText(Path.Combine(registry.ModsDir, n, "Shared.dll"), n);
+                registry.Add(new JsonObject { ["id"] = "x-" + n, ["name"] = n, ["folder"] = n, ["source"] = "thunderstore" });
+            }
+            var conflicts = Features.Conflicts.Find(registry);
+            if (conflicts.Count != 1) throw new Exception($"{conflicts.Count} conflicts");
+            var zip = Path.Combine(root, "t.zip");
+            Features.DownloadArchive.Add("valheim", "x-ModA", "1.0", zip);
+            var archived = Features.DownloadArchive.For("valheim", "x-ModA");
+            if (archived.Count != 1) throw new Exception("archive miss");
+            Features.Notes.Set("valheim", "x-ModA", "note");
+            if (Features.Notes.Get("valheim", "x-ModA") != "note") throw new Exception("notes");
+            return Task.FromResult($"{conflicts[0].A} vs {conflicts[0].B}; archive ok; notes ok");
+        });
+
         await Check("locator", async () =>
         {
             var found = new List<string>();

@@ -24,6 +24,13 @@ public static class CatalogReport
 
     public static async Task<int> Run()
     {
+        try
+        {
+            var communities = await Http.GetJson("https://thunderstore.io/api/cyberstorm/community/?page_size=200");
+            var slugs = communities.Arr("results").Select(c => c.Str("identifier")).OfType<string>().ToList();
+            Console.WriteLine("thunderstore communities matching: " + string.Join(", ", slugs.Where(x => x.Contains("hollow") || x.Contains("subnautica") || x.Contains("stardew") || x.Contains("silk"))));
+        }
+        catch (Exception e) { Console.WriteLine("communities: ERROR " + e.Message); }
         var modlinks = (await ModLinks.Load()).Count;
         Console.WriteLine($"modlinks hollow-knight: {modlinks}");
         foreach (var (game, community, domain) in Targets)

@@ -15,11 +15,11 @@ public sealed record ModDetails(ModInfo Mod, List<Block> Blocks, List<string> Im
 /// </summary>
 public static partial class Details
 {
-    public static async Task<ModDetails> Load(GameDef game, string id, CancellationToken ct = default)
+    public static async Task<ModDetails> Load(GameDef game, string id, CancellationToken ct = default, string? source = null)
     {
-        switch (game.Catalog)
+        switch (source ?? Catalog.GuessSource(game, id))
         {
-            case CatalogKind.Thunderstore:
+            case "thunderstore":
             {
                 var mod = await Thunderstore.Get(game.ThunderstoreCommunity!, id, ct) ?? throw new InvalidOperationException(I18n.T("err.modNotInCatalog"));
                 string html = "";
@@ -31,7 +31,7 @@ public static partial class Details
                     .Select(d => new Requirement(d, d[(d.IndexOf('-') + 1)..].Replace('_', ' '), true)).ToList();
                 return new ModDetails(mod, Html(html), Pictures(html, "https://thunderstore.io/"), reqs);
             }
-            case CatalogKind.ModLinks:
+            case "modlinks":
             {
                 var all = await ModLinks.Load(ct);
                 var mod = all.FirstOrDefault(m => m.Id == id) ?? throw new InvalidOperationException(I18n.T("err.modNotInCatalog"));

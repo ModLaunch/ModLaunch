@@ -96,6 +96,8 @@ public static class Program
         Save("2-installed");
         window.Navigate(() => new GamePage("subnautica", "catalog"));
         Save("3-picks");
+        window.Navigate(() => new GamePage("subnautica", "tools"));
+        Save("3a-tools");
         window.Navigate(() => new GamePage("subnautica", "profiles"));
         Save("3b-profiles");
         window.Navigate(() => new GamePage("subnautica", "saves"));
@@ -132,6 +134,8 @@ public static class Program
         Save("9d-stats");
         window.Navigate(() => new SettingsPage("about"));
         Save("9e-about");
+        window.Navigate(() => new SettingsPage("downloads"));
+        Save("9h-downloads");
 
         var setup = new SetupWindow(ModLaunch.Setup.SetupMode.Install);
         setup.Show();

@@ -72,6 +72,8 @@ public static class Demo
         Features.Backups.Create("subnautica", Path.Combine(sn.Path!, "SNAppData", "SavedGames"), "launch");
         Features.Backups.Create("subnautica", Path.Combine(sn.Path!, "SNAppData", "SavedGames"), "manual");
         Features.Profiles.Save("subnautica", "С друзьями", registry);
+        Features.Notes.Set("subnautica", "nexus:subnautica:12", "Карта с метками баз — не выключать");
+        Features.Tools.Add("subnautica", Path.Combine(sn.Path!, "Subnautica.exe"));
         Features.Profiles.Save("subnautica", "Хардкор", registry);
 
         foreach (var g in AppState.Games)

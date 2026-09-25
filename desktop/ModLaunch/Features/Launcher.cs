@@ -13,6 +13,21 @@ public static partial class Launcher
 {
     public static event Action<string, bool, long>? Exited; // игра, засчитано, мс
 
+    /// <summary>Запущенные из ModLaunch игры — для кнопки «Остановить» (как в Modrinth App).</summary>
+    static readonly Dictionary<string, (System.Diagnostics.Process Process, DateTime Started)> Running = [];
+
+    public static bool IsRunning(string gameId) { lock (Running) return Running.ContainsKey(gameId); }
+
+    public static DateTime? StartedAt(string gameId) { lock (Running) return Running.TryGetValue(gameId, out var r) ? r.Started : null; }
+
+    /// <summary>Остановить игру (вместе с дочерними процессами: SMAPI запускает саму игру).</summary>
+    public static void Stop(string gameId)
+    {
+        System.Diagnostics.Process? p;
+        lock (Running) p = Running.TryGetValue(gameId, out var r) ? r.Process : null;
+        try { p?.Kill(entireProcessTree: true); } catch { }
+    }
+
     [GeneratedRegex("\"([^\"]*)\"|'([^']*)'|(\\S+)")] private static partial Regex Arg();
 
     public static List<string> SplitArgs(string? text) =>
@@ -57,8 +72,10 @@ public static partial class Launcher
         var track = PlayTime.Track;
         if (track) PlayTime.Start(game.Id);
         process.EnableRaisingEvents = true;
+        lock (Running) Running[game.Id] = (process, DateTime.UtcNow);
         process.Exited += (_, _) =>
         {
+            lock (Running) Running.Remove(game.Id);
             var (counted, ms) = track ? PlayTime.Stop(game.Id) : (false, 0L);
             Avalonia.Threading.Dispatcher.UIThread.Post(() => Exited?.Invoke(game.Id, counted, ms));
         };

@@ -73,6 +73,20 @@ public static class Profiles
         File.Save();
     }
 
+    /// <summary>Копия профиля (как «Duplicate» в Modrinth App).</summary>
+    public static void Duplicate(string gameId, string from, string rawTo)
+    {
+        var game = Game(gameId);
+        if (game[from] is not JsonNode node) return;
+        var to = Clean(rawTo);
+        for (var i = 2; game.ContainsKey(to); i++) to = Clean($"{rawTo} {i}");
+        if (game.Count >= Max) throw new InvalidOperationException(I18n.T("err.PROFILE_LIMIT"));
+        var copy = (JsonObject)node.DeepClone();
+        copy["createdAt"] = copy["updatedAt"] = DateTime.UtcNow.ToString("o");
+        game[to] = copy;
+        File.Save();
+    }
+
     public static void Remove(string gameId, string name)
     {
         Game(gameId).Remove(name);

@@ -35,9 +35,10 @@ public static class ModUpdates
             await gate.WaitAsync(ct);
             try
             {
-                var latest = (await Catalog.Get(g.Def, catalogId, ct))?.Version;
+                var source = g.Def.SourceOf(recordId, r.Str("source"));
+                var latest = (await Catalog.Get(g.Def, catalogId, ct, source))?.Version;
                 if (Versions.IsNewer(latest, r.Str("version")))
-                    result.Add(new ModUpdate(recordId, catalogId, r.Str("name") ?? recordId, r.Str("version") ?? "", latest!, r.Str("icon"), g.Def.Catalog == CatalogKind.Nexus));
+                    result.Add(new ModUpdate(recordId, catalogId, r.Str("name") ?? recordId, r.Str("version") ?? "", latest!, r.Str("icon"), source == "nexus"));
             }
             catch { /* нет сети или мод убрали из каталога — просто не знаем */ }
             finally { gate.Release(); }
@@ -53,7 +54,7 @@ public static class ModUpdates
         var registry = g.Registry ?? throw new InvalidOperationException(I18n.T("err.gameNotFound"));
         if (update.Manual) throw new InvalidOperationException(I18n.T("err.updateManual"));
         var old = registry.Get(update.RecordId) ?? throw new InvalidOperationException(I18n.T("err.modNotFound", ("id", update.RecordId)));
-        var mod = await Catalog.Get(g.Def, update.CatalogId, ct) ?? throw new InvalidOperationException(I18n.T("err.modNotInCatalog"));
+        var mod = await Catalog.Get(g.Def, update.CatalogId, ct, g.Def.SourceOf(update.RecordId, old.Str("source"))) ?? throw new InvalidOperationException(I18n.T("err.modNotInCatalog"));
         var wasEnabled = old.Bool("enabled", true);
         if (!wasEnabled) registry.SetEnabled(update.RecordId, true);
         var oldFolder = registry.FolderFor(registry.Get(update.RecordId)!);

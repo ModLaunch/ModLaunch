@@ -53,6 +53,20 @@ public static partial class Logs
         return issues.Take(50).ToList();
     }
 
+    /// <summary>Последние строки лога (файл может быть открыт игрой — читаем с общим доступом).</summary>
+    public static List<string> Tail(string path, int maxLines)
+    {
+        try
+        {
+            using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            const int max = 1024 * 1024;
+            if (fs.Length > max) fs.Position = fs.Length - max;
+            var lines = new StreamReader(fs).ReadToEnd().Replace("\r", "").Split('\n');
+            return lines.TakeLast(maxLines).ToList();
+        }
+        catch { return []; }
+    }
+
     public static LogReport Read(GameDef game, string gamePath)
     {
         var path = PathFor(game, gamePath);

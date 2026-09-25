@@ -24,10 +24,10 @@ public static partial class Installer
     /// <summary>План установки: мод и его зависимости по порядку.</summary>
     public static async Task<(List<ModInfo> Order, List<string> Missing)> Plan(GameDef game, ModInfo mod, CancellationToken ct)
     {
-        (List<ModInfo> Order, List<string> Missing) plan = game.Catalog switch
+        (List<ModInfo> Order, List<string> Missing) plan = mod.Source switch
         {
-            CatalogKind.Thunderstore => await Thunderstore.Resolve(game.ThunderstoreCommunity!, mod.Id, ct),
-            CatalogKind.ModLinks => await ModLinks.Resolve(mod.Id, ct),
+            "thunderstore" => await Thunderstore.Resolve(game.ThunderstoreCommunity!, mod.Id, ct),
+            "modlinks" => await ModLinks.Resolve(mod.Id, ct),
             _ => (new List<ModInfo> { mod }, new List<string>()),
         };
         plan.Order.RemoveAll(m => IsLoaderPackage(game, m.Id));
@@ -68,6 +68,7 @@ public static partial class Installer
                     ["requestedBy"] = entry.Id == mod.Id ? null : mod.Id,
                 }, progress, ct);
                 if (entry.Source == "thunderstore" && registry.Game.Loader == LoaderKind.Bepinex) ApplyPackConfig(registry.GamePath, file);
+                Features.DownloadArchive.Add(registry.Game.Id, entry.Id, entry.Version, file);
                 installed++;
             }
             finally { TryDelete(file); }

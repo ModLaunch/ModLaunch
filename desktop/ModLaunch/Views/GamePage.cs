@@ -17,6 +17,8 @@ public sealed partial class GamePage : Page
     readonly GameState _g;
     string _tab;
     string _section = "all";
+    string? _source;
+    readonly Dictionary<string, long> _sourceTotals = [];
     string _query;
     SortBy _sort = SortBy.Popular;
 
@@ -66,6 +68,7 @@ public sealed partial class GamePage : Page
                 "profiles" => ProfilesView(),
                 "saves" => SavesView(),
                 "log" => LogView(),
+                "tools" => ToolsView(),
                 _ => InstalledView(),
             });
         }
@@ -106,7 +109,11 @@ public sealed partial class GamePage : Page
             buttons.Children.Add(Ui.Button(I18n.T("games.openFolder"), () => Actions.OpenFolder(_g.Path), "", Icons.Folder));
             if (_g.LoaderInstalled)
             {
-                var play = Ui.Button(I18n.T("games.play"), () => Actions.Play(_g), "primary", Icons.Play);
+                var running = Features.Launcher.IsRunning(_g.Def.Id);
+                var play = running
+                    ? Ui.Button(I18n.T("v4.stop"), () => { Features.Launcher.Stop(_g.Def.Id); MainWindow.Current?.Toast(I18n.T("v4.stopped")); }, "primary", Icons.Stop)
+                    : Ui.Button(I18n.T("games.play"), () => Actions.Play(_g), "primary", Icons.Play);
+                if (running) play.Background = Ui.Hex("#E5484D");
                 play.FontSize = 17;
                 play.Padding = new Thickness(30, 13);
                 buttons.Children.Add(play);
@@ -174,6 +181,7 @@ public sealed partial class GamePage : Page
             Tab("catalog", I18n.T("games.market"), Icons.Bag, _total > 0 ? I18n.Compact(_total) : null),
             Tab("profiles", I18n.T("games.profiles"), Icons.Layers, profiles > 0 ? profiles.ToString() : null),
             Tab("saves", I18n.T("games.saves"), Icons.Shield, saves > 0 ? saves.ToString() : null),
+            Tab("tools", I18n.T("v4.tools"), Icons.Settings, Features.Tools.For(_g.Def.Id).Count is > 0 and var t ? t.ToString() : null),
             Tab("log", I18n.T("games.log"), Icons.Alert, null));
         return new Border { Classes = { "card" }, Padding = new Thickness(6), CornerRadius = new CornerRadius(16), Child = bar, HorizontalAlignment = HorizontalAlignment.Left };
     }
@@ -201,9 +209,28 @@ public sealed partial class GamePage : Page
     {
         var col = new StackPanel { Spacing = 14 };
 
+        // Источники: основной каталог и дополнительные (как в Vortex — моды с разных сайтов).
+        var source = _source ?? _g.Def.PrimarySource;
+        if (_g.Def.Sources.Length > 1)
+        {
+            if (_sourceTotals.Count < _g.Def.Sources.Length && !Program.Demo) _ = LoadSourceTotals();
+            var sources = Ui.Row(8, Ui.Text(I18n.T("v4.source"), "small muted"));
+            sources.Children[0].VerticalAlignment = VerticalAlignment.Center;
+            foreach (var src in _g.Def.Sources)
+            {
+                var label = Catalog.Title(src) + (_sourceTotals.TryGetValue(src, out var n) ? $" · {n:N0}" : "");
+                var b = Ui.Button(label, () => { _source = src; _section = "all"; _ = Load(reset: true); Build(); }, "chip");
+                if (src == source) b.Classes.Add("active");
+                sources.Children.Add(b);
+            }
+            col.Children.Add(sources);
+        }
+
         var chips = new WrapPanel();
+        var primarySource = source == _g.Def.PrimarySource;
         foreach (var s in _g.Def.Sections)
         {
+            if (!primarySource && s.Id is not ("all" or "best")) continue;
             if (s.Id == "packs" && _g.Def.Kits.Length == 0 && _g.Def.Catalog != CatalogKind.Nexus) continue;
             var b = Ui.Button(I18n.T("sec." + s.Id), () => SelectSection(s.Id), "chip");
             if (_section == s.Id) b.Classes.Add("active");
@@ -304,6 +331,18 @@ public sealed partial class GamePage : Page
         Child = new Border { Width = 88, Height = 88, Margin = new Thickness(14), CornerRadius = new CornerRadius(14), Background = Ui.Res("Surface2"), HorizontalAlignment = HorizontalAlignment.Left },
     };
 
+    /// <summary>Сколько модов в каждом каталоге игры — для подписей у переключателя.</summary>
+    async Task LoadSourceTotals()
+    {
+        foreach (var src in _g.Def.Sources)
+        {
+            if (_sourceTotals.ContainsKey(src)) continue;
+            _sourceTotals[src] = 0;
+            try { _sourceTotals[src] = (await Catalog.Browse(_g.Def, new Query(), source: src)).Total; } catch { }
+        }
+        if (_tab == "catalog") Build();
+    }
+
     async Task Load(bool reset)
     {
         var id = ++_requestId;
@@ -316,7 +355,7 @@ public sealed partial class GamePage : Page
         {
             var page = Program.Demo
                 ? Demo.Catalog(_g.Def, new Query(_query, _page, _sort, _section))
-                : await Catalog.Browse(_g.Def, new Query(_query, _page, _sort, _section));
+                : await Catalog.Browse(_g.Def, new Query(_query, _page, _sort, _section), source: _source);
             if (id != _requestId) return;
             _mods.AddRange(page.Mods.Where(m => _mods.All(x => x.Id != m.Id)));
             _total = page.Total;

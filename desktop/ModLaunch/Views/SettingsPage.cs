@@ -34,6 +34,7 @@ public sealed class SettingsPage : Page
             ("games", "settings.tab.games", Icons.Folder),
             ("launch", "settings.tab.launch", Icons.Play),
             ("backups", "settings.tab.backups", Icons.Shield),
+            ("downloads", "settings.tab.downloads", Icons.Download),
             ("graphics", "settings.tab.graphics", Icons.Sparkles),
             ("updates", "settings.tab.updates", Icons.ArrowUp),
             ("accounts", "settings.tab.accounts", Icons.Key),
@@ -52,6 +53,7 @@ public sealed class SettingsPage : Page
             "games" => GamesTab(),
             "launch" => LaunchTab(),
             "backups" => BackupsTab(),
+            "downloads" => DownloadsTab(),
             "graphics" => GraphicsTab(),
             "updates" => UpdatesTab(),
             "accounts" => AccountsTab(),
@@ -277,6 +279,26 @@ public sealed class SettingsPage : Page
         }
         col.Children.Add(Section(I18n.T("bak.games"), I18n.T("bak.games.hint"), list));
         return col;
+    }
+
+    // ---------------------------------------------------------------- архив загрузок (как в Vortex)
+
+    Control DownloadsTab()
+    {
+        var (count, bytes) = DownloadArchive.Size();
+        var limit = new NumericUpDown { Minimum = 1, Maximum = 500, Value = (decimal)DownloadArchive.LimitGb, Width = 140, FormatString = "0" };
+        limit.ValueChanged += (_, _) => { Settings.Data["archiveLimitGb"] = (double)(limit.Value ?? 10); Settings.Save(); };
+        var limitRow = new DockPanel();
+        DockPanel.SetDock(limit, Dock.Right);
+        limitRow.Children.Add(limit);
+        limitRow.Children.Add(Ui.Text(I18n.T("v4.archive.limit"), "h3"));
+        return Section(I18n.T("v4.archive"), I18n.T("v4.archive.hint"),
+            Toggle(I18n.T("v4.archive.keep"), I18n.T("v4.archive.hint"), DownloadArchive.Keep, v => Settings.Data["keepArchives"] = v),
+            limitRow,
+            Ui.Text(I18n.T("v4.archive.size", ("n", count), ("size", GamePage.Size(bytes))), "muted"),
+            Ui.Row(10,
+                Ui.Button(I18n.T("games.openFolder"), () => Actions.OpenFolder(DownloadArchive.Root), "", Icons.Folder),
+                Ui.Button(I18n.T("v4.archive.clear"), () => { DownloadArchive.Clear(); MainWindow.Current?.Toast(I18n.T("v4.archive.cleared")); Build(); }, "ghost", Icons.Trash)));
     }
 
     // ---------------------------------------------------------------- DXVK

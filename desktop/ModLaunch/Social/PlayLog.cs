@@ -58,7 +58,7 @@ public static class PlayLog
         {
             try { ObserveLog(g.Def, registry, Features.Logs.PathFor(g.Def, g.Path!)); } catch { }
         }
-        var record = registry?.Get(g.Def.RecordId(catalogId));
+        var record = registry?.Get(catalogId) ?? (g.Def.NexusDomain is null ? null : registry?.Get(g.Def.RecordId(catalogId, "nexus")));
         var played = File.Data.Obj("mods")[Key(g.Def.Id, catalogId)]?["playedAt"] is not null;
         var own = Reviews.Mine(g.Def.Id, catalogId) is not null;
         var installed = record is not null && !record.Bool("missing");

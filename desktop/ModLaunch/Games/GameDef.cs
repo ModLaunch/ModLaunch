@@ -10,6 +10,7 @@ public sealed record Section(string Id, string[]? Thunderstore = null, string[]?
     {
         ["all"] = new("all"),
         ["picks"] = new("picks", Special: "picks"),
+        ["best"] = new("best", Special: "best"),
         ["packs"] = new("packs", Special: "packs"),
         ["buildings"] = new("buildings", ["furniture", "building"]),
         ["vehicles"] = new("vehicles", ["vehicles", "transportation"]),
@@ -107,15 +108,41 @@ public sealed class GameDef
     }
 
     /// <summary>Номер мода в списке установленных: у Nexus с приставкой, как в версии 3.x.</summary>
-    public string RecordId(string catalogId) => Catalog == CatalogKind.Nexus ? $"nexus:{NexusDomain}:{catalogId}" : catalogId;
+    public string RecordId(string catalogId, string? source = null) =>
+        (source ?? PrimarySource) == "nexus" ? $"nexus:{NexusDomain}:{catalogId}" : catalogId;
 
-    /// <summary>Обратно: номер в каталоге по записи (или null, если мод не из каталога этой игры).</summary>
+    /// <summary>Обратно: номер в каталоге по записи (или null, если это мод Nexus чужой игры).</summary>
     public string? CatalogId(string recordId)
     {
-        if (Catalog != CatalogKind.Nexus) return recordId;
         var prefix = $"nexus:{NexusDomain}:";
-        return recordId.StartsWith(prefix, StringComparison.Ordinal) ? recordId[prefix.Length..] : null;
+        if (recordId.StartsWith(prefix, StringComparison.Ordinal)) return recordId[prefix.Length..];
+        return recordId.StartsWith("nexus:", StringComparison.Ordinal) ? null : recordId;
     }
+
+    /// <summary>Источник по записи: nexus — по приставке, иначе основной (или указанный в записи).</summary>
+    public string SourceOf(string recordId, string? recorded = null) =>
+        recordId.StartsWith("nexus:", StringComparison.Ordinal) ? "nexus" : recorded is "thunderstore" or "modlinks" ? recorded : PrimarySource == "nexus" ? "thunderstore" : PrimarySource;
+
+    public string PrimarySource => Catalog switch { CatalogKind.Nexus => "nexus", CatalogKind.Thunderstore => "thunderstore", _ => "modlinks" };
+
+    /// <summary>
+    /// Все каталоги игры: основной и дополнительные (как в Vortex — моды с разных
+    /// сайтов в одном месте). Nexus — если у игры есть раздел на Nexus,
+    /// Thunderstore — если там есть её сообщество.
+    /// </summary>
+    public string[] Sources
+    {
+        get
+        {
+            var list = new List<string> { PrimarySource };
+            if (NexusDomain is not null && !list.Contains("nexus")) list.Add("nexus");
+            if (ThunderstoreCommunity is not null && ExtraThunderstore && !list.Contains("thunderstore")) list.Add("thunderstore");
+            return list.ToArray();
+        }
+    }
+
+    /// <summary>Показывать ли Thunderstore вторым каталогом (у Subnautica там сообщество загрузчика).</summary>
+    public bool ExtraThunderstore { get; init; }
 
     public bool IsLegacy(DateTime? updated) => LegacyBefore is DateTime cut && updated is DateTime u && u < cut;
 }

@@ -15,7 +15,7 @@ public static class GameCatalog
             Loader = LoaderKind.Smapi, LoaderName = "SMAPI", LoaderSite = "https://smapi.io",
             Catalog = CatalogKind.Nexus, NexusDomain = "stardewvalley", NexusGameId = 1303, NexusHide = ["2400"],
             BrowseUrl = "https://www.nexusmods.com/stardewvalley/mods",
-            Sections = Section.Pick("all", "picks", "buildings", "content", "gameplay", "items", "cosmetics", "ui", "tools", "visuals", "packs"),
+            Sections = Section.Pick("all", "picks", "best", "buildings", "content", "gameplay", "items", "cosmetics", "ui", "tools", "visuals", "packs"),
             NexusCategories = new()
             {
                 ["buildings"] = ["Buildings", "Furniture", "Interiors"],
@@ -47,8 +47,12 @@ public static class GameCatalog
             FolderNames = ["Hollow Knight"], Accent = "#6F9BFF", Art = "game-hollow-knight.jpg",
             Loader = LoaderKind.HkApi, LoaderName = "Modding API", LoaderSite = "https://github.com/hk-modding/api",
             Catalog = CatalogKind.ModLinks, BrowseUrl = "https://github.com/hk-modding/modlinks",
-            Sections = Section.Pick("all", "picks", "content", "gameplay", "cosmetics", "tools", "packs"),
-            Picks = ["Custom Knight", "Benchwarp", "Pale Court", "Randomizer 4", "HKMP", "QoL", "DebugMod"],
+            NexusDomain = "hollowknight", NexusGameId = 2698, NexusHide = ["44"],
+            Sections = Section.Pick("all", "picks", "best", "content", "gameplay", "cosmetics", "tools", "packs"),
+            Picks = ["Custom Knight", "Benchwarp", "Pale Court", "Randomizer 4", "HKMP", "QoL", "DebugMod",
+                "Transcendence", "Enemy HP Bar", "MapChanger", "GodSeekerPlus", "Charm Changer", "Lightbringer",
+                "Fyrenest", "The Glimmering Realm", "Pale Prince", "Mantis Gods", "HKTimer", "Toggleable Bindings",
+                "AdditionalMaps", "HealthShare"],
             Kits = [new("hk-comfort", ["Benchwarp", "QoL"]), new("hk-coop", ["HKMP", "Custom Knight"])],
             SignatureDirs = ["hollow_knight_Data", "Hollow Knight_Data"], GogId = "1308320804",
             Executables = ["hollow_knight.exe", "Hollow Knight.exe"],
@@ -63,8 +67,15 @@ public static class GameCatalog
             LoaderSite = "https://thunderstore.io/c/lethal-company/p/BepInEx/BepInExPack/",
             ThunderstorePackage = "BepInEx-BepInExPack", ThunderstoreCommunity = "lethal-company",
             Catalog = CatalogKind.Thunderstore, BrowseUrl = "https://thunderstore.io/c/lethal-company/",
-            Sections = Section.Pick("all", "picks", "content", "items", "gameplay", "cosmetics", "audio", "tools", "visuals", "modpacks"),
-            Picks = ["notnotnotswipez-MoreCompany", "tinyhoot-ShipLoot", "anormaltwig-LateCompany", "x753-More_Suits", "Evaisa-LethalThings", "malco-Lategame_Upgrades"],
+            NexusDomain = "lethalcompany", NexusGameId = 5848, NexusHide = ["42"],
+            Sections = Section.Pick("all", "picks", "best", "content", "items", "gameplay", "cosmetics", "audio", "tools", "visuals", "modpacks"),
+            Picks =
+            [
+                "notnotnotswipez-MoreCompany", "tinyhoot-ShipLoot", "anormaltwig-LateCompany", "x753-More_Suits", "Evaisa-LethalThings",
+                "malco-Lategame_Upgrades", "x753-Mimics", "FlipMods-ReservedFlashlightSlot", "FlipMods-TooManyEmotes", "sunnobunno-YippeeMod",
+                "FlipMods-ReservedWalkieSlot", "EliteMasterEric-Coroner", "mrgrm7-LethalCasino", "Magic_Wesley-Wesleys_Moons",
+                "LethalResonance-LETHALRESONANCE", "Jordo-NeedyCats", "TwinDimensionalProductions-CoilHeadStare",
+            ],
             SignatureDirs = ["Lethal Company_Data"], SignatureExes = ["Lethal Company.exe"],
             Executables = ["Lethal Company.exe"],
             SavesDir = _ => LocalLow("ZeekerssRBLX", "Lethal Company"),
@@ -79,9 +90,11 @@ public static class GameCatalog
             ThunderstorePackage = "Subnautica_Modding-BepInExPack", ThunderstoreCommunity = "subnautica",
             Catalog = CatalogKind.Nexus, NexusDomain = "subnautica", NexusGameId = 1155,
             // Tobey's BepInEx Pack — это загрузчик: его ставит кнопка загрузчика, в каталоге и требованиях он лишний.
-            NexusHide = ["1108"],
+            // QModManager и SMLHelper — загрузчики старой игры (до 2.0), с BepInEx не работают.
+            NexusHide = ["1108", "201", "113"],
+            ExtraThunderstore = true,
             LegacyBefore = new DateTime(2022, 12, 1), BrowseUrl = "https://www.nexusmods.com/subnautica/mods",
-            Sections = Section.Pick("all", "picks", "buildings", "vehicles", "items", "gameplay", "ui", "tools", "visuals", "packs"),
+            Sections = Section.Pick("all", "picks", "best", "buildings", "vehicles", "items", "gameplay", "ui", "tools", "visuals", "packs"),
             NexusCategories = new()
             {
                 ["buildings"] = ["Buildables"],
@@ -97,7 +110,7 @@ public static class GameCatalog
                 "1262", "1112", "859", "1457", "207", "984", "142", "12", "24", "2800", "1119", "3143", "2447", "3816",
                 "1180", "1121", "1504", "141", "216", "398", "220", "1116", "1206", "640", "1604", "1820", "1542", "871",
                 "1748", "1912", "2153", "2461", "365", "136", "1135", "235", "1453", "722", "237", "389", "3419", "517",
-                "1300", "229", "125",
+                "1300", "229", "125", "554", "51", "427", "42", "1104",
             ],
             Kits =
             [
@@ -121,8 +134,10 @@ public static class GameCatalog
             LoaderSite = "https://thunderstore.io/c/subnautica-below-zero/p/Subnautica_Modding/BepInExPack/",
             ThunderstorePackage = "Subnautica_Modding-BepInExPack", ThunderstoreCommunity = "subnautica-below-zero",
             Catalog = CatalogKind.Nexus, NexusDomain = "subnauticabelowzero", NexusGameId = 2706,
+            NexusHide = ["344", "1", "34"],
+            ExtraThunderstore = true,
             BrowseUrl = "https://www.nexusmods.com/subnauticabelowzero/mods",
-            Sections = Section.Pick("all", "picks", "buildings", "vehicles", "items", "gameplay", "ui", "tools", "visuals", "packs"),
+            Sections = Section.Pick("all", "picks", "best", "buildings", "vehicles", "items", "gameplay", "ui", "tools", "visuals", "packs"),
             NexusCategories = new()
             {
                 ["buildings"] = ["Base Pieces"],
@@ -133,7 +148,7 @@ public static class GameCatalog
                 ["tools"] = ["Library", "Utilities"],
                 ["visuals"] = ["Shader Presets"],
             },
-            Picks = ["373", "44", "287", "264", "599", "470", "52", "53", "54", "55", "137", "417", "444"],
+            Picks = ["373", "44", "287", "264", "599", "470", "52", "53", "54", "55", "137", "417", "444", "15", "10", "57", "84", "106", "128", "171", "56", "235"],
             Kits =
             [
                 new("bz-builder", ["373", "287", "264", "599", "470"]),
@@ -152,13 +167,16 @@ public static class GameCatalog
             LoaderSite = "https://thunderstore.io/c/valheim/p/denikson/BepInExPack_Valheim/",
             ThunderstorePackage = "denikson-BepInExPack_Valheim", ThunderstoreCommunity = "valheim",
             Catalog = CatalogKind.Thunderstore, BrowseUrl = "https://thunderstore.io/c/valheim/",
-            Sections = Section.Pick("all", "picks", "buildings", "items", "content", "gameplay", "vehicles", "cosmetics", "audio", "tools", "modpacks"),
+            NexusDomain = "valheim", NexusGameId = 3667, NexusHide = ["15", "505"],
+            Sections = Section.Pick("all", "picks", "best", "buildings", "items", "content", "gameplay", "vehicles", "cosmetics", "audio", "tools", "modpacks"),
             Picks =
             [
                 "Advize-PlantEverything", "RandyKnapp-EquipmentAndQuickSlots", "shudnal-ExtraSlots", "Advize-PlantEasily",
                 "OdinPlus-TeleportEverything", "MSchmoecker-MultiUserChest", "ishid4-BetterArchery",
                 "Goldenrevolver-Quick_Stack_Store_Sort_Trash_Restock", "Tekla-AutoRepair", "BentoG-MissingPieces",
-                "RustyMods-Seasonality", "Therzie-Warfare",
+                "RustyMods-Seasonality", "Therzie-Warfare", "RandyKnapp-EpicLoot", "Vapok-AdventureBackpacks", "OdinPlus-OdinArchitect",
+                "Therzie-Monstrum", "Therzie-Armory", "Smoothbrain-Sailing", "Smoothbrain-Jewelcrafting", "MathiasDecrock-PlanBuild",
+                "OdinPlus-OdinHorse", "Smoothbrain-PassivePowers", "JereKuusela-Server_devcommands",
             ],
             SignatureDirs = ["valheim_Data"], SignatureExes = ["valheim.exe"],
             Executables = ["valheim.exe"],
@@ -173,12 +191,14 @@ public static class GameCatalog
             LoaderSite = "https://thunderstore.io/c/riskofrain2/p/bbepis/BepInExPack/",
             ThunderstorePackage = "bbepis-BepInExPack", ThunderstoreCommunity = "riskofrain2",
             Catalog = CatalogKind.Thunderstore, BrowseUrl = "https://thunderstore.io/c/riskofrain2/",
-            Sections = Section.Pick("all", "picks", "content", "items", "gameplay", "cosmetics", "audio", "tools", "modpacks"),
+            Sections = Section.Pick("all", "picks", "best", "content", "items", "gameplay", "cosmetics", "audio", "tools", "modpacks"),
             Picks =
             [
                 "TeamMoonstorm-Starstorm2", "KingEnderBrine-ProperSave", "DropPod-LookingGlass", "KingEnderBrine-ScrollableLobbyUI",
                 "EnforcerGang-Enforcer", "Paladin_Alliance-PaladinMod", "Zenithrium-VanillaVoid", "MagnusMagnuson-BiggerBazaar",
-                "duckduckgreyduck-ArtificerExtended", "niwith-DropinMultiplayer",
+                "duckduckgreyduck-ArtificerExtended", "niwith-DropinMultiplayer", "EnforcerGang-Rocket", "FunkFrog-and-Sipondo-ShareSuite",
+                "TheRealElysium-EmptyChestsBeGone", "KomradeSpectre-Aetherium", "Bog-Deputy", "William758-ZetAspects",
+                "EnforcerGang-HAND_OVERCLOCKED", "JavAngle-TheHouse", "Rune580-Risk_Of_Options",
             ],
             SignatureDirs = ["Risk of Rain 2_Data"], SignatureExes = ["Risk of Rain 2.exe"],
             Executables = ["Risk of Rain 2.exe"],
@@ -193,13 +213,16 @@ public static class GameCatalog
             LoaderSite = "https://thunderstore.io/c/repo/p/BepInEx/BepInExPack/",
             ThunderstorePackage = "BepInEx-BepInExPack", ThunderstoreCommunity = "repo",
             Catalog = CatalogKind.Thunderstore, BrowseUrl = "https://thunderstore.io/c/repo/",
-            Sections = Section.Pick("all", "picks", "items", "content", "gameplay", "cosmetics", "audio", "tools", "modpacks"),
+            NexusDomain = "repo", NexusGameId = 7398,
+            Sections = Section.Pick("all", "picks", "best", "items", "content", "gameplay", "cosmetics", "audio", "tools", "modpacks"),
             Picks =
             [
                 "YMC_MHZ-MoreHead", "BULLETBOT-MoreUpgrades", "Zehs-ExtractionPointConfirmButton", "Magic_Wesley-Wesleys_Enemies",
                 "flipf17-DeadTTS", "Cronchy-DeathHeadHopper", "Jettcodey-MoreShopItems_Updated",
                 "XiaohaiMod-XH_DamageShow_EnemyHealthBar", "Lazarus-BetterTruckHeals", "Tidaleus-MoreReviveHP",
-                "Magic_Wesley-Wesleys_Valuables", "Zehs-LethalCompanyValuables",
+                "Magic_Wesley-Wesleys_Valuables", "Zehs-LethalCompanyValuables", "nickklmao-REPOConfig", "RESET-MoreHeadPlus", "eth9n-Mimic",
+                "itsUndefined-Shop_Items_Spawn_in_Level", "AriIcedT-MinecraftStrongholdLevel", "Tansinator-Map_Value_Tracker",
+                "DiFFoZ-BepInEx_Faster_Load_AssetBundles_Patcher", "OrtonLongGaming-FNAFLevel",
             ],
             SignatureDirs = ["REPO_Data"], SignatureExes = ["REPO.exe"],
             Executables = ["REPO.exe"],

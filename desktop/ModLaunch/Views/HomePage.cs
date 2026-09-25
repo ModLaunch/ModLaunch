@@ -45,6 +45,13 @@ public sealed class HomePage : Page
         header.Children.Add(Ui.Text(I18n.T("home.yourGames"), "h2"));
         content.Children.Add(header);
 
+        // «Продолжить игру» — недавно запущенные (как «Jump back in» в Modrinth App).
+        var recent = AppState.Games
+            .Select(g => (Game: g, Played: Features.PlayTime.Get(g.Def.Id)))
+            .Where(x => x.Game.Status == Detect.Found && x.Played.LastPlayed is not null)
+            .OrderByDescending(x => x.Played.LastPlayed).Take(3).ToList();
+        if (recent.Count > 0) content.Children.Add(Continue(recent));
+
         var grid = new UniformGrid { Columns = 4 };
         foreach (var g in AppState.Games) grid.Children.Add(Tile(g));
         content.Children.Add(grid);
@@ -62,6 +69,36 @@ public sealed class HomePage : Page
         }
 
         Content = new ScrollViewer { Content = content, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+    }
+
+    static Control Continue(List<(GameState Game, Features.Played Played)> recent)
+    {
+        var row = new UniformGrid { Columns = 3 };
+        foreach (var (g, played) in recent)
+        {
+            var running = Features.Launcher.IsRunning(g.Def.Id);
+            var art = g.Def.Art is null ? null : Images.Asset(g.Def.Art, 160);
+            var thumb = new Border { Width = 64, Height = 64, CornerRadius = new CornerRadius(12), ClipToBounds = true, Background = Ui.Hex(g.Def.Accent), Child = art is null ? null : new Image { Source = art, Stretch = Stretch.UniformToFill } };
+            var info = Ui.Col(3, Ui.Text(g.Def.Name, "h3"),
+                Ui.Text(running ? I18n.T("time.running") : I18n.T("time.last", ("when", Ui.Ago(played.LastPlayed))), "small", color: running ? Ui.Res("Good") : Ui.Res("Muted")),
+                Ui.Text(I18n.T("time.total", ("time", Features.PlayTime.Format(played.TotalMs))), "small muted"));
+            info.VerticalAlignment = VerticalAlignment.Center;
+            var gs = g;
+            var play = running
+                ? Ui.Button("", () => Features.Launcher.Stop(gs.Def.Id), "icon", Icons.Stop, I18n.T("v4.stop"))
+                : Ui.Button("", () => Actions.Play(gs), "icon primary", Icons.Play, I18n.T("games.play"));
+            play.VerticalAlignment = VerticalAlignment.Center;
+            var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"), ColumnSpacing = 12 };
+            grid.Children.Add(thumb);
+            Grid.SetColumn(info, 1);
+            grid.Children.Add(info);
+            Grid.SetColumn(play, 2);
+            grid.Children.Add(play);
+            var card = new Button { Classes = { "tile" }, Padding = new Thickness(12), Margin = new Thickness(0, 0, 14, 0), HorizontalAlignment = HorizontalAlignment.Stretch, Content = grid };
+            card.Click += (_, _) => MainWindow.Current?.Navigate(() => new GamePage(gs.Def.Id));
+            row.Children.Add(card);
+        }
+        return Ui.Col(12, Ui.Col(2, Ui.Text(I18n.T("v4.continue"), "h2"), Ui.Text(I18n.T("v4.continue.text"), "small muted")), row);
     }
 
     string? _popularFor;

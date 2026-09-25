@@ -218,6 +218,23 @@ public static partial class Nexus
             mod.Str("author") ?? mod.Str("uploaded_by") ?? "", mod.Str("picture_url"), file.Str("file_name"));
     }
 
+    /// <summary>Одобрить мод на Nexus (как в Vortex). Нужен ключ; Nexus требует, чтобы мод был скачан.</summary>
+    public static async Task Endorse(string domain, string modId, string version, string apiKey, CancellationToken ct = default)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"{V1}/games/{domain}/mods/{modId}/endorse.json")
+        {
+            Content = new FormUrlEncodedContent(new Dictionary<string, string> { ["version"] = version }),
+        };
+        request.Headers.TryAddWithoutValidation("apikey", apiKey);
+        foreach (var (k, v) in AppHeaders) request.Headers.TryAddWithoutValidation(k, v);
+        using var response = await Http.Client.SendAsync(request, ct);
+        var body = await response.Content.ReadAsStringAsync(ct);
+        if (response.IsSuccessStatusCode) return;
+        string? message = null;
+        try { message = JsonNode.Parse(body).Str("message"); } catch { }
+        throw new InvalidOperationException($"Nexus {(int)response.StatusCode}: {message ?? response.ReasonPhrase}");
+    }
+
     public static async Task<(string Name, bool Premium)> ValidateKey(string apiKey, CancellationToken ct = default)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, $"{V1}/users/validate.json");

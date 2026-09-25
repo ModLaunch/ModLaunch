@@ -27,8 +27,9 @@ public static class Actions
 
     public static bool IsBusy(GameState g, string catalogId) => Installing.Contains($"{g.Def.Id}/{catalogId}");
 
+    /// <summary>Стоит ли мод: номер ищем и как есть, и как мод Nexus (у игры может быть несколько каталогов).</summary>
     public static bool IsInstalled(GameState g, string catalogId) =>
-        g.Registry?.Get(g.Def.RecordId(catalogId)) is { } r && !r.Bool("missing");
+        (g.Registry?.Get(catalogId) ?? (g.Def.NexusDomain is null ? null : g.Registry?.Get(g.Def.RecordId(catalogId, "nexus")))) is { } r && !r.Bool("missing");
 
     public static void InstallLoader(GameState g)
     {
@@ -105,7 +106,7 @@ public static class Actions
 
         var meta = new JsonObject
         {
-            ["id"] = game.RecordId(modId),
+            ["id"] = game.RecordId(modId, "nexus"),
             ["name"] = mod.Name,
             ["version"] = file.Version is { Length: > 0 } fv ? fv : mod.Version,
             ["author"] = mod.Author,
@@ -141,6 +142,7 @@ public static class Actions
         {
             progress.Report(new InstallStep("install.extract", mod.Name));
             await Installer.InstallAny(registry, archive, meta, progress, ct);
+            DownloadArchive.Add(game.Id, game.RecordId(modId, "nexus"), meta.Str("version") ?? "", archive);
         }
         finally
         {
@@ -217,9 +219,10 @@ public static class Actions
             try
             {
                 progress.Report(new InstallStep("install.extract", info.Name));
+                DownloadArchive.Add(g.Def.Id, g.Def.RecordId(parsed.ModId, "nexus"), info.Version, archive);
                 var record = await Installer.InstallAny(registry, archive, new JsonObject
                 {
-                    ["id"] = g.Def.RecordId(parsed.ModId),
+                    ["id"] = g.Def.RecordId(parsed.ModId, "nexus"),
                     ["name"] = info.Name,
                     ["version"] = info.Version,
                     ["author"] = info.Author,
@@ -311,6 +314,47 @@ public static class Actions
         AppState.SetPath(g, dir);
         W.Toast(I18n.T("toast.pathSaved"));
     }
+
+    /// <summary>Переустановить мод из архива загрузок (без интернета, в том числе старую версию).</summary>
+    public static void ReinstallFromArchive(GameState g, JsonObject record, ArchivedFile file)
+    {
+        if (g.Registry is null) return;
+        var registry = g.Registry;
+        var id = record.Str("id")!;
+        Jobs.Run(record.Str("name") ?? id, g.Def.Name, async (_, progress, ct) =>
+        {
+            var wasEnabled = record.Bool("enabled", true);
+            if (!wasEnabled) registry.SetEnabled(id, true);
+            var oldFolder = registry.FolderFor(registry.Get(id)!);
+            var meta = (JsonObject)record.DeepClone();
+            meta["version"] = file.Version;
+            meta.Remove("installedAt");
+            progress.Report(new InstallStep("install.extract", record.Str("name") ?? id));
+            await Installer.InstallAny(registry, file.Path, meta, progress, ct);
+            var fresh = registry.Get(id);
+            if (fresh is not null && registry.FolderFor(fresh) != oldFolder && Directory.Exists(oldFolder)) Directory.Delete(oldFolder, true);
+            if (!wasEnabled) registry.SetEnabled(id, false);
+            Dispatcher.UIThread.Post(() => W.Toast(I18n.T("v4.reinstalled")));
+        });
+    }
+
+    /// <summary>Одобрить мод на Nexus (нужен ключ).</summary>
+    public static async Task Endorse(GameState g, string catalogId, string version)
+    {
+        var key = Settings.NexusApiKey;
+        if (string.IsNullOrEmpty(key)) { W.Toast(I18n.T("v4.endorse.key"), bad: true); return; }
+        try
+        {
+            await Nexus.Endorse(g.Def.NexusDomain!, catalogId, version, key);
+            var endorsed = Settings.Data.Obj("endorsed");
+            endorsed[$"{g.Def.Id}|{catalogId}"] = DateTime.UtcNow.ToString("o");
+            Settings.Save();
+            W.Toast(I18n.T("v4.endorsed"));
+        }
+        catch (Exception e) { W.Toast(Jobs.Explain(e), bad: true); }
+    }
+
+    public static bool IsEndorsed(GameState g, string catalogId) => Settings.Data.Obj("endorsed").Str($"{g.Def.Id}|{catalogId}") is not null;
 
     /// <summary>Поставить всё недостающее, что нашлось в каталоге.</summary>
     public static async Task InstallMissing(GameState g)

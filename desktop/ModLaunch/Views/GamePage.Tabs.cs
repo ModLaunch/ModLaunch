@@ -51,6 +51,7 @@ public sealed partial class GamePage
                 Ui.Button(I18n.T("prof.apply"), () => ApplyProfile(profile), p.Active ? "" : "primary", Icons.Check),
                 Ui.Button("", () => Overwrite(profile), "icon ghost", Icons.Save, I18n.T("prof.overwrite")),
                 Ui.Button("", () => Rename(profile), "icon ghost", Icons.Edit, I18n.T("prof.rename")),
+                Ui.Button("", () => { Profiles.Duplicate(_g.Def.Id, profile, I18n.T("v4.profile.copy", ("name", profile))); Build(); }, "icon ghost", Icons.Layers, I18n.T("v4.profile.duplicate")),
                 Ui.Button("", () => RemoveProfile(profile), "icon ghost", Icons.Trash, I18n.T("prof.remove")));
             buttons.VerticalAlignment = VerticalAlignment.Center;
             var row = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
@@ -275,6 +276,10 @@ public sealed partial class GamePage
 
     // ---------------------------------------------------------------- лог
 
+    string _logQuery = "";
+    bool _logErrors, _logRaw, _logFollow;
+    Avalonia.Threading.DispatcherTimer? _logTimer;
+
     Control LogView()
     {
         var report = Logs.Read(_g.Def, _g.Path!);
@@ -292,12 +297,51 @@ public sealed partial class GamePage
             return Ui.Card(col, 22);
         }
         col.Children.Add(Ui.Text(I18n.T("log.updated", ("time", report.Modified?.ToString("g", System.Globalization.CultureInfo.GetCultureInfo(I18n.Lang == "en" ? "en-US" : "ru-RU")) ?? "")) + " · " + report.Path, "small muted", wrap: true));
+
+        // Переключатель: «виновники» или весь лог с поиском (как в Modrinth App).
+        var modes = Ui.Row(6,
+            Ui.Button(I18n.T("log.problems"), () => { _logRaw = false; Build(); }, _logRaw ? "chip" : "chip active"),
+            Ui.Button(I18n.T("v4.log.raw"), () => { _logRaw = true; Build(); }, _logRaw ? "chip active" : "chip"));
+        col.Children.Add(modes);
+
+        if (_logRaw)
+        {
+            var lines = Logs.Tail(report.Path!, 4000);
+            var search = new TextBox { Text = _logQuery, Watermark = I18n.T("v4.log.search"), Width = 320 };
+            search.KeyDown += (_, e) => { if (e.Key == Avalonia.Input.Key.Enter) { _logQuery = search.Text ?? ""; Build(); } };
+            var errors = new CheckBox { Content = I18n.T("v4.log.errors"), IsChecked = _logErrors };
+            errors.IsCheckedChanged += (_, _) => { _logErrors = errors.IsChecked == true; Build(); };
+            var follow = new CheckBox { Content = I18n.T("v4.log.follow"), IsChecked = _logFollow };
+            follow.IsCheckedChanged += (_, _) =>
+            {
+                _logFollow = follow.IsChecked == true;
+                _logTimer?.Stop();
+                if (_logFollow) _logTimer = Avalonia.Threading.DispatcherTimer.Run(() => { if (_tab == "log" && _logFollow) Build(); return _logFollow; }, TimeSpan.FromSeconds(2)) as Avalonia.Threading.DispatcherTimer;
+            };
+            IEnumerable<string> shown = lines;
+            if (_logErrors) shown = shown.Where(l => l.Contains("Error", StringComparison.OrdinalIgnoreCase) || l.Contains("Fatal", StringComparison.OrdinalIgnoreCase) || l.Contains("Exception", StringComparison.OrdinalIgnoreCase));
+            if (_logQuery.Trim() != "") shown = shown.Where(l => l.Contains(_logQuery.Trim(), StringComparison.OrdinalIgnoreCase));
+            var list = shown.TakeLast(800).ToList();
+            var text = new SelectableTextBlock
+            {
+                Text = string.Join("\n", list),
+                FontFamily = new FontFamily("Cascadia Mono, Consolas, monospace"),
+                FontSize = 12,
+                TextWrapping = TextWrapping.NoWrap,
+                Foreground = Ui.Res("Muted"),
+            };
+            var viewer = new ScrollViewer { Content = text, Height = 460, HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto };
+            viewer.AttachedToVisualTree += (_, _) => viewer.ScrollToEnd();
+            col.Children.Add(Ui.Row(12, search, errors, follow, Ui.Text(I18n.T("v4.log.lines", ("n", list.Count)), "small muted")));
+            col.Children.Add(new Border { Background = Ui.Hex("#0B0D12"), CornerRadius = new CornerRadius(12), Padding = new Thickness(12), Child = viewer });
+            return Ui.Card(col, 22);
+        }
+
         if (report.Issues.Count == 0)
         {
             col.Children.Add(Ui.Row(10, Ui.Icon(Icons.Check, 18, Ui.Res("Good")), Ui.Text(I18n.T("log.clean"))));
             return Ui.Card(col, 22);
         }
-        col.Children.Add(Ui.Text(I18n.T("log.problems"), "h3"));
         foreach (var issue in report.Issues)
         {
             var match = _g.Registry?.List().FirstOrDefault(m => Deps.Norm(m.Str("name")) == Deps.Norm(issue.Mod) || Deps.Norm(m.Str("folder")) == Deps.Norm(issue.Mod));
@@ -316,6 +360,36 @@ public sealed partial class GamePage
             row.Children.Add(Ui.Col(4, Ui.Text(issue.Mod, "h3", color: Ui.Res("Bad")), new SelectableTextBlock { Text = issue.Message, TextWrapping = TextWrapping.Wrap, Foreground = Ui.Res("Muted"), FontSize = 12, MaxHeight = 60 }));
             col.Children.Add(new Border { Background = Ui.Res("Surface2"), CornerRadius = new CornerRadius(12), Padding = new Thickness(14, 10), Child = row });
         }
+        return Ui.Card(col, 22);
+    }
+
+    // ---------------------------------------------------------------- инструменты (как в Vortex)
+
+    Control ToolsView()
+    {
+        var col = Ui.Col(12, Ui.Text(I18n.T("v4.tools"), "h2"), Ui.Text(I18n.T("v4.tools.hint"), "muted", wrap: true));
+        var tools = Tools.For(_g.Def.Id);
+        if (tools.Count == 0) col.Children.Add(Ui.Text(I18n.T("v4.tools.empty"), "muted"));
+        foreach (var t in tools)
+        {
+            var tool = t;
+            var row = new DockPanel();
+            var buttons = Ui.Row(6,
+                Ui.Button(I18n.T("v4.tools.run"), () => { try { Tools.Run(tool); } catch (Exception e) { MainWindow.Current?.Toast(e.Message, bad: true); } }, "primary", Icons.Play),
+                Ui.Button("", () => Actions.OpenFolder(tool.Exe), "icon ghost", Icons.Folder),
+                Ui.Button("", () => { Tools.Remove(_g.Def.Id, tool.Exe); Build(); }, "icon ghost", Icons.Trash, I18n.T("v4.tools.remove")));
+            DockPanel.SetDock(buttons, Dock.Right);
+            row.Children.Add(buttons);
+            row.Children.Add(Ui.Col(2, Ui.Text(tool.Name, "h3"), Ui.Text(tool.Exe, "small muted")));
+            col.Children.Add(new Border { Background = Ui.Res("Surface2"), CornerRadius = new CornerRadius(12), Padding = new Thickness(14, 10), Child = row });
+        }
+        col.Children.Add(Ui.Button(I18n.T("v4.tools.add"), async () =>
+        {
+            var exe = await MainWindow.Current!.PickExe(I18n.T("dialog.pickExe"));
+            if (exe is null) return;
+            Tools.Add(_g.Def.Id, exe);
+            Build();
+        }, "", Icons.FilePlus));
         return Ui.Card(col, 22);
     }
 }

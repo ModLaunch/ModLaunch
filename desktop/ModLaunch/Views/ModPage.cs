@@ -36,7 +36,7 @@ public sealed class ModPage : Page
 
     async Task Load()
     {
-        try { _details = Program.Demo ? Demo.Details(_g.Def, _brief) : await Details.Load(_g.Def, _brief.Id); }
+        try { _details = Program.Demo ? Demo.Details(_g.Def, _brief) : await Details.Load(_g.Def, _brief.Id, source: _brief.Source); }
         catch (Exception e) { _error = Jobs.Explain(e); }
         Build();
     }
@@ -103,6 +103,13 @@ public sealed class ModPage : Page
             Build();
         }, fav ? "" : "ghost", Icons.Heart);
         var buttons = Ui.Col(8, action, heart);
+        if (mod.Source == "nexus" && installed)
+        {
+            var endorsed = Actions.IsEndorsed(_g, mod.Id);
+            var endorse = Ui.Button(endorsed ? "✓ " + I18n.T("v4.endorsed") : I18n.T("v4.endorse"), async () => { await Actions.Endorse(_g, mod.Id, mod.Version); Build(); }, "ghost", Icons.Heart);
+            endorse.IsEnabled = !endorsed;
+            buttons.Children.Add(endorse);
+        }
         if (mod.Url is not null) buttons.Children.Add(Ui.Button(I18n.T("mod.page"), () => Ui.OpenUrl(mod.Url), "ghost", Icons.External));
         buttons.VerticalAlignment = VerticalAlignment.Center;
 
