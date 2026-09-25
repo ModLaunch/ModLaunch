@@ -469,6 +469,43 @@ public static class SelfCheck
             return found.Count == 0 ? "no games on this machine (expected on CI)" : string.Join(", ", found);
         });
 
+        // ---------------------------------------------------------------- 6.0
+        await Check("nexus sort name/new", async () =>
+        {
+            var byName = await Nexus.Browse("subnautica", new Query(Sort: SortBy.Name), [], []);
+            var byNew = await Nexus.Browse("subnautica", new Query(Sort: SortBy.New), [], []);
+            if (byName.Mods.Count == 0 || byNew.Mods.Count == 0) throw new Exception("empty");
+            return $"name: {byName.Mods[0].Name}; new: {byNew.Mods[0].Name}";
+        });
+        await Check("catalog random + period", async () =>
+        {
+            var g = GameCatalog.ById("lethal-company")!;
+            var random = await Catalog.Browse(g, new Query(Sort: SortBy.Random));
+            var week = await Catalog.Browse(g, new Query(Sort: SortBy.Updated, Period: 7));
+            if (random.Mods.Count == 0) throw new Exception("random empty");
+            if (week.Mods.Any(m => m.UpdatedAt < DateTime.UtcNow.AddDays(-7))) throw new Exception("period filter leaked old mods");
+            return $"random page: {random.Mods.Count}, first {random.Mods[0].Name}; updated this week: {week.Mods.Count}";
+        });
+        await Check("changelog tab", async () =>
+        {
+            var g = GameCatalog.ById("lethal-company")!;
+            var mod = await Thunderstore.Get("lethal-company", "notnotnotswipez-MoreCompany") ?? throw new Exception("no mod");
+            var blocks = await Extras.Changelog(g, mod, await Extras.Versions(g, mod));
+            return $"{blocks.Count} changelog blocks";
+        });
+        await Check("youtube in description", () =>
+        {
+            var ids = Details.YouTube("see https://www.youtube.com/watch?v=dQw4w9WgXcQ and https://youtu.be/9bZkp7q19f0?t=3 [youtube]jNQXAC9IVRw[/youtube] <iframe src=\"https://www.youtube.com/embed/dQw4w9WgXcQ\">");
+            if (ids.Count != 3) throw new Exception(string.Join(",", ids));
+            return Task.FromResult(string.Join(", ", ids));
+        });
+        await Check("gamepad without controller", () =>
+        {
+            var pad = new Features.Gamepad();
+            for (var i = 0; i < 3; i++) pad.Tick();
+            return Task.FromResult(pad.Connected ? "gamepad connected" : "no gamepad (expected on CI), polling is safe");
+        });
+
         Console.WriteLine(failed == 0 ? "ALL OK" : $"{failed} FAILED");
         return failed == 0 ? 0 : 1;
     }

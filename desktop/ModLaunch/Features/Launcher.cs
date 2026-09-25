@@ -17,6 +17,7 @@ public static partial class Launcher
     static readonly Dictionary<string, (System.Diagnostics.Process Process, DateTime Started)> Running = [];
 
     public static bool IsRunning(string gameId) { lock (Running) return Running.ContainsKey(gameId); }
+    public static bool AnyRunning() { lock (Running) return Running.Count > 0; }
 
     public static DateTime? StartedAt(string gameId) { lock (Running) return Running.TryGetValue(gameId, out var r) ? r.Started : null; }
 

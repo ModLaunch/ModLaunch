@@ -214,6 +214,17 @@ public static class Program
         window.Navigate(() => new CreatorPage("docs"));
         Save("11h-docs");
 
+        var big = new BigPictureWindow(windowed: true);
+        big.Show();
+        Pump();
+        big.CaptureRenderedFrame()?.Save(Path.Combine(outDir, "13a-bigpicture.png"));
+        Console.WriteLine("saved 13a-bigpicture");
+        big.DemoMods();
+        Pump();
+        big.CaptureRenderedFrame()?.Save(Path.Combine(outDir, "13b-bigpicture-mods.png"));
+        Console.WriteLine("saved 13b-bigpicture-mods");
+        big.Close();
+
         var setup = new SetupWindow(ModLaunch.Setup.SetupMode.Install);
         setup.Show();
         Pump();

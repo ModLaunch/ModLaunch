@@ -223,7 +223,10 @@ public sealed class MainWindow : Window
         _search.VerticalAlignment = VerticalAlignment.Center;
         Grid.SetColumn(_search, 2);
         topbar.Children.Add(_search);
-        var dlWrap = new Border { Child = Ui.Row(10, _updatePill, _bell, _downloads), Margin = new Thickness(12, 0, 16, 0), VerticalAlignment = VerticalAlignment.Center };
+        var bigPicture = new Button { Classes = { "icon" }, Content = Ui.Icon(Icons.Tv, 18) };
+        ToolTip.SetTip(bigPicture, I18n.T("bp.open") + " (F11)");
+        bigPicture.Click += (_, _) => BigPictureWindow.Open();
+        var dlWrap = new Border { Child = Ui.Row(10, _updatePill, _bell, bigPicture, _downloads), Margin = new Thickness(12, 0, 16, 0), VerticalAlignment = VerticalAlignment.Center };
         Grid.SetColumn(dlWrap, 3);
         topbar.Children.Add(dlWrap);
         winButtons.VerticalAlignment = VerticalAlignment.Center;
@@ -609,6 +612,9 @@ public sealed class MainWindow : Window
         _bellList.Children.Add(Ui.Row(6, clear, center));
     }
 
+    /// <summary>Выйти из программы совсем (не в трей).</summary>
+    public void Quit() { _quitting = true; Close(); }
+
     void OnKey(object? sender, KeyEventArgs e)
     {
         if (e.KeyModifiers == KeyModifiers.Alt && e.Key == Key.Left) GoBack();
@@ -620,6 +626,7 @@ public sealed class MainWindow : Window
         else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.OemComma) Navigate(() => new SettingsPage());
         else if (e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift) && e.Key == Key.C) Navigate(() => new CreatorPage());
         else if (e.Key == Key.F1) Shortcuts();
+        else if (e.Key == Key.F11) BigPictureWindow.Open();
         else if (e.Key == Key.Escape) { if (_overlay.IsVisible) CloseDialog(); else _downloadsPanel.IsVisible = false; }
     }
 

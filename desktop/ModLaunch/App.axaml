@@ -276,6 +276,43 @@
     <Style Selector="Button.cover-btn Button.cover-play"><Setter Property="Opacity" Value="0"/></Style>
     <Style Selector="Button.cover-btn:pointerover Button.cover-play"><Setter Property="Opacity" Value="1"/></Style>
     <Style Selector="Button.cover-btn:pointerover Border"><Setter Property="BorderBrush" Value="{StaticResource Brand}"/></Style>
+    <!-- Big Picture -->
+    <Style Selector="Button.bp-cover">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="3"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="CornerRadius" Value="15"/>
+      <Setter Property="Opacity" Value="0.7"/>
+      <Setter Property="RenderTransform" Value="scale(1)"/>
+      <Setter Property="Transitions">
+        <Transitions>
+          <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.14"/>
+          <DoubleTransition Property="Opacity" Duration="0:0:0.14"/>
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Button.bp-cover:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="Transparent"/></Style>
+    <Style Selector="Button.bp-cover.selected">
+      <Setter Property="BorderBrush" Value="White"/>
+      <Setter Property="Opacity" Value="1"/>
+      <Setter Property="RenderTransform" Value="scale(1.1)"/>
+    </Style>
+    <Style Selector="Button.bp-cover.selected:pointerover /template/ ContentPresenter"><Setter Property="BorderBrush" Value="White"/></Style>
+    <Style Selector="Button.bp-action, Button.bp-row, Button.bp-icon">
+      <Setter Property="Background" Value="#33FFFFFF"/>
+      <Setter Property="BorderThickness" Value="2"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="Foreground" Value="White"/>
+    </Style>
+    <Style Selector="Button.bp-action:pointerover /template/ ContentPresenter, Button.bp-row:pointerover /template/ ContentPresenter, Button.bp-icon:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="#4DFFFFFF"/>
+    </Style>
+    <Style Selector="Button.bp-action.primary-bp"><Setter Property="Background" Value="{StaticResource Brand}"/></Style>
+    <Style Selector="Button.bp-action.primary-bp:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{StaticResource Brand2}"/></Style>
+    <Style Selector="Button.bp-action.focused, Button.bp-row.focused"><Setter Property="BorderBrush" Value="White"/></Style>
+    <Style Selector="Button.bp-row"><Setter Property="Background" Value="#14FFFFFF"/></Style>
+    <Style Selector="Button.bp-row.focused"><Setter Property="Background" Value="#2EFFFFFF"/></Style>
+
     <Style Selector="Border.skeleton"><Setter Property="Background" Value="{StaticResource Surface2}"/></Style>
     <Style Selector="Button.card-btn.dashed">
       <Setter Property="Background" Value="Transparent"/>
