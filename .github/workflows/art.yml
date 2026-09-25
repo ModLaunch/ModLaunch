@@ -14,8 +14,25 @@ jobs:
       - name: Download Steam art
         shell: bash
         run: |
-          set -u
-          sudo apt-get install -y -qq webp >/dev/null 2>&1 || true
+          set -u +e
+          pip install -q pillow
+          fit() { python3 -c "
+          import sys
+          from PIL import Image
+          src, dst, w, h = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
+          im = Image.open(src)
+          if h == 0:
+              im.thumbnail((w, 10000))
+          else:
+              k = max(w / im.width, h / im.height)
+              im = im.resize((round(im.width * k), round(im.height * k)))
+              l, t = (im.width - w) // 2, (im.height - h) // 2
+              im = im.crop((l, t, l + w, t + h))
+          if dst.endswith('.png'):
+              im.save(dst, optimize=True)
+          else:
+              im.convert('RGB').save(dst, quality=int(sys.argv[5]) if len(sys.argv) > 5 else 82, optimize=True)
+          " "$@"; }
           dir=desktop/ModLaunch/Assets/art
           mkdir -p "$dir"
           ids="413150 367520 1966720 264710 848450 892970 632360 3241660 3527290 450540 2881650 1229490 1557740 1366540 1030300 493520 794260"
@@ -29,10 +46,10 @@ jobs:
             echo "MISS $1 $2"; return 1
           }
           for id in $ids; do
-            get $id library_600x900.jpg /tmp/c.jpg && convert /tmp/c.jpg -resize 400x600^ -gravity center -extent 400x600 -quality 82 "$dir/$id-cover.jpg"
-            get $id library_hero.jpg /tmp/h.jpg && convert /tmp/h.jpg -resize 1600x -quality 78 "$dir/$id-hero.jpg"
-            get $id header.jpg /tmp/w.jpg && convert /tmp/w.jpg -quality 85 "$dir/$id-header.jpg"
-            get $id logo.png /tmp/l.png && convert /tmp/l.png -resize 640x\> "$dir/$id-logo.png"
+            get $id library_600x900.jpg /tmp/c.jpg && fit /tmp/c.jpg "$dir/$id-cover.jpg" 400 600 82
+            get $id library_hero.jpg /tmp/h.jpg && fit /tmp/h.jpg "$dir/$id-hero.jpg" 1600 0 76
+            get $id header.jpg /tmp/w.jpg && fit /tmp/w.jpg "$dir/$id-header.jpg" 460 0 85
+            get $id logo.png /tmp/l.png && fit /tmp/l.png "$dir/$id-logo.png" 640 0
           done
           ls -la "$dir"; du -sh "$dir"
       - name: Commit
