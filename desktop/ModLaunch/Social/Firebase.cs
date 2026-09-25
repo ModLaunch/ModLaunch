@@ -20,14 +20,9 @@ public static class Firebase
 
     static Firebase()
     {
-        try
-        {
-            using var stream = AssetLoader.Open(new Uri("avares://ModLaunch/Assets/reviews.config.json"));
-            var json = JsonNode.Parse(stream);
-            ProjectId = json.Str("projectId") ?? "";
-            ApiKey = json.Str("apiKey") ?? "";
-        }
-        catch { ProjectId = ""; ApiKey = ""; }
+        var json = Resources.Json("reviews.config.json");
+        ProjectId = json.Str("projectId") ?? "";
+        ApiKey = json.Str("apiKey") ?? "";
     }
 
     public static bool Configured => ProjectId != "" && ApiKey != "";

@@ -222,6 +222,7 @@ public static class SelfCheck
 
         await Check("reviews sync (read-only)", async () =>
         {
+            if (!Social.Firebase.Configured) throw new Exception("Firebase config not loaded");
             await Social.Reviews.Sync(force: true);
             var all = Social.Reviews.List();
             return $"{all.Count} reviews, {Social.Reviews.Stats().Count} rated mods";

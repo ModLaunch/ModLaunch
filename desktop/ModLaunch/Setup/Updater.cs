@@ -21,13 +21,8 @@ public static partial class Updater
 
     static (string, string) LoadRepo()
     {
-        try
-        {
-            using var stream = AssetLoader.Open(new Uri("avares://ModLaunch/Assets/update.config.json"));
-            var json = JsonNode.Parse(stream);
-            return (json.Str("owner") ?? "", json.Str("repo") ?? "");
-        }
-        catch { return ("", ""); }
+        var json = Resources.Json("update.config.json");
+        return (json.Str("owner") ?? "", json.Str("repo") ?? "");
     }
 
     public static bool Configured => Repo.Owner != "" && Repo.Repo != "";

@@ -39,6 +39,8 @@
 
   <ItemGroup>
     <AvaloniaResource Include="Assets/**" />
+    <!-- Настройки служб читаются и без запущенного интерфейса (самопроверка, установщик). -->
+    <EmbeddedResource Include="Assets/*.config.json" LogicalName="%(Filename)%(Extension)" />
     <TrimmerRootAssembly Include="ModLaunch" />
   </ItemGroup>
 
