@@ -1,0 +1,116 @@
+{
+  "results": [
+    {
+      "name": "на главной все игры (8)",
+      "ok": true,
+      "detail": " ·  ·  ·  ·  ·  ·  · "
+    },
+    {
+      "name": "Subnautica найдена по пути из настроек",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "каталог Subnautica загрузился с Nexus",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "в «Шейдерах» — полоса ReShade",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "поиск из шапки открывает каталог с найденным",
+      "ok": true,
+      "detail": "Seamoth Arms (BepInEx - Nautilus) / SeamothStorageAccess / Seamoth Energy Shield (BepInEx - Nautilus)"
+    },
+    {
+      "name": "у Decorations Mod в зависимостях Nautilus",
+      "ok": true,
+      "detail": "N, Nautilus"
+    },
+    {
+      "name": "игра запускается из ModHub",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "пока идёт игра, Ctrl+Shift+M занят под оверлей",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "оверлей открылся поверх всех окон",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "в оверлее идёт время сеанса",
+      "ok": true,
+      "detail": "0:02"
+    },
+    {
+      "name": "в оверлее — заметка к игре",
+      "ok": true,
+      "detail": "База у Затерянной реки: -1150, -680"
+    },
+    {
+      "name": "оверлей в песочнице: ни window.modhub, ни require",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "копия сохранений из оверлея",
+      "ok": true,
+      "detail": "20260925-191803-manual.zip"
+    },
+    {
+      "name": "Esc прячет оверлей",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "игру закрыли — сочетание снова свободно",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "игровое время посчитано",
+      "ok": true,
+      "detail": "{\"totalMs\":25139,\"sessions\":1,\"lastPlayed\":\"2026-09-25T19:18:00.298Z\",\"lastSessionMs\":25139,\"longestMs\":25139,\"running\":false}"
+    },
+    {
+      "name": "DXVK: exe игры распознан",
+      "ok": true,
+      "detail": "{\"exe\":\"C:\\\\Users\\\\RUNNER~1\\\\AppData\\\\Local\\\\Temp\\\\modhub-selftest-mCJK8p\\\\Games\\\\Old Game\\\\bin\\\\oldgame.exe\",\"dir\":\"C:\\\\Users\\\\RUNNER~1\\\\AppData\\\\Local\\\\Temp\\\\modhub-selftest-mCJK8p\\\\Games\\\\Old Game\\\\bin\",\"name\":\"Old Game\",\"arch\":\"x64\",\"api\":null,\"supported\":false,\"installed\":false}"
+    },
+    {
+      "name": "DXVK: скачан с GitHub и поставлен",
+      "ok": true,
+      "detail": "3.1.1: d3d10core.dll, d3d11.dll, dxgi.dll, dxgi.dll.modlaunch-backup, dxvk.modlaunch.json, oldgame.exe"
+    },
+    {
+      "name": "DXVK: своя DLL игры сохранена",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "экран «Графика» с DXVK открывается",
+      "ok": true,
+      "detail": "settings/graphics строк: 1"
+    },
+    {
+      "name": "DXVK: убран, всё как было",
+      "ok": true,
+      "detail": "dxgi.dll, oldgame.exe"
+    },
+    {
+      "name": "закрыли окно — программа вышла",
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "failed": 0,
+  "platform": "win32"
+}
