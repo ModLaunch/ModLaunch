@@ -220,6 +220,20 @@ public static class Program
         window.Navigate(() => new CreatorPage("docs"));
         Save("11h-docs");
 
+        // Широкий монитор 2560×1440: авто-масштаб и раскладка без пустых полей.
+        window.Width = 2560;
+        window.Height = 1440;
+        Pump(400);
+        window.Navigate(() => new HomePage());
+        Save("14a-wide-home");
+        window.Navigate(() => new LibraryPage());
+        Save("14b-wide-library");
+        window.Navigate(() => new SettingsPage("look"));
+        Save("14c-wide-settings");
+        window.Width = 1366;
+        window.Height = 800;
+        Pump(400);
+
         var big = new BigPictureWindow(windowed: true);
         big.Show();
         Pump();

@@ -27,7 +27,7 @@ public sealed class HomePage : Page
 
     public override void Build()
     {
-        var content = new StackPanel { Spacing = 30, Margin = new Thickness(32, 26, 32, 32), MaxWidth = 1240 };
+        var content = new StackPanel { Spacing = 30, Margin = new Thickness(32, 26, 32, 32), MaxWidth = 1680 };
 
         // Продолжить игру — последние запущенные.
         var recent = AppState.Games

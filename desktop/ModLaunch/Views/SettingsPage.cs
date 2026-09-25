@@ -65,7 +65,16 @@ public sealed class SettingsPage : Page
             _ => LookTab(),
         };
 
-        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*"), ColumnSpacing = 24, Margin = new Thickness(34, 26, 34, 34), MaxWidth = 1100 };
+        // На широком окне разделы встают в две колонки «кирпичиками».
+        if (body is StackPanel { Children.Count: > 1 } stack)
+        {
+            var masonry = new Masonry { Gap = stack.Spacing > 0 ? stack.Spacing : 16 };
+            var items = stack.Children.ToList();
+            stack.Children.Clear();
+            foreach (var c in items) masonry.Children.Add(c);
+            body = masonry;
+        }
+        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*"), ColumnSpacing = 24, Margin = new Thickness(34, 26, 34, 34), MaxWidth = 1800 };
         var side = Ui.Card(tabs, 10);
         side.VerticalAlignment = VerticalAlignment.Top;
         grid.Children.Add(side);
@@ -154,16 +163,23 @@ public sealed class SettingsPage : Page
         col.Children.Add(Section(I18n.T("look.accent"), null, accents));
 
         // Масштаб интерфейса.
-        var scales = Ui.Row(6);
-        foreach (var k in Look.Scales)
+        var scales = new WrapPanel();
+        var auto = Ui.Button(I18n.T("look.scale.auto"), () => { Look.SetAutoScale(); Build(); }, Look.AutoScale ? "chip active" : "chip", Icons.Sparkles);
+        auto.Margin = new Thickness(0, 0, 6, 6);
+        ToolTip.SetTip(auto, I18n.T("look.scale.auto.hint"));
+        scales.Children.Add(auto);
+        foreach (var k in Look.Scales.Concat([1.4]))
         {
             var kk = k;
             var chip = Ui.Button($"{k * 100:0}%", () => { Look.SetScale(kk); Build(); }, "chip");
-            if (Math.Abs(Look.Scale - k) < 0.001) chip.Classes.Add("active");
+            if (!Look.AutoScale && Math.Abs(Look.Scale - k) < 0.001) chip.Classes.Add("active");
+            chip.Margin = new Thickness(0, 0, 6, 6);
             scales.Children.Add(chip);
         }
         col.Children.Add(Section(I18n.T("look.scale"), I18n.T("look.scale.hint"), scales,
             Toggle(I18n.T("look.anim"), I18n.T("look.anim.hint"), Look.Animations, v => { Settings.Data["animations"] = v; MainWindow.Current?.Refresh(); }),
+            Toggle(I18n.T("look.smooth"), I18n.T("look.smooth.hint"), SmoothScroll.On, v => Settings.Data["smoothScroll"] = v),
+            Toggle(I18n.T("look.friendsDock"), I18n.T("look.friendsDock.hint"), Settings.Data.Bool("friendsDock", true), v => { Settings.Data["friendsDock"] = v; MainWindow.Current?.RefreshFriendsDock(); }),
             Toggle(I18n.T("look.compact"), I18n.T("look.compact.hint"), Settings.Data.Bool("compactLists"), v => Settings.Data["compactLists"] = v)));
         return col;
     }

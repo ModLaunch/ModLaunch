@@ -33,8 +33,27 @@ public static class Images
     static string Kind(Art art) => art switch { Art.Cover => "cover", Art.Header => "header", Art.Hero => "hero", _ => "logo" };
 
     /// <summary>Встроенная картинка игры (Assets/art/&lt;appid&gt;-&lt;вид&gt;), если есть.</summary>
+    /// <summary>Ширины декодирования округляются до нескольких ступеней: меньше разных копий в памяти и меньше работы.</summary>
+    static readonly int[] Buckets = [64, 128, 256, 384, 512, 768, 1024, 1600, 1920];
+    static int Bucket(int width) => Buckets.FirstOrDefault(b => b >= width, Buckets[^1]);
+
+    /// <summary>Заранее, в фоне, декодировать обложки и фоны — чтобы страницы открывались без подтормаживаний.</summary>
+    public static void Prewarm(IEnumerable<Games.GameDef> games)
+    {
+        var list = games.ToList();
+        _ = Task.Run(() =>
+        {
+            foreach (var g in list)
+            {
+                GameAsset(g, Art.Cover, 256); GameAsset(g, Art.Cover, 384); GameAsset(g, Art.Header, 256);
+            }
+            foreach (var g in list.Take(8)) { GameAsset(g, Art.Hero, 1600); GameAsset(g, Art.Logo, 768); }
+        });
+    }
+
     public static Bitmap? GameAsset(Games.GameDef def, Art art, int width)
     {
+        width = Bucket(width);
         if (def.SteamAppId <= 0) return null;
         var name = $"art/{def.SteamAppId}-{Kind(art)}.{(art == Art.Logo ? "png" : "jpg")}";
         return AssetExists(name) ? Asset(name, width) : null;

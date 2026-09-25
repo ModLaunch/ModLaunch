@@ -42,7 +42,7 @@ public sealed class LibraryPage : Page
 
     public override void Build()
     {
-        var content = new StackPanel { Spacing = 20, Margin = new Thickness(32, 26, 32, 32), MaxWidth = 1320 };
+        var content = new StackPanel { Spacing = 20, Margin = new Thickness(32, 26, 32, 32), MaxWidth = 1760 };
         bool Match(GameState g) => (_query == "" || g.Def.Name.Contains(_query, StringComparison.OrdinalIgnoreCase)) && InCollection(g);
         var all = MainWindow.OrderedGames().ToList();
         var installed = Sorted(all.Where(g => g.Status == Detect.Found && Match(g))).ToList();

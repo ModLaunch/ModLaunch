@@ -155,7 +155,7 @@ public sealed class Featured : UserControl
             var index = i;
             var b = new Button
             {
-                Classes = { "card-btn" }, Padding = new Thickness(8), Margin = new Thickness(0, 0, i < start + count - 1 ? 10 : 0, 0),
+                Classes = { "card-btn" }, Padding = new Thickness(8), Margin = new Thickness(0, 0, i < start + count - 1 ? 10 : 0, 0), HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Left,
                 Content = Ui.Row(10, new Border { Width = 64, Height = 40, CornerRadius = new CornerRadius(8), ClipToBounds = true, Child = Ui.Thumb(mod.Icon, mod.Name, 64, 0, 160) },
                     Ui.Col(1, new TextBlock { Text = mod.Name, FontWeight = FontWeight.SemiBold, FontSize = 13, TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = 130 }, Ui.Text(g.Def.ShortName, "small muted"))),
             };

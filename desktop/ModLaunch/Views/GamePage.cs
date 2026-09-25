@@ -78,7 +78,7 @@ public sealed partial class GamePage : Page
 
     public override void Build()
     {
-        var content = new StackPanel { Spacing = 18, Margin = new Thickness(34, 22, 34, 34), MaxWidth = 1180 };
+        var content = new StackPanel { Spacing = 18, Margin = new Thickness(34, 22, 34, 34), MaxWidth = 1640 };
         content.Children.Add(Header());
         if (_g.Status == Detect.Found)
         {

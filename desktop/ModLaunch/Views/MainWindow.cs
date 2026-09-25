@@ -46,6 +46,7 @@ public sealed class MainWindow : Window
     readonly Border _asideHost = new() { Width = 304, BorderThickness = new Thickness(1, 0, 0, 0) };
     readonly Border _glow = new() { IsHitTestVisible = false };
     Button? _asideToggle;
+    FriendsDock? _friendsDock;
     readonly TextBox _search = new() { Width = 320, Height = 40 };
     readonly Button _back, _forward, _downloads, _settingsButton, _friendsButton, _statsButton, _donateButton, _creatorButton, _libraryButton, _modsButton;
     readonly LayoutTransformControl _scale = new();
@@ -157,6 +158,8 @@ public sealed class MainWindow : Window
         Features.Launcher.Exited += OnGameExit;
         Features.Nxm.Received += OnExternal;
 
+        SmoothScroll.Attach(this);
+        Images.Prewarm(AppState.Games.Select(g => g.Def));
         Navigate(StartPage());
         RenderRail();
         SetupTray();
@@ -194,7 +197,8 @@ public sealed class MainWindow : Window
         top.Margin = new Thickness(0, 14, 0, 10);
         top.HorizontalAlignment = HorizontalAlignment.Center;
         DockPanel.SetDock(top, Dock.Top);
-        var bottom = Ui.Col(8, _creatorButton, _friendsButton, _statsButton, _settingsButton);
+        // Друзья — внизу окна (как «Друзья и чат» в Steam), на панели остаются инструменты.
+        var bottom = Ui.Col(8, _creatorButton, _statsButton, _settingsButton);
         bottom.Margin = new Thickness(0, 10, 0, 16);
         bottom.HorizontalAlignment = HorizontalAlignment.Center;
         DockPanel.SetDock(bottom, Dock.Bottom);
@@ -277,7 +281,11 @@ public sealed class MainWindow : Window
         DockPanel.SetDock(_asideHost, Dock.Right);
         main.Children.Add(_asideHost);
         main.Children.Add(new Panel { Children = { _glow, _page } });
-        SizeChanged += (_, _) => UpdateAsideVisibility();
+        SizeChanged += (_, _) =>
+        {
+            if (Look.AutoScale && Math.Abs(EffectiveScale() - _appliedScale) > 0.001) ApplyScale();
+            UpdateAsideVisibility();
+        };
 
         var root = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*") };
         root.Children.Add(railBorder);
@@ -290,6 +298,8 @@ public sealed class MainWindow : Window
         layers.Children.Add(root);
         layers.Children.Add(_downloadsPanel);
         layers.Children.Add(_bellPanel);
+        _friendsDock = new FriendsDock();
+        layers.Children.Add(_friendsDock);
         layers.Children.Add(_toasts);
         layers.Children.Add(_overlay);
         return layers;
@@ -368,7 +378,7 @@ public sealed class MainWindow : Window
     }
 
     void UpdateAsideVisibility() =>
-        _asideHost.IsVisible = _aside.Content is not null && Settings.Data.Bool("asideOpen", true) && Bounds.Width / Math.Max(0.5, Look.Scale) >= 1180;
+        _asideHost.IsVisible = _aside.Content is not null && Settings.Data.Bool("asideOpen", true) && Bounds.Width / Math.Max(0.5, _appliedScale) >= 1180;
 
     void RenderGlow()
     {
@@ -471,10 +481,23 @@ public sealed class MainWindow : Window
         RenderRail();
     }
 
+    double _appliedScale = 1;
+    public double Scale => _appliedScale;
+
+    /// <summary>Масштаб: выбранный вручную или «авто» — от ширины окна (1500 пикселей и больше — крупнее, до 140%).</summary>
+    double EffectiveScale()
+    {
+        if (!Look.AutoScale) return Look.Scale;
+        var w = ClientSize.Width;
+        if (w <= 0) return 1;
+        return Math.Round(Math.Clamp(w / 1500.0, 1.0, 1.4) * 20) / 20; // шаг 5%, чтобы не пересчитывать раскладку на каждый пиксель
+    }
+
     void ApplyScale()
     {
         _layers?.Classes.Set("anim", Look.Animations);
-        var k = Look.Scale;
+        var k = EffectiveScale();
+        _appliedScale = k;
         _scale.LayoutTransform = Math.Abs(k - 1) < 0.001 ? null : new ScaleTransform(k, k);
         if (_brandWord is not null) _brandWord.IsVisible = Settings.Data.Bool("showBrand", true);
         if (_railHost is not null) _railHost.IsVisible = !Settings.Data.Bool("railHidden");
@@ -712,6 +735,8 @@ public sealed class MainWindow : Window
         var center = Ui.Button(I18n.T("mc.open"), () => { _bellPanel.IsVisible = false; Navigate(() => new ModsCenterPage()); }, "ghost", Icons.Package);
         _bellList.Children.Add(Ui.Row(6, clear, center));
     }
+
+    public void RefreshFriendsDock() => _friendsDock?.Render();
 
     /// <summary>Выйти из программы совсем (не в трей).</summary>
     public void Quit() { _quitting = true; Close(); }

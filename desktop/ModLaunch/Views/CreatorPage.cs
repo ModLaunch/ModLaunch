@@ -64,7 +64,7 @@ public sealed partial class CreatorPage : Page
 
     public override void Build()
     {
-        var content = new StackPanel { Spacing = 18, Margin = new Thickness(34, 26, 34, 34), MaxWidth = 1280 };
+        var content = new StackPanel { Spacing = 18, Margin = new Thickness(34, 26, 34, 34), MaxWidth = 1640 };
 
         // Шапка: название и вкладки.
         var tabs = Ui.Row(4);

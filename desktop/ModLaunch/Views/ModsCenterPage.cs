@@ -28,7 +28,7 @@ public sealed class ModsCenterPage : Page
 
     public override void Build()
     {
-        var content = new StackPanel { Spacing = 18, Margin = new Thickness(32, 26, 32, 32), MaxWidth = 1100 };
+        var content = new StackPanel { Spacing = 18, Margin = new Thickness(32, 26, 32, 32), MaxWidth = 1400 };
         content.Children.Add(Ui.Col(4, Ui.Text(I18n.T("mc.title"), "h1"), Ui.Text(I18n.T("mc.text"), "muted", wrap: true)));
 
         var installedUpdates = ModUpdates.Found.Sum(kv => kv.Value.Count);

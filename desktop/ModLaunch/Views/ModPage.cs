@@ -62,7 +62,7 @@ public sealed partial class ModPage : Page
 
     public override void Build()
     {
-        var col = new StackPanel { Spacing = 18, Margin = new Thickness(34, 22, 34, 34), MaxWidth = 1100 };
+        var col = new StackPanel { Spacing = 18, Margin = new Thickness(34, 22, 34, 34), MaxWidth = 1500 };
         col.Children.Add(Header());
         col.Children.Add(Tabs());
         col.Children.Add(TabContent());
