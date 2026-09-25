@@ -35,10 +35,17 @@ public static partial class Installer
     }
 
     /// <summary>Каталожный мод с прямой ссылкой (Thunderstore, ModLinks) — вместе с зависимостями.</summary>
-    public static async Task<int> InstallFromCatalog(ModRegistry registry, ModInfo mod, IProgress<InstallStep> progress, CancellationToken ct, bool reinstall = false)
+    public static async Task<int> InstallFromCatalog(ModRegistry registry, ModInfo mod, IProgress<InstallStep> progress, CancellationToken ct, bool reinstall = false, string? pinVersion = null, string? pinUrl = null)
     {
         progress.Report(new InstallStep("install.deps", mod.Name));
         var (steps, _) = await Plan(registry.Game, mod, ct);
+        // Своя версия (вкладка «Файлы и версии»): вместо последней — выбранная.
+        if (pinVersion is not null)
+        {
+            reinstall = true;
+            var at = steps.FindIndex(x => x.Id == mod.Id);
+            if (at >= 0) steps[at] = steps[at].WithVersion(pinVersion, pinUrl);
+        }
         var installed = 0;
         for (var i = 0; i < steps.Count; i++)
         {
@@ -46,6 +53,15 @@ public static partial class Installer
             if (!(reinstall && entry.Id == mod.Id) && registry.Get(entry.Id) is { } existing && !existing.Bool("missing"))
             {
                 progress.Report(new InstallStep("install.exists", entry.Name, i + 1, steps.Count));
+                continue;
+            }
+            if (entry.Source == "hub")
+            {
+                // ModLaunch Hub: архив из кусков (пакет) или сборка из исходника (скрипт).
+                var hubVersion = entry.Id == mod.Id && pinVersion is not null ? (await Creator.Hub.Versions(entry.Id)).FirstOrDefault(v => v.Version == pinVersion) : null;
+                var step = i + 1;
+                await Creator.HubInstaller.Install(registry, entry.Id, new Progress<double>(r => progress.Report(new InstallStep("install.download", entry.Name, step, steps.Count, r))), ct, hubVersion);
+                installed++;
                 continue;
             }
             var url = entry.DownloadUrl ?? throw new InvalidOperationException(I18n.T("err.modNotInCatalog"));

@@ -1,41 +1,131 @@
-    // ── Creator Hub ModLaunch 5.0 ────────────────────────────────────────
+    // ── ModLaunch Hub (Creator Hub 5.5) ──────────────────────────────────
     // Вставить в консоли Firebase: Firestore Database → Правила, внутрь
     // блока match /databases/{database}/documents { … }, рядом с правилами
-    // отзывов и друзей, и нажать «Опубликовать». Остальное эти строки не трогают.
+    // отзывов и друзей, и нажать «Опубликовать». Если вставляли правила
+    // Creator Hub 5.0 — замените их этими целиком.
     //
-    // Галерея модов сообщества: исходник на ModScript (до 20 000 знаков).
-    // Читать могут все, писать — только автор и только свой документ
-    // (имя документа начинается с его uid).
+    // creations — карточки модов (читают все, пишет только автор).
+    // creations/{id}/versions — история версий; /likes — один лайк на человека;
+    // /comments — комментарии. blobs — файлы модов кусками (до 1 МБ на кусок).
+    // reports — жалобы: создать может любой, читает только владелец проекта.
 
-    function creatorMember() {
+    function hubMember() {
       return request.auth != null && request.auth.token.get('email', '') != '';
     }
-    function creatorText(value, max) {
+    function hubText(value, max) {
       return value is string && value.size() <= max;
     }
-    function creatorValid(data) {
-      return data.keys().hasOnly(['uid', 'author', 'name', 'about', 'game', 'version', 'code', 'app', 'created', 'updated'])
+    function hubDoc(id) {
+      return /databases/$(database)/documents/creations/$(id);
+    }
+    function hubValid(data) {
+      return data.keys().hasOnly(['uid', 'author', 'name', 'summary', 'description', 'game', 'version', 'kind', 'code',
+                                  'tags', 'images', 'size', 'sha256', 'chunks', 'fileName', 'changelog', 'app',
+                                  'likes', 'downloads', 'comments', 'created', 'updated'])
         && data.uid == request.auth.uid
-        && creatorText(data.author, 32) && data.author.size() > 0
-        && creatorText(data.name, 60) && data.name.size() > 0
-        && creatorText(data.about, 300)
-        && creatorText(data.game, 40) && data.game.size() > 0
-        && creatorText(data.version, 20) && data.version.matches('^[0-9]+[.][0-9]+[.][0-9]+$')
-        && creatorText(data.code, 20000) && data.code.size() > 0
-        && creatorText(data.app, 20)
+        && hubText(data.author, 32) && data.author.size() > 0
+        && hubText(data.name, 60) && data.name.size() > 0
+        && hubText(data.summary, 200)
+        && hubText(data.description, 5000)
+        && hubText(data.game, 40) && data.game.size() > 0
+        && hubText(data.version, 20) && data.version.matches('^[0-9]+[.][0-9]+[.][0-9]+$')
+        && data.kind in ['script', 'package']
+        && hubText(data.code, 20000)
+        && data.tags is list && data.tags.size() <= 6
+        && data.images is list && data.images.size() <= 6
+        && data.size is int && data.size >= 0 && data.size <= 8388608
+        && hubText(data.sha256, 64)
+        && data.chunks is int && data.chunks >= 0 && data.chunks <= 16
+        && hubText(data.fileName, 120)
+        && hubText(data.changelog, 2000)
+        && hubText(data.app, 20)
         && data.updated == request.time;
+    }
+    function hubCounters(field) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([field]);
     }
 
     match /creations/{id} {
       allow get, list: if true;
-      allow create: if creatorMember()
+      allow create: if hubMember()
         && id.matches('^' + request.auth.uid.lower() + '_[a-z0-9_]{1,60}$')
-        && creatorValid(request.resource.data)
+        && hubValid(request.resource.data)
+        && request.resource.data.likes == 0
+        && request.resource.data.downloads == 0
+        && request.resource.data.comments == 0
         && request.resource.data.created == request.time;
-      allow update: if creatorMember()
-        && resource.data.uid == request.auth.uid
-        && creatorValid(request.resource.data)
-        && request.resource.data.created == resource.data.created;
-      allow delete: if creatorMember() && resource.data.uid == request.auth.uid;
+      allow update: if
+        // Автор меняет карточку; счётчики и дата создания не трогаются.
+        (hubMember()
+          && resource.data.uid == request.auth.uid
+          && hubValid(request.resource.data)
+          && request.resource.data.created == resource.data.created
+          && request.resource.data.likes == resource.data.likes
+          && request.resource.data.downloads == resource.data.downloads
+          && request.resource.data.comments == resource.data.comments)
+        // Загрузки: +1 от любого (и анонимного) пользователя программы.
+        || (request.auth != null && hubCounters('downloads')
+          && request.resource.data.downloads == resource.data.downloads + 1)
+        // Лайк: +1 вместе с созданием своего лайка, −1 вместе с удалением.
+        || (hubMember() && hubCounters('likes')
+          && ((request.resource.data.likes == resource.data.likes + 1
+                && existsAfter(/databases/$(database)/documents/creations/$(id)/likes/$(request.auth.uid))
+                && !exists(/databases/$(database)/documents/creations/$(id)/likes/$(request.auth.uid)))
+            || (request.resource.data.likes == resource.data.likes - 1
+                && !existsAfter(/databases/$(database)/documents/creations/$(id)/likes/$(request.auth.uid))
+                && exists(/databases/$(database)/documents/creations/$(id)/likes/$(request.auth.uid)))))
+        // Комментарии: ±1 вместе с комментарием.
+        || (hubMember() && hubCounters('comments')
+          && (request.resource.data.comments == resource.data.comments + 1
+            || request.resource.data.comments == resource.data.comments - 1));
+      allow delete: if hubMember() && resource.data.uid == request.auth.uid;
+
+      match /versions/{version} {
+        allow get, list: if true;
+        allow create, update: if hubMember()
+          && getAfter(hubDoc(id)).data.uid == request.auth.uid
+          && request.resource.data.keys().hasOnly(['version', 'changelog', 'size', 'sha256', 'chunks', 'created'])
+          && request.resource.data.version == version
+          && hubText(request.resource.data.changelog, 2000);
+        allow delete: if hubMember() && get(hubDoc(id)).data.uid == request.auth.uid;
+      }
+
+      match /likes/{uid} {
+        allow get, list: if true;
+        allow create: if hubMember() && uid == request.auth.uid
+          && request.resource.data.keys().hasOnly(['created']) && request.resource.data.created == request.time;
+        allow delete: if hubMember() && uid == request.auth.uid;
+      }
+
+      match /comments/{comment} {
+        allow get, list: if true;
+        allow create: if hubMember()
+          && request.resource.data.keys().hasOnly(['uid', 'author', 'text', 'created'])
+          && request.resource.data.uid == request.auth.uid
+          && hubText(request.resource.data.author, 32)
+          && hubText(request.resource.data.text, 1000) && request.resource.data.text.size() > 0
+          && request.resource.data.created == request.time;
+        // Удалить может автор комментария или автор мода.
+        allow delete: if hubMember()
+          && (resource.data.uid == request.auth.uid || get(hubDoc(id)).data.uid == request.auth.uid);
+      }
     }
-    // ── конец правил Creator Hub ─────────────────────────────────────────
+
+    match /blobs/{blob} {
+      allow get: if true;
+      allow create, update: if hubMember()
+        && blob.matches('^' + request.auth.uid.lower() + '_.*')
+        && request.resource.data.keys().hasOnly(['uid', 'n', 'data'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.data is string && request.resource.data.data.size() <= 1000000;
+      allow delete: if hubMember() && resource.data.uid == request.auth.uid;
+    }
+
+    match /reports/{report} {
+      allow create: if request.auth != null
+        && report.matches('^.+__' + request.auth.uid + '$')
+        && request.resource.data.keys().hasOnly(['creation', 'uid', 'reason', 'created'])
+        && request.resource.data.uid == request.auth.uid
+        && hubText(request.resource.data.reason, 500);
+    }
+    // ── конец правил ModLaunch Hub ───────────────────────────────────────

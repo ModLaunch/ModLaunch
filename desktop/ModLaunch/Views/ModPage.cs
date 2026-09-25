@@ -11,7 +11,7 @@ using ModLaunch.Sources;
 namespace ModLaunch.Views;
 
 /// <summary>Страница мода: описание, картинки, требования, установка и отзывы.</summary>
-public sealed class ModPage : Page
+public sealed partial class ModPage : Page
 {
     readonly GameState _g;
     readonly ModInfo _brief;
@@ -27,6 +27,7 @@ public sealed class ModPage : Page
         _brief = mod;
         _ = Load();
         _ = SyncReviews();
+        _ = LoadExtras();
     }
 
     public override string Title => _brief.Name;
@@ -62,7 +63,10 @@ public sealed class ModPage : Page
             if (_details.Images.Count > 0) col.Children.Add(Gallery());
             col.Children.Add(About());
         }
-        col.Children.Add(ReviewsCard());
+        col.Children.Add(VersionsCard());
+        if (AuthorCard() is { } author) col.Children.Add(author);
+        if (_brief.Source == "hub") col.Children.Add(CommentsCard());
+        else col.Children.Add(ReviewsCard());
         Content = new ScrollViewer { Content = col, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
     }
 
@@ -111,6 +115,7 @@ public sealed class ModPage : Page
             buttons.Children.Add(endorse);
         }
         if (mod.Url is not null) buttons.Children.Add(Ui.Button(I18n.T("mod.page"), () => Ui.OpenUrl(mod.Url), "ghost", Icons.External));
+        ExtraButtons(buttons, mod);
         buttons.VerticalAlignment = VerticalAlignment.Center;
 
         var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"), ColumnSpacing = 22 };

@@ -32,6 +32,7 @@
         <ColorPaletteResources x:Key="Dark" Accent="#7C5CFF" RegionColor="#0F1116" ErrorText="#FF6B6B"/>
       </FluentTheme.Palettes>
     </FluentTheme>
+    <StyleInclude Source="avares://AvaloniaEdit/Themes/Fluent/AvaloniaEdit.xaml"/>
 
     <Style Selector="Window">
       <Setter Property="Background" Value="{StaticResource Bg}"/>
@@ -229,6 +230,74 @@
           <KeyFrame Cue="100%"><Setter Property="Opacity" Value="1"/></KeyFrame>
         </Animation>
       </Style.Animations>
+    </Style>
+
+    <!-- 5.5: анимации. Работают, когда у корня окна есть класс anim (настройка «Анимации»). -->
+    <Style Selector=".anim Button.rise">
+      <Setter Property="Transitions">
+        <Transitions>
+          <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.18" Easing="CubicEaseOut"/>
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector=".anim Button.rise:pointerover"><Setter Property="RenderTransform" Value="translateY(-5px)"/></Style>
+    <Style Selector=".anim Button.rise:pointerover /template/ ContentPresenter">
+      <Setter Property="BoxShadow" Value="0 14 34 0 #55000000"/>
+    </Style>
+    <Style Selector=".anim Button.primary:pointerover /template/ ContentPresenter">
+      <Setter Property="BoxShadow" Value="0 6 22 0 #557C5CFF"/>
+    </Style>
+    <Style Selector=".anim Border.skeleton">
+      <Style.Animations>
+        <Animation Duration="0:0:1.2" IterationCount="Infinite" PlaybackDirection="Alternate" Easing="SineEaseInOut">
+          <KeyFrame Cue="0%"><Setter Property="Opacity" Value="0.35"/></KeyFrame>
+          <KeyFrame Cue="100%"><Setter Property="Opacity" Value="0.85"/></KeyFrame>
+        </Animation>
+      </Style.Animations>
+    </Style>
+    <Style Selector=".anim Border.float">
+      <Style.Animations>
+        <Animation Duration="0:0:3.2" IterationCount="Infinite" PlaybackDirection="Alternate" Easing="SineEaseInOut">
+          <KeyFrame Cue="0%"><Setter Property="TranslateTransform.Y" Value="-6"/></KeyFrame>
+          <KeyFrame Cue="100%"><Setter Property="TranslateTransform.Y" Value="6"/></KeyFrame>
+        </Animation>
+      </Style.Animations>
+    </Style>
+    <Style Selector=".anim Border.pulse">
+      <Style.Animations>
+        <Animation Duration="0:0:0.9" IterationCount="Infinite" PlaybackDirection="Alternate" Easing="SineEaseInOut">
+          <KeyFrame Cue="0%"><Setter Property="ScaleTransform.ScaleX" Value="0.8"/><Setter Property="ScaleTransform.ScaleY" Value="0.8"/></KeyFrame>
+          <KeyFrame Cue="100%"><Setter Property="ScaleTransform.ScaleX" Value="1.25"/><Setter Property="ScaleTransform.ScaleY" Value="1.25"/></KeyFrame>
+        </Animation>
+      </Style.Animations>
+    </Style>
+    <Style Selector=".anim Button.rail">
+      <Setter Property="Transitions">
+        <Transitions>
+          <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.16"/>
+          <BrushTransition Property="BorderBrush" Duration="0:0:0.2"/>
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector=".anim Button.rail:pointerover"><Setter Property="RenderTransform" Value="scale(1.08)"/></Style>
+    <Style Selector=".anim Button.chip">
+      <Setter Property="Transitions">
+        <Transitions>
+          <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.12"/>
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector=".anim Button.chip:pointerover"><Setter Property="RenderTransform" Value="translateY(-1px)"/></Style>
+    <Style Selector="Border.hero">
+      <Setter Property="Background" Value="{StaticResource Surface}"/>
+    </Style>
+    <Style Selector=".anim Border.hero">
+      <Setter Property="Background">
+        <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+          <GradientStop Color="#2A2350" Offset="0"/>
+          <GradientStop Color="#171A21" Offset="0.65"/>
+        </LinearGradientBrush>
+      </Setter>
     </Style>
   </Application.Styles>
 </Application>

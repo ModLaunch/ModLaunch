@@ -274,8 +274,9 @@ public static class SelfCheck
                 lines.Add($"{g.Id}={total} ({string.Join(", ", parts)})");
                 if (total < 1000) small.Add(g.Id);
             }
-            // Hollow Knight, Below Zero, ROUNDS и Dyson Sphere Program: на всех сайтах вместе меньше 1000 модов — больше просто нет.
-            var unexpected = small.Where(id => id is not ("hollow-knight" or "subnautica-below-zero" or "rounds" or "dyson-sphere-program")).ToList();
+            // Hollow Knight, Below Zero, ROUNDS, Dyson Sphere Program, GTFO и Outward: на всех сайтах вместе меньше 1000 модов — больше просто нет.
+            // ULTRAKILL и Content Warning — ровно около 1000, число гуляет на пару модов.
+            var unexpected = small.Where(id => id is not ("hollow-knight" or "subnautica-below-zero" or "rounds" or "dyson-sphere-program" or "gtfo" or "outward" or "ultrakill" or "content-warning")).ToList();
             if (unexpected.Count > 0) throw new Exception("under 1000: " + string.Join(", ", unexpected) + " | " + string.Join("; ", lines));
             return string.Join("; ", lines);
         });
@@ -387,6 +388,77 @@ public static class SelfCheck
             var (community, package, domain, nexusId) = await CustomGames.FindSources("Lethal Company");
             if (community != "lethal-company" || domain != "lethalcompany") throw new Exception($"sources {community} {domain}");
             return $"unity ok, unreal mods → {paks}; Lethal Company → {community} ({package}), nexus {domain} #{nexusId}";
+        });
+
+        await Check("modscript 5.5: if/else, write, json", () =>
+        {
+            var b = Creator.ModScript.Compile("mod \"T\"\ngame valheim\nlet n = 3\nif $n > 5 {\n  let r = \"big\"\n}\nelse if $n >= 3 {\n  let r = \"mid\"\n}\nelse {\n  let r = \"small\"\n}\nwrite \"a.txt\" = \"r=$r\"\nwrite \"b.json\" = json \"{\\\"x\\\": 1}\"\nif $r contains mi {\n  print \"ok\"\n}\n");
+            if (!b.Ok) throw new Exception(string.Join("; ", b.Diags.Select(d => $"{d.Line} {d.Message}")));
+            if (b.Writes.Count != 2 || b.Writes[0].Text != "r=mid") throw new Exception("writes: " + string.Join(" | ", b.Writes.Select(w => w.Path + "=" + w.Text)));
+            if (b.Log.Count != 1) throw new Exception("contains failed");
+            var letter = Creator.ModScript.Compile(Creator.Templates.ById("sdv-letter")!.Code);
+            if (letter.Changes.Last()["Entries"]?["ModLaunch.Welcome"]?["Trigger"]?.GetValue<string>() != "DayStarted") throw new Exception("json entry: " + letter.Changes.Last().ToJsonString());
+            var rain = Creator.ModScript.Compile(Creator.Templates.ById("sdv-rain")!.Code);
+            if (rain.Changes.Count != 35) throw new Exception($"nested loops gave {rain.Changes.Count}");
+            return Task.FromResult($"else-if ok, {b.Writes.Count} files, json entry ok, nested loops 35");
+        });
+        await Check("examples: every needs exists", async () =>
+        {
+            var bad = new List<string>();
+            var n = 0;
+            foreach (var t in Creator.Templates.All)
+            {
+                var b = Creator.ModScript.Compile(t.Code);
+                var game = GameCatalog.ById(b.Game);
+                if (game is null) { bad.Add($"{t.Id}: game {b.Game}"); continue; }
+                foreach (var need in b.Needs)
+                {
+                    n++;
+                    if (await Catalog.Get(game, need, default, "thunderstore") is null) bad.Add($"{t.Id}: {need}");
+                }
+            }
+            if (bad.Count > 0) throw new Exception(string.Join(", ", bad));
+            return $"{Creator.Templates.All.Length} examples, {n} required mods found";
+        });
+        await Check("nexus-grade: versions + author", async () =>
+        {
+            var lc = GameCatalog.ById("lethal-company")!;
+            var mc = (await Catalog.Get(lc, "notnotnotswipez-MoreCompany"))!;
+            var tsVersions = await Extras.Versions(lc, mc);
+            var tsAuthor = await Extras.ByAuthor(lc, (await Catalog.Get(lc, "FlipMods-ReservedFlashlightSlot"))!);
+            var sn = GameCatalog.ById("subnautica")!;
+            var naut = (await Catalog.Get(sn, "1262", default, "nexus"))!;
+            var nxVersions = await Extras.Versions(sn, naut);
+            var nxAuthor = await Extras.ByAuthor(sn, naut);
+            if (tsVersions.Count < 2 || nxVersions.Count < 2) throw new Exception($"versions ts {tsVersions.Count} nexus {nxVersions.Count}");
+            if (tsVersions.Any(v => v.Url is null)) throw new Exception("ts version without url");
+            return $"MoreCompany {tsVersions.Count} versions (latest {tsVersions[0].Version}); FlipMods {tsAuthor.Count} more mods; Nautilus {nxVersions.Count} files, changelog lines {nxVersions.Sum(v => v.Changelog.Split('\n').Length)}; author {nxAuthor.Count} more";
+        });
+        await Check("blocklist + tracking", () =>
+        {
+            var g = GameCatalog.ById("valheim")!;
+            var mod = new ModInfo { Source = "thunderstore", Id = "Someone-Thing", Name = "Thing", Author = "Someone" };
+            Features.Blocklist.HideAuthor(mod);
+            if (!Catalog.IsHidden(g, mod)) throw new Exception("author not hidden");
+            Features.Blocklist.Clear();
+            if (Catalog.IsHidden(g, mod)) throw new Exception("not cleared");
+            Features.Tracking.Toggle("valheim", mod);
+            if (!Features.Tracking.Has("valheim", mod)) throw new Exception("not tracked");
+            Features.Tracking.Toggle("valheim", mod);
+            return Task.FromResult("hide/unhide, track/untrack ok");
+        });
+        await Check("ModLaunch Hub reachable", async () =>
+        {
+            try
+            {
+                var all = await Creator.Hub.All(force: true);
+                return $"{all.Count} mods in Hub, {all.Select(m => m.Uid).Distinct().Count()} authors";
+            }
+            catch (Social.ServiceError e) when (e.Code == "DENIED")
+            {
+                // Правила Firestore вставляет владелец проекта — это не поломка программы.
+                return "rules from firebase/creations.rules are not published yet (PERMISSION_DENIED)";
+            }
         });
 
         await Check("locator", async () =>

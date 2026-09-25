@@ -63,7 +63,7 @@ public static class Actions
             try
             {
                 if (mod.Source == "nexus") await InstallNexus(g, registry, mod.Id, mod.Name, pin, job, progress, ct, withDeps: pin is null);
-                else await Installer.InstallFromCatalog(registry, mod, progress, ct, reinstall);
+                else await Installer.InstallFromCatalog(registry, mod, progress, ct, reinstall, pin?.Version, pin?.FileName);
             }
             finally
             {

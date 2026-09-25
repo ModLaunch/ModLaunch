@@ -30,7 +30,7 @@ public static class Thunderstore
         return dash <= 0 || dash == id.Length - 1 ? null : (id[..dash], id[(dash + 1)..]);
     }
 
-    static ModInfo ToMod(JsonNode item, string community)
+    internal static ModInfo ToMod(JsonNode item, string community)
     {
         var ns = item.Str("namespace") ?? "";
         var name = item.Str("name") ?? "";

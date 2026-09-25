@@ -23,7 +23,7 @@ public static partial class Nexus
         ["Application-Version"] = Http.Version,
     };
 
-    const string ModFields = "modId name summary author version pictureUrl thumbnailUrl thumbnailLargeUrl downloads endorsements adultContent updatedAt modCategory { name } uploader { name }";
+    internal const string ModFields = "modId name summary author version pictureUrl thumbnailUrl thumbnailLargeUrl downloads endorsements adultContent updatedAt modCategory { name } uploader { name }";
 
     public static Task<JsonNode> Query(string query, JsonObject variables, CancellationToken ct) => GraphQl(query, variables, ct);
 
@@ -53,7 +53,7 @@ public static partial class Nexus
         return BbCode().Replace(s, "").Trim();
     }
 
-    static ModInfo? FromNode(JsonNode? node, string domain)
+    internal static ModInfo? FromNode(JsonNode? node, string domain)
     {
         var id = node.Long("modId");
         if (id == 0) return null;

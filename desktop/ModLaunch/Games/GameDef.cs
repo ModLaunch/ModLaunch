@@ -130,12 +130,14 @@ public sealed class GameDef
 
     /// <summary>Источник по записи: nexus — по приставке, иначе основной (или указанный в записи).</summary>
     public string SourceOf(string recordId, string? recorded = null) =>
-        recordId.StartsWith("nexus:", StringComparison.Ordinal) ? "nexus" : recorded is "thunderstore" or "modlinks" ? recorded : PrimarySource == "nexus" ? "thunderstore" : PrimarySource;
+        recordId.StartsWith("nexus:", StringComparison.Ordinal) ? "nexus" : recorded is "thunderstore" or "modlinks" or "hub" ? recorded : PrimarySource == "nexus" ? "thunderstore" : PrimarySource;
 
     public string PrimarySource => Catalog switch { CatalogKind.Nexus => "nexus", CatalogKind.Thunderstore => "thunderstore", CatalogKind.ModLinks => "modlinks", _ => "none" };
 
     /// <summary>Есть ли у игры хоть один каталог модов.</summary>
     public bool HasCatalog => Sources.Length > 0;
+    /// <summary>Есть ли каталог, кроме ModLaunch Hub.</summary>
+    public bool HasExternalCatalog => Sources.Any(s => s != "hub");
 
     public static string SteamArt(int appId) => $"https://cdn.akamai.steamstatic.com/steam/apps/{appId}/header.jpg";
 
@@ -152,6 +154,8 @@ public sealed class GameDef
             if (PrimarySource != "none") list.Add(PrimarySource);
             if (NexusDomain is not null && !list.Contains("nexus")) list.Add("nexus");
             if (ThunderstoreCommunity is not null && ExtraThunderstore && !list.Contains("thunderstore")) list.Add("thunderstore");
+            // ModLaunch Hub — моды сообщества ModLaunch есть у каждой игры.
+            list.Add("hub");
             return list.ToArray();
         }
     }

@@ -183,6 +183,28 @@ public static class Program
         Save("10l-palette");
         window.CloseDialog();
 
+        // 5.5: ModLaunch Hub, публикация, страница мода из Hub, новые игры.
+        CreatorPage.DemoHub([]);
+        window.Navigate(() => new CreatorPage("hub"));
+        Save("11a-hub-empty");
+        var demoHub = Core.Demo.Hub();
+        CreatorPage.DemoHub(demoHub);
+        window.Navigate(() => new CreatorPage("hub"));
+        Save("11b-hub");
+        window.Navigate(() => new ModPage(demoHub[0].Game, Creator.Hub.ToModInfo(demoHub[0])));
+        Save("11c-hub-mod");
+        window.Navigate(() => new CreatorPage("examples"));
+        Save("11d-examples");
+        HubPublish.Show(new Creator.HubDraft { Name = "Больше слотов", Summary = "Ещё 8 быстрых слотов", Game = "valheim", Version = "1.2.0", Tags = ["qol", "ui"] }, fromProject: false, pack: null);
+        Save("11e-publish");
+        window.CloseDialog();
+        window.Navigate(() => new GamePage("hollow-knight-silksong", "catalog"));
+        Save("11f-silksong");
+        window.Navigate(() => new ModPage("subnautica", Core.Demo.Many(Games.GameCatalog.ById("subnautica")!, ["2800"])[0]));
+        Save("11g-mod-versions");
+        window.Navigate(() => new CreatorPage("docs"));
+        Save("11h-docs");
+
         var setup = new SetupWindow(ModLaunch.Setup.SetupMode.Install);
         setup.Show();
         Pump();

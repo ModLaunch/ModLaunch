@@ -22,6 +22,7 @@ public static class CatalogReport
         ("repo", "repo", "repo"),
         ("peak", "peak", "peak"), ("h3vr", "h3vr", null), ("content-warning", "content-warning", "contentwarning"),
         ("ultrakill", "ultrakill", "ultrakill"), ("rounds", "rounds", null), ("dyson-sphere-program", "dyson-sphere-program", "dysonsphereprogram"),
+        ("hollow-knight-silksong", "hollow-knight-silksong", "hollowknightsilksong"), ("gtfo", "gtfo", "gtfo"), ("outward", "outward", "outward"),
     ];
 
     /// <summary>5.5: все сообщества Thunderstore по числу модов и проверка API для новых функций.</summary>
@@ -102,7 +103,6 @@ public static class CatalogReport
 
     public static async Task<int> Run()
     {
-        await Probe();
         try
         {
             var communities = await Http.GetJson("https://thunderstore.io/api/cyberstorm/community/?page_size=200");

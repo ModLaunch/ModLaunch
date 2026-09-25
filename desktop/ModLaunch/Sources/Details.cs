@@ -19,6 +19,16 @@ public static partial class Details
     {
         switch (source ?? Catalog.GuessSource(game, id))
         {
+            case "hub":
+            {
+                var hub = await Creator.Hub.Get(id, ct) ?? throw new InvalidOperationException(I18n.T("err.modNotInCatalog"));
+                var reqs = hub.Kind == "script"
+                    ? Creator.ModScript.Compile(hub.Code).Needs.Select(n => new Requirement(n, n.Contains('-') ? n[(n.LastIndexOf('-') + 1)..].Replace('_', ' ') : n, true)).ToList()
+                    : [];
+                var text = hub.Description != "" ? hub.Description : hub.Summary;
+                if (hub.Changelog != "") text += $"\n\n## {I18n.T("hub.changelog", ("version", hub.Version))}\n{hub.Changelog}";
+                return new ModDetails(Creator.Hub.ToModInfo(hub), Markdown(text), hub.Images, reqs);
+            }
             case "thunderstore":
             {
                 var mod = await Thunderstore.Get(game.ThunderstoreCommunity!, id, ct) ?? throw new InvalidOperationException(I18n.T("err.modNotInCatalog"));

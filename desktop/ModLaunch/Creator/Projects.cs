@@ -118,6 +118,7 @@ public static partial class Projects
             files[folder + "manifest.json"] = Utf8(manifest.ToJsonString(Pretty));
             files[folder + "content.json"] = Utf8(content.ToJsonString(Pretty));
             foreach (var c in b.Copies) files[folder + c.To] = ReadCopy(c);
+            foreach (var (path, text) in b.Writes) files[folder + path] = Utf8(text);
             if (b.Configs.Count > 0) warnings.Add(I18n.T("cr.warn.configSmapi"));
             if (b.Changes.Count == 0 && b.Copies.Count == 0) warnings.Add(I18n.T("cr.warn.empty"));
         }
@@ -160,13 +161,16 @@ public static partial class Projects
                     text = Features.Ini.Patch(text, section.Key, section.ToDictionary(c => c.Key, c => c.Value));
                 files["config/" + group.Key] = Utf8(text);
             }
-            foreach (var c in b.Copies) files[c.To.StartsWith("plugins/") || c.To.StartsWith("config/") || c.To.StartsWith("patchers/") ? c.To : "plugins/" + c.To] = ReadCopy(c);
+            string Place(string to) => to.StartsWith("plugins/") || to.StartsWith("config/") || to.StartsWith("patchers/") ? to : "plugins/" + to;
+            foreach (var c in b.Copies) files[Place(c.To)] = ReadCopy(c);
+            foreach (var (path, text) in b.Writes) files[Place(path)] = Utf8(text);
             if (b.Changes.Count > 0) warnings.Add(I18n.T("cr.warn.cpBepinex"));
         }
         else
         {
             format = "zip";
             foreach (var c in b.Copies) files[c.To] = ReadCopy(c);
+            foreach (var (path, text) in b.Writes) files[path] = Utf8(text);
             if (b.Changes.Count > 0 || b.Configs.Count > 0) warnings.Add(I18n.T("cr.warn.onlyFiles"));
         }
         if (b.Inis.Count > 0)
@@ -226,32 +230,40 @@ public static partial class Projects
     public static JsonObject Install(GameState g, ModBuild b, Packed packed)
     {
         if (g.Path is null || g.Registry is null) throw new InvalidOperationException(I18n.T("cr.install.noGame"));
-        var id = "creator:" + PackageName(b.Name);
-        if (g.Registry.Has(id)) g.Registry.Remove(id);
-        var record = Installer.InstallArchive(g.Registry, packed.Zip, new JsonObject
+        var record = Install(g.Registry, b, packed, "creator:" + PackageName(b.Name), "creator");
+        g.Refresh();
+        return record;
+    }
+
+    public static JsonObject Install(ModRegistry registry, ModBuild b, Packed packed, string id, string source, JsonObject? extra = null)
+    {
+        if (registry.Has(id)) registry.Remove(id);
+        var meta = new JsonObject
         {
             ["id"] = id,
             ["name"] = b.Name,
             ["version"] = b.Version,
             ["author"] = b.Author,
-            ["source"] = "creator",
-        });
-        if (g.Def.Loader == LoaderKind.Bepinex)
-        {
+            ["source"] = source,
+        };
+        foreach (var (k, v) in extra ?? new JsonObject()) meta[k] = v?.DeepClone();
+        var record = Installer.InstallArchive(registry, packed.Zip, meta);
+        ApplySettings(registry.Game, registry.GamePath, b);
+        return record;
+    }
+
+    /// <summary>Строки config/ini из скрипта — прямо в файлы игры (с копией .modlaunch-bak).</summary>
+    public static void ApplySettings(GameDef game, string gamePath, ModBuild b)
+    {
+        if (game.Loader == LoaderKind.Bepinex)
             foreach (var group in b.Configs.GroupBy(c => c.File))
-            {
-                var file = Path.Combine(g.Path, "BepInEx", "config", group.Key);
-                Patch(file, group);
-            }
-        }
+                Patch(Path.Combine(gamePath, "BepInEx", "config", group.Key), group);
         foreach (var group in b.Inis.GroupBy(c => c.File))
         {
-            var file = Path.GetFullPath(Path.Combine(g.Path, group.Key));
-            if (!file.StartsWith(Path.GetFullPath(g.Path), StringComparison.OrdinalIgnoreCase)) continue;
+            var file = Path.GetFullPath(Path.Combine(gamePath, group.Key));
+            if (!file.StartsWith(Path.GetFullPath(gamePath), StringComparison.OrdinalIgnoreCase)) continue;
             Patch(file, group);
         }
-        g.Refresh();
-        return record;
     }
 
     static void Patch(string file, IEnumerable<ConfigEdit> edits)

@@ -163,7 +163,7 @@ public sealed class SettingsPage : Page
             scales.Children.Add(chip);
         }
         col.Children.Add(Section(I18n.T("look.scale"), I18n.T("look.scale.hint"), scales,
-            Toggle(I18n.T("look.anim"), I18n.T("look.anim.hint"), Look.Animations, v => Settings.Data["animations"] = v),
+            Toggle(I18n.T("look.anim"), I18n.T("look.anim.hint"), Look.Animations, v => { Settings.Data["animations"] = v; MainWindow.Current?.Refresh(); }),
             Toggle(I18n.T("look.compact"), I18n.T("look.compact.hint"), Settings.Data.Bool("compactLists"), v => Settings.Data["compactLists"] = v)));
         return col;
     }
@@ -235,6 +235,25 @@ public sealed class SettingsPage : Page
         }
         col.Children.Add(Section(I18n.T("look.games"), I18n.T("look.games.hint"), list,
             Ui.Button(I18n.T("add.title"), () => MainWindow.Current?.Navigate(() => new AddGamePage()), "", Icons.Plus)));
+
+        // Скрытые моды и авторы (как блок-лист на Nexus).
+        var hiddenList = new StackPanel { Spacing = 6 };
+        var blocked = Features.Blocklist.All();
+        if (blocked.Count == 0) hiddenList.Children.Add(Ui.Text(I18n.T("nx.hidden.none"), "muted"));
+        foreach (var (key, title, author) in blocked)
+        {
+            var k = key;
+            var a = author;
+            var back = Ui.Button(I18n.T("nx.unhide"), () => { Features.Blocklist.Unhide(k, a); Build(); }, "ghost", Icons.Eye);
+            var row = new DockPanel();
+            DockPanel.SetDock(back, Dock.Right);
+            row.Children.Add(back);
+            var label = Ui.Row(8, Ui.Icon(author ? Icons.User : Icons.Package, 15, Ui.Res("Muted")), Ui.Text(title));
+            label.VerticalAlignment = VerticalAlignment.Center;
+            row.Children.Add(label);
+            hiddenList.Children.Add(row);
+        }
+        col.Children.Add(Section(I18n.T("nx.hidden.title"), I18n.T("nx.hidden.hint"), hiddenList));
         return col;
     }
 

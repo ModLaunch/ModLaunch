@@ -25,6 +25,8 @@ public sealed class ModBuild
     public readonly List<ConfigEdit> Configs = [];
     public readonly List<ConfigEdit> Inis = [];
     public readonly List<FileCopy> Copies = [];
+    /// <summary>Файлы, которые скрипт создаёт сам (write): путь → текст.</summary>
+    public readonly List<(string Path, string Text)> Writes = [];
     /// <summary>Изменения Content Patcher (Stardew Valley): готовые объекты для content.json.</summary>
     public readonly List<JsonObject> Changes = [];
     public readonly List<Diag> Diags = [];
@@ -47,7 +49,7 @@ public static partial class ModScript
 
     /// <summary>Все команды языка — для подсказок и подсветки.</summary>
     public static readonly string[] Keywords =
-        ["mod", "version", "author", "about", "game", "icon", "website", "needs", "let", "for", "in", "from", "to", "when", "edit", "entry", "dialogue", "mail", "image", "config", "ini", "copy", "print"];
+        ["mod", "version", "author", "about", "game", "icon", "website", "needs", "let", "for", "in", "from", "to", "when", "if", "else", "edit", "entry", "dialogue", "mail", "image", "config", "ini", "copy", "write", "json", "print"];
 
     // ---------------------------------------------------------------- лексер
 
@@ -111,11 +113,13 @@ public static partial class ModScript
         {
             var toks = Lex(lines[n], n + 1, diags);
             if (toks.Count == 0) continue;
-            if (toks.Count == 1 && toks[0] is { Kind: T.Sym, Text: "}" })
+            if (toks[0] is { Kind: T.Sym, Text: "}" })
             {
                 if (stack.Count == 1) diags.Add(new Diag(n + 1, "err.extraBrace"));
                 else stack.Pop();
-                continue;
+                // «} else {» — закрыть блок и сразу открыть следующий.
+                toks = toks[1..];
+                if (toks.Count == 0) continue;
             }
             var opens = toks[^1] is { Kind: T.Sym, Text: "{" };
             var node = new Node { Line = n + 1, Toks = opens ? toks[..^1] : toks };
@@ -158,6 +162,13 @@ public static partial class ModScript
     {
         if (toks.Count == 0) { diags.Add(new Diag(line, "err.noValue")); return ""; }
         if (toks.Count == 1 && toks[0].Kind == T.Str) return Subst(toks[0].Text, env, line, diags);
+        // json "…" — готовый JSON-объект или список (например, запись Data/TriggerActions).
+        if (toks.Count == 2 && toks[0] is { Kind: T.Word, Text: "json" } && toks[1].Kind == T.Str)
+        {
+            var text = Subst(toks[1].Text, env, line, diags);
+            try { JsonNode.Parse(text); } catch { diags.Add(new Diag(line, "err.json")); }
+            return JsonMark + text;
+        }
         var expr = string.Join(" ", toks.Select(t => t.Kind == T.Str ? "\"" + t.Text + "\"" : t.Text));
         expr = Subst(expr, env, line, diags);
         if (Regex.IsMatch(expr, @"^[\d\s.+\-*/()%]+$") && Regex.IsMatch(expr, @"[+\-*/%]") && Calc(expr) is double d)
@@ -204,8 +215,11 @@ public static partial class ModScript
         catch { return null; }
     }
 
+    const string JsonMark = "\u0001json:";
+
     static JsonNode Json(string value)
     {
+        if (value.StartsWith(JsonMark)) { try { return JsonNode.Parse(value[JsonMark.Length..]) ?? JsonValue.Create("")!; } catch { return JsonValue.Create("")!; } }
         if (long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var l)) return JsonValue.Create(l)!;
         if (double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var d) && value.Contains('.')) return JsonValue.Create(d)!;
         if (value is "true" or "false") return JsonValue.Create(value == "true")!;
@@ -230,9 +244,39 @@ public static partial class ModScript
 
     static void Run(List<Node> nodes, Env env, ModBuild b)
     {
+        bool? last = null; // результат последнего if в этом блоке — для else
         foreach (var node in nodes)
         {
             if (b.Statements++ > 5000) { b.Diags.Add(new Diag(node.Line, "err.tooMuch")); return; }
+            var head = node.Toks[0].Text.ToLowerInvariant();
+            try
+            {
+                if (head == "if")
+                {
+                    if (node.Body is null) throw new ScriptError("err.ifBlock");
+                    var ok = Cond(node.Toks.Skip(1).ToList(), env, node.Line, b.Diags);
+                    if (ok) Run(node.Body, env, b);
+                    last = ok;
+                    continue;
+                }
+                if (head == "else")
+                {
+                    if (last is null) throw new ScriptError("err.else");
+                    if (node.Body is null) throw new ScriptError("err.ifBlock");
+                    if (node.Toks.Count > 1 && node.Toks[1].Text == "if")
+                    {
+                        var ok = last == false && Cond(node.Toks.Skip(2).ToList(), env, node.Line, b.Diags);
+                        if (ok) Run(node.Body, env, b);
+                        last = last == true || ok;
+                        continue;
+                    }
+                    if (last == false) Run(node.Body, env, b);
+                    last = null;
+                    continue;
+                }
+            }
+            catch (ScriptError e) { b.Diags.Add(new Diag(node.Line, e.Message)); continue; }
+            last = null;
             try { Exec(node, env, b); }
             catch (ScriptError e) { b.Diags.Add(new Diag(node.Line, e.Message)); }
             catch (Exception e) { b.Diags.Add(new Diag(node.Line, "err.generic|" + e.Message)); }
@@ -369,6 +413,18 @@ public static partial class ModScript
                 break;
             }
 
+            case "write":
+            {
+                // write "plugins/MyMod/readme.txt" = "текст"
+                var eq = Eq();
+                if (eq != 2) throw new ScriptError("err.write");
+                var path = S(1).Replace('\\', '/');
+                if (path.Contains("..") || Path.IsPathRooted(path)) throw new ScriptError("err.path");
+                var text = Value(t.Skip(3).ToList(), env, line, d);
+                b.Writes.Add((path, text.StartsWith(JsonMark) ? text[JsonMark.Length..] : text));
+                break;
+            }
+
             case "copy":
             {
                 if (t.Count != 4 || t[2].Text != "to") throw new ScriptError("err.copy");
@@ -383,6 +439,37 @@ public static partial class ModScript
                 d.Add(new Diag(line, "err.unknown|" + t[0].Text));
                 break;
         }
+    }
+
+    /// <summary>Условие if: «a == b», «a != b», «a &gt; b» (и &lt;, &gt;=, &lt;=), «a contains b» или просто значение.</summary>
+    static bool Cond(List<Tok> t, Env env, int line, List<Diag> d)
+    {
+        if (t.Count == 0) throw new ScriptError("err.if");
+        for (var i = 0; i < t.Count; i++)
+        {
+            var x = t[i];
+            if (x.Kind == T.Str) continue;
+            string? op = x.Text switch { "==" or "!=" or ">" or "<" or ">=" or "<=" or "contains" => x.Text, "=" or "!" when x.Kind == T.Sym || x.Text == "!" => x.Text, _ => null };
+            if (op is null) continue;
+            var skip = 1;
+            if (op is "=" or "!" or ">" or "<" && i + 1 < t.Count && t[i + 1] is { Kind: T.Sym, Text: "=" }) { op += "="; skip = 2; }
+            if (op is "=" or "!") throw new ScriptError("err.if");
+            var left = Value(t.Take(i).ToList(), env, line, d);
+            var right = Value(t.Skip(i + skip).ToList(), env, line, d);
+            var num = double.TryParse(left, NumberStyles.Float, CultureInfo.InvariantCulture, out var a) & double.TryParse(right, NumberStyles.Float, CultureInfo.InvariantCulture, out var c);
+            return op switch
+            {
+                "==" => num ? a == c : left == right,
+                "!=" => num ? a != c : left != right,
+                ">" => num ? a > c : string.CompareOrdinal(left, right) > 0,
+                "<" => num ? a < c : string.CompareOrdinal(left, right) < 0,
+                ">=" => num ? a >= c : string.CompareOrdinal(left, right) >= 0,
+                "<=" => num ? a <= c : string.CompareOrdinal(left, right) <= 0,
+                _ => left.Contains(right, StringComparison.OrdinalIgnoreCase),
+            };
+        }
+        var v = Value(t, env, line, d);
+        return v is not ("" or "0" or "false" or "no");
     }
 
     static void AddChange(ModBuild b, Env env, JsonObject change)

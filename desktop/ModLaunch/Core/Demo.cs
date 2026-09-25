@@ -127,4 +127,22 @@ public static class Demo
         ], [], game.Catalog == CatalogKind.Nexus ? [new Requirement("1262", "Nautilus", true)] : []);
 
     public static List<ModInfo> Many(GameDef game, IEnumerable<string> ids) => ids.Distinct().Select((id, i) => Mod(game, id, i)).ToList();
+
+    /// <summary>Моды ModLaunch Hub для скриншотов (без сети).</summary>
+    public static List<Creator.HubMod> Hub()
+    {
+        Creator.HubMod M(string id, string author, string name, string summary, string game, string kind, long dl, long likes, long comments, int daysAgo, params string[] tags) =>
+            new(id, "demo" + author, author, name, summary, "## Что умеет\n- " + summary + "\n- Работает с последней версией игры\n\nСтавится в один клик через ModLaunch.", game, "1." + (dl % 7) + ".0",
+                kind, "", [.. tags], [], kind == "package" ? 2_400_000 : 0, "", kind == "package" ? 3 : 0, "mod.zip", "Исправления и новые настройки",
+                likes, dl, comments, DateTime.UtcNow.AddDays(-daysAgo - 30), DateTime.UtcNow.AddDays(-daysAgo));
+        return
+        [
+            M("demo_slots", "Kira", "Больше слотов", "Ещё 8 быстрых слотов и удобная раскладка", "valheim", "package", 18400, 2210, 64, 1, "qol", "ui"),
+            M("demo_seeds", "Farmer", "Дешёвые семена", "Весенние семена вдвое дешевле", "stardew-valley", "script", 9310, 1402, 31, 3, "gameplay", "tweaks"),
+            M("demo_night", "Nox", "Ночь с друзьями", "Сборка: 8 игроков, костюмы и заход в игру", "lethal-company", "script", 25120, 3120, 102, 0, "modpack", "multiplayer"),
+            M("demo_hud", "Vega", "Чистый интерфейс", "Минималистичный HUD без лишних надписей", "subnautica", "package", 7120, 980, 18, 6, "ui", "visuals"),
+            M("demo_peak", "Alpin", "Большая экспедиция", "PEAK на большую компанию", "peak", "script", 4210, 611, 12, 2, "modpack", "multiplayer"),
+            M("demo_audio", "Echo", "Живой звук", "Новые звуки шагов и воды", "repo", "package", 3050, 402, 9, 9, "audio"),
+        ];
+    }
 }

@@ -38,6 +38,7 @@ public sealed class MainWindow : Window
     readonly LayoutTransformControl _scale = new();
     Control? _railHost;
     Control? _brandWord;
+    Panel? _layers;
     readonly Button _updatePill = new() { Classes = { "chip" }, IsVisible = false, VerticalAlignment = VerticalAlignment.Center };
     readonly Border _friendsBadge = new() { IsVisible = false };
     readonly Panel _overlay = new() { IsVisible = false };
@@ -45,6 +46,10 @@ public sealed class MainWindow : Window
     readonly Border _downloadsPanel;
     readonly StackPanel _downloadsList = new() { Spacing = 10 };
     readonly Border _dlBadge = new() { IsVisible = false };
+    readonly Button _bell = new() { Classes = { "icon" } };
+    readonly Border _bellBadge = new() { IsVisible = false };
+    readonly Border _bellPanel;
+    readonly StackPanel _bellList = new() { Spacing = 8 };
 
     readonly List<Func<Page>> _history = [];
     int _index = -1;
@@ -87,11 +92,28 @@ public sealed class MainWindow : Window
             Classes = { "icon" },
             Content = new Panel { Children = { Ui.Icon(Icons.Download, 18), _dlBadge } },
         };
+        _dlBadge.Classes.Add("pulse");
+        _dlBadge.RenderTransform = new ScaleTransform();
         _dlBadge.Width = 10; _dlBadge.Height = 10; _dlBadge.CornerRadius = new CornerRadius(5);
         _dlBadge.Background = Ui.Res("Brand2"); _dlBadge.HorizontalAlignment = HorizontalAlignment.Right; _dlBadge.VerticalAlignment = VerticalAlignment.Top;
         _dlBadge.Margin = new Thickness(0, -4, -4, 0);
-        _downloads.Click += (_, _) => _downloadsPanel!.IsVisible = !_downloadsPanel.IsVisible;
+        _downloads.Click += (_, _) => { _downloadsPanel!.IsVisible = !_downloadsPanel.IsVisible; _bellPanel!.IsVisible = false; };
         ToolTip.SetTip(_downloads, I18n.T("dl.button"));
+
+        _bellBadge.Width = 10; _bellBadge.Height = 10; _bellBadge.CornerRadius = new CornerRadius(5);
+        _bellBadge.Background = Ui.Res("Bad"); _bellBadge.HorizontalAlignment = HorizontalAlignment.Right; _bellBadge.VerticalAlignment = VerticalAlignment.Top;
+        _bellBadge.Margin = new Thickness(0, -4, -4, 0);
+        _bell.Content = new Panel { Children = { Ui.Icon(Icons.Bell, 18), _bellBadge } };
+        _bell.Click += (_, _) => { _bellPanel!.IsVisible = !_bellPanel.IsVisible; _downloadsPanel!.IsVisible = false; RenderBell(); };
+        ToolTip.SetTip(_bell, I18n.T("nx.notify"));
+        _bellPanel = new Border
+        {
+            Classes = { "card" }, Width = 400, MaxHeight = 540, Padding = new Thickness(16), Margin = new Thickness(0, 64, 64, 0),
+            HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top, IsVisible = false,
+            BoxShadow = BoxShadows.Parse("0 18 50 0 #80000000"),
+            Child = Ui.Col(12, Ui.Text(I18n.T("nx.notify"), "h3"), new ScrollViewer { Content = _bellList, MaxHeight = 460 }),
+        };
+        Features.Tracking.Changed += () => Dispatcher.UIThread.Post(() => { RenderBell(); });
 
         _downloadsPanel = new Border
         {
@@ -196,7 +218,7 @@ public sealed class MainWindow : Window
         _search.VerticalAlignment = VerticalAlignment.Center;
         Grid.SetColumn(_search, 2);
         topbar.Children.Add(_search);
-        var dlWrap = new Border { Child = Ui.Row(10, _updatePill, _creatorButton, _downloads), Margin = new Thickness(12, 0, 16, 0), VerticalAlignment = VerticalAlignment.Center };
+        var dlWrap = new Border { Child = Ui.Row(10, _updatePill, _creatorButton, _bell, _downloads), Margin = new Thickness(12, 0, 16, 0), VerticalAlignment = VerticalAlignment.Center };
         Grid.SetColumn(dlWrap, 3);
         topbar.Children.Add(dlWrap);
         winButtons.VerticalAlignment = VerticalAlignment.Center;
@@ -224,8 +246,11 @@ public sealed class MainWindow : Window
         root.Children.Add(main);
 
         var layers = new Panel();
+        _layers = layers;
+        layers.Classes.Set("anim", Look.Animations);
         layers.Children.Add(root);
         layers.Children.Add(_downloadsPanel);
+        layers.Children.Add(_bellPanel);
         layers.Children.Add(_toasts);
         layers.Children.Add(_overlay);
         return layers;
@@ -347,6 +372,7 @@ public sealed class MainWindow : Window
 
     void ApplyScale()
     {
+        _layers?.Classes.Set("anim", Look.Animations);
         var k = Look.Scale;
         _scale.LayoutTransform = Math.Abs(k - 1) < 0.001 ? null : new ScaleTransform(k, k);
         if (_brandWord is not null) _brandWord.IsVisible = Settings.Data.Bool("showBrand");
@@ -516,13 +542,68 @@ public sealed class MainWindow : Window
         if (page.GameId is string gid) { Settings.Data["lastGame"] = gid; Settings.Save(); }
         page.Build();
         _page.Content = page;
+        Animate.PageIn(page);
         _title.Text = page.Title;
         _search.Text = "";
         _search.Watermark = page.SearchHint;
         _back.IsEnabled = _index > 0;
         _forward.IsEnabled = _index < _history.Count - 1;
         _downloadsPanel.IsVisible = false;
+        _bellPanel.IsVisible = false;
         RenderRail();
+    }
+
+    /// <summary>Уведомления: новые версии отслеживаемых модов (всех каталогов и ModLaunch Hub).</summary>
+    void RenderBell()
+    {
+        var updates = Features.Tracking.Updates;
+        var hub = Creator.Hub.Updates.Where(h => !updates.Any(u => u.Item.Source == "hub" && u.Item.Id == h.Id)).ToList();
+        _bellBadge.IsVisible = updates.Count + hub.Count > 0;
+        _bellList.Children.Clear();
+        if (updates.Count + hub.Count == 0)
+        {
+            _bellList.Children.Add(Ui.Col(6, Ui.Text(I18n.T("nx.notify.empty"), "h3"), Ui.Text(I18n.T("nx.notify.empty.text"), "muted small", wrap: true)));
+            return;
+        }
+        foreach (var u in updates)
+        {
+            var uu = u;
+            var game = Games.GameCatalog.ById(u.Item.Game);
+            var row = new Button
+            {
+                Classes = { "ghost" }, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Left, Padding = new Thickness(8),
+                Content = Ui.Row(10, Ui.Thumb(u.Now.Icon ?? u.Item.Icon, u.Item.Name, 40, 10), Ui.Col(2,
+                    Ui.Text(u.Item.Name, "h3"),
+                    Ui.Text(I18n.T("nx.notify.update", ("from", u.Item.Version), ("to", u.Now.Version)), "small", color: Ui.Res("Good")),
+                    Ui.Text($"{game?.Name} · {Sources.Catalog.Title(u.Item.Source)}", "small muted"))),
+            };
+            row.Click += (_, _) =>
+            {
+                Features.Tracking.Seen(uu);
+                _bellPanel.IsVisible = false;
+                if (game is not null) Navigate(() => new ModPage(game.Id, uu.Now));
+            };
+            _bellList.Children.Add(row);
+        }
+        foreach (var h in hub)
+        {
+            var hh = h;
+            var row = new Button
+            {
+                Classes = { "ghost" }, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Left, Padding = new Thickness(8),
+                Content = Ui.Row(10, Ui.Thumb(h.Images.FirstOrDefault(), h.Name, 40, 10), Ui.Col(2,
+                    Ui.Text(h.Name, "h3"), Ui.Text(I18n.T("nx.notify.hub", ("version", h.Version)), "small", color: Ui.Res("Good")))),
+            };
+            row.Click += (_, _) => { Creator.Hub.MarkSeen(hh); _bellPanel.IsVisible = false; CreatorPage.OpenMod(hh); };
+            _bellList.Children.Add(row);
+        }
+        var clear = Ui.Button(I18n.T("nx.notify.clear"), () =>
+        {
+            foreach (var u in Features.Tracking.Updates.ToList()) Features.Tracking.Seen(u);
+            foreach (var h in Creator.Hub.Updates.ToList()) Creator.Hub.MarkSeen(h);
+            RenderBell();
+        }, "ghost", Icons.Check);
+        _bellList.Children.Add(clear);
     }
 
     void OnKey(object? sender, KeyEventArgs e)
@@ -572,6 +653,12 @@ public sealed class MainWindow : Window
             try { Social.Friends.GoOffline().Wait(1500); } catch { }
         };
         await AppState.DetectAll();
+        _ = Task.Run(async () =>
+        {
+            try { await Features.Tracking.Check(); } catch { }
+            try { await Creator.Hub.All(); } catch { }
+            Dispatcher.UIThread.Post(RenderBell);
+        });
         if (Program.StartupLink is string link) Actions.InstallNxm(link);
         if (Features.ModUpdates.OnStart)
         {
@@ -639,6 +726,7 @@ public sealed class MainWindow : Window
     {
         _dlBadge.IsVisible = Jobs.Running > 0;
         _downloadsList.Children.Clear();
+        _downloadsList.Children.Add(Ui.Button(I18n.T("nx.history"), ShowHistory, "ghost", Icons.Clock));
         if (Jobs.All.Count == 0)
         {
             _downloadsList.Children.Add(Ui.Col(6, Ui.Text(I18n.T("dl.empty"), "h3"), Ui.Text(I18n.T("dl.empty.text"), "muted small", wrap: true)));
@@ -657,8 +745,30 @@ public sealed class MainWindow : Window
         }
     }
 
+    /// <summary>История загрузок за всё время (как «Download history» на Nexus).</summary>
+    public void ShowHistory()
+    {
+        _downloadsPanel.IsVisible = false;
+        var list = new StackPanel { Spacing = 6 };
+        var items = Features.History.All();
+        if (items.Count == 0) list.Children.Add(Ui.Text(I18n.T("nx.history.empty"), "muted"));
+        foreach (var h in items.Take(150))
+        {
+            var row = new DockPanel();
+            var when = Ui.Text(h.At.ToLocalTime().ToString("dd.MM HH:mm"), "small muted");
+            DockPanel.SetDock(when, Dock.Right);
+            row.Children.Add(when);
+            row.Children.Add(Ui.Row(8, Ui.Dot(h.Ok ? Ui.Res("Good") : Ui.Res("Bad")), Ui.Text($"{h.Title} · {h.Game}", "small")));
+            list.Children.Add(row);
+        }
+        Dialog(I18n.T("nx.history"), new ScrollViewer { Content = list, MaxHeight = 460 },
+            Ui.Button(I18n.T("nx.history.clear"), () => { Features.History.Clear(); CloseDialog(); }, "ghost", Icons.Trash),
+            Ui.Button(I18n.T("common.close"), CloseDialog, "primary"));
+    }
+
     void OnJobFinished(Job job)
     {
+        try { Features.History.Add(job); } catch { }
         if (job.Status == JobStatus.Done && Settings.Data.Bool("toastOnDone", true)) Toast($"{job.Title} — {I18n.T("dl.done").ToLowerInvariant()}");
         else if (job.Status == JobStatus.Failed) Toast($"{job.Title}: {job.Error}", bad: true);
         foreach (var g in AppState.Games) if (g.Path is not null) g.Refresh();
@@ -679,8 +789,9 @@ public sealed class MainWindow : Window
             Child = Ui.Text(text, wrap: true),
         };
         _toasts.Children.Add(t);
+        Animate.ToastIn(t);
         var seconds = Settings.Data.Long("toastSeconds") is var ts && ts > 0 ? ts : 4;
-        DispatcherTimer.RunOnce(() => _toasts.Children.Remove(t), TimeSpan.FromSeconds(bad ? Math.Max(8, seconds) : seconds));
+        DispatcherTimer.RunOnce(() => Animate.ToastOut(t, () => _toasts.Children.Remove(t)), TimeSpan.FromSeconds(bad ? Math.Max(8, seconds) : seconds));
     }
 
     // ---------------------------------------------------------------- окна поверх

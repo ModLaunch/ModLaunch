@@ -15,7 +15,7 @@ namespace ModLaunch.Views;
 /// Creator Hub: свои моды на языке ModScript — редактор с проверкой на лету,
 /// «примочки» (примеры), сборка в пакет, установка в игру и галерея сообщества.
 /// </summary>
-public sealed class CreatorPage : Page
+public sealed partial class CreatorPage : Page
 {
     public override string Title => "Creator Hub";
     public override string SearchHint => I18n.T("cr.search");
@@ -23,26 +23,16 @@ public sealed class CreatorPage : Page
     string _tab;
     Project? _open;
     string _filter = "";
-    string? _galleryGame;
-    static List<Creation>? _gallery;
-    static string? _galleryError;
-    bool _galleryLoading;
-
-    readonly TextBox _code = new()
-    {
-        AcceptsReturn = true, AcceptsTab = true, TextWrapping = TextWrapping.NoWrap,
-        FontFamily = new FontFamily("Cascadia Mono, Consolas, JetBrains Mono, monospace"), FontSize = 13.5,
-        VerticalContentAlignment = VerticalAlignment.Top, MinHeight = 460,
-    };
+    readonly ScriptEditor _code = new() { MinHeight = 480 };
     readonly StackPanel _check = new() { Spacing = 8 };
     DispatcherTimer? _debounce;
     bool _dirty;
 
-    public CreatorPage(string tab = "mine", string? project = null)
+    public CreatorPage(string tab = "hub", string? project = null)
     {
         _tab = tab;
-        if (project is not null) Open(Projects.Get(project));
-        _code.TextChanged += (_, _) =>
+        if (project is not null) { _tab = "mine"; Open(Projects.Get(project)); }
+        _code.TextChanged += () =>
         {
             _dirty = true;
             _debounce?.Stop();
@@ -50,14 +40,11 @@ public sealed class CreatorPage : Page
             _debounce.Tick += (_, _) => { _debounce!.Stop(); RenderCheck(); };
             _debounce.Start();
         };
-        _code.KeyDown += (_, e) =>
-        {
-            if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.S) { Save(); e.Handled = true; }
-        };
+        _code.SaveRequested += () => Save();
         DetachedFromVisualTree += (_, _) => { if (_dirty) Save(quiet: true); };
     }
 
-    public override void Search(string text) { _filter = text.Trim(); if (_open is null && _tab == "mine") _tab = "examples"; Build(); }
+    public override void Search(string text) { _filter = text.Trim(); if (_open is null && _tab is "mine" or "published") _tab = "hub"; Build(); }
 
     void Open(Project? p)
     {
@@ -81,7 +68,7 @@ public sealed class CreatorPage : Page
 
         // Шапка: название и вкладки.
         var tabs = Ui.Row(4);
-        foreach (var (id, key, icon) in new[] { ("mine", "cr.tab.mine", Icons.Edit), ("examples", "cr.tab.examples", Icons.Wand), ("community", "cr.tab.community", Icons.Globe), ("docs", "cr.tab.docs", Icons.Book) })
+        foreach (var (id, key, icon) in new[] { ("hub", "hub.tab", Icons.Globe), ("mine", "cr.tab.mine", Icons.Edit), ("published", "hub.tab.mine", Icons.Upload), ("examples", "cr.tab.examples", Icons.Wand), ("docs", "cr.tab.docs", Icons.Book) })
         {
             var b = Ui.Button(I18n.T(key), () => { if (_dirty) Save(quiet: true); _tab = id; _open = id == "mine" ? _open : null; Build(); }, "tab", icon);
             if (_tab == id) b.Classes.Add("active");
@@ -100,7 +87,8 @@ public sealed class CreatorPage : Page
         content.Children.Add(_tab switch
         {
             "examples" => Examples(),
-            "community" => Community(),
+            "hub" => HubView(),
+            "published" => PublishedView(),
             "docs" => Docs(),
             _ => _open is null ? Mine() : Editor(),
         });
@@ -161,7 +149,7 @@ public sealed class CreatorPage : Page
             Ui.Button("", Delete, "icon ghost", Icons.Trash, I18n.T("cr.delete")),
             Ui.Button(I18n.T("cr.save"), () => Save(), "", Icons.Save),
             Ui.Button(I18n.T("cr.export"), () => _ = Export(), "", Icons.Package),
-            Ui.Button(I18n.T("cr.publish"), () => _ = Publish(), "", Icons.Upload),
+            Ui.Button(I18n.T("cr.publish"), Publish, "", Icons.Upload),
             Ui.Button(I18n.T("cr.install"), () => _ = InstallOpen(), "primary", Icons.Play));
         var bar = new DockPanel();
         DockPanel.SetDock(actions, Dock.Right);
@@ -179,6 +167,8 @@ public sealed class CreatorPage : Page
             ("let", "let name = 1\n"),
             ("for", "for x in 1 2 3 {\n  print \"$x\"\n}\n"),
             ("when", "when Season = spring {\n  \n}\n"),
+            ("if", "if $x > 1 {\n  \n}\nelse {\n  \n}\n"),
+            ("write", "write \"MyMod/readme.txt\" = \"текст\"\n"),
             ("copy", "copy \"file.txt\" to \"plugins/MyMod/file.txt\"\n"),
         })
         {
@@ -199,24 +189,9 @@ public sealed class CreatorPage : Page
         return Ui.Col(14, bar, grid);
     }
 
-    void Insert(string text)
-    {
-        var at = Math.Clamp(_code.CaretIndex, 0, (_code.Text ?? "").Length);
-        var s = _code.Text ?? "";
-        if (at > 0 && s[at - 1] != '\n') text = "\n" + text;
-        _code.Text = s.Insert(at, text);
-        _code.CaretIndex = at + text.Length;
-        _code.Focus();
-    }
+    void Insert(string text) => _code.Insert(text);
 
-    void GoToLine(int line)
-    {
-        var s = _code.Text ?? "";
-        var at = 0;
-        for (var i = 1; i < line && at >= 0; i++) at = s.IndexOf('\n', at) is var n && n >= 0 ? n + 1 : -1;
-        _code.CaretIndex = Math.Max(0, at);
-        _code.Focus();
-    }
+    void GoToLine(int line) => _code.GoToLine(line);
 
     static string Msg(Diag d) => ModScript.Explain(d, (k, a) => I18n.T(k, a));
 
@@ -227,6 +202,7 @@ public sealed class CreatorPage : Page
         var b = ModScript.Compile(_code.Text ?? "");
         var game = GameCatalog.ById(b.Game);
         var errors = b.Diags.Where(d => !d.Warning).ToList();
+        _code.MarkErrors(errors.Select(d => d.Line));
         _check.Children.Add(Ui.Row(8,
             Ui.Dot(errors.Count == 0 ? Ui.Res("Good") : Ui.Res("Bad"), 10),
             Ui.Text(errors.Count == 0 ? I18n.T("cr.ok") : I18n.T("cr.errors", ("n", errors.Count)), "h3")));
@@ -329,35 +305,38 @@ public sealed class CreatorPage : Page
         w.Dialog(I18n.T("cr.export.title", ("name", Path.GetFileName(r.Packed.Zip))), body, buttons.ToArray());
     }
 
-    async Task Publish()
+    void Publish()
     {
         Save(quiet: true);
-        var code = _code.Text ?? "";
+        var code = _code.Text;
         var b = ModScript.Compile(code);
-        var w = MainWindow.Current!;
-        if (!b.Ok) { w.Toast(I18n.T("cr.build.hasErrors"), bad: true); return; }
-        if (!Social.Account.SignedIn)
+        if (!b.Ok) { MainWindow.Current?.Toast(I18n.T("cr.build.hasErrors"), bad: true); return; }
+        var dir = _open!.Dir;
+        HubPublish.Show(new HubDraft
         {
-            w.Dialog(I18n.T("cr.publish"), Ui.Text(I18n.T("cr.publish.signin"), "muted", wrap: true),
-                Ui.Button(I18n.T("common.cancel"), w.CloseDialog),
-                Ui.Button(I18n.T("acc.title"), () => { w.CloseDialog(); w.Navigate(() => new SettingsPage("accounts")); }, "primary", Icons.User));
-            return;
-        }
-        try
-        {
-            await Gallery.Publish(b, code);
-            _gallery = null;
-            w.Toast(I18n.T("cr.publish.done", ("name", b.Name)));
-        }
-        catch (Exception e) { w.Toast(Social.Firebase.Explain("creator", e), bad: true); }
+            Name = b.Name, Summary = b.About, Game = b.Game, Version = b.Version, Code = code,
+            Description = b.About,
+        }, fromProject: true, pack: async () => (await Projects.Pack(b, dir)).Zip, done: () => { _tab = "published"; Build(); });
     }
 
     // ---------------------------------------------------------------- примочки
 
+    string _exCategory = "all";
+
     Control Examples()
     {
+        var chips = Ui.Row(6);
+        foreach (var c in Templates.Categories)
+        {
+            var cc = c;
+            var n = c == "all" ? Templates.All.Length : Templates.All.Count(t => Templates.Category(t) == c);
+            var chip = Ui.Button($"{I18n.T("cr.cat." + c)} · {n}", () => { _exCategory = cc; Build(); }, "chip");
+            if (_exCategory == c) chip.Classes.Add("active");
+            chips.Children.Add(chip);
+        }
         var grid = new UniformGrid { Columns = 2 };
-        foreach (var t in Templates.All)
+        var index = 0;
+        foreach (var t in Templates.All.Where(t => _exCategory == "all" || Templates.Category(t) == _exCategory))
         {
             var title = I18n.T($"cr.ex.{t.Id}");
             if (_filter != "" && !title.Contains(_filter, StringComparison.OrdinalIgnoreCase) && !t.Code.Contains(_filter, StringComparison.OrdinalIgnoreCase)) continue;
@@ -380,9 +359,10 @@ public sealed class CreatorPage : Page
                     Build();
                 }, "primary", Icons.Wand)), 18);
             card.Margin = new Thickness(0, 0, 14, 14);
+            Animate.Stagger(card, index++);
             grid.Children.Add(card);
         }
-        return grid;
+        return Ui.Col(14, chips, grid);
     }
 
     /// <summary>Суть примера: команды после описания мода (или подсказки, если команд нет).</summary>
@@ -395,81 +375,6 @@ public sealed class CreatorPage : Page
         return string.Join('\n', body);
     }
 
-    // ---------------------------------------------------------------- сообщество
-
-    Control Community()
-    {
-        if (_gallery is null && !_galleryLoading && !Program.Screenshot) _ = LoadGallery();
-        var col = new StackPanel { Spacing = 12 };
-        var chips = Ui.Row(6);
-        var all = Ui.Button(I18n.T("aside.all"), () => { _galleryGame = null; Build(); }, "chip");
-        if (_galleryGame is null) all.Classes.Add("active");
-        chips.Children.Add(all);
-        foreach (var gid in (_gallery ?? []).Select(c => c.Game).Distinct().Take(12))
-        {
-            var g = gid;
-            var chip = Ui.Button(GameCatalog.ById(g)?.ShortName ?? g, () => { _galleryGame = g; Build(); }, "chip");
-            if (_galleryGame == g) chip.Classes.Add("active");
-            chips.Children.Add(chip);
-        }
-        var bar = new DockPanel();
-        var refresh = Ui.Button("", () => { _gallery = null; Build(); }, "icon ghost", Icons.Refresh, I18n.T("cr.refresh"));
-        DockPanel.SetDock(refresh, Dock.Right);
-        bar.Children.Add(refresh);
-        bar.Children.Add(chips);
-        col.Children.Add(bar);
-
-        if (_galleryLoading) col.Children.Add(Ui.Card(Ui.Row(12, new ProgressBar { IsIndeterminate = true, Width = 120 }, Ui.Text(I18n.T("cr.loading"), "muted"))));
-        else if (_galleryError is not null) col.Children.Add(Ui.Card(Ui.Col(6, Ui.Text(I18n.T("cr.gallery.error"), "h3"), Ui.Text(_galleryError, "small muted", wrap: true))));
-        var items = (_gallery ?? []).Where(c => (_galleryGame is null || c.Game == _galleryGame)
-            && (_filter == "" || c.Name.Contains(_filter, StringComparison.OrdinalIgnoreCase) || c.About.Contains(_filter, StringComparison.OrdinalIgnoreCase))).ToList();
-        if (!_galleryLoading && _galleryError is null && items.Count == 0)
-            col.Children.Add(Ui.Card(Ui.Col(6, Ui.Text(I18n.T("cr.gallery.empty"), "h3"), Ui.Text(I18n.T("cr.gallery.empty.text"), "small muted", wrap: true))));
-        foreach (var c in items)
-        {
-            var game = GameCatalog.ById(c.Game);
-            var cc = c;
-            var buttons = Ui.Row(8,
-                Ui.Button(I18n.T("cr.gallery.open"), () => { var p = Projects.Create(cc.Name, cc.Code); _tab = "mine"; Open(p); Build(); }, "", Icons.Edit),
-                Ui.Button(I18n.T("cr.install"), () => _ = InstallCreation(cc), "primary", Icons.Download));
-            if (c.Mine) buttons.Children.Insert(0, Ui.Button("", () => _ = Unpublish(cc), "icon ghost", Icons.Trash, I18n.T("cr.unpublish")));
-            buttons.VerticalAlignment = VerticalAlignment.Center;
-            var row = new DockPanel();
-            DockPanel.SetDock(buttons, Dock.Right);
-            row.Children.Add(buttons);
-            row.Children.Add(Ui.Row(12, Ui.Thumb(game?.ArtUrl, game?.Name ?? c.Game, 44, 10), Ui.Col(2,
-                Ui.Text($"{c.Name}  ·  {c.Version}", "h3"),
-                Ui.Text(c.About == "" ? (game?.Name ?? c.Game) : c.About, "small muted"),
-                Ui.Text($"{c.Author} · {game?.Name ?? c.Game} · {Ui.Ago(c.Updated)}", "small", color: Ui.Res("Faint")))));
-            col.Children.Add(Ui.Card(row, 14));
-        }
-        return col;
-    }
-
-    async Task LoadGallery()
-    {
-        _galleryLoading = true;
-        _galleryError = null;
-        try { _gallery = await Gallery.Browse(); }
-        catch (Exception e) { _gallery = []; _galleryError = Social.Firebase.Explain("creator", e); }
-        _galleryLoading = false;
-        Build();
-    }
-
-    static async Task InstallCreation(Creation c)
-    {
-        var b = ModScript.Compile(c.Code);
-        if (!b.Ok) { MainWindow.Current?.Toast(I18n.T("cr.build.hasErrors"), bad: true); return; }
-        try { await InstallBuilt(b, await Projects.Pack(b, null)); }
-        catch (Exception e) { MainWindow.Current?.Toast(Jobs.Explain(e), bad: true); }
-    }
-
-    async Task Unpublish(Creation c)
-    {
-        try { await Gallery.Unpublish(c.Id); _gallery?.Remove(c); Build(); MainWindow.Current?.Toast(I18n.T("cr.unpublished")); }
-        catch (Exception e) { MainWindow.Current?.Toast(Social.Firebase.Explain("creator", e), bad: true); }
-    }
-
     // ---------------------------------------------------------------- справка
 
     static Control Docs()
@@ -479,9 +384,9 @@ public sealed class CreatorPage : Page
         foreach (var group in new[]
         {
             ("cr.docs.basics", new[] { "mod", "version", "author", "about", "game", "icon", "needs" }),
-            ("cr.docs.logic", new[] { "let", "for", "when", "print" }),
+            ("cr.docs.logic", new[] { "let", "if", "else", "for", "when", "print" }),
             ("cr.docs.stardew", new[] { "edit", "entry", "dialogue", "mail", "image" }),
-            ("cr.docs.bepinex", new[] { "config", "ini", "copy" }),
+            ("cr.docs.bepinex", new[] { "config", "ini", "copy", "write", "json" }),
         })
         {
             var rows = new StackPanel { Spacing = 10 };

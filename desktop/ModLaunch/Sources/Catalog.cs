@@ -14,7 +14,8 @@ public static partial class Catalog
     private static partial Regex NotMods();
 
     public static bool IsHidden(GameDef game, ModInfo mod) =>
-        mod.Source == "nexus" ? game.NexusHide.Contains(mod.Id) : NotMods().IsMatch(mod.Id);
+        (mod.Source == "nexus" ? game.NexusHide.Contains(mod.Id) : mod.Source != "hub" && NotMods().IsMatch(mod.Id))
+        || Features.Blocklist.Hides(game.Id, mod);
 
     public static async Task<Page> Browse(GameDef game, Query q, CancellationToken ct = default, string? source = null)
     {
@@ -23,6 +24,7 @@ public static partial class Catalog
         // «Лучшие» — весь каталог по оценкам.
         if (section.Special == "best") { q = q with { Sort = SortBy.Rating }; section = Section.All["all"]; }
         if (source == "none" || !game.Sources.Contains(source)) return new Page([], 0, false, q.Page);
+        if (source == "hub") return await HubPage(game, q, section, ct);
         var primary = source == game.PrimarySource;
         var page = source switch
         {
@@ -33,8 +35,24 @@ public static partial class Catalog
         return page with { Mods = page.Mods.Where(m => !IsHidden(game, m)).ToList() };
     }
 
+    /// <summary>ModLaunch Hub как каталог игры: поиск, сортировка и «Лучшие» — на месте.</summary>
+    static async Task<Page> HubPage(GameDef game, Query q, Section section, CancellationToken ct)
+    {
+        List<Creator.HubMod> all;
+        try { all = await Creator.Hub.All(ct: ct); }
+        catch (Exception e) { throw new InvalidOperationException(Social.Firebase.Explain("creator", e)); }
+        var text = q.Text.Trim();
+        var list = all.Where(m => m.Game == game.Id && (text == "" || m.Name.Contains(text, StringComparison.OrdinalIgnoreCase)
+            || m.Summary.Contains(text, StringComparison.OrdinalIgnoreCase) || m.Author.Contains(text, StringComparison.OrdinalIgnoreCase)));
+        var sorted = Creator.Hub.Sort(list, q.Sort switch { SortBy.Rating => "likes", SortBy.New => "new", SortBy.Updated => "updated", _ => "downloads" }).ToList();
+        const int size = 20;
+        var mods = sorted.Skip((q.Page - 1) * size).Take(size).Select(Creator.Hub.ToModInfo).ToList();
+        return new Page(mods, sorted.Count, q.Page * size < sorted.Count, q.Page);
+    }
+
     public static async Task<ModInfo?> Get(GameDef game, string id, CancellationToken ct = default, string? source = null) => (source ?? GuessSource(game, id)) switch
     {
+        "hub" => await Creator.Hub.Get(id, ct) is { } h ? Creator.Hub.ToModInfo(h) : null,
         "thunderstore" => await Thunderstore.Get(game.ThunderstoreCommunity!, id, ct),
         "modlinks" => (await ModLinks.Load(ct)).FirstOrDefault(m => m.Id.Equals(id, StringComparison.OrdinalIgnoreCase)),
         _ => (await Nexus.Details(game.NexusDomain!, game.NexusGameId, id, ct)).Mod,
@@ -43,6 +61,8 @@ public static partial class Catalog
     /// <summary>Номер Nexus — число, пакет Thunderstore — «Автор-Имя», у ModLinks — имя.</summary>
     public static string GuessSource(GameDef game, string id)
     {
+        // Номер мода в ModLaunch Hub: «uid_имя», uid Firebase — 20+ букв и цифр.
+        if (System.Text.RegularExpressions.Regex.IsMatch(id, "^[a-z0-9]{20,}_[a-z0-9_]+$")) return "hub";
         if (id.All(char.IsDigit) && game.NexusDomain is not null) return "nexus";
         if (game.Catalog == CatalogKind.ModLinks) return "modlinks";
         return game.ThunderstoreCommunity is not null && id.Contains('-') ? "thunderstore" : game.PrimarySource;
@@ -68,6 +88,7 @@ public static partial class Catalog
     {
         "thunderstore" => "Thunderstore",
         "modlinks" => "ModLinks",
+        "hub" => "ModLaunch Hub",
         _ => "Nexus Mods",
     };
 }
