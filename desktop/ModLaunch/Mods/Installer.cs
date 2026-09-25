@@ -56,7 +56,7 @@ public static partial class Installer
             try
             {
                 progress.Report(new InstallStep("install.extract", entry.Name, i + 1, steps.Count));
-                InstallArchive(registry, file, new JsonObject
+                await InstallAny(registry, file, new JsonObject
                 {
                     ["id"] = entry.Id,
                     ["name"] = entry.Name,
@@ -66,7 +66,7 @@ public static partial class Installer
                     ["url"] = entry.Url,
                     ["icon"] = entry.Icon,
                     ["requestedBy"] = entry.Id == mod.Id ? null : mod.Id,
-                });
+                }, progress, ct);
                 if (entry.Source == "thunderstore" && registry.Game.Loader == LoaderKind.Bepinex) ApplyPackConfig(registry.GamePath, file);
                 installed++;
             }
@@ -84,6 +84,65 @@ public static partial class Installer
         {
             try { if (Archive.HasFolder(archive, folder)) Archive.Extract(archive, target, folder, ignoreCase: true); } catch { }
         }
+    }
+
+    /// <summary>Любой архив: пресет ReShade ставится как пресет, остальное — как мод.</summary>
+    public static async Task<JsonObject> InstallAny(ModRegistry registry, string archivePath, JsonObject meta, IProgress<InstallStep> progress, CancellationToken ct)
+    {
+        if (Features.ReShade.LooksLikePreset(archivePath)) return await InstallPreset(registry, archivePath, meta, progress, ct);
+        return InstallArchive(registry, archivePath, meta);
+    }
+
+    /// <summary>Пресет ReShade: ставим ReShade, если его нет, докачиваем эффекты и делаем пресет текущим.</summary>
+    static async Task<JsonObject> InstallPreset(ModRegistry registry, string archivePath, JsonObject meta, IProgress<InstallStep> progress, CancellationToken ct)
+    {
+        var game = registry.Game;
+        var dir = registry.PresetDir;
+        if (Features.ReShade.Detect(dir).Dll is null) await Features.ReShade.Install(dir, game.ReShadeApi, progress, ct);
+        var presets = Features.ReShade.ExtractPreset(dir, archivePath);
+        if (presets.Count == 0) throw new InvalidOperationException(I18n.T("err.presetEmpty"));
+        var wanted = presets.SelectMany(p => Features.ReShade.PresetEffects(File.ReadAllText(Path.Combine(dir, p)))).Distinct().ToList();
+        var missing = await Features.ReShade.EnsureEffects(dir, wanted, progress, ct);
+        Features.ReShade.Activate(dir, Path.Combine(dir, presets[0]));
+
+        JsonObject? primary = null;
+        var metaId = meta.Str("id");
+        foreach (var file in presets)
+        {
+            var title = Path.GetFileNameWithoutExtension(file);
+            var saved = registry.Add(new JsonObject
+            {
+                ["id"] = primary is not null && metaId is not null ? $"{metaId}#{file}" : metaId ?? $"preset:{file}",
+                ["name"] = primary is not null ? title : meta.Str("name") ?? title,
+                ["version"] = meta.Str("version") ?? "",
+                ["author"] = meta.Str("author") ?? "",
+                ["source"] = meta.Str("source") ?? "file",
+                ["url"] = meta.Str("url"),
+                ["icon"] = meta.Str("icon"),
+                ["kind"] = "preset",
+                ["folder"] = file,
+                ["fileCount"] = 1,
+                ["dependencies"] = new JsonArray(),
+                ["requires"] = new JsonArray(),
+                ["missingEffects"] = new JsonArray(missing.Select(x => (JsonNode)x).ToArray()),
+                ["requestedBy"] = primary is not null && metaId is not null ? metaId : null,
+                ["enabled"] = true,
+                ["missing"] = false,
+            });
+            primary ??= saved;
+        }
+        return primary!;
+    }
+
+    /// <summary>Текущий пресет ReShade после включения, выключения или удаления.</summary>
+    public static void SyncPreset(ModRegistry registry, JsonObject? preferred)
+    {
+        try
+        {
+            var active = preferred ?? registry.List().LastOrDefault(m => m.Str("kind") == "preset" && m.Bool("enabled", true) && !m.Bool("missing"));
+            Features.ReShade.Activate(registry.PresetDir, active is null ? null : Path.Combine(registry.PresetDir, active.Str("folder")!));
+        }
+        catch { }
     }
 
     /// <summary>Разложить архив мода по папкам и записать в список.</summary>

@@ -39,6 +39,7 @@ public static class GameCatalog
             Executables = ["StardewModdingAPI.exe", "Stardew Valley.exe"],
             SavesDir = _ => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "StardewValley", "Saves"),
             ModMarker = "manifest",
+            ReShadeApi = "opengl",
         },
         new()
         {

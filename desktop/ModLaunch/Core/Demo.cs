@@ -44,6 +44,10 @@ public static class Demo
         Make("repo", "REPO", "REPO_Data", true);
         Settings.Save();
 
+        // Игровое время — прямо в файл, до первого обращения к PlayTime.
+        File.WriteAllText(Path.Combine(root, "data", "playtime.json"),
+            "{\"games\":{\"subnautica\":{\"totalMs\":45300000,\"sessions\":14,\"lastPlayed\":\"" + DateTime.UtcNow.AddDays(-1).ToString("o") + "\"}}}");
+
         var sn = AppState.Game("subnautica");
         sn.Path = Settings.GamePath("subnautica");
         sn.Status = Detect.Found;
@@ -53,12 +57,23 @@ public static class Demo
             Directory.CreateDirectory(Path.Combine(on ? registry.ModsDir : Path.Combine(registry.StorageDir, "disabled"), name));
             registry.Add(new JsonObject
             {
-                ["id"] = id, ["name"] = name, ["version"] = "2.1." + days, ["author"] = "Subnautica Modding", ["source"] = "nexus",
+                ["id"] = "nexus:subnautica:" + id, ["name"] = name, ["version"] = "2.1." + days, ["author"] = "Subnautica Modding", ["source"] = "nexus",
                 ["folder"] = name, ["enabled"] = on, ["missing"] = false,
                 ["installedAt"] = DateTime.UtcNow.AddDays(-days).ToString("o"),
                 ["url"] = $"https://www.nexusmods.com/subnautica/mods/{id}",
             });
         }
+        // Лог с ошибкой мода, сохранения и копии, профили.
+        File.WriteAllText(Path.Combine(sn.Path!, "BepInEx", "LogOutput.log"),
+            "[Info   :   BepInEx] Loading [Nautilus 1.0]\n[Error  : Map Mod] NullReferenceException: Object reference not set to an instance of an object\n  at MapMod.Plugin.Awake ()\n");
+        var saves = Path.Combine(sn.Path!, "SNAppData", "SavedGames", "slot0000");
+        Directory.CreateDirectory(saves);
+        File.WriteAllText(Path.Combine(saves, "gameinfo.json"), "{}");
+        Features.Backups.Create("subnautica", Path.Combine(sn.Path!, "SNAppData", "SavedGames"), "launch");
+        Features.Backups.Create("subnautica", Path.Combine(sn.Path!, "SNAppData", "SavedGames"), "manual");
+        Features.Profiles.Save("subnautica", "С друзьями", registry);
+        Features.Profiles.Save("subnautica", "Хардкор", registry);
+
         foreach (var g in AppState.Games)
         {
             if (Settings.GamePath(g.Def.Id) is not string p) { g.Status = Detect.NotFound; continue; }
@@ -90,6 +105,14 @@ public static class Demo
             .Skip((q.Page - 1) * 12).Take(12).ToList();
         return new Page(mods, 1234, q.Page < 3, q.Page);
     }
+
+    public static (List<CollectionInfo>, long, bool) Collections(int page) =>
+        (Enumerable.Range(0, 6).Select(i => new CollectionInfo($"demo{i}", new[] { "Строитель баз", "Полный ремастер", "Выживание+", "Удобства", "Подлодки", "Хардкор" }[i],
+            "Подборка модов от игроков.", null, "Player" + i, 900 - i * 120, 40000 - i * 5000, 12 + i * 5, "https://www.nexusmods.com/")).ToList(), 6, false);
+
+    public static (CollectionInfo, List<CollectionMod>) Collection(GameDef game) =>
+        (new CollectionInfo("demo0", "Строитель баз", "Всё для красивых баз: декорации, новые постройки и удобства.", null, "Player0", 900, 40000, 7, "https://www.nexusmods.com/"),
+         game.Picks.Take(7).Select((id, i) => new CollectionMod(id, 1000 + i, Names.GetValueOrDefault(id) ?? id, "1.0", null, null, i == 6)).ToList());
 
     public static List<ModInfo> Many(GameDef game, IEnumerable<string> ids) => ids.Distinct().Select((id, i) => Mod(game, id, i)).ToList();
 }

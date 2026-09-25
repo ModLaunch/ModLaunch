@@ -12,12 +12,20 @@ public static class Program
     public static bool Screenshot { get; private set; }
     public static bool Demo { get; private set; }
 
+    /// <summary>Ссылка nxm://, с которой программу запустили.</summary>
+    public static string? StartupLink { get; private set; }
+
     [STAThread]
     public static int Main(string[] args)
     {
         if (args.Contains("--selfcheck")) return SelfCheck.Run().GetAwaiter().GetResult();
         var shot = Array.IndexOf(args, "--screenshot");
         if (shot >= 0 && shot + 1 < args.Length) return Screenshots(args[shot + 1]);
+
+        // Один экземпляр: второй запуск (в том числе по ссылке nxm://) передаёт ссылку первому.
+        if (!Features.Nxm.Claim(args)) return 0;
+        StartupLink = args.FirstOrDefault(a => a.StartsWith("nxm://", StringComparison.OrdinalIgnoreCase));
+        try { if (!Features.Nxm.IsRegistered()) Features.Nxm.Register(); } catch { }
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
         return 0;
     }
@@ -67,6 +75,17 @@ public static class Program
         Save("2-installed");
         window.Navigate(() => new GamePage("subnautica", "catalog"));
         Save("3-picks");
+        window.Navigate(() => new GamePage("subnautica", "profiles"));
+        Save("3b-profiles");
+        window.Navigate(() => new GamePage("subnautica", "saves"));
+        Save("3c-saves");
+        window.Navigate(() => new GamePage("subnautica", "log"));
+        Save("3d-log");
+        var packs = new GamePage("subnautica", "catalog");
+        window.Navigate(() => packs);
+        Pump(300);
+        packs.ShowSection("packs");
+        Save("3e-collections");
         window.Navigate(() => new GamePage("lethal-company", "catalog", "More"));
         Save("4-catalog");
         window.Navigate(() => new GamePage("valheim"));
@@ -75,6 +94,12 @@ public static class Program
         Save("6-notfound");
         window.Navigate(() => new SettingsPage("games"));
         Save("7-settings");
+        window.Navigate(() => new SettingsPage("launch"));
+        Save("7b-launch");
+        window.Navigate(() => new SettingsPage("graphics"));
+        Save("7c-graphics");
+        window.Navigate(() => new SettingsPage("backups"));
+        Save("7d-backups");
         I18n.Set("en");
         window.Navigate(() => new HomePage());
         Save("8-home-en");

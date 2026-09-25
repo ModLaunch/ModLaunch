@@ -2,6 +2,7 @@ using System.Text.Json.Nodes;
 using Avalonia.Controls;
 using Avalonia.Threading;
 using ModLaunch.Core;
+using ModLaunch.Features;
 using ModLaunch.Games;
 using ModLaunch.Loaders;
 using ModLaunch.Mods;
@@ -9,89 +10,129 @@ using ModLaunch.Sources;
 
 namespace ModLaunch.Views;
 
-/// <summary>Действия, общие для нескольких экранов: установка, запуск, загрузчик.</summary>
+public sealed record Pin(long FileId, string Version, string? FileName);
+
+/// <summary>Действия, общие для нескольких экранов: установка, запуск, загрузчик, nxm, коллекции.</summary>
 public static class Actions
 {
     public static readonly HashSet<string> Installing = [];
 
-    /// <summary>Файлы с Nexus без Premium ждём по одному: иначе не понять, какой архив к какому моду.</summary>
+    /// <summary>Моды Nexus, которые ждём из браузера: «игра:номер» → куда отдать файл (или готовую запись по nxm://).</summary>
+    static readonly Dictionary<string, TaskCompletionSource<object>> BrowserWaits = [];
+
+    /// <summary>Окна ожидания файла показываем по одному: иначе человек запутается, какую кнопку нажимать.</summary>
     static readonly SemaphoreSlim NexusBrowser = new(1);
 
     static MainWindow W => MainWindow.Current!;
+
+    public static bool IsBusy(GameState g, string catalogId) => Installing.Contains($"{g.Def.Id}/{catalogId}");
+
+    public static bool IsInstalled(GameState g, string catalogId) =>
+        g.Registry?.Get(g.Def.RecordId(catalogId)) is { } r && !r.Bool("missing");
 
     public static void InstallLoader(GameState g)
     {
         if (g.Path is null) return;
         var path = g.Path;
-        Jobs.Run(g.Def.LoaderName, g.Def.Name, async (_, progress, ct) =>
-        {
-            await Loader.Install(g.Def, path, progress, ct);
-        });
+        Jobs.Run(g.Def.LoaderName, g.Def.Name, async (_, progress, ct) => { await Loader.Install(g.Def, path, progress, ct); });
     }
 
-    public static void Install(GameState g, ModInfo mod)
+    static bool NeedLoader(GameState g)
     {
-        if (g.Path is null || g.Registry is null) return;
-        if (!g.LoaderInstalled)
-        {
-            W.Dialog(I18n.T("loader.needed.title", ("loader", g.Def.LoaderName)),
-                Ui.Text(I18n.T("loader.needed.text", ("loader", g.Def.LoaderName), ("game", g.Def.Name)), "muted", wrap: true),
-                Ui.Button(I18n.T("common.cancel"), W.CloseDialog),
-                Ui.Button(I18n.T("games.installLoader", ("loader", g.Def.LoaderName)), () => { W.CloseDialog(); InstallLoader(g); }, "primary"));
-            return;
-        }
+        if (g.LoaderInstalled) return false;
+        W.Dialog(I18n.T("loader.needed.title", ("loader", g.Def.LoaderName)),
+            Ui.Text(I18n.T("loader.needed.text", ("loader", g.Def.LoaderName), ("game", g.Def.Name)), "muted", wrap: true),
+            Ui.Button(I18n.T("common.cancel"), W.CloseDialog),
+            Ui.Button(I18n.T("games.installLoader", ("loader", g.Def.LoaderName)), () => { W.CloseDialog(); InstallLoader(g); }, "primary"));
+        return true;
+    }
 
+    /// <summary>Установить мод из каталога (с зависимостями). Возвращает задачу, чтобы коллекции ставились по очереди.</summary>
+    public static Task Install(GameState g, ModInfo mod, Pin? pin = null, bool reinstall = false)
+    {
+        if (g.Path is null || g.Registry is null || NeedLoader(g)) return Task.CompletedTask;
         var registry = g.Registry;
         var key = $"{g.Def.Id}/{mod.Id}";
-        if (!Installing.Add(key)) return;
+        if (!Installing.Add(key)) return Task.CompletedTask;
         AppState.Notify();
 
-        Jobs.Run(mod.Name, g.Def.Name, async (job, progress, ct) =>
+        var done = new TaskCompletionSource();
+        var job = Jobs.Run(mod.Name, g.Def.Name, async (job, progress, ct) =>
         {
             try
             {
-                if (mod.Source == "nexus") await InstallNexus(g, registry, mod, job, progress, ct);
-                else await Installer.InstallFromCatalog(registry, mod, progress, ct);
+                if (mod.Source == "nexus") await InstallNexus(g, registry, mod.Id, mod.Name, pin, job, progress, ct, withDeps: pin is null);
+                else await Installer.InstallFromCatalog(registry, mod, progress, ct, reinstall);
             }
             finally
             {
                 Installing.Remove(key);
             }
         });
+        void OnFinished(Job j)
+        {
+            if (j != job) return;
+            Jobs.Finished -= OnFinished;
+            done.TrySetResult();
+        }
+        Jobs.Finished += OnFinished;
+        return done.Task;
     }
 
-    static async Task InstallNexus(GameState g, ModRegistry registry, ModInfo mod, Job job, IProgress<InstallStep> progress, CancellationToken ct)
+    /// <summary>Мод с Nexus: сначала недостающие требования, потом сам мод. Premium — напрямую, иначе через браузер.</summary>
+    static async Task InstallNexus(GameState g, ModRegistry registry, string modId, string title, Pin? pin, Job job, IProgress<InstallStep> progress, CancellationToken ct, bool withDeps)
     {
-        progress.Report(new InstallStep("install.deps", mod.Name));
-        var (_, file, _) = await Nexus.Details(g.Def.NexusDomain!, g.Def.NexusGameId, mod.Id, ct);
-        if (file is null) throw new InvalidOperationException(I18n.T("err.nexus.noLink"));
+        var game = g.Def;
+        if (withDeps)
+        {
+            progress.Report(new InstallStep("install.deps", title));
+            var plan = await Deps.NexusPlan(game, registry, modId, ct);
+            if (plan.Count > 0)
+            {
+                Dispatcher.UIThread.Post(() => W.Toast(I18n.T("deps.first", ("list", string.Join(", ", plan.Select(p => p.Name))))));
+                foreach (var (id, name) in plan)
+                {
+                    if (IsInstalled(g, id)) continue;
+                    await InstallNexus(g, registry, id, name, null, job, progress, ct, withDeps: false);
+                }
+            }
+        }
 
+        var (mod, main, reqs) = await Nexus.Details(game.NexusDomain!, game.NexusGameId, modId, ct);
+        if (mod is null) throw new InvalidOperationException(I18n.T("err.modNotInCatalog"));
+        var file = pin is not null ? new NexusFile(pin.FileId, "", pin.Version is { Length: > 0 } v ? v : main?.Version ?? "", pin.FileName, 0) : main;
+        if (file is null) throw new InvalidOperationException(I18n.T("err.nexus.noFiles"));
+
+        var meta = new JsonObject
+        {
+            ["id"] = game.RecordId(modId),
+            ["name"] = mod.Name,
+            ["version"] = file.Version is { Length: > 0 } fv ? fv : mod.Version,
+            ["author"] = mod.Author,
+            ["source"] = "nexus",
+            ["url"] = mod.Url,
+            ["icon"] = mod.Icon,
+            ["requires"] = new JsonArray(reqs.Where(r => !game.NexusHide.Contains(r.Id)).Select(r => (JsonNode)new JsonObject { ["id"] = r.Id, ["name"] = r.Name }).ToArray()),
+        };
+
+        var apiKey = Settings.NexusApiKey;
         string archive;
         var temporary = true;
-        var apiKey = Settings.NexusApiKey;
         if (!string.IsNullOrEmpty(apiKey) && Settings.NexusPremium)
         {
-            var url = await Nexus.DownloadLink(g.Def.NexusDomain!, mod.Id, file.FileId, apiKey, ct: ct);
-            archive = await Http.Download(url, file.FileName ?? $"{mod.Id}.zip",
+            var url = await Nexus.DownloadLink(game.NexusDomain!, modId, file.FileId, apiKey, ct: ct);
+            archive = await Http.Download(url, file.FileName ?? $"{modId}.zip",
                 new Progress<double>(r => progress.Report(new InstallStep("install.download", mod.Name, Ratio: r))), ct: ct);
         }
         else
         {
-            // Без Premium Nexus отдаёт файл только после нажатия на сайте.
             await NexusBrowser.WaitAsync(ct);
             try
             {
-            var page = Nexus.FilePageUrl(g.Def.NexusDomain!, mod.Id, file.FileId);
-            var since = DateTime.Now;
-            progress.Report(new InstallStep("install.browser", mod.Name));
-            var picked = new TaskCompletionSource<string>();
-            await Dispatcher.UIThread.InvokeAsync(() => ShowNexusWait(mod, page, job, picked));
-            Ui.OpenUrl(page);
-            var watch = DownloadWatch.WaitForArchive(since, ct);
-            var done = await Task.WhenAny(watch, picked.Task);
-            archive = await done;
-            temporary = false;
-            await Dispatcher.UIThread.InvokeAsync(W.CloseDialog);
+                var got = await WaitFromBrowser(g, modId, mod.Name, file.FileId, job, progress, ct);
+                if (got is JsonObject viaNxm) { _ = viaNxm; return; } // пришло по nxm:// и уже установлено
+                archive = (string)got;
+                temporary = false;
             }
             finally { NexusBrowser.Release(); }
         }
@@ -99,79 +140,186 @@ public static class Actions
         try
         {
             progress.Report(new InstallStep("install.extract", mod.Name));
-            Installer.InstallArchive(registry, archive, new JsonObject
-            {
-                ["id"] = mod.Id,
-                ["name"] = mod.Name,
-                ["version"] = file.Version,
-                ["author"] = mod.Author,
-                ["source"] = "nexus",
-                ["url"] = mod.Url,
-                ["icon"] = mod.Icon,
-            });
+            await Installer.InstallAny(registry, archive, meta, progress, ct);
         }
         finally
         {
+            // Скачанное нами — убираем; скачанное браузером остаётся у человека в «Загрузках».
             if (temporary) try { File.Delete(archive); } catch { }
         }
     }
 
-    static void ShowNexusWait(ModInfo mod, string page, Job job, TaskCompletionSource<string> picked)
+    static async Task<object> WaitFromBrowser(GameState g, string modId, string name, long fileId, Job job, IProgress<InstallStep> progress, CancellationToken ct)
+    {
+        var page = Nexus.FilePageUrl(g.Def.NexusDomain!, modId, fileId);
+        var waitKey = $"{g.Def.Id}:{modId}";
+        var tcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+        lock (BrowserWaits) BrowserWaits[waitKey] = tcs;
+        progress.Report(new InstallStep("install.browser", name));
+        await Dispatcher.UIThread.InvokeAsync(() => ShowNexusWait(name, page, job, tcs));
+        Ui.OpenUrl(page);
+        using var stop = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var watch = DownloadWatch.WaitForArchive(DownloadWatch.NexusMatcher(modId), stop.Token)
+            .ContinueWith(t => { if (t.IsCompletedSuccessfully) tcs.TrySetResult(t.Result); else if (t.Exception?.InnerException is TimeoutException te) tcs.TrySetException(te); }, TaskScheduler.Default);
+        using var reg = ct.Register(() => tcs.TrySetCanceled());
+        try { return await tcs.Task; }
+        finally
+        {
+            stop.Cancel();
+            lock (BrowserWaits) BrowserWaits.Remove(waitKey);
+            await Dispatcher.UIThread.InvokeAsync(W.CloseDialog);
+        }
+    }
+
+    static void ShowNexusWait(string mod, string page, Job job, TaskCompletionSource<object> picked)
     {
         var steps = Ui.Col(10,
-            Ui.Text("1. " + I18n.T("nexus.wait.step1", ("mod", mod.Name)), wrap: true),
+            Ui.Text("1. " + I18n.T("nexus.wait.step1", ("mod", mod)), wrap: true),
             Ui.Text("2. " + I18n.T("nexus.wait.step2"), wrap: true),
             Ui.Text("3. " + I18n.T("nexus.wait.step3"), wrap: true),
             Ui.Row(10, new ProgressBar { IsIndeterminate = true, Width = 120, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center }, Ui.Text(I18n.T("nexus.wait.status"), "muted small")));
         W.Dialog(I18n.T("nexus.wait.title"), steps,
-            Ui.Button(I18n.T("common.cancel"), () => { job.Cancel.Cancel(); W.CloseDialog(); }),
+            Ui.Button(I18n.T("common.cancel"), () => { job.Cancel.Cancel(); picked.TrySetCanceled(); W.CloseDialog(); }),
             Ui.Button(I18n.T("nexus.wait.file"), async () =>
             {
-                var file = await W.PickFile(I18n.T("nexus.wait.file"));
+                var file = await W.PickFile(I18n.T("dialog.pickArchive"));
                 if (file is not null) picked.TrySetResult(file);
             }, "", Icons.FilePlus),
             Ui.Button(I18n.T("nexus.wait.reopen"), () => Ui.OpenUrl(page), "primary", Icons.External));
     }
 
+    // ---------------------------------------------------------------- nxm://
+
+    /// <summary>Ссылка «Mod Manager Download»: качаем по API (ключ нужен, Premium — нет).</summary>
+    public static void InstallNxm(string link)
+    {
+        var parsed = Nxm.Parse(link);
+        if (parsed is null) { W.Toast(I18n.T("err.linkUnparsed"), bad: true); return; }
+        var g = AppState.Games.FirstOrDefault(x => x.Def.NexusDomain == parsed.Domain);
+        if (g is null) { W.Toast(I18n.T("toast.nxmForeign", ("game", parsed.Domain)), bad: true); return; }
+        if (g.Registry is null) { W.Toast(I18n.T("toast.notFound", ("game", g.Def.Name)), bad: true); return; }
+        if (NeedLoader(g)) return;
+        var apiKey = Settings.NexusApiKey;
+        if (string.IsNullOrEmpty(apiKey))
+        {
+            W.Dialog(I18n.T("nexus.key.title", ("game", g.Def.Name)), Ui.Text(I18n.T("err.nexus.noKey"), "muted", wrap: true),
+                Ui.Button(I18n.T("common.close"), W.CloseDialog),
+                Ui.Button(I18n.T("nexus.key.paste"), () => { W.CloseDialog(); W.Navigate(() => new SettingsPage("accounts")); }, "primary"));
+            return;
+        }
+        var registry = g.Registry;
+        Jobs.Run($"Nexus #{parsed.ModId}", g.Def.Name, async (job, progress, ct) =>
+        {
+            progress.Report(new InstallStep("install.deps", $"#{parsed.ModId}"));
+            var info = await Nexus.FileInfo(parsed.Domain, parsed.ModId, parsed.FileId, apiKey, ct);
+            var url = await Nexus.DownloadLink(parsed.Domain, parsed.ModId, parsed.FileId, apiKey, parsed.Key, parsed.Expires, ct);
+            var archive = await Http.Download(url, info.FileName ?? "mod.zip", new Progress<double>(r => progress.Report(new InstallStep("install.download", info.Name, Ratio: r))), ct: ct);
+            try
+            {
+                progress.Report(new InstallStep("install.extract", info.Name));
+                var record = await Installer.InstallAny(registry, archive, new JsonObject
+                {
+                    ["id"] = g.Def.RecordId(parsed.ModId),
+                    ["name"] = info.Name,
+                    ["version"] = info.Version,
+                    ["author"] = info.Author,
+                    ["source"] = "nexus",
+                    ["url"] = $"https://www.nexusmods.com/{parsed.Domain}/mods/{parsed.ModId}",
+                    ["icon"] = info.Icon,
+                }, progress, ct);
+                // Этот мод ждали из браузера — ожидание закончено.
+                lock (BrowserWaits) if (BrowserWaits.TryGetValue($"{g.Def.Id}:{parsed.ModId}", out var wait)) wait.TrySetResult(record);
+            }
+            finally { try { File.Delete(archive); } catch { } }
+        });
+    }
+
+    // ---------------------------------------------------------------- коллекции и наборы
+
+    public static CancellationTokenSource? CollectionRun { get; private set; }
+
+    /// <summary>Поставить моды по очереди (коллекция, набор, сборка из файла).</summary>
+    public static async Task InstallQueue(GameState g, string title, IList<(ModInfo Mod, Pin? Pin)> items)
+    {
+        if (g.Registry is null || NeedLoader(g)) return;
+        CollectionRun?.Cancel();
+        var run = CollectionRun = new CancellationTokenSource();
+        var done = 0;
+        var failed = new List<string>();
+        for (var i = 0; i < items.Count; i++)
+        {
+            if (run.IsCancellationRequested) break;
+            var (mod, pin) = items[i];
+            if (IsInstalled(g, mod.Id)) { done++; continue; }
+            W.Toast(I18n.T("coll.run", ("name", title), ("i", i + 1), ("n", items.Count)));
+            await Install(g, mod, pin);
+            if (IsInstalled(g, mod.Id)) done++; else failed.Add(mod.Name);
+        }
+        if (run.IsCancellationRequested) W.Toast(I18n.T("coll.stopped", ("done", done), ("n", items.Count)));
+        else if (failed.Count > 0) W.Toast(I18n.T("coll.partial", ("done", done), ("n", items.Count), ("list", string.Join(", ", failed.Take(6)))), bad: true);
+        else W.Toast(I18n.T("coll.done", ("name", title), ("n", done)));
+        if (CollectionRun == run) CollectionRun = null;
+    }
+
+    public static void StopQueue() => CollectionRun?.Cancel();
+
+    // ---------------------------------------------------------------- файлы, запуск, папки
+
     public static async void InstallFromFile(GameState g)
     {
-        if (g.Registry is null) return;
-        var file = await W.PickFile(I18n.T("inst.fromFile"));
+        if (g.Registry is null || NeedLoader(g)) return;
+        var file = await W.PickFile(I18n.T("dialog.pickArchive"));
         if (file is null) return;
         var registry = g.Registry;
-        Jobs.Run(Path.GetFileNameWithoutExtension(file), g.Def.Name, (_, progress, _) =>
+        Jobs.Run(Path.GetFileNameWithoutExtension(file), g.Def.Name, async (_, progress, ct) =>
         {
             progress.Report(new InstallStep("install.extract", Path.GetFileName(file)));
-            Installer.InstallArchive(registry, file, new JsonObject { ["source"] = "file" });
-            return Task.CompletedTask;
+            await Installer.InstallAny(registry, file, new JsonObject { ["source"] = "file", ["name"] = Path.GetFileNameWithoutExtension(file) }, progress, ct);
         });
     }
 
     public static void Play(GameState g)
     {
         if (g.Path is null) return;
-        var exe = g.Def.LaunchExe(g.Path);
         try
         {
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(exe) { WorkingDirectory = g.Path, UseShellExecute = true });
-            W.Toast(I18n.T("toast.launched"));
+            var backup = Launcher.Launch(g.Def, g.Path);
+            W.Toast(I18n.T("toast.launched") + (backup is null ? "" : " · " + I18n.T("bak.created")));
+            if (Settings.Data.Str("afterLaunch") == "minimize") W.WindowState = WindowState.Minimized;
+            AppState.Notify();
         }
-        catch (Exception e) { W.Toast(e.Message, bad: true); }
+        catch (Exception e) { W.Toast(Jobs.Explain(e), bad: true); }
     }
 
     public static void OpenFolder(string? path)
     {
+        if (path is null) return;
+        if (File.Exists(path)) path = Path.GetDirectoryName(path);
         if (path is null || !Directory.Exists(path)) return;
         Ui.OpenUrl(path);
     }
 
     public static async void PickGameFolder(GameState g)
     {
-        var dir = await W.PickFolder(g.Def.Name);
+        var dir = await W.PickFolder(I18n.T("dialog.pickGame"));
         if (dir is null) return;
         var error = Locator.Validate(g.Def, dir);
         if (error is not null) { W.Toast(I18n.T(error, ("game", g.Def.Name)), bad: true); return; }
         AppState.SetPath(g, dir);
         W.Toast(I18n.T("toast.pathSaved"));
+    }
+
+    /// <summary>Поставить всё недостающее, что нашлось в каталоге.</summary>
+    public static async Task InstallMissing(GameState g)
+    {
+        if (g.Registry is null) return;
+        List<Missing> missing;
+        try { missing = await Deps.FindResolved(g.Registry); }
+        catch (Exception e) { W.Toast(Jobs.Explain(e), bad: true); return; }
+        var ids = missing.Where(m => m.ResolveId is not null).Select(m => m.ResolveId!).Distinct().ToList();
+        if (ids.Count == 0) { W.Toast(I18n.T("deps.none"), bad: true); return; }
+        W.Toast(I18n.T("deps.after", ("list", string.Join(", ", missing.Where(m => m.ResolveId is not null).Select(m => m.Name).Distinct()))));
+        var mods = Program.Demo ? Demo.Many(g.Def, ids) : await Catalog.Many(g.Def, ids);
+        await InstallQueue(g, I18n.T("deps.install"), mods.Select(m => (m, (Pin?)null)).ToList());
     }
 }

@@ -96,11 +96,13 @@ public sealed class MainWindow : Window
         Jobs.Changed += _ => RenderDownloads();
         Jobs.Finished += OnJobFinished;
         KeyDown += OnKey;
+        Features.Launcher.Exited += OnGameExit;
+        Features.Nxm.Received += OnExternal;
 
         Navigate(() => new HomePage());
         RenderRail();
         RenderDownloads();
-        if (!Program.Screenshot) _ = AppState.DetectAll();
+        if (!Program.Screenshot) _ = StartUp();
     }
 
     Control BuildLayout()
@@ -297,6 +299,37 @@ public sealed class MainWindow : Window
         else if (e.Key == Key.Escape) { if (_overlay.IsVisible) CloseDialog(); else _downloadsPanel.IsVisible = false; }
     }
 
+    async Task StartUp()
+    {
+        await AppState.DetectAll();
+        if (Program.StartupLink is string link) Actions.InstallNxm(link);
+        if (Features.ModUpdates.OnStart)
+        {
+            foreach (var g in AppState.Games.Where(g => g.Status == Detect.Found && g.ModCount > 0))
+            {
+                try { await Features.ModUpdates.Check(g); } catch { }
+            }
+            AppState.Notify();
+        }
+    }
+
+    void OnGameExit(string gameId, bool counted, long ms)
+    {
+        var game = AppState.Game(gameId);
+        if (Settings.Data.Str("afterLaunch") == "minimize" && Settings.Data.Bool("restoreAfterGame", true) && WindowState == WindowState.Minimized)
+            WindowState = WindowState.Normal;
+        if (counted) Toast(I18n.T("time.session", ("game", game.Def.Name), ("time", Features.PlayTime.Format(ms))));
+        AppState.Notify();
+    }
+
+    /// <summary>Второй запуск программы передал нам ссылку nxm:// (или просто просит показаться).</summary>
+    public void OnExternal(string line)
+    {
+        if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
+        Activate();
+        if (line.StartsWith("nxm://", StringComparison.OrdinalIgnoreCase)) Actions.InstallNxm(line);
+    }
+
     // ---------------------------------------------------------------- загрузки и уведомления
 
     void RenderDownloads()
@@ -380,7 +413,9 @@ public sealed class MainWindow : Window
     }
 
     public Task<string?> PickFolder(string title) => Pickers.Folder(this, title);
-    public Task<string?> PickFile(string title) => Pickers.File(this, title);
+    public Task<string?> PickFile(string title, bool json = false) => Pickers.File(this, title, json);
+    public Task<string?> PickSaveFile(string title, string suggested) => Pickers.Save(this, title, suggested);
+    public Task<string?> PickExe(string title) => Pickers.Exe(this, title);
 }
 
 static class Pickers
@@ -391,14 +426,35 @@ static class Pickers
         return result.FirstOrDefault()?.TryGetLocalPath();
     }
 
-    public static async Task<string?> File(TopLevel top, string title)
+    public static async Task<string?> File(TopLevel top, string title, bool json)
     {
-        var result = await top.StorageProvider.OpenFilePickerAsync(new Avalonia.Platform.Storage.FilePickerOpenOptions
+        var type = json
+            ? new FilePickerFileType(I18n.T("dialog.pack")) { Patterns = ["*.json"] }
+            : new FilePickerFileType(I18n.T("dialog.archives")) { Patterns = ["*.zip", "*.7z", "*.rar"] };
+        var result = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions { Title = title, AllowMultiple = false, FileTypeFilter = [type] });
+        return result.FirstOrDefault()?.TryGetLocalPath();
+    }
+
+    public static async Task<string?> Exe(TopLevel top, string title)
+    {
+        var result = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
             Title = title,
             AllowMultiple = false,
-            FileTypeFilter = [new Avalonia.Platform.Storage.FilePickerFileType("Архивы модов") { Patterns = ["*.zip", "*.7z", "*.rar"] }],
+            FileTypeFilter = [new FilePickerFileType(I18n.T("dialog.exe")) { Patterns = ["*.exe"] }],
         });
         return result.FirstOrDefault()?.TryGetLocalPath();
+    }
+
+    public static async Task<string?> Save(TopLevel top, string title, string suggested)
+    {
+        var result = await top.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = title,
+            SuggestedFileName = suggested,
+            DefaultExtension = "json",
+            FileTypeChoices = [new FilePickerFileType(I18n.T("dialog.pack")) { Patterns = ["*.json"] }],
+        });
+        return result?.TryGetLocalPath();
     }
 }

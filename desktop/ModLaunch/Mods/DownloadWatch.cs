@@ -1,40 +1,51 @@
+using System.Text.RegularExpressions;
 using ModLaunch.Core;
 
 namespace ModLaunch.Mods;
 
 /// <summary>
 /// Ждёт, пока браузер докачает архив в «Загрузки» (Nexus без Premium).
-/// Файл считается готовым, когда он архив, появился после начала ожидания
-/// и его размер перестал меняться.
+/// Файлы Nexus называются «Имя-номерМода-версия-время.zip», поэтому архив
+/// узнаётся по «-номер-» в имени. Готов — когда размер перестал меняться.
 /// </summary>
-public static class DownloadWatch
+public static partial class DownloadWatch
 {
-    public static async Task<string> WaitForArchive(DateTime since, CancellationToken ct, string? folder = null)
+    [GeneratedRegex(@"\.(zip|7z|rar)$", RegexOptions.IgnoreCase)] private static partial Regex ArchiveName();
+    [GeneratedRegex(@"\.(crdownload|part|partial|download|tmp|opdownload)$", RegexOptions.IgnoreCase)] private static partial Regex Partial();
+
+    static Dictionary<string, (long Size, DateTime Time)> List(string dir)
     {
-        folder ??= Paths.UserDownloads;
-        var sizes = new Dictionary<string, long>();
-        while (true)
+        var result = new Dictionary<string, (long, DateTime)>(StringComparer.OrdinalIgnoreCase);
+        try
         {
-            ct.ThrowIfCancellationRequested();
-            try
-            {
-                foreach (var file in Directory.EnumerateFiles(folder))
-                {
-                    if (!Archive.IsArchive(file)) continue;
-                    var info = new FileInfo(file);
-                    if (info.LastWriteTimeUtc < since.ToUniversalTime().AddSeconds(-2) && info.CreationTimeUtc < since.ToUniversalTime().AddSeconds(-2)) continue;
-                    if (sizes.TryGetValue(file, out var last) && last == info.Length && info.Length > 0 && CanOpen(file)) return file;
-                    sizes[file] = info.Length;
-                }
-            }
-            catch (IOException) { }
-            await Task.Delay(1000, ct);
+            foreach (var file in new DirectoryInfo(dir).EnumerateFiles())
+                result[file.Name] = (file.Length, file.LastWriteTimeUtc);
         }
+        catch { }
+        return result;
     }
 
-    static bool CanOpen(string file)
+    public static Func<string, bool> NexusMatcher(string modId) => name => name.Contains($"-{modId}-", StringComparison.Ordinal);
+
+    public static async Task<string> WaitForArchive(Func<string, bool> match, CancellationToken ct, string? folder = null, TimeSpan? timeout = null)
     {
-        try { using var _ = File.Open(file, FileMode.Open, FileAccess.Read, FileShare.None); return true; }
-        catch { return false; }
+        folder ??= Paths.UserDownloads;
+        var before = List(folder);
+        var sizes = new Dictionary<string, long>();
+        var until = DateTime.UtcNow + (timeout ?? TimeSpan.FromMinutes(20));
+        while (true)
+        {
+            await Task.Delay(1000, ct);
+            if (DateTime.UtcNow > until) throw new TimeoutException(I18n.T("err.dl.timeout"));
+            var now = List(folder);
+            foreach (var (name, info) in now)
+            {
+                if (!ArchiveName().IsMatch(name) || Partial().IsMatch(name) || !match(name)) continue;
+                if (before.TryGetValue(name, out var old) && old == info) continue;
+                if (now.ContainsKey(name + ".part")) continue;
+                if (info.Size > 0 && sizes.TryGetValue(name, out var last) && last == info.Size) return Path.Combine(folder, name);
+                sizes[name] = info.Size;
+            }
+        }
     }
 }

@@ -16,6 +16,8 @@ public sealed class ModRegistry
     public string GamePath { get; }
     public string ModsDir { get; }
     public string StorageDir { get; }
+    /// <summary>Куда кладутся пресеты ReShade — рядом с exe игры.</summary>
+    public string PresetDir { get; }
 
     public ModRegistry(GameDef game, string gamePath)
     {
@@ -23,6 +25,7 @@ public sealed class ModRegistry
         GamePath = gamePath;
         ModsDir = game.ModsDir(gamePath);
         StorageDir = Path.Combine(gamePath, "ModHub");
+        PresetDir = Features.ReShade.DirOf(game, gamePath);
         _file = new JsonFile(Path.Combine(Paths.GamesDir, $"{game.Id}.json"), () => new JsonObject { ["mods"] = new JsonObject() });
     }
 
@@ -46,10 +49,24 @@ public sealed class ModRegistry
         return record;
     }
 
-    string BaseFor(JsonObject mod, bool enabled) =>
-        enabled ? ModsDir : Path.Combine(StorageDir, "disabled");
+    string BaseFor(JsonObject mod, bool enabled) => mod.Str("kind") == "preset"
+        ? enabled ? PresetDir : Path.Combine(StorageDir, "disabled-presets")
+        : enabled ? ModsDir : Path.Combine(StorageDir, "disabled");
 
     public string FolderFor(JsonObject mod) => Path.Combine(BaseFor(mod, mod.Bool("enabled", true)), mod.Str("folder") ?? "");
+
+    static bool Exists(string path) => Directory.Exists(path) || File.Exists(path);
+
+    static void Move(string from, string to)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(to)!);
+        if (Directory.Exists(from))
+        {
+            if (Directory.Exists(to)) Directory.Delete(to, true);
+            Directory.Move(from, to);
+        }
+        else File.Move(from, to, true);
+    }
 
     public void SetEnabled(string id, bool enabled)
     {
@@ -57,11 +74,9 @@ public sealed class ModRegistry
         if (mod.Bool("enabled", true) == enabled) return;
         var from = FolderFor(mod);
         var to = Path.Combine(BaseFor(mod, enabled), mod.Str("folder") ?? "");
-        if (Directory.Exists(from))
+        if (Exists(from))
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(to)!);
-            if (Directory.Exists(to)) Directory.Delete(to, true);
-            Directory.Move(from, to);
+            Move(from, to);
             mod["missing"] = false;
         }
         else mod["missing"] = true;
@@ -74,6 +89,7 @@ public sealed class ModRegistry
         if (Get(id) is not { } mod) return;
         var folder = FolderFor(mod);
         if (Directory.Exists(folder)) Directory.Delete(folder, true);
+        else if (mod.Str("kind") == "preset" && File.Exists(folder)) File.Delete(folder);
         Mods.Remove(id);
         _file.Save();
     }
@@ -84,8 +100,7 @@ public sealed class ModRegistry
         var changed = false;
         foreach (var mod in List())
         {
-            if (mod.Str("kind") == "preset") continue;
-            var missing = !Directory.Exists(FolderFor(mod));
+            var missing = !Exists(FolderFor(mod));
             if (mod.Bool("missing") != missing) { mod["missing"] = missing; changed = true; }
         }
         if (changed) _file.Save();

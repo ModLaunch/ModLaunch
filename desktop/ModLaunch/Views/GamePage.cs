@@ -12,7 +12,7 @@ using ModLaunch.Sources;
 namespace ModLaunch.Views;
 
 /// <summary>Страница игры: шапка с запуском и две вкладки — установленные моды и каталог.</summary>
-public sealed class GamePage : Page
+public sealed partial class GamePage : Page
 {
     readonly GameState _g;
     string _tab;
@@ -60,7 +60,14 @@ public sealed class GamePage : Page
         if (_g.Status == Detect.Found)
         {
             content.Children.Add(Tabs());
-            content.Children.Add(_tab == "catalog" ? CatalogView() : InstalledView());
+            content.Children.Add(_tab switch
+            {
+                "catalog" => CatalogView(),
+                "profiles" => ProfilesView(),
+                "saves" => SavesView(),
+                "log" => LogView(),
+                _ => InstalledView(),
+            });
         }
         else content.Children.Add(NotFoundView());
         Content = new ScrollViewer { Content = content, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
@@ -83,7 +90,13 @@ public sealed class GamePage : Page
             new TextBlock { Text = _g.Def.Name, FontSize = 28, FontWeight = FontWeight.Bold, Foreground = Brushes.White },
             Ui.Row(8, Ui.Dot(status.Item1), Ui.Text(status.Item2, "small", color: Ui.Hex("#D5DAE5"))));
         if (_g.Path is not null)
-            info.Children.Add(Ui.Row(8, Ui.Icon(Icons.Folder, 13, Ui.Hex("#AAB2C2")), Ui.Text(ShortPath(_g.Path), "small", color: Ui.Hex("#AAB2C2"))));
+        {
+            var line = Ui.Row(16, Ui.Row(8, Ui.Icon(Icons.Folder, 13, Ui.Hex("#AAB2C2")), Ui.Text(ShortPath(_g.Path), "small", color: Ui.Hex("#AAB2C2"))));
+            var played = Features.PlayTime.Get(_g.Def.Id);
+            if (played.Running) line.Children.Add(Ui.Row(8, Ui.Icon(Icons.Clock, 13, Ui.Res("Good")), Ui.Text(I18n.T("time.running"), "small", color: Ui.Res("Good"))));
+            else if (played.TotalMs > 0) line.Children.Add(Ui.Row(8, Ui.Icon(Icons.Clock, 13, Ui.Hex("#AAB2C2")), Ui.Text(I18n.T("time.total", ("time", Features.PlayTime.Format(played.TotalMs))), "small", color: Ui.Hex("#AAB2C2"))));
+            info.Children.Add(line);
+        }
         info.VerticalAlignment = VerticalAlignment.Center;
 
         var buttons = Ui.Row(10);
@@ -153,9 +166,15 @@ public sealed class GamePage : Page
             return b;
         }
 
+        var updates = Features.ModUpdates.Found.TryGetValue(_g.Def.Id, out var found) && found.Count > 0 ? $" · ↑{found.Count}" : "";
+        var profiles = Features.Profiles.List(_g.Def.Id).Count;
+        var saves = Features.Backups.List(_g.Def.Id).Count;
         var bar = Ui.Row(4,
-            Tab("installed", I18n.T("games.downloads"), Icons.List, _g.ModCount.ToString()),
-            Tab("catalog", I18n.T("games.market"), Icons.Bag, _total > 0 ? I18n.Compact(_total) : null));
+            Tab("installed", I18n.T("games.downloads"), Icons.List, _g.ModCount + updates),
+            Tab("catalog", I18n.T("games.market"), Icons.Bag, _total > 0 ? I18n.Compact(_total) : null),
+            Tab("profiles", I18n.T("games.profiles"), Icons.Layers, profiles > 0 ? profiles.ToString() : null),
+            Tab("saves", I18n.T("games.saves"), Icons.Shield, saves > 0 ? saves.ToString() : null),
+            Tab("log", I18n.T("games.log"), Icons.Alert, null));
         return new Border { Classes = { "card" }, Padding = new Thickness(6), CornerRadius = new CornerRadius(16), Child = bar, HorizontalAlignment = HorizontalAlignment.Left };
     }
 
@@ -176,115 +195,6 @@ public sealed class GamePage : Page
         return Ui.Card(col, 26);
     }
 
-    // ---------------------------------------------------------------- установленные
-
-    Control InstalledView()
-    {
-        var registry = _g.Registry!;
-        var col = new StackPanel { Spacing = 10 };
-
-        var head = new DockPanel();
-        var actions = Ui.Row(8,
-            Ui.Button(I18n.T("inst.fromFile"), () => Actions.InstallFromFile(_g), "", Icons.FilePlus),
-            Ui.Button(I18n.T("games.openFolder"), () => Actions.OpenFolder(registry.ModsDir), "", Icons.Folder));
-        DockPanel.SetDock(actions, Dock.Right);
-        head.Children.Add(actions);
-        head.Children.Add(Ui.Text(I18n.T("inst.title"), "h2"));
-        col.Children.Add(head);
-
-        var problems = Mods.Installer.CheckDependencies(registry);
-        if (problems.Count > 0)
-            col.Children.Add(Notice(Icons.Alert, I18n.T("inst.problems", ("list", string.Join(", ", problems.Select(p => p.Missing).Distinct()))), Ui.Res("Warn")));
-        var unmanaged = registry.Unmanaged();
-        if (unmanaged.Count > 0)
-            col.Children.Add(Notice(Icons.Package, I18n.T("inst.unmanaged", ("list", string.Join(", ", unmanaged.Take(6)))), Ui.Res("Muted")));
-
-        var mods = registry.List();
-        if (mods.Count == 0)
-        {
-            col.Children.Add(Ui.Card(Ui.Col(10,
-                Ui.Text(I18n.T("inst.empty"), "h3"),
-                Ui.Text(I18n.T("dl.empty.text"), "muted", wrap: true),
-                Ui.Button(I18n.T("games.market"), () => { _tab = "catalog"; _ = Load(reset: true); Build(); }, "primary", Icons.Bag)), 24));
-            return col;
-        }
-
-        foreach (var mod in mods) col.Children.Add(InstalledRow(registry, mod));
-        return col;
-    }
-
-    static Control Notice(string icon, string text, IBrush color) => new Border
-    {
-        Background = Ui.Res("Surface"),
-        BorderBrush = color,
-        BorderThickness = new Thickness(1),
-        CornerRadius = new CornerRadius(12),
-        Padding = new Thickness(14, 10),
-        Child = Ui.Row(10, Ui.Icon(icon, 16, color), Ui.Text(text, "small", wrap: true)),
-    };
-
-    Control InstalledRow(Mods.ModRegistry registry, JsonObject mod)
-    {
-        var id = mod.Str("id")!;
-        var name = mod.Str("name") ?? id;
-        var enabled = mod.Bool("enabled", true);
-        var missing = mod.Bool("missing");
-
-        var sub = new List<string>();
-        if (mod.Str("version") is { Length: > 0 } v) sub.Add(I18n.T("mod.version", ("version", v)));
-        if (mod.Str("author") is { Length: > 0 } a) sub.Add(a);
-        if (DateTime.TryParse(mod.Str("installedAt"), out var at)) sub.Add(Ui.Ago(at.ToUniversalTime()));
-
-        var title = Ui.Row(8, Ui.Text(name, "h3"));
-        if (missing) title.Children.Add(ModRow.Tag(I18n.T("inst.missing"), Ui.Hex("#3A1A1A"), Ui.Res("Bad")));
-        else if (!enabled) title.Children.Add(ModRow.Tag(I18n.T("inst.off"), Ui.Res("Surface3"), Ui.Res("Muted")));
-        var middle = Ui.Col(4, title, Ui.Text(string.Join(" · ", sub), "small muted"));
-        middle.VerticalAlignment = VerticalAlignment.Center;
-
-        var toggle = new ToggleSwitch { IsChecked = enabled, OnContent = "", OffContent = "", VerticalAlignment = VerticalAlignment.Center, IsEnabled = !missing };
-        ToolTip.SetTip(toggle, enabled ? I18n.T("mod.disable") : I18n.T("mod.enable"));
-        toggle.IsCheckedChanged += (_, _) =>
-        {
-            try
-            {
-                registry.SetEnabled(id, toggle.IsChecked == true);
-                MainWindow.Current?.Toast(I18n.T(toggle.IsChecked == true ? "toast.enabled" : "toast.disabled"));
-            }
-            catch (Exception e) { MainWindow.Current?.Toast(Jobs.Explain(e), bad: true); }
-            Build();
-        };
-
-        var remove = Ui.Button("", () => ConfirmRemove(registry, id, name), "icon ghost", Icons.Trash, I18n.T("mod.remove"));
-        var right = Ui.Row(6, toggle, remove);
-        if (mod.Str("url") is string url) right.Children.Insert(0, Ui.Button("", () => Ui.OpenUrl(url), "icon ghost", Icons.External, I18n.T("mod.page")));
-        right.VerticalAlignment = VerticalAlignment.Center;
-
-        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"), ColumnSpacing = 14 };
-        grid.Children.Add(Ui.Thumb(mod.Str("icon"), name, 48, 12, 96));
-        Grid.SetColumn(middle, 1);
-        grid.Children.Add(middle);
-        Grid.SetColumn(right, 2);
-        grid.Children.Add(right);
-        var card = new Border { Classes = { "card" }, Padding = new Thickness(12), Child = grid };
-        if (!enabled || missing) card.Opacity = 0.7;
-        return card;
-    }
-
-    void ConfirmRemove(Mods.ModRegistry registry, string id, string name)
-    {
-        var w = MainWindow.Current!;
-        w.Dialog(I18n.T("mod.removeConfirm", ("name", name)),
-            Ui.Text(I18n.T("mod.removeConfirm.text"), "muted", wrap: true),
-            Ui.Button(I18n.T("common.cancel"), w.CloseDialog),
-            Ui.Button(I18n.T("mod.remove"), () =>
-            {
-                w.CloseDialog();
-                try { registry.Remove(id); w.Toast(I18n.T("toast.removed")); }
-                catch (Exception e) { w.Toast(Jobs.Explain(e), bad: true); }
-                AppState.Notify();
-            }, "primary", Icons.Trash));
-    }
-
     // ---------------------------------------------------------------- каталог
 
     Control CatalogView()
@@ -294,7 +204,7 @@ public sealed class GamePage : Page
         var chips = new WrapPanel();
         foreach (var s in _g.Def.Sections)
         {
-            if (s.Id == "packs" && _g.Def.Kits.Length == 0) continue;
+            if (s.Id == "packs" && _g.Def.Kits.Length == 0 && _g.Def.Catalog != CatalogKind.Nexus) continue;
             var b = Ui.Button(I18n.T("sec." + s.Id), () => SelectSection(s.Id), "chip");
             if (_section == s.Id) b.Classes.Add("active");
             b.Margin = new Thickness(0, 0, 8, 8);
@@ -333,6 +243,9 @@ public sealed class GamePage : Page
         return col;
     }
 
+    /// <summary>Открыть раздел каталога (для снимков экрана).</summary>
+    public void ShowSection(string id) => SelectSection(id);
+
     void SelectSection(string id)
     {
         _section = id;
@@ -341,8 +254,8 @@ public sealed class GamePage : Page
         Build();
     }
 
-    bool IsInstalled(ModInfo mod) => _g.Registry?.Get(mod.Id) is { } r && !r.Bool("missing");
-    bool IsInstalling(ModInfo mod) => Actions.Installing.Contains($"{_g.Def.Id}/{mod.Id}");
+    bool IsInstalled(ModInfo mod) => Actions.IsInstalled(_g, mod.Id);
+    bool IsInstalling(ModInfo mod) => Actions.IsBusy(_g, mod.Id);
 
     void RenderList()
     {
@@ -350,7 +263,9 @@ public sealed class GamePage : Page
         _listHost.Children.Clear();
 
         if (_section == "picks") { RenderPicks(); return; }
-        if (_section == "packs") { RenderKits(); return; }
+        if (_section == "packs") { RenderKits(); _listHost.Children.Add(CollectionsBlock()); return; }
+        if (_section == "modpacks" && _g.Def.Catalog == CatalogKind.Thunderstore) _listHost.Children.Add(Ui.Card(Ui.Text(I18n.T("packs.intro"), "muted", wrap: true), 16));
+        if (_section == "visuals") _listHost.Children.Add(ReShadeCard());
 
         if (_error is not null && _mods.Count == 0)
         {
@@ -371,7 +286,7 @@ public sealed class GamePage : Page
 
         var picks = _g.Def.Picks.ToHashSet();
         foreach (var mod in _mods)
-            _listHost.Children.Add(ModRow.Build(_g.Def, mod, IsInstalled(mod), IsInstalling(mod), picks.Contains(mod.Id), () => Actions.Install(_g, mod)));
+            _listHost.Children.Add(ModRow.Build(_g.Def, mod, IsInstalled(mod), IsInstalling(mod), picks.Contains(mod.Id), () => _ = Actions.Install(_g, mod)));
 
         if (_hasMore)
         {
@@ -439,7 +354,7 @@ public sealed class GamePage : Page
         var byId = _picks.ToDictionary(m => m.Id, StringComparer.OrdinalIgnoreCase);
         foreach (var id in _g.Def.Picks)
             if (byId.TryGetValue(id, out var mod))
-                _listHost!.Children.Add(ModRow.Build(_g.Def, mod, IsInstalled(mod), IsInstalling(mod), true, () => Actions.Install(_g, mod)));
+                _listHost!.Children.Add(ModRow.Build(_g.Def, mod, IsInstalled(mod), IsInstalling(mod), true, () => _ = Actions.Install(_g, mod)));
         if (_listHost!.Children.Count == 0)
             _listHost.Children.Add(Ui.Card(Ui.Text(_error ?? I18n.T("catalog.error"), "muted", wrap: true), 22));
     }
@@ -480,13 +395,14 @@ public sealed class GamePage : Page
     void InstallKit(Kit kit, List<ModInfo> missing)
     {
         var w = MainWindow.Current!;
-        w.Dialog(I18n.T("kit.confirm", ("name", I18n.T($"kit.{kit.Id}.title"))),
+        var title = I18n.T($"kit.{kit.Id}.title");
+        w.Dialog(I18n.T("kit.confirm", ("name", title)),
             Ui.Text(I18n.T("kit.confirm.text", ("n", missing.Count)), "muted", wrap: true),
             Ui.Button(I18n.T("common.cancel"), w.CloseDialog),
             Ui.Button(I18n.T("mod.install"), () =>
             {
                 w.CloseDialog();
-                foreach (var mod in missing) Actions.Install(_g, mod);
+                _ = Actions.InstallQueue(_g, title, missing.Select(m => (m, (Pin?)null)).ToList());
             }, "primary", Icons.Download));
     }
 }

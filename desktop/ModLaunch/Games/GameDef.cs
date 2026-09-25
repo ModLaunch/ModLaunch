@@ -74,6 +74,8 @@ public sealed class GameDef
     public required string[] Executables { get; init; }
     public Func<string, string>? SavesDir { get; init; }
     public required string ModMarker { get; init; } // "dll" или "manifest"
+    /// <summary>Как ReShade встаёт в игру: dx11 (dxgi.dll) или opengl (opengl32.dll).</summary>
+    public string ReShadeApi { get; init; } = "dx11";
 
     public string ModsDir(string gamePath) => Loader switch
     {
@@ -102,6 +104,17 @@ public sealed class GameDef
             try { if (Directory.EnumerateFiles(dir, $"goggame-{GogId}.*").Any()) return true; } catch { }
         }
         return false;
+    }
+
+    /// <summary>Номер мода в списке установленных: у Nexus с приставкой, как в версии 3.x.</summary>
+    public string RecordId(string catalogId) => Catalog == CatalogKind.Nexus ? $"nexus:{NexusDomain}:{catalogId}" : catalogId;
+
+    /// <summary>Обратно: номер в каталоге по записи (или null, если мод не из каталога этой игры).</summary>
+    public string? CatalogId(string recordId)
+    {
+        if (Catalog != CatalogKind.Nexus) return recordId;
+        var prefix = $"nexus:{NexusDomain}:";
+        return recordId.StartsWith(prefix, StringComparison.Ordinal) ? recordId[prefix.Length..] : null;
     }
 
     public bool IsLegacy(DateTime? updated) => LegacyBefore is DateTime cut && updated is DateTime u && u < cut;

@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using ModLaunch.Core;
+using ModLaunch.Features;
 using ModLaunch.Games;
 using ModLaunch.Loaders;
 using ModLaunch.Mods;
@@ -124,6 +125,99 @@ public static class SelfCheck
                 w.Write("{\"Name\":\"Some Mod\",\"UniqueID\":\"a.b\",\"Version\":\"1.0\"}");
             var roots = Archive.FindRoots(zip, "manifest", 5);
             return Task.FromResult($"{roots.Count} root: {roots[0].Prefix}");
+        });
+
+        await Check("nexus collections", async () =>
+        {
+            var (items, total, _) = await NexusCollections.Browse("subnautica", 1, "");
+            if (items.Count == 0) throw new Exception("empty");
+            var (info, mods) = await NexusCollections.Get("subnautica", items[0].Url);
+            if (mods.Count == 0 || mods[0].FileId == 0) throw new Exception("no files in " + info.Slug);
+            return $"{total} collections; «{info.Name}»: {mods.Count} mods, {mods.Count(m => m.Optional)} optional";
+        });
+        await Check("nexus deps plan", async () =>
+        {
+            var game = GameCatalog.ById("subnautica")!;
+            var dir = Path.Combine(root, "Subnautica");
+            Directory.CreateDirectory(Path.Combine(dir, "Subnautica_Data"));
+            var plan = await Features.Deps.NexusPlan(game, new ModRegistry(game, dir), "1119", default);
+            if (plan.Count == 0) throw new Exception("Base Kits should need Nautilus");
+            return string.Join(", ", plan.Select(p => $"{p.Name} #{p.Id}"));
+        });
+        await Check("smapi index", async () =>
+        {
+            var found = await Features.SmapiIndex.Lookup(["Pathoschild.ContentPatcher"], default);
+            return found.TryGetValue("Pathoschild.ContentPatcher", out var hit) && hit.NexusId is not null ? $"Content Patcher → #{hit.NexusId}" : throw new Exception("not found");
+        });
+        await Check("mod updates", async () =>
+        {
+            var game = GameCatalog.ById("lethal-company")!;
+            var dir = Path.Combine(root, "LC-updates");
+            Directory.CreateDirectory(Path.Combine(dir, "Lethal Company_Data"));
+            var registry = new ModRegistry(game, dir);
+            Directory.CreateDirectory(Path.Combine(registry.ModsDir, "MoreCompany"));
+            registry.Add(new JsonObject { ["id"] = "notnotnotswipez-MoreCompany", ["name"] = "MoreCompany", ["version"] = "0.0.1", ["source"] = "thunderstore", ["folder"] = "MoreCompany" });
+            var state = new GameState { Def = game, Path = dir, Status = Detect.Found };
+            var ups = await Features.ModUpdates.Check(state);
+            return ups.Count == 1 ? $"MoreCompany 0.0.1 → {ups[0].Latest}" : throw new Exception($"{ups.Count} updates");
+        });
+        await Check("dxvk", async () =>
+        {
+            if (!OperatingSystem.IsWindows()) return "skipped (not Windows)";
+            var dir = Path.Combine(root, "OldGame");
+            Directory.CreateDirectory(dir);
+            var exe = Path.Combine(dir, "game.exe");
+            File.Copy(Path.Combine(Environment.SystemDirectory, "notepad.exe"), exe);
+            File.WriteAllText(Path.Combine(dir, "d3d9.dll"), "original");
+            var info = Features.Dxvk.Inspect(exe);
+            var (version, api) = await Features.Dxvk.Install(exe, "dx9", new Progress<InstallStep>(_ => { }), default);
+            if (new FileInfo(Path.Combine(dir, "d3d9.dll")).Length < 100_000) throw new Exception("d3d9.dll not replaced");
+            if (!Features.Dxvk.Status(dir).Installed) throw new Exception("no marker");
+            Features.Dxvk.Remove(dir);
+            if (File.ReadAllText(Path.Combine(dir, "d3d9.dll")) != "original") throw new Exception("original not restored");
+            return $"DXVK {version} ({api}, {info.Arch}) installed and removed";
+        });
+        await Check("reshade", async () =>
+        {
+            var dir = Path.Combine(root, "ShaderGame");
+            Directory.CreateDirectory(dir);
+            var state = await Features.ReShade.Install(dir, "dx11", new Progress<InstallStep>(_ => { }), default);
+            if (state.Dll is null) throw new Exception("dll not detected");
+            var fx = Directory.EnumerateFiles(Path.Combine(dir, "reshade-shaders"), "*.fx", SearchOption.AllDirectories).Count();
+            Features.ReShade.Activate(dir, Path.Combine(dir, "My.ini"));
+            var preset = Features.ReShade.Detect(dir).Preset;
+            return $"{state.Dll}, {fx} effects, preset {preset}";
+        });
+        await Check("backups + profiles + pack", () =>
+        {
+            var game = GameCatalog.ById("subnautica")!;
+            var dir = Path.Combine(root, "Subnautica");
+            var saves = Path.Combine(dir, "SNAppData", "SavedGames", "slot0000");
+            Directory.CreateDirectory(saves);
+            File.WriteAllText(Path.Combine(saves, "save.json"), "v1");
+            var b = Features.Backups.Create("subnautica", Path.GetDirectoryName(saves), "manual") ?? throw new Exception("no backup");
+            File.WriteAllText(Path.Combine(saves, "save.json"), "v2");
+            Features.Backups.Restore("subnautica", b.Name, Path.GetDirectoryName(saves)!);
+            if (File.ReadAllText(Path.Combine(saves, "save.json")) != "v1") throw new Exception("restore failed");
+
+            var registry = new ModRegistry(game, dir);
+            foreach (var n in new[] { "A", "B" })
+            {
+                Directory.CreateDirectory(Path.Combine(registry.ModsDir, n));
+                registry.Add(new JsonObject { ["id"] = "nexus:subnautica:" + n, ["name"] = n, ["source"] = "nexus", ["folder"] = n });
+            }
+            Features.Profiles.Save("subnautica", "both", registry);
+            registry.SetEnabled("nexus:subnautica:B", false);
+            var (on, _, _) = Features.Profiles.Apply("subnautica", "both", registry);
+            if (on != 1 || !Directory.Exists(Path.Combine(registry.ModsDir, "B"))) throw new Exception("profile apply failed");
+            var pack = Features.ModPack.Parse(Features.ModPack.Build(game, registry, "test"));
+            if (pack.Mods.Count != 2) throw new Exception("pack roundtrip");
+            return Task.FromResult($"backup {b.Name} restored; profile on={on}; pack {pack.Mods.Count} mods");
+        });
+        await Check("log parse", () =>
+        {
+            var issues = Features.Logs.Parse(GameCatalog.ById("valheim")!, "[Error  : Some Mod] boom\n[Error  :   BepInEx] ignore\n");
+            return issues.Count == 1 ? Task.FromResult(issues[0].Mod) : throw new Exception($"{issues.Count}");
         });
 
         await Check("locator", async () =>
