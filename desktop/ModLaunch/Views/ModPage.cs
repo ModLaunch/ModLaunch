@@ -21,10 +21,12 @@ public sealed partial class ModPage : Page
     string _text = "";
     bool _sending;
 
-    public ModPage(string gameId, ModInfo mod)
+    public ModPage(string gameId, ModInfo mod, string tab = "about")
     {
         _g = AppState.Game(gameId);
         _brief = mod;
+        _tab = tab;
+        try { Features.Recent.Add(gameId, mod); } catch { }
         _ = Load();
         _ = SyncReviews();
         _ = LoadExtras();
@@ -55,18 +57,8 @@ public sealed partial class ModPage : Page
     {
         var col = new StackPanel { Spacing = 18, Margin = new Thickness(34, 22, 34, 34), MaxWidth = 1100 };
         col.Children.Add(Header());
-        if (_error is not null) col.Children.Add(Ui.Card(Ui.Text(_error, "muted", wrap: true), 20));
-        else if (_details is null) col.Children.Add(Ui.Card(Ui.Text(I18n.T("common.loading"), "muted"), 20));
-        else
-        {
-            if (_details.Requirements.Count > 0) col.Children.Add(RequirementsCard());
-            if (_details.Images.Count > 0) col.Children.Add(Gallery());
-            col.Children.Add(About());
-        }
-        col.Children.Add(VersionsCard());
-        if (AuthorCard() is { } author) col.Children.Add(author);
-        if (_brief.Source == "hub") col.Children.Add(CommentsCard());
-        else col.Children.Add(ReviewsCard());
+        col.Children.Add(Tabs());
+        col.Children.Add(TabContent());
         Content = new ScrollViewer { Content = col, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
     }
 

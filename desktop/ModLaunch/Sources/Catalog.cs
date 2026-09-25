@@ -24,15 +24,32 @@ public static partial class Catalog
         // «Лучшие» — весь каталог по оценкам.
         if (section.Special == "best") { q = q with { Sort = SortBy.Rating }; section = Section.All["all"]; }
         if (source == "none" || !game.Sources.Contains(source)) return new Page([], 0, false, q.Page);
-        if (source == "hub") return await HubPage(game, q, section, ct);
         var primary = source == game.PrimarySource;
-        var page = source switch
+        Task<Page> Fetch(Query query) => source switch
         {
-            "thunderstore" => await Thunderstore.Search(game.ThunderstoreCommunity!, q, primary ? section.Thunderstore ?? [] : [], ct),
-            "modlinks" => await ModLinks.Search(q, section.ModLinks ?? [], ct),
-            _ => await Nexus.Browse(game.NexusDomain!, q, primary ? game.NexusCategories.GetValueOrDefault(section.Id) ?? [] : [], game.NexusHide, ct),
+            "hub" => HubPage(game, query, section, ct),
+            "thunderstore" => Thunderstore.Search(game.ThunderstoreCommunity!, query, primary ? section.Thunderstore ?? [] : [], ct),
+            "modlinks" => ModLinks.Search(query, section.ModLinks ?? [], ct),
+            _ => Nexus.Browse(game.NexusDomain!, query, primary ? game.NexusCategories.GetValueOrDefault(section.Id) ?? [] : [], game.NexusHide, ct),
         };
-        return page with { Mods = page.Mods.Where(m => !IsHidden(game, m)).ToList() };
+
+        Page page;
+        if (q.Sort == SortBy.Random)
+        {
+            // «Случайные», как на Nexus: случайная страница популярного списка, перемешанная.
+            var popular = q with { Sort = SortBy.Popular, Page = 1 };
+            page = await Fetch(popular);
+            var size = Math.Max(1, page.Mods.Count);
+            var pages = (int)Math.Clamp((page.Total + size - 1) / size, 1, 60);
+            if (pages > 1) page = await Fetch(popular with { Page = Random.Shared.Next(1, pages + 1) });
+            page = page with { Mods = page.Mods.OrderBy(_ => Random.Shared.Next()).ToList(), HasMore = true, Number = q.Page };
+        }
+        else page = await Fetch(q);
+
+        IEnumerable<ModInfo> mods = page.Mods.Where(m => !IsHidden(game, m));
+        if (q.Period > 0) mods = mods.Where(m => m.UpdatedAt is null || m.UpdatedAt >= DateTime.UtcNow.AddDays(-q.Period));
+        if (q.Sort == SortBy.Name && source != "nexus") mods = mods.OrderBy(m => m.Name, StringComparer.CurrentCultureIgnoreCase);
+        return page with { Mods = mods.ToList() };
     }
 
     /// <summary>ModLaunch Hub как каталог игры: поиск, сортировка и «Лучшие» — на месте.</summary>
@@ -44,7 +61,9 @@ public static partial class Catalog
         var text = q.Text.Trim();
         var list = all.Where(m => m.Game == game.Id && (text == "" || m.Name.Contains(text, StringComparison.OrdinalIgnoreCase)
             || m.Summary.Contains(text, StringComparison.OrdinalIgnoreCase) || m.Author.Contains(text, StringComparison.OrdinalIgnoreCase)));
-        var sorted = Creator.Hub.Sort(list, q.Sort switch { SortBy.Rating => "likes", SortBy.New => "new", SortBy.Updated => "updated", _ => "downloads" }).ToList();
+        var sorted = q.Sort == SortBy.Name
+            ? list.OrderBy(m => m.Name, StringComparer.CurrentCultureIgnoreCase).ToList()
+            : Creator.Hub.Sort(list, q.Sort switch { SortBy.Rating => "likes", SortBy.New => "new", SortBy.Updated => "updated", _ => "downloads" }).ToList();
         const int size = 20;
         var mods = sorted.Skip((q.Page - 1) * size).Take(size).Select(Creator.Hub.ToModInfo).ToList();
         return new Page(mods, sorted.Count, q.Page * size < sorted.Count, q.Page);

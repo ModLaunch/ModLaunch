@@ -146,6 +146,21 @@
       <Setter Property="Foreground" Value="White"/>
     </Style>
 
+    <Style Selector="ToggleButton.chip">
+      <Setter Property="CornerRadius" Value="12"/>
+      <Setter Property="FontSize" Value="13"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="Background" Value="{StaticResource Surface}"/>
+      <Setter Property="Foreground" Value="{StaticResource Muted}"/>
+      <Setter Property="BorderBrush" Value="{StaticResource Line}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+    </Style>
+    <Style Selector="ToggleButton.chip:checked /template/ ContentPresenter">
+      <Setter Property="Background" Value="#E5484D"/>
+      <Setter Property="BorderBrush" Value="#E5484D"/>
+      <Setter Property="Foreground" Value="White"/>
+    </Style>
+
     <Style Selector="Button.tab">
       <Setter Property="Background" Value="Transparent"/>
       <Setter Property="BorderThickness" Value="0"/>

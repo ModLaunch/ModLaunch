@@ -202,8 +202,15 @@ public static class Program
         window.CloseDialog();
         window.Navigate(() => new GamePage("hollow-knight-silksong", "catalog"));
         Save("11f-silksong");
-        window.Navigate(() => new ModPage("subnautica", Core.Demo.Many(Games.GameCatalog.ById("subnautica")!, ["2800"])[0]));
+        var demoMod = Core.Demo.Many(Games.GameCatalog.ById("subnautica")!, ["2800"])[0];
+        window.Navigate(() => new ModPage("subnautica", demoMod, "files"));
         Save("11g-mod-versions");
+        window.Navigate(() => new ModPage("subnautica", demoMod, "stats"));
+        Save("12a-mod-stats");
+        window.Navigate(() => new ModPage("subnautica", demoMod, "changes"));
+        Save("12b-mod-changes");
+        window.Navigate(() => new ModsCenterPage("updates"));
+        Save("12c-mods-center");
         window.Navigate(() => new CreatorPage("docs"));
         Save("11h-docs");
 

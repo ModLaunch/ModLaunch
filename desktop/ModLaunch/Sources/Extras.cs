@@ -47,6 +47,32 @@ public static class Extras
         }
     }
 
+    /// <summary>
+    /// Полный список изменений (вкладка «Изменения»): у Thunderstore — CHANGELOG
+    /// пакета, у остальных — собирается из записей к версиям.
+    /// </summary>
+    public static async Task<List<Block>> Changelog(GameDef game, ModInfo mod, List<VersionInfo>? versions, CancellationToken ct = default)
+    {
+        if (!Program.Demo && mod.Source == "thunderstore" && Thunderstore.Split(mod.Id) is var (ns, name))
+        {
+            try
+            {
+                var html = (await Http.GetJson($"https://thunderstore.io/api/cyberstorm/package/{Uri.EscapeDataString(ns)}/{Uri.EscapeDataString(name)}/latest/changelog/", ct, 20)).Str("html") ?? "";
+                if (html.Trim() != "") return Details.Html(html);
+            }
+            catch { }
+        }
+        var blocks = new List<Block>();
+        foreach (var v in versions ?? [])
+        {
+            if (v.Changelog.Trim() == "") continue;
+            blocks.Add(new Block("h", v.Date is null ? v.Version : $"{v.Version} · {v.Date:dd.MM.yyyy}"));
+            foreach (var line in v.Changelog.Split('\n').Select(l => l.Trim().TrimStart('-', '*', '•').Trim()).Where(l => l != ""))
+                blocks.Add(new Block("li", line));
+        }
+        return blocks;
+    }
+
     /// <summary>Другие моды этого автора для этой же игры.</summary>
     public static async Task<List<ModInfo>> ByAuthor(GameDef game, ModInfo mod, CancellationToken ct = default)
     {

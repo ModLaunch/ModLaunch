@@ -71,13 +71,16 @@ public static partial class Nexus
             Rating = node.Long("endorsements"),
             UpdatedAt = DateTime.TryParse(node.Str("updatedAt"), out var d) ? d.ToUniversalTime() : null,
             Categories = node?["modCategory"].Str("name") is string c ? [c] : [],
+            Adult = node.Bool("adultContent"),
         };
     }
 
     static JsonObject Sort(SortBy sort) => sort switch
     {
         SortBy.Rating => new() { ["endorsements"] = new JsonObject { ["direction"] = "DESC" } },
-        SortBy.Updated or SortBy.New => new() { ["updatedAt"] = new JsonObject { ["direction"] = "DESC" } },
+        SortBy.Updated => new() { ["updatedAt"] = new JsonObject { ["direction"] = "DESC" } },
+        SortBy.New => new() { ["createdAt"] = new JsonObject { ["direction"] = "DESC" } },
+        SortBy.Name => new() { ["name"] = new JsonObject { ["direction"] = "ASC" } },
         _ => new() { ["downloads"] = new JsonObject { ["direction"] = "DESC" } },
     };
 
@@ -94,8 +97,8 @@ public static partial class Nexus
             var f = new JsonObject
             {
                 ["gameDomainName"] = new JsonArray(new JsonObject { ["value"] = domain, ["op"] = "EQUALS" }),
-                ["adultContent"] = new JsonArray(new JsonObject { ["value"] = false, ["op"] = "EQUALS" }),
             };
+            if (!q.Adult) f["adultContent"] = new JsonArray(new JsonObject { ["value"] = false, ["op"] = "EQUALS" });
             var sub = new JsonArray();
             if (include.Length == 1) f["categoryName"] = new JsonArray(new JsonObject { ["value"] = include[0], ["op"] = "EQUALS" });
             else if (include.Length > 1)
@@ -131,7 +134,7 @@ public static partial class Nexus
             result = await Run(Eq("nameStemmed", needle, "MATCHES"));
 
         var mods = result.Arr("nodes")
-            .Where(n => !n.Bool("adultContent"))
+            .Where(n => q.Adult || !n.Bool("adultContent"))
             .Select(n => FromNode(n, domain))
             .OfType<ModInfo>()
             .Where(m => !hide.Contains(m.Id))

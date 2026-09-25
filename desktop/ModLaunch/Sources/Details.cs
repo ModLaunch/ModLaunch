@@ -7,7 +7,11 @@ namespace ModLaunch.Sources;
 
 public sealed record Block(string Kind, string Text); // h | p | li
 public sealed record Requirement(string Id, string Name, bool Available);
-public sealed record ModDetails(ModInfo Mod, List<Block> Blocks, List<string> Images, List<Requirement> Requirements);
+public sealed record ModDetails(ModInfo Mod, List<Block> Blocks, List<string> Images, List<Requirement> Requirements)
+{
+    /// <summary>Ролики YouTube из описания — для вкладки «Видео».</summary>
+    public List<string> Videos { get; init; } = [];
+}
 
 /// <summary>
 /// Страница мода: описание (HTML Thunderstore, BBCode Nexus, Markdown README),
@@ -27,7 +31,7 @@ public static partial class Details
                     : [];
                 var text = hub.Description != "" ? hub.Description : hub.Summary;
                 if (hub.Changelog != "") text += $"\n\n## {I18n.T("hub.changelog", ("version", hub.Version))}\n{hub.Changelog}";
-                return new ModDetails(Creator.Hub.ToModInfo(hub), Markdown(text), hub.Images, reqs);
+                return new ModDetails(Creator.Hub.ToModInfo(hub), Markdown(text), hub.Images, reqs) { Videos = YouTube(text) };
             }
             case "thunderstore":
             {
@@ -39,7 +43,7 @@ public static partial class Details
                 }
                 var reqs = mod.Dependencies.Where(d => !d.EndsWith("BepInExPack", StringComparison.OrdinalIgnoreCase) && !d.Contains("BepInExPack_") && !d.StartsWith("xiaoye97-BepInEx", StringComparison.OrdinalIgnoreCase))
                     .Select(d => new Requirement(d, d[(d.LastIndexOf('-') + 1)..].Replace('_', ' '), true)).ToList();
-                return new ModDetails(mod, Html(html), Pictures(html, "https://thunderstore.io/"), reqs);
+                return new ModDetails(mod, Html(html), Pictures(html, "https://thunderstore.io/"), reqs) { Videos = YouTube(html) };
             }
             case "modlinks":
             {
@@ -58,10 +62,18 @@ public static partial class Details
                 var images = Pictures(html, "https://www.nexusmods.com/");
                 if (mod.Icon is not null) images.Insert(0, mod.Icon);
                 var reqs = requirements.Where(r => !game.NexusHide.Contains(r.Id)).Select(r => new Requirement(r.Id, r.Name, true)).ToList();
-                return new ModDetails(mod, Html(html), images.Distinct().ToList(), reqs);
+                return new ModDetails(mod, Html(html), images.Distinct().ToList(), reqs) { Videos = YouTube(description) };
             }
         }
     }
+
+    /// <summary>Идентификаторы роликов YouTube в тексте (ссылки, встраивания, [youtube]id[/youtube]).</summary>
+    public static List<string> YouTube(string? text) =>
+        YouTubeLinks().Matches(text ?? "").Select(m => m.Groups[1].Success && m.Groups[1].Value != "" ? m.Groups[1].Value : m.Groups[2].Value)
+            .Where(id => id.Length == 11).Distinct().Take(12).ToList();
+
+    [GeneratedRegex(@"(?:youtube(?:-nocookie)?\.com/(?:watch\?(?:[^""'\s<>]*&)?v=|embed/|shorts/|v/)|youtu\.be/)([A-Za-z0-9_-]{11})|\[youtube\]\s*([A-Za-z0-9_-]{11})\s*\[/youtube\]", RegexOptions.IgnoreCase)]
+    private static partial Regex YouTubeLinks();
 
     // ---------------------------------------------------------------- README с GitHub (Hollow Knight)
 
@@ -88,7 +100,7 @@ public static partial class Details
 
     [GeneratedRegex(@"!\[[^\]]*\]\(([^)\s]+)")] private static partial Regex MarkdownImages();
 
-    static List<Block> Markdown(string text)
+    public static List<Block> Markdown(string text)
     {
         var blocks = new List<Block>();
         var para = new List<string>();
@@ -131,7 +143,7 @@ public static partial class Details
         return s;
     }
 
-    static List<Block> Html(string html)
+    public static List<Block> Html(string html)
     {
         if (string.IsNullOrWhiteSpace(html)) return [];
         var s = Regex.Replace(html, @"<(script|style)[\s\S]*?</\1>", "", RegexOptions.IgnoreCase);

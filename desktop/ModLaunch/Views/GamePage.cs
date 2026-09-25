@@ -21,6 +21,8 @@ public sealed partial class GamePage : Page
     readonly Dictionary<string, long> _sourceTotals = [];
     string _query;
     SortBy _sort = SortBy.Popular;
+    int _period;
+    bool _adult = Settings.Data.Bool("showAdult", false);
 
     // Каталог грузится отдельно от перерисовки: перерисовка не должна его сбрасывать.
     readonly List<ModInfo> _mods = [];
@@ -254,7 +256,7 @@ public sealed partial class GamePage : Page
             search.KeyDown += (_, e) => { if (e.Key == Key.Enter) { _query = search.Text ?? ""; _ = Load(reset: true); } };
 
             var sort = new ComboBox { Width = 200, Height = 42 };
-            var sorts = new[] { SortBy.Popular, SortBy.Rating, SortBy.Updated, SortBy.New };
+            var sorts = new[] { SortBy.Popular, SortBy.Rating, SortBy.Updated, SortBy.New, SortBy.Name, SortBy.Random };
             foreach (var s in sorts) sort.Items.Add(I18n.T("sort." + s.ToString().ToLowerInvariant()));
             sort.SelectedIndex = Array.IndexOf(sorts, _sort);
             sort.SelectionChanged += (_, _) =>
@@ -264,10 +266,36 @@ public sealed partial class GamePage : Page
                 _ = Load(reset: true);
             };
 
-            var bar = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), ColumnSpacing = 10 };
+            // Период, как на Nexus: «обновлены за сутки / неделю / месяц / год».
+            var periods = new[] { 0, 1, 7, 30, 365 };
+            var period = new ComboBox { Width = 160, Height = 42 };
+            foreach (var d in periods) period.Items.Add(I18n.T("period." + d));
+            period.SelectedIndex = Array.IndexOf(periods, _period);
+            period.SelectionChanged += (_, _) =>
+            {
+                if (period.SelectedIndex < 0 || periods[period.SelectedIndex] == _period) return;
+                _period = periods[period.SelectedIndex];
+                _ = Load(reset: true);
+            };
+
+            var adult = new ToggleButton { Classes = { "chip" }, Content = "18+", IsChecked = _adult, Height = 42, Padding = new Thickness(14, 0), VerticalContentAlignment = VerticalAlignment.Center };
+            ToolTip.SetTip(adult, I18n.T("catalog.adult"));
+            adult.IsCheckedChanged += (_, _) =>
+            {
+                _adult = adult.IsChecked == true;
+                Settings.Data["showAdult"] = _adult;
+                Settings.Save();
+                _ = Load(reset: true);
+            };
+
+            var bar = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto,Auto,Auto"), ColumnSpacing = 10 };
             bar.Children.Add(search);
             Grid.SetColumn(sort, 1);
             bar.Children.Add(sort);
+            Grid.SetColumn(period, 2);
+            bar.Children.Add(period);
+            Grid.SetColumn(adult, 3);
+            bar.Children.Add(adult);
             col.Children.Add(bar);
         }
 
@@ -361,8 +389,8 @@ public sealed partial class GamePage : Page
         try
         {
             var page = Program.Demo
-                ? Demo.Catalog(_g.Def, new Query(_query, _page, _sort, _section))
-                : await Catalog.Browse(_g.Def, new Query(_query, _page, _sort, _section), source: _source);
+                ? Demo.Catalog(_g.Def, new Query(_query, _page, _sort, _section, _period, _adult))
+                : await Catalog.Browse(_g.Def, new Query(_query, _page, _sort, _section, _period, _adult), source: _source);
             if (id != _requestId) return;
             _mods.AddRange(page.Mods.Where(m => _mods.All(x => x.Id != m.Id)));
             _total = page.Total;

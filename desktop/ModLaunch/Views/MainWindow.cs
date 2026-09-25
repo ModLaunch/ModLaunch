@@ -34,7 +34,7 @@ public sealed class MainWindow : Window
     readonly StackPanel _railGames = new() { Spacing = 10, HorizontalAlignment = HorizontalAlignment.Center };
     readonly TextBlock _title = new() { FontWeight = FontWeight.SemiBold, VerticalAlignment = VerticalAlignment.Center, FontSize = 14 };
     readonly TextBox _search = new() { Width = 320, Height = 40 };
-    readonly Button _back, _forward, _downloads, _settingsButton, _friendsButton, _statsButton, _donateButton, _creatorButton, _libraryButton;
+    readonly Button _back, _forward, _downloads, _settingsButton, _friendsButton, _statsButton, _donateButton, _creatorButton, _libraryButton, _modsButton;
     readonly LayoutTransformControl _scale = new();
     Control? _railHost;
     Control? _brandWord;
@@ -78,6 +78,7 @@ public sealed class MainWindow : Window
         _donateButton = RailIcon(Icons.Coffee, () => Navigate(() => new DonatePage()), I18n.T("nav.donate"));
         // Как в Modrinth App: разделы — отдельными пунктами на боковой панели.
         _libraryButton = RailIcon(Icons.Layers, () => Navigate(() => new LibraryPage()), I18n.T("lib.title"));
+        _modsButton = RailIcon(Icons.Package, () => Navigate(() => new ModsCenterPage()), I18n.T("mc.title"));
         _creatorButton = RailIcon(Icons.Tools, () => Navigate(() => new CreatorPage()), "Creator Hub");
         _friendsBadge.Width = 10; _friendsBadge.Height = 10; _friendsBadge.CornerRadius = new CornerRadius(5);
         _friendsBadge.Background = Ui.Res("Good"); _friendsBadge.HorizontalAlignment = HorizontalAlignment.Right; _friendsBadge.VerticalAlignment = VerticalAlignment.Top;
@@ -175,7 +176,7 @@ public sealed class MainWindow : Window
         // Главная — по логотипу (одна кнопка вместо двух).
         _logo = logo;
         ToolTip.SetTip(logo, I18n.T("nav.menu"));
-        var top = Ui.Col(8, logo, _libraryButton, new Border { Height = 1, Background = Ui.Res("Line"), Margin = new Thickness(14, 6, 14, 0) });
+        var top = Ui.Col(8, logo, _libraryButton, _modsButton, new Border { Height = 1, Background = Ui.Res("Line"), Margin = new Thickness(14, 6, 14, 0) });
         top.Margin = new Thickness(0, 14, 0, 10);
         top.HorizontalAlignment = HorizontalAlignment.Center;
         DockPanel.SetDock(top, Dock.Top);
@@ -301,7 +302,7 @@ public sealed class MainWindow : Window
             var b = new Button
             {
                 Classes = { "rail" },
-                Content = new Border { CornerRadius = new CornerRadius(11), ClipToBounds = true, Child = Ui.GameImage(g.Def, 120) },
+                Content = new Border { CornerRadius = new CornerRadius(11), ClipToBounds = true, Child = Ui.GameImage(g.Def, 120, art: Images.Art.Cover) },
             };
             if (_current?.GameId == id) b.Classes.Add("active");
             b.Click += (_, _) => Navigate(() => new GamePage(id));
@@ -313,6 +314,7 @@ public sealed class MainWindow : Window
         _railGames.Children.Add(plus);
         _creatorButton.Classes.Set("active", _current is CreatorPage);
         _libraryButton.Classes.Set("active", _current is LibraryPage);
+        _modsButton.Classes.Set("active", _current is ModsCenterPage);
         _friendsButton.IsVisible = Settings.Data.Bool("railFriends", true);
         if (_logo is not null) _logo.BorderBrush = _current is HomePage ? Ui.Res("Brand") : Brushes.Transparent;
         _settingsButton.Classes.Set("active", _current is SettingsPage);
@@ -603,7 +605,8 @@ public sealed class MainWindow : Window
             foreach (var h in Creator.Hub.Updates.ToList()) Creator.Hub.MarkSeen(h);
             RenderBell();
         }, "ghost", Icons.Check);
-        _bellList.Children.Add(clear);
+        var center = Ui.Button(I18n.T("mc.open"), () => { _bellPanel.IsVisible = false; Navigate(() => new ModsCenterPage()); }, "ghost", Icons.Package);
+        _bellList.Children.Add(Ui.Row(6, clear, center));
     }
 
     void OnKey(object? sender, KeyEventArgs e)
