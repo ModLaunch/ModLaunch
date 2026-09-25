@@ -5,10 +5,10 @@
 
 Object.assign(EN, {
   'hero.chip': 'Out now:',
-  'hero.chip2': 'ModLaunch Hub and ModScript',
+  'hero.chip2': 'Big Picture and a Steam-style library',
   'hero.title1': 'Mods in one click.',
   'hero.title2': 'And your own mod hub.',
-  'hero.lead': 'ModLaunch finds your games, installs the mod loader, pulls in dependencies and keeps everything updated. It also has ModLaunch Hub — an ad-free community mod site — and its own modding language, ModScript.',
+  'hero.lead': 'ModLaunch finds your games, installs the mod loader, pulls in dependencies and keeps everything updated. A library with real covers, Big Picture mode for gamepads, the ad-free ModLaunch Hub and its own modding language, ModScript.',
   'hero.hub': 'Open Hub',
   'hero.games': 'games',
   'hero.mods': 'mods',
@@ -97,7 +97,7 @@ Object.assign(EN, {
   'sc.add': 'Any game',
   'sc.light': 'Light theme',
   'sc.overlay': 'Overlay',
-  'cap.home': 'All your games, “Continue playing” and popular mods on one screen.',
+  'cap.home': 'Your games as covers, “Continue playing” and popular mods on one screen.',
   'cap.hub': 'ModLaunch Hub: trending, new and loved mods, tags and filters.',
   'cap.editor': 'The ModScript editor: highlighting, hints and a live “what you get” panel.',
   'cap.versions': 'Files and versions with changelogs — install any version or roll back.',
@@ -109,6 +109,17 @@ Object.assign(EN, {
   'news.eyebrow': 'What’s new',
   'news.title': 'Latest versions',
   'news.all': 'All versions and the full changelog',
+  'news.60': 'Big Picture', 'news.60a': 'Big Picture mode and PC control with a gamepad', 'news.60b': 'A Steam-style library with covers', 'news.60c': 'Mod tabs and a Mods center, like Nexus', 'news.60d': 'Logo is Home, Creator Hub moved down',
+  'f.bp': 'Big Picture and gamepad', 'f.bp.p': 'Press F11 and ModLaunch goes fullscreen like Steam on a TV: big covers, game art in the background, launch games, toggle mods and power off the PC from the couch. The View button turns the gamepad into a mouse and keyboard: stick moves the cursor, A clicks, X opens the on-screen keyboard.',
+  'f.lib': 'A Steam-style library', 'f.lib.p': 'Real covers for all 17 games — even offline. Your games on top, the rest below. Every game gets a header with its art and logo.',
+  'f.tabs': 'Everything Nexus has', 'f.tabs.p': 'Mod tabs: files, changelog, requirements, images, videos, reviews and stats. Random and name sorting, time period and an 18+ switch.',
+  'f.center': 'Mods center', 'f.center.p': 'Updates, tracked, favorites, recently viewed, download history and hidden — on one page.',
+  'vs.r10': 'Big Picture and gamepad PC control',
+  'sc.library': 'Library', 'sc.bp': 'Big Picture', 'sc.modtabs': 'Mod tabs', 'sc.center': 'Mods center',
+  'cap.library': 'A Steam-style library: real covers, your games on top, the rest below.',
+  'cap.bigpicture': 'Big Picture: fullscreen, gamepad, mods and power menu from the couch.',
+  'cap.mod-stats': 'Nexus-style mod tabs: files, changelog, requirements, videos, reviews and stats.',
+  'cap.mods-center': 'Mods center: updates, tracked, favorites, history, recently viewed and hidden.',
   'news.55': 'ModLaunch Hub', 'news.55a': 'Our own mod site in the app', 'news.55b': 'ModScript editor with highlighting', 'news.55c': 'Versions, tracking, author mods', 'news.55d': 'Silksong, GTFO and Outward',
   'news.50': 'Creator Hub', 'news.50a': 'The ModScript mod language', 'news.50b': 'The “+” button for any game', 'news.50c': 'Six new games', 'news.50d': 'Themes and flexible settings',
   'news.40': 'New engine', 'news.40a': 'C# and Avalonia instead of Electron', 'news.40b': 'A 4× smaller file', 'news.40c': 'Several catalogs per game', 'news.40d': 'Vortex and Modrinth App tricks',
@@ -134,6 +145,10 @@ Object.assign(ru, {
   'hub.empty.btn': 'Как опубликовать',
   'hub.soon': 'ModLaunch Hub открывается',
   'hub.soon.p': 'Галерею прямо сейчас включают. Моды, опубликованные в программе, появятся здесь.',
+  'cap.library': 'Библиотека как в Steam: настоящие обложки, ваши игры сверху, остальные ниже.',
+  'cap.bigpicture': 'Big Picture: весь экран, геймпад, моды и меню питания — с дивана.',
+  'cap.mod-stats': 'Вкладки мода как на Nexus: файлы, изменения, требования, видео, отзывы и статистика.',
+  'cap.mods-center': 'Центр модов: обновления, отслеживаемые, избранное, история, недавнее и скрытое.',
   'cap.hub': 'ModLaunch Hub: моды в тренде, новые и любимые, теги и фильтры.',
   'cap.editor': 'Редактор ModScript: подсветка, подсказки и панель «что получится».',
   'cap.versions': 'Файлы и версии со списком изменений — поставить любую или откатиться.',
@@ -149,7 +164,7 @@ function renderGames() {
   const grid = document.getElementById('gamesGrid');
   grid.innerHTML = GAMES.map((g) => `
     <article class="game reveal" style="--g:${g.color || '#7c5cff'}">
-      <img src="${steamArt(g.steam)}" alt="" loading="lazy" onerror="if(this.dataset.f){this.remove()}else{this.dataset.f=1;this.src='${steamHeader(g.steam)}'}" />
+      <img src="img/art/${g.steam}.webp" alt="" loading="lazy" onerror="if(this.dataset.f){this.remove()}else{this.dataset.f=1;this.src='${steamArt(g.steam)}'}" />
       <span class="count">${esc(t('games.mods', { n: compact(g.mods) }))}</span>
       ${g.fresh ? `<span class="badge">${esc(t('games.new'))}</span>` : ''}
       <div><h3>${esc(g.name)}</h3><p>${esc(g.loader)} · ${esc(g.src)}</p></div>

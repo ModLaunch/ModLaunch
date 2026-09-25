@@ -4,7 +4,7 @@
    с проверкой SHA-256 и ссылки вида hub.html#mod=<id> / #author=<uid>. */
 
 Object.assign(EN, {
-  'h.chip': 'New in ModLaunch 5.5',
+  'h.chip': 'New in ModLaunch 6.0',
   'h.title1': 'ModLaunch',
   'h.sub': 'Community mods — no ads, no paid “fast download”, no middlemen. Browse and download here; in ModLaunch they install with one button.',
   'h.search': 'Name, author or tag',
