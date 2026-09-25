@@ -248,6 +248,19 @@
       <Setter Property="BorderBrush" Value="#3A4150"/>
     </Style>
     <Style Selector="Button.card-btn:pressed"><Setter Property="RenderTransform" Value="none"/></Style>
+    <Style Selector="Button.cover-btn">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+      <Setter Property="VerticalContentAlignment" Value="Top"/>
+      <Setter Property="FontWeight" Value="Normal"/>
+      <Setter Property="Transitions"><Transitions/></Setter>
+    </Style>
+    <Style Selector="Button.cover-btn:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="Transparent"/></Style>
+    <Style Selector="Button.cover-btn:pressed"><Setter Property="RenderTransform" Value="none"/></Style>
+    <Style Selector="Button.cover-btn Button.cover-play"><Setter Property="Opacity" Value="0"/></Style>
+    <Style Selector="Button.cover-btn:pointerover Button.cover-play"><Setter Property="Opacity" Value="1"/></Style>
+    <Style Selector="Button.cover-btn:pointerover Border"><Setter Property="BorderBrush" Value="{StaticResource Brand}"/></Style>
     <Style Selector="Border.skeleton"><Setter Property="Background" Value="{StaticResource Surface2}"/></Style>
     <Style Selector="Button.card-btn.dashed">
       <Setter Property="Background" Value="Transparent"/>

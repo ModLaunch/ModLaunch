@@ -467,7 +467,7 @@
   "lib.title": "Библиотека",
   "lib.search": "Искать в библиотеке",
   "lib.all": "Все",
-  "lib.found": "Установленные",
+  "lib.found": "Мои игры",
   "lib.missing": "Не найдены",
   "lib.empty": "Ничего не нашлось.",
   "lib.open": "Библиотека",
@@ -476,7 +476,12 @@
   "nx.untrack": "Не отслеживать",
   "nx.more": "Ещё",
   "hub.share": "Скопировать ссылку",
-  "hub.shared": "Ссылка на мод скопирована"
+  "hub.shared": "Ссылка на мод скопирована",
+  "lib.other": "Другие поддерживаемые игры",
+  "lib.other.hint": "Их нет на этом компьютере — установите игру или укажите папку, и она появится выше.",
+  "lib.showOther": "Показать",
+  "lib.hideOther": "Скрыть",
+  "lib.custom": "своя"
  },
  "en": {
   "add.title": "Add a game",
@@ -946,7 +951,7 @@
   "lib.title": "Library",
   "lib.search": "Search the library",
   "lib.all": "All",
-  "lib.found": "Installed",
+  "lib.found": "My games",
   "lib.missing": "Not found",
   "lib.empty": "Nothing found.",
   "lib.open": "Library",
@@ -955,6 +960,11 @@
   "nx.untrack": "Stop tracking",
   "nx.more": "More",
   "hub.share": "Copy link",
-  "hub.shared": "Mod link copied"
+  "hub.shared": "Mod link copied",
+  "lib.other": "Other supported games",
+  "lib.other.hint": "Not on this PC — install the game or point to its folder and it moves up.",
+  "lib.showOther": "Show",
+  "lib.hideOther": "Hide",
+  "lib.custom": "custom"
  }
 }

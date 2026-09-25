@@ -34,11 +34,12 @@ public sealed class MainWindow : Window
     readonly StackPanel _railGames = new() { Spacing = 10, HorizontalAlignment = HorizontalAlignment.Center };
     readonly TextBlock _title = new() { FontWeight = FontWeight.SemiBold, VerticalAlignment = VerticalAlignment.Center, FontSize = 14 };
     readonly TextBox _search = new() { Width = 320, Height = 40 };
-    readonly Button _back, _forward, _downloads, _homeButton, _settingsButton, _friendsButton, _statsButton, _donateButton, _creatorButton, _libraryButton;
+    readonly Button _back, _forward, _downloads, _settingsButton, _friendsButton, _statsButton, _donateButton, _creatorButton, _libraryButton;
     readonly LayoutTransformControl _scale = new();
     Control? _railHost;
     Control? _brandWord;
     Panel? _layers;
+    Border? _logo;
     readonly Button _updatePill = new() { Classes = { "chip" }, IsVisible = false, VerticalAlignment = VerticalAlignment.Center };
     readonly Border _friendsBadge = new() { IsVisible = false };
     readonly Panel _overlay = new() { IsVisible = false };
@@ -71,14 +72,13 @@ public sealed class MainWindow : Window
 
         _back = Ui.Button("", GoBack, "icon ghost", Icons.Back, I18n.T("nav.back"));
         _forward = Ui.Button("", GoForward, "icon ghost", Icons.Forward, I18n.T("nav.forward"));
-        _homeButton = RailIcon(Icons.Home, () => Navigate(() => new HomePage()), I18n.T("nav.menu"));
         _settingsButton = RailIcon(Icons.Settings, () => Navigate(() => new SettingsPage()), I18n.T("nav.settings"));
         _friendsButton = RailIcon(Icons.Users, () => Navigate(() => new FriendsPage()), I18n.T("friends.title"));
         _statsButton = RailIcon(Icons.Chart, () => Navigate(() => new StatsPage()), I18n.T("stats.title"));
         _donateButton = RailIcon(Icons.Coffee, () => Navigate(() => new DonatePage()), I18n.T("nav.donate"));
         // Как в Modrinth App: разделы — отдельными пунктами на боковой панели.
         _libraryButton = RailIcon(Icons.Layers, () => Navigate(() => new LibraryPage()), I18n.T("lib.title"));
-        _creatorButton = RailIcon(Icons.Code, () => Navigate(() => new CreatorPage()), "Creator Hub");
+        _creatorButton = RailIcon(Icons.Tools, () => Navigate(() => new CreatorPage()), "Creator Hub");
         _friendsBadge.Width = 10; _friendsBadge.Height = 10; _friendsBadge.CornerRadius = new CornerRadius(5);
         _friendsBadge.Background = Ui.Res("Good"); _friendsBadge.HorizontalAlignment = HorizontalAlignment.Right; _friendsBadge.VerticalAlignment = VerticalAlignment.Top;
         _friendsBadge.Margin = new Thickness(0, 6, 6, 0);
@@ -160,7 +160,7 @@ public sealed class MainWindow : Window
         // Боковая панель: логотип, главная, игры, настройки.
         var logo = new Border
         {
-            Width = 48, Height = 48, CornerRadius = new CornerRadius(14), ClipToBounds = true,
+            Width = 48, Height = 48, CornerRadius = new CornerRadius(14), ClipToBounds = true, BorderThickness = new Thickness(2),
             Child = new Image { Source = Images.Asset("icon.png", 96), Stretch = Stretch.UniformToFill },
             Cursor = new Cursor(StandardCursorType.Hand),
         };
@@ -172,12 +172,14 @@ public sealed class MainWindow : Window
             Background = Ui.Res("Rail"),
             LastChildFill = true,
         };
-        var top = Ui.Col(8, logo, new Border { Height = 1, Background = Ui.Res("Line"), Margin = new Thickness(14, 6) }, _homeButton, _libraryButton, _creatorButton,
-            new Border { Height = 1, Background = Ui.Res("Line"), Margin = new Thickness(14, 6, 14, 0) });
+        // Главная — по логотипу (одна кнопка вместо двух).
+        _logo = logo;
+        ToolTip.SetTip(logo, I18n.T("nav.menu"));
+        var top = Ui.Col(8, logo, _libraryButton, new Border { Height = 1, Background = Ui.Res("Line"), Margin = new Thickness(14, 6, 14, 0) });
         top.Margin = new Thickness(0, 14, 0, 10);
         top.HorizontalAlignment = HorizontalAlignment.Center;
         DockPanel.SetDock(top, Dock.Top);
-        var bottom = Ui.Col(8, _friendsButton, _statsButton, _settingsButton);
+        var bottom = Ui.Col(8, _creatorButton, _friendsButton, _statsButton, _settingsButton);
         bottom.Margin = new Thickness(0, 10, 0, 16);
         bottom.HorizontalAlignment = HorizontalAlignment.Center;
         DockPanel.SetDock(bottom, Dock.Bottom);
@@ -312,7 +314,7 @@ public sealed class MainWindow : Window
         _creatorButton.Classes.Set("active", _current is CreatorPage);
         _libraryButton.Classes.Set("active", _current is LibraryPage);
         _friendsButton.IsVisible = Settings.Data.Bool("railFriends", true);
-        _homeButton.Classes.Set("active", _current is HomePage);
+        if (_logo is not null) _logo.BorderBrush = _current is HomePage ? Ui.Res("Brand") : Brushes.Transparent;
         _settingsButton.Classes.Set("active", _current is SettingsPage);
         _friendsButton.Classes.Set("active", _current is FriendsPage);
         _statsButton.Classes.Set("active", _current is StatsPage);

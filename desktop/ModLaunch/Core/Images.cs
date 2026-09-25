@@ -27,13 +27,56 @@ public static class Images
         });
     }
 
-    /// <summary>Обложка игры, если она уже под рукой (из ресурсов или кэша); из сети — через Ui.GameImage.</summary>
+    /// <summary>Вид обложки: вертикальная (как в библиотеке Steam), широкая шапка, фон или логотип.</summary>
+    public enum Art { Cover, Header, Hero, Logo }
+
+    static string Kind(Art art) => art switch { Art.Cover => "cover", Art.Header => "header", Art.Hero => "hero", _ => "logo" };
+
+    /// <summary>Встроенная картинка игры (Assets/art/&lt;appid&gt;-&lt;вид&gt;), если есть.</summary>
+    public static Bitmap? GameAsset(Games.GameDef def, Art art, int width)
+    {
+        if (def.SteamAppId <= 0) return null;
+        var name = $"art/{def.SteamAppId}-{Kind(art)}.{(art == Art.Logo ? "png" : "jpg")}";
+        return AssetExists(name) ? Asset(name, width) : null;
+    }
+
+    static readonly ConcurrentDictionary<string, bool> Exists = new();
+    static bool AssetExists(string name) => Exists.GetOrAdd(name, n =>
+    {
+        try { return AssetLoader.Exists(new Uri($"avares://ModLaunch/Assets/{n}")); } catch { return false; }
+    });
+
+    /// <summary>Ссылки Steam на картинку игры — если встроенной нет (свои игры, новые игры).</summary>
+    public static string[] SteamUrls(int appId, Art art)
+    {
+        if (appId <= 0) return [];
+        var file = art switch { Art.Cover => "library_600x900.jpg", Art.Hero => "library_hero.jpg", Art.Logo => "logo.png", _ => "header.jpg" };
+        return
+        [
+            $"https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/{appId}/{file}",
+            $"https://cdn.akamai.steamstatic.com/steam/apps/{appId}/{file}",
+        ];
+    }
+
+    /// <summary>Обложка игры, если она уже под рукой (встроенная или в кэше); из сети — через Ui.GameImage.</summary>
     public static Bitmap? Game(Games.GameDef def, int width)
     {
+        if (GameAsset(def, Art.Header, width) is { } header) return header;
         if (def.Art is not null) return Asset(def.Art, width);
         if (def.ArtUrl is null) return null;
         var task = FromUrl(def.ArtUrl, width);
         return task.IsCompleted ? task.Result : null;
+    }
+
+    /// <summary>Картинка игры любого вида: встроенная, иначе из Steam по очереди ссылок.</summary>
+    public static async Task<Bitmap?> GameAsync(Games.GameDef def, Art art, int width)
+    {
+        if (GameAsset(def, art, width) is { } local) return local;
+        foreach (var url in SteamUrls(def.SteamAppId, art))
+            if (await FromUrl(url, width) is { } bmp) return bmp;
+        if (art == Art.Cover && GameAsset(def, Art.Hero, width * 3) is { } hero) return hero;
+        if (art is Art.Header or Art.Cover && def.Art is not null) return Asset(def.Art, width);
+        return def.ArtUrl is null ? null : await FromUrl(def.ArtUrl, width);
     }
 
     public static Task<Bitmap?> FromUrl(string? url, int decodeWidth = 160)

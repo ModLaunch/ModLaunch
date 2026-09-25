@@ -82,7 +82,6 @@ public sealed partial class GamePage : Page
 
     Control Header()
     {
-        var art = Images.Game(_g.Def, 900);
         var status = _g.Status switch
         {
             Detect.Found when _g.Def.Loader == LoaderKind.None => (Ui.Res("Good"), I18n.T("add.noLoader", ("folder", _g.Def.ModsFolder))),
@@ -92,8 +91,14 @@ public sealed partial class GamePage : Page
             _ => (Ui.Res("Faint"), I18n.T("games.notDetected")),
         };
 
-        var info = Ui.Col(8,
-            new TextBlock { Text = _g.Def.Name, FontSize = 28, FontWeight = FontWeight.Bold, Foreground = Brushes.White },
+        // Логотип игры вместо названия, если он есть (как в Steam).
+        var logo = Images.GameAsset(_g.Def, Images.Art.Logo, 640);
+        Control title = logo is null
+            ? new TextBlock { Text = _g.Def.Name, FontSize = 30, FontWeight = FontWeight.Bold, Foreground = Brushes.White }
+            : new Image { Source = logo, MaxHeight = 96, MaxWidth = 340, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Left };
+        if (logo is not null) ToolTip.SetTip(title, _g.Def.Name);
+        var info = Ui.Col(10,
+            title,
             Ui.Row(8, Ui.Dot(status.Item1), Ui.Text(status.Item2, "small", color: Ui.Hex("#D5DAE5"))));
         if (_g.Path is not null)
         {
@@ -103,10 +108,10 @@ public sealed partial class GamePage : Page
             else if (played.TotalMs > 0) line.Children.Add(Ui.Row(8, Ui.Icon(Icons.Clock, 13, Ui.Hex("#AAB2C2")), Ui.Text(I18n.T("time.total", ("time", Features.PlayTime.Format(played.TotalMs))), "small", color: Ui.Hex("#AAB2C2"))));
             info.Children.Add(line);
         }
-        info.VerticalAlignment = VerticalAlignment.Center;
+        info.VerticalAlignment = VerticalAlignment.Bottom;
 
         var buttons = Ui.Row(10);
-        buttons.VerticalAlignment = VerticalAlignment.Center;
+        buttons.VerticalAlignment = VerticalAlignment.Bottom;
         if (_g.Status == Detect.Found)
         {
             buttons.Children.Add(Ui.Button(I18n.T("games.openFolder"), () => Actions.OpenFolder(_g.Path), "", Icons.Folder));
@@ -142,15 +147,14 @@ public sealed partial class GamePage : Page
             ClipToBounds = true,
             BorderBrush = Ui.Res("Line"),
             BorderThickness = new Thickness(1),
-            Height = 132,
+            Height = 240,
             Child = new Panel
             {
                 Children =
                 {
-                    art is null
-                        ? new Border { Background = new LinearGradientBrush { StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative), GradientStops = { new GradientStop(Color.Parse(_g.Def.Accent), 0), new GradientStop(Color.Parse("#1A1206"), 1) } } }
-                        : new Image { Source = art, Stretch = Stretch.UniformToFill },
-                    new Border { Background = new LinearGradientBrush { StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 0, RelativeUnit.Relative), GradientStops = { new GradientStop(Color.Parse("#EB0F1116"), 0), new GradientStop(Color.Parse("#990F1116"), 0.6), new GradientStop(Color.Parse("#400F1116"), 1) } } },
+                    Ui.GameImage(_g.Def, 1400, art: Images.Art.Hero),
+                    new Border { Background = new LinearGradientBrush { StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(0, 1, RelativeUnit.Relative), GradientStops = { new GradientStop(Color.Parse("#100F1116"), 0), new GradientStop(Color.Parse("#700F1116"), 0.5), new GradientStop(Color.Parse("#F00F1116"), 1) } } },
+                    new Border { Background = new LinearGradientBrush { StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 0, RelativeUnit.Relative), GradientStops = { new GradientStop(Color.Parse("#A00F1116"), 0), new GradientStop(Color.Parse("#000F1116"), 0.7) } } },
                     grid,
                 },
             },

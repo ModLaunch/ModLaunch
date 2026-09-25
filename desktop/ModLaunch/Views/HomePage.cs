@@ -37,8 +37,8 @@ public sealed class HomePage : Page
         var mine = MainWindow.OrderedGames().Where(g => g.Status == Detect.Found).ToList();
         var searching = AppState.Games.Any(g => g.Status == Detect.Searching);
         var games = new WrapPanel();
-        foreach (var g in mine) games.Children.Add(GameCard.Create(g));
-        games.Children.Add(GameCard.Add());
+        foreach (var g in mine) games.Children.Add(GameCard.Cover(g, 150));
+        games.Children.Add(GameCard.AddCover(150));
         var section = Ui.Col(12, Header(I18n.T("home.yourGames"), I18n.T("lib.open"), () => MainWindow.Current?.Navigate(() => new LibraryPage())));
         if (mine.Count == 0)
             section.Children.Add(Ui.Text(searching ? I18n.T("games.searching") : I18n.T("home.noGames"), "muted", wrap: true));
@@ -83,24 +83,7 @@ public sealed class HomePage : Page
         foreach (var (g, played) in recent)
         {
             var running = Features.Launcher.IsRunning(g.Def.Id);
-            var cover = new Border { Width = 56, Height = 56, CornerRadius = new CornerRadius(12), ClipToBounds = true, Child = Ui.GameImage(g.Def, 160) };
-            var info = Ui.Col(2, Ui.Text(g.Def.Name, "h3"),
-                Ui.Text(running ? I18n.T("time.running") : I18n.T("time.last", ("when", Ui.Ago(played.LastPlayed))), "small", color: running ? Ui.Res("Good") : Ui.Res("Muted")));
-            info.VerticalAlignment = VerticalAlignment.Center;
-            var gs = g;
-            var play = running
-                ? Ui.Button(I18n.T("v4.stop"), () => Features.Launcher.Stop(gs.Def.Id), "", Icons.Stop)
-                : Ui.Button(I18n.T("games.play"), () => Actions.Play(gs), "primary", Icons.Play);
-            play.VerticalAlignment = VerticalAlignment.Center;
-            var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"), ColumnSpacing = 12 };
-            grid.Children.Add(cover);
-            Grid.SetColumn(info, 1);
-            grid.Children.Add(info);
-            Grid.SetColumn(play, 2);
-            grid.Children.Add(play);
-            var card = new Button { Classes = { "card-btn" }, Width = 380, Padding = new Thickness(10), Margin = new Thickness(0, 0, 12, 12), Content = grid };
-            card.Click += (_, _) => MainWindow.Current?.Navigate(() => new GamePage(gs.Def.Id));
-            row.Children.Add(card);
+            row.Children.Add(GameCard.Row(g, running ? I18n.T("time.running") : I18n.T("time.last", ("when", Ui.Ago(played.LastPlayed)))));
         }
         return Ui.Col(12, Header(I18n.T("v4.continue"), null, null), row);
     }
