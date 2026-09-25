@@ -5,7 +5,7 @@
 
 Object.assign(EN, {
   'hero.chip': 'Out now:',
-  'hero.chip2': 'the beloved ModLaunch 3 design and Steam collections',
+  'hero.chip2': 'smooth scrolling, wide screens and friends at the bottom',
   'hero.title1': 'Mods in one click.',
   'hero.title2': 'And your own mod hub.',
   'hero.lead': 'ModLaunch finds your games, installs the mod loader, pulls in dependencies and keeps everything updated. A library with real covers, Big Picture mode for gamepads, the ad-free ModLaunch Hub and its own modding language, ModScript.',
@@ -109,6 +109,10 @@ Object.assign(EN, {
   'news.eyebrow': 'What’s new',
   'news.title': 'Latest versions',
   'news.all': 'All versions and the full changelog',
+  'news.71': 'Smoothness', 'news.71a': 'Smooth scrolling synced to your monitor', 'news.71b': 'Auto scale for 1440p, 4K and ultrawide', 'news.71c': 'Friends at the bottom, like Steam', 'news.71d': 'A new installer and wider settings',
+  'sc.wide': 'Wide screen', 'sc.setup': 'Installer',
+  'cap.wide': '2560×1440: the interface scales itself — no empty margins.',
+  'cap.setup': 'The installer: a wall of real game covers, steps and tips.',
   'news.70': 'ModLaunch 3 design', 'news.70a': 'Breadcrumbs, info panel and game-colored glow', 'news.70b': '“ModLaunch pick” carousel and top mods', 'news.70c': 'Grid catalog, “Hot” badges, hide installed', 'news.70d': 'Steam-style collections and sorting',
   'f.v7': 'The ModLaunch 3 design — only better', 'f.v7.p': 'Breadcrumbs in the header, an info panel for the game and mod, a glow in the game’s color, a big “ModLaunch pick” carousel, top mods and a list or grid catalog like Modrinth.',
   'f.coll': 'Collections like Steam', 'f.coll.p': 'Favorites and your own collections, sorting by hours played, hiding games and a right-click menu on covers.',
@@ -150,6 +154,8 @@ Object.assign(ru, {
   'hub.soon': 'ModLaunch Hub открывается',
   'hub.soon.p': 'Галерею прямо сейчас включают. Моды, опубликованные в программе, появятся здесь.',
   'cap.library': 'Библиотека как в Steam: обложки, коллекции, сортировка и скрытые игры.',
+  'cap.wide': '2560×1440: интерфейс сам становится крупнее — без пустых полей.',
+  'cap.setup': 'Установщик: стена настоящих обложек игр, шаги и подсказки.',
   'cap.mod': 'Страница мода: большая картинка, плитки с цифрами, установка и переход на сайт мода.',
   'cap.bigpicture': 'Big Picture: весь экран, геймпад, моды и меню питания — с дивана.',
   'cap.mod-stats': 'Вкладки мода как на Nexus: файлы, изменения, требования, видео, отзывы и статистика.',
