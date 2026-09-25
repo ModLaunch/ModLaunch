@@ -25,7 +25,8 @@ public static class Thunderstore
 
     public static (string Ns, string Name)? Split(string id)
     {
-        var dash = id.IndexOf('-');
+        // Имя пакета — без дефисов, а в имени автора они бывают (FunkFrog-and-Sipondo): делим по последнему.
+        var dash = id.LastIndexOf('-');
         return dash <= 0 || dash == id.Length - 1 ? null : (id[..dash], id[(dash + 1)..]);
     }
 
