@@ -24,7 +24,8 @@ public sealed class BigPictureWindow : Window
     readonly Gamepad _pad = new();
     readonly DispatcherTimer _timer;
     readonly List<GameState> _games;
-    readonly Image _hero = new() { Stretch = Stretch.UniformToFill };
+    readonly Panel _heroHost = new() { ClipToBounds = true };
+    int _shownGame = -1;
     readonly Panel _heroFallback = new();
     readonly ContentControl _title = new();
     readonly TextBlock _facts = new() { FontSize = 18, Foreground = Ui.Hex("#C9CFDB") };
@@ -84,6 +85,9 @@ public sealed class BigPictureWindow : Window
         Content = BuildLayout();
         BuildCarousel();
         Select(0);
+        Classes.Set("juicy", Animate.On);
+        // Анимируем содержимое обложки, а не саму кнопку: у кнопки прозрачность задаёт стиль (выбранная ярче).
+        for (var i = 0; i < _carousel.Children.Count; i++) if (_carousel.Children[i] is Button { Content: Control inner }) Animate.From(inner, "translateY(80px) scale(0.9)", 520, 120 + Math.Min(i * 45, 500), new Avalonia.Animation.Easings.BackEaseOut());
 
         _pad.Pressed += OnPad;
         _pad.Released += p => { if (_pcMode) PcControl.Press(p, false); };
@@ -144,7 +148,7 @@ public sealed class BigPictureWindow : Window
             Children =
             {
                 _heroFallback,
-                _hero,
+                _heroHost,
                 new Border { Background = new LinearGradientBrush { StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(0, 1, RelativeUnit.Relative),
                     GradientStops = { new GradientStop(Color.Parse("#9008090D"), 0), new GradientStop(Color.Parse("#2008090D"), 0.25), new GradientStop(Color.Parse("#C008090D"), 0.62), new GradientStop(Color.Parse("#FA08090D"), 1) } } },
                 new Border { Background = new LinearGradientBrush { StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 0, RelativeUnit.Relative),
@@ -210,15 +214,20 @@ public sealed class BigPictureWindow : Window
         if (_carousel.Children[_game] is Control c) c.BringIntoView();
 
         var g = _games[_game];
-        _heroFallback.Background = new SolidColorBrush(Color.Parse(g.Def.Accent));
-        _hero.Source = Images.GameAsset(g.Def, Images.Art.Hero, 1920);
-        if (_hero.Source is null)
+        var changed = _shownGame != _game;
+        _shownGame = _game;
+        if (changed)
         {
-            var def = g.Def;
-            _ = Images.GameAsync(def, Images.Art.Hero, 1920).ContinueWith(t =>
+            _heroFallback.Background = new SolidColorBrush(Color.Parse(g.Def.Accent));
+            if (Images.GameAsset(g.Def, Images.Art.Hero, 1920) is { } local) SetHero(local);
+            else
             {
-                if (t.Result is Bitmap b) Dispatcher.UIThread.Post(() => { if (Selected?.Def == def) _hero.Source = b; });
-            });
+                var def = g.Def;
+                _ = Images.GameAsync(def, Images.Art.Hero, 1920).ContinueWith(t =>
+                {
+                    if (t.Result is Bitmap b) Dispatcher.UIThread.Post(() => { if (Selected?.Def == def) SetHero(b); });
+                });
+            }
         }
         var logo = Images.GameAsset(g.Def, Images.Art.Logo, 900);
         _title.Content = logo is null
@@ -233,6 +242,42 @@ public sealed class BigPictureWindow : Window
         facts.Add(GameCard.Status(g));
         _facts.Text = string.Join("  ·  ", facts);
         RenderActions();
+        if (changed)
+        {
+            // Логотип, строка фактов и кнопки въезжают слева лесенкой.
+            Animate.From(_title, "translateX(-40px)", 420, 0, new Avalonia.Animation.Easings.BackEaseOut());
+            Animate.From(_facts, "translateX(-30px)", 380, 60);
+            Animate.From(_actions, "translateX(-24px)", 380, 110);
+        }
+    }
+
+    /// <summary>Новый фон плавно проявляется поверх старого и медленно «отъезжает» (эффект Кена Бёрнса).</summary>
+    void SetHero(Bitmap bitmap)
+    {
+        var image = new Image { Source = bitmap, Stretch = Stretch.UniformToFill };
+        _heroHost.Children.Add(image);
+        if (!Animate.On)
+        {
+            while (_heroHost.Children.Count > 1) _heroHost.Children.RemoveAt(0);
+            return;
+        }
+        image.Opacity = 0;
+        image.RenderTransform = Avalonia.Media.Transformation.TransformOperations.Parse("scale(1.1)");
+        Dispatcher.UIThread.Post(() =>
+        {
+            image.Transitions =
+            [
+                new Avalonia.Animation.DoubleTransition { Property = OpacityProperty, Duration = TimeSpan.FromMilliseconds(520), Easing = new Avalonia.Animation.Easings.CubicEaseOut() },
+                new Avalonia.Animation.TransformOperationsTransition { Property = RenderTransformProperty, Duration = TimeSpan.FromMilliseconds(1600), Easing = new Avalonia.Animation.Easings.CubicEaseOut() },
+            ];
+            image.Opacity = 1;
+            image.RenderTransform = Avalonia.Media.Transformation.TransformOperations.Parse("scale(1)");
+        }, DispatcherPriority.Background);
+        DispatcherTimer.RunOnce(() =>
+        {
+            // Старые фоны убираем, когда новый уже проявился.
+            while (_heroHost.Children.Count > 1 && _heroHost.Children[0] != image) _heroHost.Children.RemoveAt(0);
+        }, TimeSpan.FromMilliseconds(600));
     }
 
     // ---------------------------------------------------------------- кнопки действий
@@ -390,6 +435,7 @@ public sealed class BigPictureWindow : Window
         shade.PointerPressed += (_, _) => CloseModal();
         _modal.Children.Add(shade);
         _modal.Children.Add(box);
+        if (!_modal.IsVisible) { Animate.Pop(box); Animate.From(shade, "none", 200); }
         _modal.IsVisible = true;
         if (list.Children.Count > _modalIndex && _modalIndex >= 0) list.Children[_modalIndex].BringIntoView();
     }

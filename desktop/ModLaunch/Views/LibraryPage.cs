@@ -19,6 +19,8 @@ public sealed class LibraryPage : Page
     public override string SearchHint => I18n.T("lib.search");
     public override void Search(string text) { _query = text.Trim(); Build(); }
 
+    Control Intro(Control c, int index) { if (!Shown) Animate.Rise(c, index); return c; }
+
     public override void Build()
     {
         var content = new StackPanel { Spacing = 22, Margin = new Thickness(32, 26, 32, 32), MaxWidth = 1320 };
@@ -37,8 +39,9 @@ public sealed class LibraryPage : Page
         content.Children.Add(head);
 
         var grid = new WrapPanel();
-        foreach (var g in installed) grid.Children.Add(GameCard.Cover(g));
-        grid.Children.Add(GameCard.AddCover());
+        var n = 0;
+        foreach (var g in installed) grid.Children.Add(Intro(GameCard.Cover(g), n++));
+        grid.Children.Add(Intro(GameCard.AddCover(), n++));
         content.Children.Add(grid);
 
         if (other.Count > 0)
@@ -60,7 +63,7 @@ public sealed class LibraryPage : Page
             if (_showOther)
             {
                 var more = new WrapPanel();
-                foreach (var g in other) more.Children.Add(GameCard.Cover(g, 128));
+                foreach (var g in other) more.Children.Add(Intro(GameCard.Cover(g, 128), n++));
                 content.Children.Add(more);
             }
         }

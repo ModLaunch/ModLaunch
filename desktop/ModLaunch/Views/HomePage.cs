@@ -22,6 +22,8 @@ public sealed class HomePage : Page
         MainWindow.Current?.Navigate(() => new GamePage(game.Def.Id, "catalog", text));
     }
 
+    Control Intro(Control c, int index) { if (!Shown) Animate.Rise(c, index); return c; }
+
     public override void Build()
     {
         var content = new StackPanel { Spacing = 30, Margin = new Thickness(32, 26, 32, 32), MaxWidth = 1240 };
@@ -37,8 +39,9 @@ public sealed class HomePage : Page
         var mine = MainWindow.OrderedGames().Where(g => g.Status == Detect.Found).ToList();
         var searching = AppState.Games.Any(g => g.Status == Detect.Searching);
         var games = new WrapPanel();
-        foreach (var g in mine) games.Children.Add(GameCard.Cover(g, 150));
-        games.Children.Add(GameCard.AddCover(150));
+        var n = 0;
+        foreach (var g in mine) games.Children.Add(Intro(GameCard.Cover(g, 150), n++));
+        games.Children.Add(Intro(GameCard.AddCover(150), n++));
         var section = Ui.Col(12, Header(I18n.T("home.yourGames"), I18n.T("lib.open"), () => MainWindow.Current?.Navigate(() => new LibraryPage())));
         if (mine.Count == 0)
             section.Children.Add(Ui.Text(searching ? I18n.T("games.searching") : I18n.T("home.noGames"), "muted", wrap: true));

@@ -98,6 +98,12 @@ public static class Program
         Save("1-home");
         window.Navigate(() => new LibraryPage());
         Save("1a-library");
+        // Наведение на обложку: подъём, тень, зум картинки и кнопка «Играть».
+        Pump(1200);
+        window.MouseMove(new Point(190, 280));
+        Pump(700);
+        Save("1b-library-hover");
+        window.MouseMove(new Point(5, 5));
         window.Navigate(() => new GamePage("subnautica", "installed"));
         Save("2-installed");
         window.Navigate(() => new GamePage("subnautica", "catalog"));

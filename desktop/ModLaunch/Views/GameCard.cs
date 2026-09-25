@@ -27,9 +27,11 @@ public static class GameCard
     {
         var found = g.Status == Detect.Found;
         var height = Math.Round(width * 1.5);
+        // Внешний слой — подъём и тень при наведении, внутренний — обрезка по скруглению и зум картинки.
         var art = new Border
         {
             Width = width, Height = height, CornerRadius = new CornerRadius(10), ClipToBounds = true,
+            BorderThickness = new Thickness(2), BorderBrush = Brushes.Transparent,
             Child = Ui.GameImage(g.Def, (int)(width * 2), art: Images.Art.Cover),
         };
         var layers = new Panel { Children = { art } };
@@ -65,7 +67,7 @@ public static class GameCard
             Padding = new Thickness(0),
             Margin = new Thickness(0, 0, 16, 18),
             Opacity = found ? 1 : 0.5,
-            Content = Ui.Col(8, layers, Ui.Col(1, name, status)),
+            Content = Ui.Col(8, new Border { Classes = { "cover-art" }, CornerRadius = new CornerRadius(10), Child = layers }, Ui.Col(1, name, status)),
         };
         ToolTip.SetTip(card, g.Def.Name);
         var id = g.Def.Id;
@@ -86,7 +88,7 @@ public static class GameCard
                 new TextBlock { Text = I18n.T("add.tile.text"), HorizontalAlignment = HorizontalAlignment.Center, FontSize = 12, Foreground = Ui.Res("Muted"), TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center, Margin = new Thickness(12, 0) }),
         };
         if (box.Child is Control c) c.VerticalAlignment = VerticalAlignment.Center;
-        var card = new Button { Classes = { "cover-btn" }, Width = width, Padding = new Thickness(0), Margin = new Thickness(0, 0, 16, 18), Content = box, VerticalAlignment = VerticalAlignment.Top };
+        var card = new Button { Classes = { "cover-btn" }, Width = width, Padding = new Thickness(0), Margin = new Thickness(0, 0, 16, 18), Content = new Border { Classes = { "cover-art" }, CornerRadius = new CornerRadius(10), Child = box }, VerticalAlignment = VerticalAlignment.Top };
         card.Click += (_, _) => MainWindow.Current?.Navigate(() => new AddGamePage());
         return card;
     }

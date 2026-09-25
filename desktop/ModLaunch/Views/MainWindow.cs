@@ -14,6 +14,8 @@ namespace ModLaunch.Views;
 /// <summary>Экран программы: у каждого свой адрес, чтобы работали «назад» и «вперёд».</summary>
 public abstract class Page : UserControl
 {
+    /// <summary>Страница уже показана: вступительные анимации больше не играют.</summary>
+    public bool Shown { get; set; }
     public abstract string Title { get; }
     public virtual string? GameId => null;
     public virtual string SearchHint => I18n.T("search.home");
@@ -58,6 +60,7 @@ public sealed class MainWindow : Window
 
     public MainWindow()
     {
+        Classes.Set("juicy", Animate.On);
         Current = this;
         Title = "ModLaunch";
         Width = 1366;
@@ -370,6 +373,7 @@ public sealed class MainWindow : Window
     /// <summary>Перерисовать рамку окна после смены настроек интерфейса.</summary>
     public void Refresh()
     {
+        Classes.Set("juicy", Animate.On);
         Settings.Save();
         ApplyScale();
         RenderRail();
@@ -546,7 +550,9 @@ public sealed class MainWindow : Window
         _current = page;
         if (page.GameId is string gid) { Settings.Data["lastGame"] = gid; Settings.Save(); }
         page.Build();
+        page.Shown = true;
         _page.Content = page;
+        Animate.PageIn(page);
         _title.Text = page.Title;
         _search.Text = "";
         _search.Watermark = page.SearchHint;
@@ -819,8 +825,6 @@ public sealed class MainWindow : Window
             VerticalAlignment = VerticalAlignment.Center,
             BoxShadow = BoxShadows.Parse("0 24 70 0 #99000000"),
             Child = Ui.Col(16, Ui.Text(title, "h2", wrap: true), body, buttons),
-            RenderTransform = Look.Animations ? new ScaleTransform(0.96, 0.96) : null,
-            Transitions = new Avalonia.Animation.Transitions { new Avalonia.Animation.TransformOperationsTransition { Property = RenderTransformProperty, Duration = TimeSpan.FromMilliseconds(160) } },
         };
         var shade = new Border { Background = new SolidColorBrush(Color.Parse("#99000000")) };
         shade.PointerPressed += (_, _) => CloseDialog();
@@ -828,7 +832,8 @@ public sealed class MainWindow : Window
         _overlay.Children.Add(shade);
         _overlay.Children.Add(card);
         _overlay.IsVisible = true;
-        Dispatcher.UIThread.Post(() => card.RenderTransform = Avalonia.Media.Transformation.TransformOperations.Parse("scale(1)"), DispatcherPriority.Background);
+        Animate.Pop(card);
+        Animate.From(shade, "none", 220);
     }
 
     public void CloseDialog()

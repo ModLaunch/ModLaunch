@@ -149,7 +149,7 @@ public static class Ui
     /// </summary>
     public static Control GameImage(Games.GameDef def, int decode, Stretch stretch = Stretch.UniformToFill, Images.Art art = Images.Art.Header)
     {
-        var image = new Image { Stretch = stretch, Source = Images.GameAsset(def, art, decode) ?? (art == Images.Art.Header ? Images.Game(def, decode) : null) };
+        var image = new Image { Classes = { "zoom" }, Stretch = stretch, Source = Images.GameAsset(def, art, decode) ?? (art == Images.Art.Header ? Images.Game(def, decode) : null) };
         Border? backRef = null;
         if (image.Source is null)
             _ = Images.GameAsync(def, art, decode).ContinueWith(t =>
@@ -190,7 +190,7 @@ public static class Ui
             },
             Child = new TextBlock { Text = initials, FontWeight = FontWeight.Bold, FontSize = size * 0.3, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
         };
-        var image = new Image { Stretch = Stretch.UniformToFill };
+        var image = new Image { Classes = { "zoom" }, Stretch = Stretch.UniformToFill };
         var host = new Border { Width = size, Height = size, CornerRadius = new CornerRadius(radius), ClipToBounds = true, Child = new Panel { Children = { fallback, image } } };
         if (!string.IsNullOrEmpty(url))
         {
