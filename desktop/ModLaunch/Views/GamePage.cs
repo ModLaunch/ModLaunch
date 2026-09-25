@@ -22,6 +22,8 @@ public sealed partial class GamePage : Page
     string _query;
     SortBy _sort = SortBy.Popular;
     int _period;
+    bool _hideInstalled = Settings.Data.Bool("hideInstalled");
+    string _view = Settings.Data.Str("catalogView") == "grid" ? "grid" : "list";
     bool _adult = Settings.Data.Bool("showAdult", false);
 
     // Каталог грузится отдельно от перерисовки: перерисовка не должна его сбрасывать.
@@ -47,6 +49,20 @@ public sealed partial class GamePage : Page
     }
 
     public override string Title => _tab == "catalog" && _g.Status == Detect.Found ? I18n.T("games.market") : _g.Def.Name;
+    public override Control? Aside() => Views.Aside.Game(_g);
+    public override IEnumerable<(string Text, Action? Open)> Crumbs =>
+    [
+        (_g.Def.Name, () => MainWindow.Current?.Navigate(() => new GamePage(_g.Def.Id))),
+        (_g.Status != Detect.Found ? I18n.T("games.notDetected") : _tab switch
+        {
+            "catalog" => I18n.T("games.market"),
+            "profiles" => I18n.T("games.profiles"),
+            "saves" => I18n.T("games.saves"),
+            "tools" => I18n.T("v4.tools"),
+            "log" => I18n.T("games.log"),
+            _ => I18n.T("games.downloads"),
+        }, null),
+    ];
     public override string? GameId => _g.Def.Id;
     public override string SearchHint => I18n.T("search.game", ("game", _g.Def.Name));
 
@@ -57,6 +73,7 @@ public sealed partial class GamePage : Page
         if (_section == "picks" || _section == "packs") _section = "all";
         _ = Load(reset: true);
         Build();
+        MainWindow.Current?.RenderCrumbs();
     }
 
     public override void Build()
@@ -185,13 +202,13 @@ public sealed partial class GamePage : Page
         var updates = Features.ModUpdates.Found.TryGetValue(_g.Def.Id, out var found) && found.Count > 0 ? $" · ↑{found.Count}" : "";
         var profiles = Features.Profiles.List(_g.Def.Id).Count;
         var saves = Features.Backups.List(_g.Def.Id).Count;
-        var bar = Ui.Row(4,
+        var bar = new WrapPanel { Children = {
             Tab("installed", I18n.T("games.downloads"), Icons.List, _g.ModCount + updates),
             _g.Def.HasCatalog ? Tab("catalog", I18n.T("games.market"), Icons.Bag, _total > 0 ? I18n.Compact(_total) : null) : new Control { IsVisible = false },
             Tab("profiles", I18n.T("games.profiles"), Icons.Layers, profiles > 0 ? profiles.ToString() : null),
             Tab("saves", I18n.T("games.saves"), Icons.Shield, saves > 0 ? saves.ToString() : null),
             Tab("tools", I18n.T("v4.tools"), Icons.Settings, Features.Tools.For(_g.Def.Id).Count is > 0 and var t ? t.ToString() : null),
-            Tab("log", I18n.T("games.log"), Icons.Alert, null));
+            Tab("log", I18n.T("games.log"), Icons.Alert, null) } };
         return new Border { Classes = { "card" }, Padding = new Thickness(6), CornerRadius = new CornerRadius(16), Child = bar, HorizontalAlignment = HorizontalAlignment.Left };
     }
 
@@ -241,7 +258,7 @@ public sealed partial class GamePage : Page
         {
             if (!primarySource && s.Id is not ("all" or "best")) continue;
             if (s.Id == "packs" && _g.Def.Kits.Length == 0 && _g.Def.Catalog != CatalogKind.Nexus) continue;
-            var b = Ui.Button(I18n.T("sec." + s.Id), () => SelectSection(s.Id), "chip");
+            var b = Ui.Button(I18n.T("sec." + s.Id), () => SelectSection(s.Id), "chip", SectionIcon(s.Id));
             if (_section == s.Id) b.Classes.Add("active");
             b.Margin = new Thickness(0, 0, 8, 8);
             chips.Children.Add(b);
@@ -297,6 +314,25 @@ public sealed partial class GamePage : Page
             Grid.SetColumn(adult, 3);
             bar.Children.Add(adult);
             col.Children.Add(bar);
+
+            // Вторая строка, как в ModLaunch 3 и Modrinth: «скрыть установленные» и вид списком / сеткой.
+            var hide = new ToggleSwitch { IsChecked = _hideInstalled, OnContent = "", OffContent = "", MinWidth = 0, VerticalAlignment = VerticalAlignment.Center };
+            hide.IsCheckedChanged += (_, _) => { _hideInstalled = hide.IsChecked == true; Settings.Data["hideInstalled"] = _hideInstalled; Settings.Save(); RenderList(); };
+            Button ViewButton(string id, string icon, string tip)
+            {
+                var b = Ui.Button("", () => { _view = id; Settings.Data["catalogView"] = id; Settings.Save(); Build(); }, _view == id ? "icon active" : "icon", icon, tip);
+                return b;
+            }
+            var views = new Border { Classes = { "card" }, Padding = new Thickness(3), CornerRadius = new CornerRadius(12), Child = Ui.Row(2, ViewButton("list", Icons.List, I18n.T("cat.list")), ViewButton("grid", Icons.Grid, I18n.T("cat.grid"))) };
+            var second = new DockPanel();
+            DockPanel.SetDock(views, Dock.Right);
+            second.Children.Add(views);
+            var hideLabel = Ui.Text(I18n.T("cat.hideInstalled"), "muted");
+            hideLabel.VerticalAlignment = VerticalAlignment.Center;
+            var hideRow = Ui.Row(10, hide, hideLabel);
+            hideRow.VerticalAlignment = VerticalAlignment.Center;
+            second.Children.Add(hideRow);
+            col.Children.Add(second);
         }
 
         _listHost = new StackPanel { Spacing = 10 };
@@ -317,6 +353,35 @@ public sealed partial class GamePage : Page
     }
 
     bool IsInstalled(ModInfo mod) => Actions.IsInstalled(_g, mod.Id);
+
+    /// <summary>Значки разделов, как в ModLaunch 3.</summary>
+    static string? SectionIcon(string id) => id switch
+    {
+        "picks" => Icons.Trophy,
+        "best" => Icons.Star,
+        "packs" or "modpacks" => Icons.Layers,
+        "buildings" => Icons.Home,
+        "vehicles" => Icons.Car,
+        "items" => Icons.Wrench,
+        "gameplay" => Icons.Gamepad,
+        "content" => Icons.Package,
+        "visuals" => Icons.Image,
+        "cosmetics" => Icons.Palette,
+        "audio" => Icons.Music,
+        "ui" => Icons.Sidebar,
+        "tools" => Icons.Settings,
+        _ => null,
+    };
+
+    /// <summary>«Хит» — тройка самых скачиваемых, «Лучшее» — тройка по оценкам, «Новое» — вышло за неделю.</summary>
+    string? BadgeFor(ModInfo mod, int index)
+    {
+        if (_query != "") return null;
+        if (_sort == SortBy.Popular && index < 3) return "hit";
+        if (_sort == SortBy.Rating && index < 3) return "best";
+        if (mod.UpdatedAt is { } d && d > DateTime.UtcNow.AddDays(-7) && _sort is SortBy.New) return "new";
+        return null;
+    }
     bool IsInstalling(ModInfo mod) => Actions.IsBusy(_g, mod.Id);
 
     void RenderList()
@@ -347,8 +412,18 @@ public sealed partial class GamePage : Page
         }
 
         var picks = _g.Def.Picks.ToHashSet();
-        foreach (var mod in _mods)
-            _listHost.Children.Add(ModRow.Build(_g.Def, mod, IsInstalled(mod), IsInstalling(mod), picks.Contains(mod.Id), () => _ = Actions.Install(_g, mod), () => MainWindow.Current?.Navigate(() => new ModPage(_g.Def.Id, mod))));
+        var shown = _hideInstalled ? _mods.Where(m => !IsInstalled(m)).ToList() : _mods;
+        var tiles = _view == "grid" ? new WrapPanel() : null;
+        if (tiles is not null) _listHost.Children.Add(tiles);
+        for (var i = 0; i < shown.Count; i++)
+        {
+            var mod = shown[i];
+            var badge = BadgeFor(mod, i);
+            void Install() => _ = Actions.Install(_g, mod);
+            void Open() => MainWindow.Current?.Navigate(() => new ModPage(_g.Def.Id, mod));
+            if (tiles is not null) tiles.Children.Add(ModRow.Tile(_g.Def, mod, IsInstalled(mod), IsInstalling(mod), Install, Open, badge));
+            else _listHost.Children.Add(ModRow.Build(_g.Def, mod, IsInstalled(mod), IsInstalling(mod), picks.Contains(mod.Id), Install, Open, badge));
+        }
 
         if (_hasMore)
         {

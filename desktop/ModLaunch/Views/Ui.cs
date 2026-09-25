@@ -65,6 +65,15 @@ public static class Icons
     public const string Tools = "M3.5 7.5l4-4 4 4-4 4z M9.5 9.5L20.5 20.5 M17 3l4 4-2.5 2.5-4-4z M16.5 7.5L6 18 M6 18l-2.5 2.5";
     public const string Gamepad = "M6 11h4 M8 9v4 M15 12h.01 M18 10h.01 M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z";
     public const string Tv = "M2 7a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z M8 22h8 M12 19v3";
+    public const string Sidebar = "M3 4h18v16H3z M15 4v16";
+    public const string Flame = "M12 2c1 3.5 5 6 5 11a5 5 0 0 1-10 0c0-2.5 1.2-4 2.5-5.5.3 1.5 1 2.5 2.5 3 0-3-1-5.5 0-8.5z";
+    public const string Trophy = "M8 21h8 M12 17v4 M7 4h10v5a5 5 0 0 1-10 0z M17 5h3v2a3 3 0 0 1-3 3 M7 5H4v2a3 3 0 0 0 3 3";
+    public const string Car = "M5 17h14 M3 13l2-6h14l2 6v4H3z M7 17v2 M17 17v2";
+    public const string Wrench = "M14.7 6.3a4 4 0 0 0 5 5L21 13l-8 8-3-3 8-8-1.3-1.3a4 4 0 0 1-5-5z M3 21l6-6";
+    public const string Music = "M9 18V5l12-2v13 M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M18 19a3 3 0 1 0 0-6 3 3 0 0 0 0 6z";
+    public const string Grid = "M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z";
+    public const string Info = "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z M12 16v-4 M12 8h.01";
+    public const string Lock = "M5 11h14v10H5z M8 11V7a4 4 0 0 1 8 0v4";
     public const string Power = "M12 2v10 M18.4 6.6a9 9 0 1 1-12.77.04";
     public const string Keyboard = "M2 6h20v12H2z M6 10h.01 M10 10h.01 M14 10h.01 M18 10h.01 M8 14h8";
     public const string Mouse = "M12 2a6 6 0 0 0-6 6v8a6 6 0 0 0 12 0V8a6 6 0 0 0-6-6z M12 6v4";

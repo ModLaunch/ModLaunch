@@ -55,7 +55,7 @@ public sealed partial class ModPage
             try { _hubMod = await Hub.Get(_brief.Id); _comments = await Hub.Comments(_brief.Id); } catch { _comments = []; }
         });
         await Task.WhenAll(versions, author, hub);
-        Avalonia.Threading.Dispatcher.UIThread.Post(Build);
+        Avalonia.Threading.Dispatcher.UIThread.Post(() => { Build(); MainWindow.Current?.RenderAside(); });
     }
 
     /// <summary>

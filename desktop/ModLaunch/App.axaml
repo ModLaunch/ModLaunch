@@ -171,6 +171,9 @@
       <Setter Property="Foreground" Value="White"/>
     </Style>
 
+    <Style Selector="Button.icon.active"><Setter Property="Background" Value="{StaticResource BrandSoft}"/><Setter Property="Foreground" Value="{StaticResource Brand2}"/></Style>
+    <Style Selector="Button.icon.active:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{StaticResource BrandSoft}"/><Setter Property="Foreground" Value="{StaticResource Brand2}"/></Style>
+
     <Style Selector="Button.tab">
       <Setter Property="Background" Value="Transparent"/>
       <Setter Property="BorderThickness" Value="0"/>

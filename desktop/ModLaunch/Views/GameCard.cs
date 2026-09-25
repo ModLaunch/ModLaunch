@@ -72,7 +72,48 @@ public static class GameCard
         ToolTip.SetTip(card, g.Def.Name);
         var id = g.Def.Id;
         card.Click += (_, _) => MainWindow.Current?.Navigate(() => new GamePage(id));
+        card.ContextFlyout = Menu(g);
+        if (Features.GameCollections.IsFavorite(id))
+            layers.Children.Add(new Border
+            {
+                Width = 26, Height = 26, CornerRadius = new CornerRadius(13), Margin = new Thickness(8), Background = new SolidColorBrush(Color.FromArgb(200, 12, 13, 18)),
+                HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top, Child = Ui.Icon(Icons.Star, 13, Ui.Hex("#F2C25C")),
+            });
         return card;
+    }
+
+    /// <summary>Меню по правой кнопке, как в библиотеке Steam.</summary>
+    public static MenuFlyout Menu(GameState g)
+    {
+        var id = g.Def.Id;
+        var menu = new MenuFlyout();
+        MenuItem Item(string text, string icon, Action run)
+        {
+            var m = new MenuItem { Header = text, Icon = Ui.Icon(icon, 14) };
+            m.Click += (_, _) => run();
+            return m;
+        }
+        if (g.Status == Detect.Found && g.LoaderInstalled) menu.Items.Add(Item(I18n.T("games.play"), Icons.Play, () => Actions.Play(g)));
+        var fav = Features.GameCollections.IsFavorite(id);
+        menu.Items.Add(Item(fav ? I18n.T("lib.unfavorite") : I18n.T("lib.favorite"), Icons.Star, () => { Features.GameCollections.Toggle(Features.GameCollections.Favorites, id); AppState.Notify(); }));
+        var collections = new MenuItem { Header = I18n.T("lib.addTo"), Icon = Ui.Icon(Icons.Layers, 14) };
+        foreach (var name in Features.GameCollections.Names())
+        {
+            var n = name;
+            var has = Features.GameCollections.Has(n, id);
+            collections.Items.Add(Item((has ? "✓  " : "") + n, Icons.Layers, () => { Features.GameCollections.Toggle(n, id); AppState.Notify(); }));
+        }
+        if (collections.Items.Count == 0) collections.Items.Add(new MenuItem { Header = I18n.T("lib.noCollections"), IsEnabled = false });
+        menu.Items.Add(collections);
+        menu.Items.Add(new Separator());
+        if (g.Status == Detect.Found)
+        {
+            menu.Items.Add(Item(I18n.T("games.openFolder"), Icons.Folder, () => Actions.OpenFolder(g.Path)));
+            menu.Items.Add(Item(I18n.T("lib.properties"), Icons.Settings, () => MainWindow.Current?.Navigate(() => new GamePage(id, "tools"))));
+        }
+        var hidden = Features.GameCollections.IsHidden(id);
+        menu.Items.Add(Item(hidden ? I18n.T("lib.unhide") : I18n.T("lib.hide"), hidden ? Icons.Eye : Icons.EyeOff, () => { Features.GameCollections.ToggleHidden(id); AppState.Notify(); }));
+        return menu;
     }
 
     /// <summary>Обложка «Добавить игру» того же размера.</summary>

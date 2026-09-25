@@ -33,6 +33,12 @@ public sealed partial class ModPage : Page
     }
 
     public override string Title => _brief.Name;
+    public override Control? Aside() => Views.Aside.Mod(_g, Mod, _details, _versions?.Count ?? 0);
+    public override IEnumerable<(string Text, Action? Open)> Crumbs =>
+    [
+        (_g.Def.Name, () => MainWindow.Current?.Navigate(() => new GamePage(_g.Def.Id, "catalog"))),
+        (Mod.Name, null),
+    ];
     public override string? GameId => _g.Def.Id;
     public override string SearchHint => I18n.T("search.game", ("game", _g.Def.Name));
     public override void Search(string text) => MainWindow.Current?.Navigate(() => new GamePage(_g.Def.Id, "catalog", text));
@@ -42,6 +48,7 @@ public sealed partial class ModPage : Page
         try { _details = Program.Demo ? Demo.Details(_g.Def, _brief) : await Details.Load(_g.Def, _brief.Id, source: _brief.Source); }
         catch (Exception e) { _error = Jobs.Explain(e); }
         Build();
+        MainWindow.Current?.RenderAside();
     }
 
     async Task SyncReviews()
@@ -68,21 +75,34 @@ public sealed partial class ModPage : Page
         var installed = Actions.IsInstalled(_g, mod.Id);
         var busy = Actions.IsBusy(_g, mod.Id);
         var stat = Reviews.Stats().GetValueOrDefault($"{_g.Def.Id}|{mod.Id}");
+        var accent = Color.Parse(_g.Def.Accent);
 
-        var facts = Ui.Row(18);
-        if (stat is not null) facts.Children.Add(Ui.Row(6, Stars(stat.Avg, 14), Ui.Text($"{stat.Avg:0.0} · " + I18n.T("rev.count." + I18n.Plural(stat.Count, "one", "few", "many"), ("n", stat.Count)), "small muted")));
-        if (mod.Downloads > 0) facts.Children.Add(Ui.Row(6, Ui.Icon(Icons.Download, 13, Ui.Res("Muted")), Ui.Text(I18n.Compact(mod.Downloads), "small muted")));
-        if (mod.Rating > 0) facts.Children.Add(Ui.Row(6, Ui.Icon(Icons.Heart, 13, Ui.Res("Muted")), Ui.Text(I18n.Compact(mod.Rating), "small muted")));
-        if (mod.UpdatedAt is not null) facts.Children.Add(Ui.Row(6, Ui.Icon(Icons.Refresh, 13, Ui.Res("Muted")), Ui.Text(Ui.Ago(mod.UpdatedAt), "small muted")));
-        if (mod.Version != "") facts.Children.Add(Ui.Text(I18n.T("mod.version", ("version", mod.Version)), "small muted"));
+        // Плитки с цифрами, как в ModLaunch 3.
+        Control Tile(Control top, string label) => new Border
+        {
+            Background = Ui.Hex("#661A1D26"), BorderBrush = Ui.Hex("#1FFFFFFF"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(12),
+            Padding = new Thickness(14, 10), MinWidth = 104, Margin = new Thickness(0, 0, 8, 8),
+            Child = Ui.Col(3, top, new TextBlock { Text = label, FontSize = 12, Foreground = Ui.Res("Muted") }),
+        };
+        Control Big(string text) => new TextBlock { Text = text, FontSize = 19, FontWeight = FontWeight.Bold };
+        var tiles = new WrapPanel();
+        tiles.Children.Add(Tile(stat is null ? Ui.Icon(Icons.Star, 18, Ui.Hex("#F2C25C")) : Ui.Row(6, Big($"{stat.Avg:0.0}"), Stars(stat.Avg, 12)),
+            stat is null ? I18n.T("mod.rate") : I18n.T("rev.count." + I18n.Plural(stat.Count, "one", "few", "many"), ("n", stat.Count))));
+        if (mod.Downloads > 0) tiles.Children.Add(Tile(Big(I18n.Compact(mod.Downloads)), I18n.T("mt.stats.downloads")));
+        if (mod.Rating > 0) tiles.Children.Add(Tile(Big(I18n.Compact(mod.Rating)), mod.Source == "nexus" ? I18n.T("mt.stats.endorse") : I18n.T("mt.stats.likes")));
+        if (mod.UpdatedAt is not null) tiles.Children.Add(Tile(Big(mod.UpdatedAt.Value.ToLocalTime().ToString("MMM yyyy", System.Globalization.CultureInfo.GetCultureInfo(I18n.Lang == "en" ? "en-US" : "ru-RU"))), I18n.T("mod.updatedTile")));
+        if (_details is { Requirements.Count: > 0 }) tiles.Children.Add(Tile(Big(_details.Requirements.Count.ToString()), I18n.T("mod.depsTile")));
 
-        var info = Ui.Col(6,
-            new TextBlock { Text = mod.Name, FontSize = 28, FontWeight = FontWeight.Bold, TextWrapping = TextWrapping.Wrap },
-            Ui.Text(mod.Author == "" ? _g.Def.Name : I18n.T("mod.by", ("author", mod.Author)) + " · " + _g.Def.Name, "brand"),
-            facts);
-        if (mod.Description != "") info.Children.Add(Ui.Text(mod.Description, "muted", wrap: true));
-        if (_g.Def.IsLegacy(mod.UpdatedAt)) info.Children.Add(ModRow.Tag(I18n.T("badge.old.hint"), Ui.Hex("#3A2A12"), Ui.Res("Warn")));
-        info.VerticalAlignment = VerticalAlignment.Center;
+        var category = mod.Categories.FirstOrDefault();
+        var pill = new Border
+        {
+            Background = new SolidColorBrush(Color.FromArgb(50, accent.R, accent.G, accent.B)), BorderBrush = new SolidColorBrush(Color.FromArgb(140, accent.R, accent.G, accent.B)),
+            BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(999), Padding = new Thickness(10, 3), HorizontalAlignment = HorizontalAlignment.Left,
+            Child = new TextBlock { Text = category is null ? _g.Def.Name : $"{_g.Def.Name} · {category}", FontSize = 12, FontWeight = FontWeight.SemiBold },
+        };
+        var byline = new List<string>();
+        if (mod.Author != "") byline.Add(I18n.T("mod.by", ("author", mod.Author)));
+        if (mod.Version != "") byline.Add(I18n.T("mod.version", ("version", mod.Version)));
 
         Button action;
         if (installed) action = Ui.Button(I18n.T("mod.installed"), () => MainWindow.Current?.Navigate(() => new GamePage(_g.Def.Id, "installed")), "", Icons.Check);
@@ -90,17 +110,42 @@ public sealed partial class ModPage : Page
         else action = Ui.Button(I18n.T("mod.install"), async () => { await Actions.Install(_g, mod); Build(); }, "primary", Icons.Download);
         action.IsEnabled = !busy && _g.Status == Detect.Found;
         action.FontSize = 16;
-        action.Padding = new Thickness(26, 12);
-        var buttons = Ui.Col(8, action, ActionRow(mod, installed));
-        buttons.VerticalAlignment = VerticalAlignment.Center;
+        action.Padding = new Thickness(28, 12);
+        var buttons = Ui.Row(8, action);
+        if (mod.Url is not null) buttons.Children.Add(Ui.Button(I18n.T("aside.openOn", ("site", Views.Aside.SourceName(mod.Source))), () => Ui.OpenUrl(mod.Url), "", Icons.External));
+        buttons.Children.Add(ActionRow(mod, installed));
 
-        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"), ColumnSpacing = 22 };
-        grid.Children.Add(Ui.Thumb(mod.Icon, mod.Name, 120, 18, 240));
+        var info = Ui.Col(10,
+            pill,
+            new TextBlock { Text = mod.Name, FontSize = 30, FontWeight = FontWeight.Bold, TextWrapping = TextWrapping.Wrap },
+            Ui.Text(string.Join(" · ", byline), "muted"),
+            tiles,
+            buttons);
+        if (mod.Source == "nexus" && !installed) info.Children.Add(Ui.Row(8, Ui.Icon(Icons.Info, 14, Ui.Res("Muted")), Ui.Text(I18n.T("mod.nexusHint"), "small muted", wrap: true)));
+        if (_g.Def.IsLegacy(mod.UpdatedAt)) info.Children.Add(ModRow.Tag(I18n.T("badge.old.hint"), Ui.Hex("#3A2A12"), Ui.Res("Warn")));
+        info.VerticalAlignment = VerticalAlignment.Center;
+
+        var cover = _details?.Images.FirstOrDefault() ?? mod.Icon;
+        var picture = new Border
+        {
+            Width = 250, Height = 230, CornerRadius = new CornerRadius(18), ClipToBounds = true, VerticalAlignment = VerticalAlignment.Top,
+            BorderBrush = Ui.Hex("#26FFFFFF"), BorderThickness = new Thickness(1), Child = Ui.Thumb(cover, mod.Name, 250, 0, 520),
+        };
+        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*"), ColumnSpacing = 26, Margin = new Thickness(26) };
+        grid.Children.Add(picture);
         Grid.SetColumn(info, 1);
         grid.Children.Add(info);
-        Grid.SetColumn(buttons, 2);
-        grid.Children.Add(buttons);
-        return Ui.Card(grid, 22);
+
+        return new Border
+        {
+            CornerRadius = new CornerRadius(22), ClipToBounds = true, BorderBrush = Ui.Res("Line"), BorderThickness = new Thickness(1),
+            Background = new LinearGradientBrush
+            {
+                StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
+                GradientStops = { new GradientStop(Color.FromArgb(46, accent.R, accent.G, accent.B), 0), new GradientStop(Color.Parse("#171A21"), 0.6), new GradientStop(Color.FromArgb(30, accent.R, accent.G, accent.B), 1) },
+            },
+            Child = grid,
+        };
     }
 
     Control RequirementsCard()

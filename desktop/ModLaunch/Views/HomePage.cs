@@ -14,6 +14,7 @@ namespace ModLaunch.Views;
 public sealed class HomePage : Page
 {
     public override string Title => I18n.T("nav.menu");
+    public override Control? Aside() => Views.Aside.Home();
 
     public override void Search(string text)
     {
@@ -36,26 +37,29 @@ public sealed class HomePage : Page
         if (recent.Count > 0 && Settings.Data.Bool("homeContinue", true)) content.Children.Add(Continue(recent));
 
         // Ваши игры — только те, что есть на компьютере.
-        var mine = MainWindow.OrderedGames().Where(g => g.Status == Detect.Found).ToList();
+        var mine = MainWindow.OrderedGames().Where(g => g.Status == Detect.Found && !Features.GameCollections.IsHidden(g.Def.Id)).ToList();
         var searching = AppState.Games.Any(g => g.Status == Detect.Searching);
         var games = new WrapPanel();
         var n = 0;
-        foreach (var g in mine) games.Children.Add(Intro(GameCard.Cover(g, 150), n++));
-        games.Children.Add(Intro(GameCard.AddCover(150), n++));
+        foreach (var g in mine) games.Children.Add(Intro(GameCard.Cover(g, 132), n++));
+        games.Children.Add(Intro(GameCard.AddCover(132), n++));
         var section = Ui.Col(12, Header(I18n.T("home.yourGames"), I18n.T("lib.open"), () => MainWindow.Current?.Navigate(() => new LibraryPage())));
         if (mine.Count == 0)
             section.Children.Add(Ui.Text(searching ? I18n.T("games.searching") : I18n.T("home.noGames"), "muted", wrap: true));
         section.Children.Add(games);
         content.Children.Add(section);
 
-        var first = mine.FirstOrDefault(g => g.LoaderInstalled) ?? mine.FirstOrDefault();
-        if (first is not null && Settings.Data.Bool("homePopular", true))
+        // «Выбор ModLaunch» — карусель лучших модов для ваших игр.
+        if (_featured is null) { if (!_featuredLoading) { _featuredLoading = true; Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = LoadFeatured(mine)); } }
+        else if (_featured.Count > 0 && Settings.Data.Bool("homePopular", true))
         {
-            if (_popularFor != first.Def.Id) { _popularFor = first.Def.Id; _popular = null; _ = LoadPopular(first); }
-            if (_popular is { Count: > 0 })
-                content.Children.Add(Shelf(I18n.T("home.popular", ("game", first.Def.Name)), _popular.Select(m => (first.Def.Id, m)).ToList(),
-                    () => MainWindow.Current?.Navigate(() => new GamePage(first.Def.Id, "catalog"))));
+            _featuredView ??= new Featured(_featured);
+            if (_featuredView.Parent is Panel old) old.Children.Remove(_featuredView);
+            content.Children.Add(_featuredView);
         }
+
+        // Топ модов: все ваши игры вместе или одна.
+        if (mine.Count > 0 && Settings.Data.Bool("homePopular", true)) content.Children.Add(TopMods(mine));
 
         var favorites = Favorites.All().Where(f => AppState.Games.Any(g => g.Def.Id == f.GameId && g.Status == Detect.Found)).Take(20).ToList();
         if (favorites.Count > 0 && Settings.Data.Bool("homeFavorites", true)) content.Children.Add(Shelf(I18n.T("home.favorites"), favorites, null));
@@ -91,18 +95,64 @@ public sealed class HomePage : Page
         return Ui.Col(12, Header(I18n.T("v4.continue"), null, null), row);
     }
 
-    string? _popularFor;
-    List<Sources.ModInfo>? _popular;
+    // Карусель и её данные живут весь сеанс: перерисовка главной не сбрасывает прокрутку.
+    static List<(GameState Game, Sources.ModInfo Mod)>? _featured;
+    Featured? _featuredView;
+    static bool _featuredLoading;
+    string _topGame = "all";
 
-    async Task LoadPopular(GameState g)
+    async Task LoadFeatured(List<GameState> mine)
     {
-        try
+        var lists = new List<List<(GameState, Sources.ModInfo)>>();
+        foreach (var g in mine.Where(g => g.Def.Picks.Length > 0).Take(6))
         {
-            var page = Program.Demo ? Demo.Catalog(g.Def, new Sources.Query()) : await Sources.Catalog.Browse(g.Def, new Sources.Query());
-            _popular = page.Mods.Take(12).ToList();
+            try
+            {
+                var ids = g.Def.Picks.Take(4).ToList();
+                var mods = Program.Demo ? Demo.Many(g.Def, ids) : await Sources.Catalog.Many(g.Def, ids);
+                lists.Add(mods.Where(m => !Actions.IsInstalled(g, m.Id)).Concat(mods.Where(m => Actions.IsInstalled(g, m.Id))).Select(m => (g, m)).ToList());
+            }
+            catch { }
         }
-        catch { _popular = []; }
+        // Чередуем игры: мод из первой, из второй… — чтобы карусель не была про одну игру.
+        var result = new List<(GameState, Sources.ModInfo)>();
+        for (var i = 0; result.Count < 10 && lists.Any(l => l.Count > i); i++)
+            foreach (var l in lists) if (l.Count > i && result.Count < 10) result.Add(l[i]);
+        _featured = result;
+        foreach (var g in mine) await Views.Aside.PopularAsync(g);
         Build();
+    }
+
+    Control TopMods(List<GameState> mine)
+    {
+        var chips = new WrapPanel();
+        Button Chip(string id, string text, Games.GameDef? def)
+        {
+            Control content = def is null ? new TextBlock { Text = text } : Ui.Row(6, new Border { Width = 18, Height = 18, CornerRadius = new CornerRadius(9), ClipToBounds = true, Child = Ui.GameImage(def, 40, art: Images.Art.Cover) }, new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center });
+            var b = new Button { Classes = { "chip" }, Content = content, Margin = new Thickness(0, 0, 8, 8) };
+            if (_topGame == id) b.Classes.Add("active");
+            b.Click += (_, _) => { _topGame = id; Build(); };
+            return b;
+        }
+        chips.Children.Add(Chip("all", I18n.T("top.all"), null));
+        foreach (var g in mine.Where(g => g.Def.HasCatalog)) chips.Children.Add(Chip(g.Def.Id, g.Def.ShortName, g.Def));
+
+        var pool = mine.Where(g => _topGame == "all" || g.Def.Id == _topGame)
+            .SelectMany(g => (Views.Aside.Popular(g) ?? []).Select(m => (Game: g, Mod: m)))
+            .OrderByDescending(x => x.Mod.Downloads).Take(8).ToList();
+        var list = Ui.Col(10);
+        foreach (var (g, m) in pool)
+        {
+            var gg = g; var mm = m;
+            list.Children.Add(ModRow.Build(g.Def, m, Actions.IsInstalled(g, m.Id), Actions.IsBusy(g, m.Id), false,
+                () => _ = Actions.Install(gg, mm), () => MainWindow.Current?.Navigate(() => new ModPage(gg.Def.Id, mm))));
+        }
+        if (pool.Count == 0) list.Children.Add(Ui.Text(I18n.T("common.loading"), "muted"));
+        var head = new DockPanel();
+        var title = Ui.Row(10, Ui.Icon(Icons.Trophy, 20, Ui.Hex("#F2C25C")), Ui.Text(I18n.T("top.title"), "h2"));
+        title.VerticalAlignment = VerticalAlignment.Center;
+        head.Children.Add(title);
+        return Ui.Col(12, head, chips, list);
     }
 
     /// <summary>Полка модов: небольшие карточки в ряд с прокруткой.</summary>

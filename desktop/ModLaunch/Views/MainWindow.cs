@@ -22,6 +22,12 @@ public abstract class Page : UserControl
     public virtual void Search(string text) { }
     /// <summary>Перестроить содержимое (язык сменился, игра нашлась…).</summary>
     public abstract void Build();
+    /// <summary>«Хлебные крошки» в шапке: Subnautica › Каталог модов.</summary>
+    public virtual IEnumerable<(string Text, Action? Open)> Crumbs => [(Title, null)];
+    /// <summary>Правая панель со сведениями о том, что на экране (как в ModLaunch 3). null — панели нет.</summary>
+    public virtual Control? Aside() => null;
+    /// <summary>Цвет свечения фона: у страниц игры — цвет игры.</summary>
+    public virtual string? Accent => GameId is string id ? AppState.Game(id).Def.Accent : null;
 }
 
 /// <summary>
@@ -35,6 +41,11 @@ public sealed class MainWindow : Window
     readonly ContentControl _page = new() { Name = "Page" };
     readonly StackPanel _railGames = new() { Spacing = 10, HorizontalAlignment = HorizontalAlignment.Center };
     readonly TextBlock _title = new() { FontWeight = FontWeight.SemiBold, VerticalAlignment = VerticalAlignment.Center, FontSize = 14 };
+    readonly StackPanel _crumbs = new() { Orientation = Orientation.Horizontal, Spacing = 6, VerticalAlignment = VerticalAlignment.Center };
+    readonly ContentControl _aside = new();
+    readonly Border _asideHost = new() { Width = 304, BorderThickness = new Thickness(1, 0, 0, 0) };
+    readonly Border _glow = new() { IsHitTestVisible = false };
+    Button? _asideToggle;
     readonly TextBox _search = new() { Width = 320, Height = 40 };
     readonly Button _back, _forward, _downloads, _settingsButton, _friendsButton, _statsButton, _donateButton, _creatorButton, _libraryButton, _modsButton;
     readonly LayoutTransformControl _scale = new();
@@ -136,7 +147,7 @@ public sealed class MainWindow : Window
         _scale.Child = BuildLayout();
         Content = _scale;
         ApplyScale();
-        Look.Changed += () => { ApplyScale(); RenderRail(); _current?.Build(); };
+        Look.Changed += () => { ApplyScale(); RenderRail(); _current?.Build(); RenderAside(); RenderGlow(); };
 
         I18n.Changed += () => { RebuildChrome(); _current?.Build(); };
         AppState.Changed += OnStateChanged;
@@ -205,8 +216,16 @@ public sealed class MainWindow : Window
                 Inlines = { new Avalonia.Controls.Documents.Run("Mod"), new Avalonia.Controls.Documents.Run("Launch") { Foreground = Ui.Res("Brand2") } },
             };
         // Минимализм: по умолчанию в шапке только название экрана, логотип — на боковой панели.
-        var brand = Ui.Row(10, _brandWord, _title);
-        _brandWord.IsVisible = Settings.Data.Bool("showBrand");
+        // Как в ModLaunch 3: слово-логотип, разделитель и «хлебные крошки».
+        var brand = Ui.Row(14, _brandWord, new Border { Width = 1, Height = 22, Background = Ui.Res("Line"), VerticalAlignment = VerticalAlignment.Center }, _crumbs);
+        _brandWord.IsVisible = Settings.Data.Bool("showBrand", true);
+        _brandWord.Cursor = new Cursor(StandardCursorType.Hand);
+        _brandWord.PointerPressed += (_, _) => Navigate(() => new HomePage());
+        _search.InnerRightContent = new Border
+        {
+            Margin = new Thickness(0, 0, 8, 0), Background = Ui.Res("Surface3"), CornerRadius = new CornerRadius(6), Padding = new Thickness(7, 2), VerticalAlignment = VerticalAlignment.Center,
+            Child = new TextBlock { Text = "Ctrl K", FontSize = 11, FontWeight = FontWeight.SemiBold, Foreground = Ui.Res("Muted") },
+        };
 
         var winButtons = Ui.Row(2,
             WinButton(Icons.Minimize, () => WindowState = WindowState.Minimized, I18n.T("win.minimize")),
@@ -229,7 +248,10 @@ public sealed class MainWindow : Window
         var bigPicture = new Button { Classes = { "icon" }, Content = Ui.Icon(Icons.Tv, 18) };
         ToolTip.SetTip(bigPicture, I18n.T("bp.open") + " (F11)");
         bigPicture.Click += (_, _) => BigPictureWindow.Open();
-        var dlWrap = new Border { Child = Ui.Row(10, _updatePill, _bell, bigPicture, _downloads), Margin = new Thickness(12, 0, 16, 0), VerticalAlignment = VerticalAlignment.Center };
+        _asideToggle = new Button { Classes = { "icon" }, Content = Ui.Icon(Icons.Sidebar, 18) };
+        ToolTip.SetTip(_asideToggle, I18n.T("aside.toggle"));
+        _asideToggle.Click += (_, _) => { Settings.Data["asideOpen"] = !Settings.Data.Bool("asideOpen", true); Settings.Save(); RenderAside(); };
+        var dlWrap = new Border { Child = Ui.Row(10, _updatePill, _bell, _asideToggle, bigPicture, _downloads), Margin = new Thickness(12, 0, 16, 0), VerticalAlignment = VerticalAlignment.Center };
         Grid.SetColumn(dlWrap, 3);
         topbar.Children.Add(dlWrap);
         winButtons.VerticalAlignment = VerticalAlignment.Center;
@@ -249,7 +271,13 @@ public sealed class MainWindow : Window
         var main = new DockPanel();
         DockPanel.SetDock(topBorder, Dock.Top);
         main.Children.Add(topBorder);
-        main.Children.Add(_page);
+        _asideHost.BorderBrush = Ui.Res("Line");
+        _asideHost.Background = Ui.Res("Rail");
+        _asideHost.Child = new ScrollViewer { Content = new Border { Padding = new Thickness(20, 22, 20, 22), Child = _aside }, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+        DockPanel.SetDock(_asideHost, Dock.Right);
+        main.Children.Add(_asideHost);
+        main.Children.Add(new Panel { Children = { _glow, _page } });
+        SizeChanged += (_, _) => UpdateAsideVisibility();
 
         var root = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*") };
         root.Children.Add(railBorder);
@@ -289,6 +317,8 @@ public sealed class MainWindow : Window
     {
         _search.Watermark = _current?.SearchHint ?? I18n.T("search.home");
         _title.Text = _current?.Title ?? "";
+        RenderCrumbs();
+        RenderAside();
         RenderRail();
         RenderDownloads();
     }
@@ -297,6 +327,67 @@ public sealed class MainWindow : Window
     {
         RenderRail();
         _current?.Build();
+        RenderAside();
+    }
+
+    // ---------------------------------------------------------------- шапка, правая панель, свечение
+
+    public void RenderCrumbs()
+    {
+        _crumbs.Children.Clear();
+        var items = _current?.Crumbs.ToList() ?? [];
+        for (var i = 0; i < items.Count; i++)
+        {
+            var (text, open) = items[i];
+            var last = i == items.Count - 1;
+            if (i > 0) _crumbs.Children.Add(Ui.Icon(Icons.Forward, 12, Ui.Res("Faint")));
+            var t = new TextBlock
+            {
+                Text = text, FontSize = 14, VerticalAlignment = VerticalAlignment.Center, MaxWidth = 280, TextTrimming = TextTrimming.CharacterEllipsis,
+                FontWeight = last ? FontWeight.SemiBold : FontWeight.Medium, Foreground = last ? Ui.Res("Text") : Ui.Res("Muted"),
+            };
+            if (open is not null && !last)
+            {
+                t.Cursor = new Cursor(StandardCursorType.Hand);
+                var go = open;
+                t.PointerPressed += (_, _) => go();
+            }
+            _crumbs.Children.Add(t);
+        }
+    }
+
+    /// <summary>Перестроить правую панель (страница вызывает, когда догрузила данные).</summary>
+    public void RenderAside()
+    {
+        Control? content = null;
+        try { content = _current?.Aside(); } catch { }
+        _aside.Content = content;
+        _asideToggle?.Classes.Set("active", Settings.Data.Bool("asideOpen", true));
+        if (_asideToggle is not null) _asideToggle.IsVisible = content is not null;
+        UpdateAsideVisibility();
+    }
+
+    void UpdateAsideVisibility() =>
+        _asideHost.IsVisible = _aside.Content is not null && Settings.Data.Bool("asideOpen", true) && Bounds.Width / Math.Max(0.5, Look.Scale) >= 1180;
+
+    void RenderGlow()
+    {
+        var accent = Color.Parse(_current?.Accent ?? Look.Accent);
+        RadialGradientBrush Spot(double x, double y, byte alpha, double r) => new()
+        {
+            Center = new RelativePoint(x, y, RelativeUnit.Relative), GradientOrigin = new RelativePoint(x, y, RelativeUnit.Relative),
+            RadiusX = new RelativeScalar(r, RelativeUnit.Relative), RadiusY = new RelativeScalar(r * 0.9, RelativeUnit.Relative),
+            GradientStops = { new GradientStop(Color.FromArgb(alpha, accent.R, accent.G, accent.B), 0), new GradientStop(Color.FromArgb(0, accent.R, accent.G, accent.B), 1) },
+        };
+        var light = Look.Theme == "light";
+        _glow.Child = new Panel
+        {
+            Children =
+            {
+                new Border { Background = Spot(0.12, 0.0, (byte)(light ? 26 : 40), 0.75) },
+                new Border { Background = Spot(0.95, 1.0, (byte)(light ? 16 : 26), 0.7) },
+            },
+        };
     }
 
     void RenderRail()
@@ -312,6 +403,7 @@ public sealed class MainWindow : Window
             };
             if (_current?.GameId == id) b.Classes.Add("active");
             b.Click += (_, _) => Navigate(() => new GamePage(id));
+            b.ContextFlyout = GameCard.Menu(g);
             ToolTip.SetTip(b, g.Def.Name);
             _railGames.Children.Add(b);
         }
@@ -384,7 +476,7 @@ public sealed class MainWindow : Window
         _layers?.Classes.Set("anim", Look.Animations);
         var k = Look.Scale;
         _scale.LayoutTransform = Math.Abs(k - 1) < 0.001 ? null : new ScaleTransform(k, k);
-        if (_brandWord is not null) _brandWord.IsVisible = Settings.Data.Bool("showBrand");
+        if (_brandWord is not null) _brandWord.IsVisible = Settings.Data.Bool("showBrand", true);
         if (_railHost is not null) _railHost.IsVisible = !Settings.Data.Bool("railHidden");
     }
 
@@ -552,6 +644,9 @@ public sealed class MainWindow : Window
         page.Build();
         page.Shown = true;
         _page.Content = page;
+        RenderCrumbs();
+        RenderAside();
+        RenderGlow();
         Animate.PageIn(page);
         _title.Text = page.Title;
         _search.Text = "";
@@ -625,7 +720,7 @@ public sealed class MainWindow : Window
     {
         if (e.KeyModifiers == KeyModifiers.Alt && e.Key == Key.Left) GoBack();
         else if (e.KeyModifiers == KeyModifiers.Alt && e.Key == Key.Right) GoForward();
-        else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.K) _search.Focus();
+        else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.K) { _search.Focus(); _search.SelectAll(); }
         else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.J) _downloadsPanel.IsVisible = !_downloadsPanel.IsVisible;
         else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.P) CommandPalette();
         else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.B) ToggleRail();
