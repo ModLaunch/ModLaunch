@@ -43,7 +43,21 @@ public static class AppState
 
     public static GameState Game(string id) => Games.First(g => g.Def.Id == id);
 
-    public static void Notify() => Avalonia.Threading.Dispatcher.UIThread.Post(() => Changed?.Invoke());
+    static int _pending;
+
+    /// <summary>
+    /// «Что-то поменялось — перерисуй». Частые сигналы (поиск игр, загрузки)
+    /// склеиваются: окно перерисовывается не чаще раза в 150 мс.
+    /// </summary>
+    public static void Notify()
+    {
+        if (Interlocked.Exchange(ref _pending, 1) == 1) return;
+        Avalonia.Threading.Dispatcher.UIThread.Post(() => Avalonia.Threading.DispatcherTimer.RunOnce(() =>
+        {
+            Interlocked.Exchange(ref _pending, 0);
+            Changed?.Invoke();
+        }, TimeSpan.FromMilliseconds(150)));
+    }
 
     /// <summary>Сохранённые пути проверяем сразу, остальные игры ищем в фоне.</summary>
     public static async Task DetectAll(bool force = false)

@@ -188,18 +188,13 @@ public sealed class SettingsPage : Page
 
         col.Children.Add(Section(I18n.T("look.chrome"), I18n.T("look.chrome.hint"),
             Toggle(I18n.T("look.brand"), I18n.T("look.brand.hint"), Settings.Data.Bool("showBrand"), v => { Settings.Data["showBrand"] = v; Chrome(); }),
-            Toggle(I18n.T("look.creator"), I18n.T("look.creator.hint"), Settings.Data.Bool("showCreator", true), v => { Settings.Data["showCreator"] = v; Chrome(); }),
             Toggle(I18n.T("look.rail"), I18n.T("look.rail.hint"), !Settings.Data.Bool("railHidden"), v => { Settings.Data["railHidden"] = !v; Chrome(); }),
-            Toggle(I18n.T("look.railFound"), I18n.T("look.railFound.hint"), Settings.Data.Bool("railFoundOnly"), v => { Settings.Data["railFoundOnly"] = v; Chrome(); }),
-            Toggle(I18n.T("look.railFriends"), I18n.T("look.railFriends.hint"), Settings.Data.Bool("railFriends", true), v => { Settings.Data["railFriends"] = v; Chrome(); }),
-            Toggle(I18n.T("look.railDonate"), I18n.T("look.railDonate.hint"), Settings.Data.Bool("railDonate", true), v => { Settings.Data["railDonate"] = v; Chrome(); })));
+            Toggle(I18n.T("look.railFriends"), I18n.T("look.railFriends.hint"), Settings.Data.Bool("railFriends", true), v => { Settings.Data["railFriends"] = v; Chrome(); })));
 
         col.Children.Add(Section(I18n.T("look.home"), I18n.T("look.home.hint"),
             Toggle(I18n.T("v4.continue"), I18n.T("v4.continue.text"), Settings.Data.Bool("homeContinue", true), v => Settings.Data["homeContinue"] = v),
-            Toggle(I18n.T("look.home.hero"), I18n.T("look.home.hero.hint"), Settings.Data.Bool("homeHero", true), v => Settings.Data["homeHero"] = v),
             Toggle(I18n.T("home.favorites"), I18n.T("home.favorites.text"), Settings.Data.Bool("homeFavorites", true), v => Settings.Data["homeFavorites"] = v),
-            Toggle(I18n.T("look.home.popular"), I18n.T("look.home.popular.hint"), Settings.Data.Bool("homePopular", true), v => Settings.Data["homePopular"] = v),
-            Toggle(I18n.T("look.home.missing"), I18n.T("look.home.missing.hint"), Settings.Data.Bool("homeFoundOnly"), v => Settings.Data["homeFoundOnly"] = v)));
+            Toggle(I18n.T("look.home.popular"), I18n.T("look.home.popular.hint"), Settings.Data.Bool("homePopular", true), v => Settings.Data["homePopular"] = v)));
 
         // Какие игры показывать и в каком порядке.
         var list = new StackPanel { Spacing = 6 };
@@ -311,7 +306,7 @@ public sealed class SettingsPage : Page
         var map = new (string Tab, string[] Keys)[]
         {
             ("look", ["settings.language", "look.theme", "look.accent", "look.scale", "look.anim", "look.compact"]),
-            ("interface", ["look.start", "look.chrome", "look.home", "look.games", "look.brand", "look.creator", "look.rail"]),
+            ("interface", ["look.start", "look.chrome", "look.home", "look.games", "look.brand", "look.rail"]),
             ("system", ["sys.tray", "sys.autostart", "sys.toast", "sys.transfer", "sys.confirm"]),
             ("games", ["settings.games", "games.deep"]),
             ("launch", ["settings.tab.launch", "ov.title", "launch.args", "launch.time"]),
@@ -856,7 +851,8 @@ public sealed class SettingsPage : Page
             MainWindow.Current?.Toast(I18n.T(on ? "stats.enabled" : "stats.disabled"));
             AppState.Notify();
         };
-        var name = Ui.Col(4, Ui.Text("ModLaunch", "h2"), version);
+        var name = Ui.Col(4, Ui.Text("ModLaunch", "h2"), version,
+            Ui.Button(I18n.T("nav.donate"), () => MainWindow.Current?.Navigate(() => new DonatePage()), "ghost", Icons.Coffee));
         name.VerticalAlignment = VerticalAlignment.Center;
 
         var latest = Setup.Updater.Latest;

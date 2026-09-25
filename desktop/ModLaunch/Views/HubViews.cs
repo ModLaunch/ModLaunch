@@ -168,13 +168,12 @@ public sealed partial class CreatorPage
     static Control Grid3(IEnumerable<HubMod> mods)
     {
         var grid = new UniformGrid { Columns = 3 };
-        var i = 0;
-        foreach (var m in mods) grid.Children.Add(Card(m, i++));
+        foreach (var m in mods) grid.Children.Add(Card(m));
         return grid;
     }
 
     /// <summary>Карточка мода: обложка, название, автор, счётчики.</summary>
-    public static Control Card(HubMod m, int index = 0)
+    public static Control Card(HubMod m)
     {
         var game = GameCatalog.ById(m.Game);
         Control cover = m.Images.Count > 0
@@ -210,11 +209,10 @@ public sealed partial class CreatorPage
         body.Margin = new Thickness(14, 12, 14, 14);
         var card = new Button
         {
-            Classes = { "tile", "rise" }, Margin = new Thickness(0, 0, 14, 14), Padding = new Thickness(0),
+            Classes = { "tile" }, Margin = new Thickness(0, 0, 14, 14), Padding = new Thickness(0),
             HorizontalAlignment = HorizontalAlignment.Stretch,
             Content = new StackPanel { Children = { top, body } },
         };
-        Animate.Stagger(card, index);
         card.Click += (_, _) => OpenMod(m);
         return card;
     }

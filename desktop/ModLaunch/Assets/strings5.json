@@ -463,7 +463,20 @@
   "err.creator.NO_FILE": "Выберите архив мода.",
   "err.creator.SAME_VERSION": "Такая версия уже опубликована — поднимите номер версии.",
   "err.creator.BAD_HASH": "Файл повреждён при скачивании (SHA-256 не совпал). Попробуйте ещё раз.",
-  "err.creator.EXISTS": "Это уже сделано."
+  "err.creator.EXISTS": "Это уже сделано.",
+  "lib.title": "Библиотека",
+  "lib.search": "Искать в библиотеке",
+  "lib.all": "Все",
+  "lib.found": "Установленные",
+  "lib.missing": "Не найдены",
+  "lib.empty": "Ничего не нашлось.",
+  "lib.open": "Библиотека",
+  "home.noGames": "На компьютере пока не нашлось поддерживаемых игр. Добавьте игру кнопкой «+» или откройте библиотеку.",
+  "home.all": "Все",
+  "nx.untrack": "Не отслеживать",
+  "nx.more": "Ещё",
+  "hub.share": "Скопировать ссылку",
+  "hub.shared": "Ссылка на мод скопирована"
  },
  "en": {
   "add.title": "Add a game",
@@ -929,6 +942,19 @@
   "err.creator.NO_FILE": "Pick a mod archive.",
   "err.creator.SAME_VERSION": "This version is already published — bump the version number.",
   "err.creator.BAD_HASH": "The file got damaged while downloading (SHA-256 mismatch). Try again.",
-  "err.creator.EXISTS": "Already done."
+  "err.creator.EXISTS": "Already done.",
+  "lib.title": "Library",
+  "lib.search": "Search the library",
+  "lib.all": "All",
+  "lib.found": "Installed",
+  "lib.missing": "Not found",
+  "lib.empty": "Nothing found.",
+  "lib.open": "Library",
+  "home.noGames": "No supported games found on this PC yet. Add one with “+” or open the library.",
+  "home.all": "All",
+  "nx.untrack": "Stop tracking",
+  "nx.more": "More",
+  "hub.share": "Copy link",
+  "hub.shared": "Mod link copied"
  }
 }

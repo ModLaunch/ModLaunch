@@ -110,7 +110,6 @@ public sealed partial class GamePage : Page
         if (_g.Status == Detect.Found)
         {
             buttons.Children.Add(Ui.Button(I18n.T("games.openFolder"), () => Actions.OpenFolder(_g.Path), "", Icons.Folder));
-            buttons.Children.Add(Ui.Button("", () => MainWindow.Current?.Navigate(() => new CreatorPage()), "icon", Icons.Code, I18n.T("cr.forGame")));
             if (_g.LoaderInstalled)
             {
                 var running = Features.Launcher.IsRunning(_g.Def.Id);

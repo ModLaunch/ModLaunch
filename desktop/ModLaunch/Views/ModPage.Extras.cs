@@ -58,21 +58,27 @@ public sealed partial class ModPage
         Avalonia.Threading.Dispatcher.UIThread.Post(Build);
     }
 
-    /// <summary>Кнопки под «Установить»: отслеживать, лайк, скрыть, пожаловаться, проверить файл.</summary>
-    void ExtraButtons(StackPanel buttons, ModInfo mod)
+    /// <summary>
+    /// Под «Установить» — только избранное, лайк (у модов Hub) и меню «⋯»,
+    /// а редкие действия (отслеживать, скрыть, пожаловаться…) — в меню.
+    /// </summary>
+    Control ActionRow(ModInfo mod, bool installed)
     {
-        var tracked = Tracking.Has(_g.Def.Id, mod);
-        buttons.Children.Add(Ui.Button(tracked ? "✓ " + I18n.T("nx.tracking") : I18n.T("nx.track"), () =>
+        var row = Ui.Row(6);
+        var fav = Favorites.Has(_g.Def.Id, mod.Id);
+        var heart = Ui.Button("", () =>
         {
-            var on = Tracking.Toggle(_g.Def.Id, mod);
-            MainWindow.Current?.Toast(I18n.T(on ? "nx.tracked" : "nx.untracked", ("name", mod.Name)));
+            var on = Favorites.Toggle(_g.Def.Id, mod);
+            MainWindow.Current?.Toast(I18n.T(on ? "fav.added" : "fav.removed"));
             Build();
-        }, tracked ? "" : "ghost", Icons.Bell, I18n.T("nx.track.hint")));
+        }, "icon", null, I18n.T(fav ? "fav.remove" : "fav.add"));
+        heart.Content = Ui.Icon(Icons.Heart, 18, fav ? Ui.Res("Bad") : null, fill: fav);
+        row.Children.Add(heart);
 
         if (mod.Source == "hub")
         {
             var liked = Hub.Liked(mod.Id);
-            buttons.Children.Insert(1, Ui.Button($"{(liked ? "♥" : "♡")} {I18n.Compact(_hubMod?.Likes ?? mod.Rating)}", async () =>
+            row.Children.Add(Ui.Button($"👍 {I18n.Compact(_hubMod?.Likes ?? mod.Rating)}", async () =>
             {
                 if (_hubMod is null) return;
                 try
@@ -82,20 +88,46 @@ public sealed partial class ModPage
                     Build();
                 }
                 catch (Exception e) { MainWindow.Current?.Toast(Social.Firebase.Explain("creator", e), bad: true); }
-            }, liked ? "" : "ghost", null, I18n.T("hub.like")));
-            if (_hubMod is { IsPackage: true, Sha256.Length: 64 } pkg)
-                buttons.Children.Add(Ui.Button(I18n.T("hub.virustotal"), () => Ui.OpenUrl($"https://www.virustotal.com/gui/file/{pkg.Sha256}"), "ghost", Icons.Shield, I18n.T("hub.virustotal.hint")));
-            buttons.Children.Add(Ui.Button(I18n.T("hub.report"), Report, "ghost", Icons.Flag));
+            }, liked ? "primary" : "", null, I18n.T("hub.like")));
         }
 
-        buttons.Children.Add(Ui.Button(I18n.T("nx.hide"), () =>
+        var menu = new MenuFlyout();
+        void Item(string text, Action run)
         {
-            var w = MainWindow.Current!;
-            w.Dialog(I18n.T("nx.hide"), Ui.Text(I18n.T("nx.hide.text"), "muted", wrap: true),
-                Ui.Button(I18n.T("common.cancel"), w.CloseDialog),
-                Ui.Button(I18n.T("nx.hide.author", ("author", mod.Author)), () => { Blocklist.HideAuthor(mod); w.CloseDialog(); w.Toast(I18n.T("nx.hidden")); }, "", Icons.User),
-                Ui.Button(I18n.T("nx.hide.mod"), () => { Blocklist.HideMod(_g.Def.Id, mod); w.CloseDialog(); w.Toast(I18n.T("nx.hidden")); }, "primary", Icons.EyeOff));
-        }, "ghost", Icons.EyeOff));
+            var item = new MenuItem { Header = text };
+            item.Click += (_, _) => run();
+            menu.Items.Add(item);
+        }
+        var tracked = Tracking.Has(_g.Def.Id, mod);
+        Item(tracked ? I18n.T("nx.untrack") : I18n.T("nx.track"), () =>
+        {
+            var on = Tracking.Toggle(_g.Def.Id, mod);
+            MainWindow.Current?.Toast(I18n.T(on ? "nx.tracked" : "nx.untracked", ("name", mod.Name)));
+            Build();
+        });
+        if (mod.Source == "nexus" && installed && !Actions.IsEndorsed(_g, mod.Id))
+            Item(I18n.T("v4.endorse"), async () => { await Actions.Endorse(_g, mod.Id, mod.Version); Build(); });
+        if (mod.Url is not null) Item(I18n.T("mod.page"), () => Ui.OpenUrl(mod.Url));
+        if (mod.Source == "hub")
+        {
+            Item(I18n.T("hub.share"), async () =>
+            {
+                var url = $"https://modlaunch.github.io/ModLaunch/hub.html#mod={Uri.EscapeDataString(mod.Id)}";
+                if (TopLevel.GetTopLevel(this)?.Clipboard is { } clip) await clip.SetTextAsync(url);
+                MainWindow.Current?.Toast(I18n.T("hub.shared"));
+            });
+            if (_hubMod is { IsPackage: true, Sha256.Length: 64 } pkg)
+                Item(I18n.T("hub.virustotal"), () => Ui.OpenUrl($"https://www.virustotal.com/gui/file/{pkg.Sha256}"));
+            Item(I18n.T("hub.report"), Report);
+        }
+        menu.Items.Add(new Separator());
+        Item(I18n.T("nx.hide.mod"), () => { Blocklist.HideMod(_g.Def.Id, mod); MainWindow.Current?.Toast(I18n.T("nx.hidden")); });
+        if (mod.Author != "") Item(I18n.T("nx.hide.author", ("author", mod.Author)), () => { Blocklist.HideAuthor(mod); MainWindow.Current?.Toast(I18n.T("nx.hidden")); });
+        var more = new Button { Classes = { "icon" }, Content = new TextBlock { Text = "⋯", FontSize = 20, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center }, Flyout = menu };
+        ToolTip.SetTip(more, I18n.T("nx.more"));
+        row.Children.Add(more);
+        if (tracked) row.Children.Add(new TextBlock { Text = "🔔", VerticalAlignment = VerticalAlignment.Center, Opacity = 0.8 });
+        return row;
     }
 
     // ---------------------------------------------------------------- файлы и версии
@@ -158,17 +190,15 @@ public sealed partial class ModPage
     {
         if (_byAuthor is not { Count: > 0 }) return null;
         var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
-        var i = 0;
         foreach (var m in _byAuthor)
         {
             var mm = m;
             var card = new Button
             {
-                Classes = { "tile", "rise" }, Width = 190, Padding = new Thickness(12),
+                Classes = { "card-btn" }, Width = 190, Padding = new Thickness(12),
                 Content = Ui.Col(8, Ui.Thumb(m.Icon, m.Name, 64, 12), Ui.Text(m.Name, "h3"),
                     Ui.Text(m.Downloads > 0 ? "↓ " + I18n.Compact(m.Downloads) : m.Version, "small muted")),
             };
-            Animate.Stagger(card, i++);
             card.Click += (_, _) => MainWindow.Current?.Navigate(() => new ModPage(_g.Def.Id, mm));
             row.Children.Add(card);
         }

@@ -99,23 +99,7 @@ public sealed partial class ModPage : Page
         action.IsEnabled = !busy && _g.Status == Detect.Found;
         action.FontSize = 16;
         action.Padding = new Thickness(26, 12);
-        var fav = Favorites.Has(_g.Def.Id, mod.Id);
-        var heart = Ui.Button(fav ? I18n.T("fav.remove") : I18n.T("fav.add"), () =>
-        {
-            var on = Favorites.Toggle(_g.Def.Id, mod);
-            MainWindow.Current?.Toast(I18n.T(on ? "fav.added" : "fav.removed"));
-            Build();
-        }, fav ? "" : "ghost", Icons.Heart);
-        var buttons = Ui.Col(8, action, heart);
-        if (mod.Source == "nexus" && installed)
-        {
-            var endorsed = Actions.IsEndorsed(_g, mod.Id);
-            var endorse = Ui.Button(endorsed ? "✓ " + I18n.T("v4.endorsed") : I18n.T("v4.endorse"), async () => { await Actions.Endorse(_g, mod.Id, mod.Version); Build(); }, "ghost", Icons.Heart);
-            endorse.IsEnabled = !endorsed;
-            buttons.Children.Add(endorse);
-        }
-        if (mod.Url is not null) buttons.Children.Add(Ui.Button(I18n.T("mod.page"), () => Ui.OpenUrl(mod.Url), "ghost", Icons.External));
-        ExtraButtons(buttons, mod);
+        var buttons = Ui.Col(8, action, ActionRow(mod, installed));
         buttons.VerticalAlignment = VerticalAlignment.Center;
 
         var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"), ColumnSpacing = 22 };

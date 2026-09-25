@@ -34,7 +34,7 @@ public sealed class MainWindow : Window
     readonly StackPanel _railGames = new() { Spacing = 10, HorizontalAlignment = HorizontalAlignment.Center };
     readonly TextBlock _title = new() { FontWeight = FontWeight.SemiBold, VerticalAlignment = VerticalAlignment.Center, FontSize = 14 };
     readonly TextBox _search = new() { Width = 320, Height = 40 };
-    readonly Button _back, _forward, _downloads, _homeButton, _settingsButton, _friendsButton, _statsButton, _donateButton, _creatorButton;
+    readonly Button _back, _forward, _downloads, _homeButton, _settingsButton, _friendsButton, _statsButton, _donateButton, _creatorButton, _libraryButton;
     readonly LayoutTransformControl _scale = new();
     Control? _railHost;
     Control? _brandWord;
@@ -76,9 +76,9 @@ public sealed class MainWindow : Window
         _friendsButton = RailIcon(Icons.Users, () => Navigate(() => new FriendsPage()), I18n.T("friends.title"));
         _statsButton = RailIcon(Icons.Chart, () => Navigate(() => new StatsPage()), I18n.T("stats.title"));
         _donateButton = RailIcon(Icons.Coffee, () => Navigate(() => new DonatePage()), I18n.T("nav.donate"));
-        _creatorButton = new Button { Classes = { "chip" }, VerticalAlignment = VerticalAlignment.Center, Content = Ui.Row(6, Ui.Icon(Icons.Code, 15), new TextBlock { Text = "Creator Hub", VerticalAlignment = VerticalAlignment.Center }) };
-        _creatorButton.Click += (_, _) => Navigate(() => new CreatorPage());
-        ToolTip.SetTip(_creatorButton, I18n.T("cr.tip"));
+        // Как в Modrinth App: разделы — отдельными пунктами на боковой панели.
+        _libraryButton = RailIcon(Icons.Layers, () => Navigate(() => new LibraryPage()), I18n.T("lib.title"));
+        _creatorButton = RailIcon(Icons.Code, () => Navigate(() => new CreatorPage()), "Creator Hub");
         _friendsBadge.Width = 10; _friendsBadge.Height = 10; _friendsBadge.CornerRadius = new CornerRadius(5);
         _friendsBadge.Background = Ui.Res("Good"); _friendsBadge.HorizontalAlignment = HorizontalAlignment.Right; _friendsBadge.VerticalAlignment = VerticalAlignment.Top;
         _friendsBadge.Margin = new Thickness(0, 6, 6, 0);
@@ -145,6 +145,7 @@ public sealed class MainWindow : Window
         Navigate(StartPage());
         RenderRail();
         SetupTray();
+        RenderBell();
         RenderDownloads();
         if (!Program.Screenshot) _ = StartUp();
         if (Program.Autostarted && Settings.Data.Bool("startMinimized"))
@@ -171,11 +172,12 @@ public sealed class MainWindow : Window
             Background = Ui.Res("Rail"),
             LastChildFill = true,
         };
-        var top = Ui.Col(14, logo, new Border { Height = 1, Background = Ui.Res("Line"), Margin = new Thickness(14, 0) }, _homeButton);
+        var top = Ui.Col(8, logo, new Border { Height = 1, Background = Ui.Res("Line"), Margin = new Thickness(14, 6) }, _homeButton, _libraryButton, _creatorButton,
+            new Border { Height = 1, Background = Ui.Res("Line"), Margin = new Thickness(14, 6, 14, 0) });
         top.Margin = new Thickness(0, 14, 0, 10);
         top.HorizontalAlignment = HorizontalAlignment.Center;
         DockPanel.SetDock(top, Dock.Top);
-        var bottom = Ui.Col(10, _friendsButton, _statsButton, _donateButton, _settingsButton);
+        var bottom = Ui.Col(8, _friendsButton, _statsButton, _settingsButton);
         bottom.Margin = new Thickness(0, 10, 0, 16);
         bottom.HorizontalAlignment = HorizontalAlignment.Center;
         DockPanel.SetDock(bottom, Dock.Bottom);
@@ -218,7 +220,7 @@ public sealed class MainWindow : Window
         _search.VerticalAlignment = VerticalAlignment.Center;
         Grid.SetColumn(_search, 2);
         topbar.Children.Add(_search);
-        var dlWrap = new Border { Child = Ui.Row(10, _updatePill, _creatorButton, _bell, _downloads), Margin = new Thickness(12, 0, 16, 0), VerticalAlignment = VerticalAlignment.Center };
+        var dlWrap = new Border { Child = Ui.Row(10, _updatePill, _bell, _downloads), Margin = new Thickness(12, 0, 16, 0), VerticalAlignment = VerticalAlignment.Center };
         Grid.SetColumn(dlWrap, 3);
         topbar.Children.Add(dlWrap);
         winButtons.VerticalAlignment = VerticalAlignment.Center;
@@ -293,19 +295,11 @@ public sealed class MainWindow : Window
         _railGames.Children.Clear();
         foreach (var g in RailGames())
         {
-            var art = Images.Game(g.Def, 120);
-            Control face = art is not null
-                ? new Image { Source = art, Stretch = Stretch.UniformToFill }
-                : new Border { Background = Ui.Hex(g.Def.Accent), Child = new TextBlock { Text = g.Def.ShortName[..1], FontWeight = FontWeight.Bold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Foreground = Brushes.Black } };
-            var status = Ui.Dot(g.Status == Detect.Found ? Ui.Res("Good") : Ui.Res("Faint"), 9);
-            status.HorizontalAlignment = HorizontalAlignment.Right;
-            status.VerticalAlignment = VerticalAlignment.Bottom;
-            status.Margin = new Thickness(0, 0, 2, 2);
             var id = g.Def.Id;
             var b = new Button
             {
                 Classes = { "rail" },
-                Content = new Panel { Children = { new Border { CornerRadius = new CornerRadius(11), ClipToBounds = true, Child = face }, status } },
+                Content = new Border { CornerRadius = new CornerRadius(11), ClipToBounds = true, Child = Ui.GameImage(g.Def, 120) },
             };
             if (_current?.GameId == id) b.Classes.Add("active");
             b.Click += (_, _) => Navigate(() => new GamePage(id));
@@ -314,13 +308,10 @@ public sealed class MainWindow : Window
         }
         var plus = RailIcon(Icons.Plus, () => Navigate(() => new AddGamePage()), I18n.T("add.title"));
         plus.Classes.Set("active", _current is AddGamePage);
-        plus.BorderBrush = _current is AddGamePage ? Ui.Res("Brand") : Ui.Res("Line");
-        plus.BorderThickness = new Thickness(1.5);
         _railGames.Children.Add(plus);
         _creatorButton.Classes.Set("active", _current is CreatorPage);
-        _creatorButton.IsVisible = Settings.Data.Bool("showCreator", true);
+        _libraryButton.Classes.Set("active", _current is LibraryPage);
         _friendsButton.IsVisible = Settings.Data.Bool("railFriends", true);
-        _donateButton.IsVisible = Settings.Data.Bool("railDonate", true);
         _homeButton.Classes.Set("active", _current is HomePage);
         _settingsButton.Classes.Set("active", _current is SettingsPage);
         _friendsButton.Classes.Set("active", _current is FriendsPage);
@@ -335,11 +326,18 @@ public sealed class MainWindow : Window
     }
 
     /// <summary>Игры на боковой панели: без скрытых, по желанию — только найденные, свой порядок.</summary>
+    /// <summary>
+    /// Игры на боковой панели — как недавние сборки в Modrinth App: только те,
+    /// что есть на компьютере, недавно запущенные сверху, не больше восьми.
+    /// Остальные — в «Библиотеке».
+    /// </summary>
     public static IEnumerable<GameState> RailGames()
     {
         var hidden = Settings.Data.Arr("hiddenGames").Select(x => x?.ToString()).ToHashSet();
-        var foundOnly = Settings.Data.Bool("railFoundOnly");
-        return OrderedGames().Where(g => !hidden.Contains(g.Def.Id) && (!foundOnly || g.Status == Detect.Found));
+        return OrderedGames()
+            .Where(g => !hidden.Contains(g.Def.Id) && g.Status == Detect.Found)
+            .OrderByDescending(g => Features.PlayTime.Get(g.Def.Id).LastPlayed ?? DateTime.MinValue)
+            .Take(8);
     }
 
     /// <summary>Все игры в порядке, заданном в настройках (остальные — как в программе).</summary>
@@ -542,7 +540,6 @@ public sealed class MainWindow : Window
         if (page.GameId is string gid) { Settings.Data["lastGame"] = gid; Settings.Save(); }
         page.Build();
         _page.Content = page;
-        Animate.PageIn(page);
         _title.Text = page.Title;
         _search.Text = "";
         _search.Watermark = page.SearchHint;
@@ -559,6 +556,7 @@ public sealed class MainWindow : Window
         var updates = Features.Tracking.Updates;
         var hub = Creator.Hub.Updates.Where(h => !updates.Any(u => u.Item.Source == "hub" && u.Item.Id == h.Id)).ToList();
         _bellBadge.IsVisible = updates.Count + hub.Count > 0;
+        _bell.IsVisible = _bellBadge.IsVisible || _bellPanel.IsVisible;
         _bellList.Children.Clear();
         if (updates.Count + hub.Count == 0)
         {

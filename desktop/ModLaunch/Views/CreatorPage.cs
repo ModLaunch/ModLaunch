@@ -335,7 +335,6 @@ public sealed partial class CreatorPage : Page
             chips.Children.Add(chip);
         }
         var grid = new UniformGrid { Columns = 2 };
-        var index = 0;
         foreach (var t in Templates.All.Where(t => _exCategory == "all" || Templates.Category(t) == _exCategory))
         {
             var title = I18n.T($"cr.ex.{t.Id}");
@@ -359,7 +358,6 @@ public sealed partial class CreatorPage : Page
                     Build();
                 }, "primary", Icons.Wand)), 18);
             card.Margin = new Thickness(0, 0, 14, 14);
-            Animate.Stagger(card, index++);
             grid.Children.Add(card);
         }
         return Ui.Col(14, chips, grid);

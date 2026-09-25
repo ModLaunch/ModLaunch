@@ -96,6 +96,8 @@ public static class Program
         }
 
         Save("1-home");
+        window.Navigate(() => new LibraryPage());
+        Save("1a-library");
         window.Navigate(() => new GamePage("subnautica", "installed"));
         Save("2-installed");
         window.Navigate(() => new GamePage("subnautica", "catalog"));

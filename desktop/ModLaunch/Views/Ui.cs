@@ -134,6 +134,35 @@ public static class Ui
 
     public static Border Dot(IBrush color, double size = 8) => new Border { Width = size, Height = size, CornerRadius = new CornerRadius(size), Background = color, VerticalAlignment = VerticalAlignment.Center };
 
+    /// <summary>
+    /// Обложка игры: цветной фон сразу, картинка — когда загрузится. Окно при
+    /// этом не перерисовывается, меняется только эта картинка.
+    /// </summary>
+    public static Control GameImage(Games.GameDef def, int decode, Stretch stretch = Stretch.UniformToFill)
+    {
+        var image = new Image { Stretch = stretch, Source = Images.Game(def, decode) };
+        if (image.Source is null && def.ArtUrl is not null)
+            _ = Images.FromUrl(def.ArtUrl, decode).ContinueWith(t =>
+            {
+                if (t.Result is Bitmap bmp) Avalonia.Threading.Dispatcher.UIThread.Post(() => image.Source = bmp);
+            });
+        var initials = new TextBlock
+        {
+            Text = def.ShortName[..1], FontWeight = FontWeight.Bold, FontSize = 18, Foreground = Brushes.White,
+            HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+        };
+        var back = new Border
+        {
+            Background = new LinearGradientBrush
+            {
+                StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
+                GradientStops = { new GradientStop(Color.Parse(def.Accent), 0), new GradientStop(Color.Parse("#1A1D26"), 1) },
+            },
+            Child = initials,
+        };
+        return new Panel { Children = { back, image } };
+    }
+
     /// <summary>Картинка по ссылке: пока грузится — буквы на цветном фоне.</summary>
     public static Control Thumb(string? url, string name, double size, double radius = 12, int decode = 160)
     {
