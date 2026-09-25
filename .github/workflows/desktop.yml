@@ -33,6 +33,13 @@ jobs:
           Get-Content selfcheck.txt
           if ($p.ExitCode -ne 0) { throw "self-check failed" }
 
+      - name: Catalog report (counts and top mods per game)
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath out/ModLaunch.exe -ArgumentList '--catalog-report' -PassThru -Wait -NoNewWindow -RedirectStandardOutput report.txt
+          Get-Content report.txt
+
       - name: Screenshots
         shell: pwsh
         run: |
