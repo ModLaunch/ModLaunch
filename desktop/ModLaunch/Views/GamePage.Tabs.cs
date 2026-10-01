@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.VisualTree;
 using ModLaunch.Core;
 using ModLaunch.Features;
 using ModLaunch.Sources;
@@ -278,7 +279,7 @@ public sealed partial class GamePage
 
     string _logQuery = "";
     bool _logErrors, _logRaw, _logFollow;
-    Avalonia.Threading.DispatcherTimer? _logTimer;
+    IDisposable? _logTimer;
 
     Control LogView()
     {
@@ -315,8 +316,18 @@ public sealed partial class GamePage
             follow.IsCheckedChanged += (_, _) =>
             {
                 _logFollow = follow.IsChecked == true;
-                _logTimer?.Stop();
-                if (_logFollow) _logTimer = Avalonia.Threading.DispatcherTimer.Run(() => { if (_tab == "log" && _logFollow) Build(); return _logFollow; }, TimeSpan.FromSeconds(2)) as Avalonia.Threading.DispatcherTimer;
+                // DispatcherTimer.Run возвращает не сам таймер, а «выключатель»: раньше его приводили
+                // к DispatcherTimer, получали null, и старый таймер не останавливался никогда.
+                _logTimer?.Dispose();
+                _logTimer = null;
+                if (_logFollow) _logTimer = Avalonia.Threading.DispatcherTimer.Run(() =>
+                {
+                    // Ушли со страницы — перестаём перечитывать лог (раньше это шло до закрытия программы,
+                    // и каждый заход на вкладку добавлял ещё один такой таймер).
+                    if (!_logFollow || this.GetVisualRoot() is null) { _logFollow = false; _logTimer = null; return false; }
+                    if (_tab == "log") Build();
+                    return true;
+                }, TimeSpan.FromSeconds(2));
             };
             IEnumerable<string> shown = lines;
             if (_logErrors) shown = shown.Where(l => l.Contains("Error", StringComparison.OrdinalIgnoreCase) || l.Contains("Fatal", StringComparison.OrdinalIgnoreCase) || l.Contains("Exception", StringComparison.OrdinalIgnoreCase));

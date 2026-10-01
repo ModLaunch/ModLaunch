@@ -143,7 +143,13 @@ public static class Ui
         if (icon is not null && text == "") content = Icon(icon, 18);
         var b = new Button { Content = content };
         foreach (var c in classes.Split(' ', StringSplitOptions.RemoveEmptyEntries)) b.Classes.Add(c);
-        b.Click += (_, _) => onClick();
+        // Нажатие обрабатывается внутри оконной процедуры Windows: ошибка, вылетевшая
+        // отсюда, закрыла бы программу. Вместо этого — журнал и всплывашка.
+        b.Click += (_, _) =>
+        {
+            try { onClick(); }
+            catch (Exception e) { CrashLog.Report("button", e); }
+        };
         if (tip is not null) ToolTip.SetTip(b, tip);
         return b;
     }

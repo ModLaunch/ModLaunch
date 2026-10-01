@@ -38,6 +38,9 @@ public static class Program
         var shot = Array.IndexOf(args, "--screenshot");
         if (shot >= 0 && shot + 1 < args.Length) return Screenshots(args[shot + 1]);
 
+        // Ошибки — в logs\errors.log, а не молчаливый вылет (подробности — в CrashLog).
+        CrashLog.Install();
+
         // Установка, обновление, удаление — та же программа в другом режиме.
         SetupMode = ModLaunch.Setup.Installer.Detect(args);
         if (SetupMode != ModLaunch.Setup.SetupMode.None)

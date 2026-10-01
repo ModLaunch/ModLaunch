@@ -649,10 +649,14 @@ public sealed class MainWindow : Window
 
     // ---------------------------------------------------------------- навигация
 
+    /// <summary>Сколько шагов помнит «Назад»: при долгой работе история росла без конца.</summary>
+    const int HistoryLimit = 50;
+
     public void Navigate(Func<Page> make)
     {
         if (_index < _history.Count - 1) _history.RemoveRange(_index + 1, _history.Count - _index - 1);
         _history.Add(make);
+        if (_history.Count > HistoryLimit) _history.RemoveRange(0, _history.Count - HistoryLimit);
         _index = _history.Count - 1;
         Show(make());
     }
@@ -758,6 +762,7 @@ public sealed class MainWindow : Window
 
     async Task StartUp()
     {
+        if (CrashLog.TakeCrashMarker()) Dispatcher.UIThread.Post(ShowCrashNotice, DispatcherPriority.Background);
         Setup.Updater.Changed += () => Dispatcher.UIThread.Post(RenderRail);
         Social.Account.Changed += () => Dispatcher.UIThread.Post(() => { RenderRail(); _current?.Build(); });
         _ = Task.Run(async () =>
@@ -804,6 +809,14 @@ public sealed class MainWindow : Window
             }
             AppState.Notify();
         }
+    }
+
+    /// <summary>Прошлый запуск закончился вылетом: сказать об этом и показать, где причина.</summary>
+    void ShowCrashNotice()
+    {
+        Dialog(I18n.T("crash.title"), Ui.Text(I18n.T("crash.text", ("path", CrashLog.File)), "muted", wrap: true),
+            Ui.Button(I18n.T("crash.open"), () => { CloseDialog(); Ui.OpenUrl(CrashLog.File); }, "", Icons.External),
+            Ui.Button(I18n.T("common.close"), CloseDialog, "primary"));
     }
 
     void OnGameExit(string gameId, bool counted, long ms)

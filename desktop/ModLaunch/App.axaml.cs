@@ -12,6 +12,7 @@ public partial class App : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
+        if (!Program.Screenshot) CrashLog.InstallUi();
         I18n.Set(Settings.Language);
         Look.Apply();
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)

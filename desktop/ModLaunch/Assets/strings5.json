@@ -650,7 +650,11 @@
   "setup.tip.3": "Правая кнопка на обложке — коллекции и избранное, как в Steam.",
   "setup.tip.4": "Ctrl+K — поиск модов с любой страницы.",
   "setup.tip.5": "В ModLaunch Hub можно публиковать свои моды — без рекламы.",
-  "setup.done.games": "Уже поддерживается 17 игр — и любая другая через «+»"
+  "setup.done.games": "Уже поддерживается 17 игр — и любая другая через «+»",
+  "crash.title": "ModLaunch закрылся с ошибкой",
+  "crash.text": "В прошлый раз программа неожиданно закрылась. Причина записана в журнал: {path}. Если это повторяется — пришлите этот файл разработчику.",
+  "crash.open": "Открыть журнал",
+  "err.unexpected": "Что-то пошло не так: {reason}. ModLaunch продолжает работу, подробности — в logs\\errors.log."
  },
  "en": {
   "add.title": "Add a game",
@@ -1303,6 +1307,10 @@
   "setup.tip.3": "Right-click a cover for collections and favorites, like Steam.",
   "setup.tip.4": "Ctrl+K searches mods from any page.",
   "setup.tip.5": "Publish your own mods to ModLaunch Hub — no ads.",
-  "setup.done.games": "17 games supported out of the box — and any other via “+”"
+  "setup.done.games": "17 games supported out of the box — and any other via “+”",
+  "crash.title": "ModLaunch closed because of an error",
+  "crash.text": "Last time the app closed unexpectedly. The reason is saved in the log: {path}. If it keeps happening, please send this file to the developer.",
+  "crash.open": "Open log",
+  "err.unexpected": "Something went wrong: {reason}. ModLaunch keeps running, details are in logs\\errors.log."
  }
 }

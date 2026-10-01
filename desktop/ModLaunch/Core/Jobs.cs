@@ -31,6 +31,14 @@ public static class Jobs
     {
         var job = new Job { Title = title, GameName = gameName };
         All.Insert(0, job);
+        // Панель показывает 30 последних, история — в History. Законченные сверх сотни
+        // убираем: при долгой работе список копился вместе с их CancellationTokenSource.
+        for (var i = All.Count - 1; i >= 0 && All.Count > 100; i--)
+        {
+            if (All[i].Status == JobStatus.Running) continue;
+            All[i].Cancel.Dispose();
+            All.RemoveAt(i);
+        }
         Raise(job);
         var progress = new Progress<InstallStep>(step =>
         {

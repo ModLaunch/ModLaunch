@@ -36,14 +36,40 @@ public sealed class JsonFile
         }
     }
 
+    /// <summary>
+    /// Записать файл. Не бросает исключений: антивирус, индексатор или OneDrive
+    /// на долю секунды держат файл открытым, и File.Move падал с «файл занят».
+    /// Это случалось и в фоновом потоке (время в игре пишется, когда игра
+    /// закрылась), а там исключение молча закрывало всю программу. Теперь —
+    /// несколько попыток, а не вышло — запись в журнал: данные остаются
+    /// в памяти и уйдут на диск со следующим сохранением.
+    /// </summary>
     public void Save()
     {
-        lock (_lock)
+        try
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
-            var tmp = _path + ".tmp";
-            File.WriteAllText(tmp, Data.ToJsonString(Pretty));
-            File.Move(tmp, _path, true);
+            lock (_lock)
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
+                var tmp = _path + ".tmp";
+                File.WriteAllText(tmp, Data.ToJsonString(Pretty));
+                for (var attempt = 1; ; attempt++)
+                {
+                    try
+                    {
+                        File.Move(tmp, _path, true);
+                        return;
+                    }
+                    catch (Exception e) when (attempt < 5 && e is IOException or UnauthorizedAccessException)
+                    {
+                        Thread.Sleep(50 * attempt);
+                    }
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            CrashLog.Write("save " + Path.GetFileName(_path), e);
         }
     }
 }

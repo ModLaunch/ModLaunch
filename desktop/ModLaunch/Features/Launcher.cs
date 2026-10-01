@@ -74,12 +74,19 @@ public static partial class Launcher
         if (track) PlayTime.Start(game.Id);
         process.EnableRaisingEvents = true;
         lock (Running) Running[game.Id] = (process, DateTime.UtcNow);
-        process.Exited += (_, _) =>
+        // Exited приходит из фонового потока. Раньше время в игре сохранялось прямо
+        // в нём, и любая ошибка записи (файл занят антивирусом) молча закрывала
+        // ModLaunch сразу после выхода из игры. Теперь всё — в потоке интерфейса,
+        // где ошибка попадёт в журнал, а не уронит программу.
+        process.Exited += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
-            lock (Running) Running.Remove(game.Id);
+            // Игру могли успеть запустить снова — тогда в списке уже новый процесс, его не трогаем.
+            lock (Running)
+                if (Running.TryGetValue(game.Id, out var r) && r.Process == process) Running.Remove(game.Id);
             var (counted, ms) = track ? PlayTime.Stop(game.Id) : (false, 0L);
-            Avalonia.Threading.Dispatcher.UIThread.Post(() => Exited?.Invoke(game.Id, counted, ms));
-        };
+            process.Dispose();
+            Exited?.Invoke(game.Id, counted, ms);
+        });
         return backup;
     }
 }
