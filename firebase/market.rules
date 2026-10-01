@@ -1,0 +1,483 @@
+    // ── ModLaunch Market (Creator Hub 8.1) ───────────────────────────────
+    // Вставить в консоли Firebase: Firestore Database → Правила, внутрь
+    // блока match /databases/{database}/documents { … }, рядом с правилами
+    // ModLaunch Hub (creations.rules), и нажать «Опубликовать». Нужен
+    // rules_version = '2' (первая строка правил).
+    //
+    // Своего сервера нет, поэтому каждое движение кредитов проверяется здесь:
+    // ops — журнал операций (только создание). Баланс в wallets меняется только
+    // вместе с новой записью ops в том же пакете записи, и правила сверяют
+    // сумму, отправителя и получателя. Получить кредиты из воздуха нельзя:
+    // стартовые 100 при создании кошелька и +25 раз в 20 часов.
+    //
+    // wallets  — кошельки (видит только владелец).
+    // assets   — ассеты: модели, текстуры, звуки, куски кода (читают все).
+    // vault    — файлы ассетов кусками: платные отдаются только владельцам копии.
+    // owns     — кто чем владеет (инвентарь): {uid}_{asset}, serial — номер копии.
+    // listings — перепродажа своей копии: {uid}_{asset}.
+    // trades   — обмен: предмет на предмет или кредиты на предмет.
+    // orders   — живые заказы: ставки креаторов (bids), деньги на время работы
+    //            замораживаются (escrow) и уходят исполнителю после сдачи.
+
+    function mkSigned() {
+      return request.auth != null;
+    }
+    function mkMember() {
+      return request.auth != null && request.auth.token.get('email', '') != '';
+    }
+    function mkPath(collection, id) {
+      return /databases/$(database)/documents/$(collection)/$(id);
+    }
+    function mkWallet(uid) {
+      return mkPath('wallets', uid);
+    }
+    function mkOp(id) {
+      return mkPath('ops', id);
+    }
+    function mkInt(value, low, high) {
+      return value is int && value >= low && value <= high;
+    }
+    function mkText(value, max) {
+      return value is string && value.size() <= max;
+    }
+    function mkName(value, max) {
+      return mkText(value, max) && value.size() > 0;
+    }
+    function mkNow(value) {
+      return value == request.time;
+    }
+
+    // ---- кошелёк
+
+    match /wallets/{uid} {
+      allow get: if mkSigned() && request.auth.uid == uid;
+      allow create: if mkMember() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['balance', 'bonusAt', 'lastOp', 'created'])
+        && request.resource.data.balance == 100
+        && mkNow(request.resource.data.bonusAt)
+        && mkNow(request.resource.data.created)
+        && request.resource.data.lastOp == '';
+      allow update: if mkMember() && (mkBonus(uid) || mkLedger(uid));
+    }
+
+    // Ежедневный бонус: +25 не чаще раза в 20 часов.
+    function mkBonus(uid) {
+      return request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['balance', 'bonusAt'])
+        && request.resource.data.balance == resource.data.balance + 25
+        && mkNow(request.resource.data.bonusAt)
+        && request.time > resource.data.bonusAt + duration.value(20, 'h');
+    }
+
+    // Любое другое изменение — ровно на сумму новой операции из того же пакета.
+    function mkLedger(uid) {
+      let next = request.resource.data;
+      let op = getAfter(mkOp(next.lastOp)).data;
+      return next.diff(resource.data).affectedKeys().hasOnly(['balance', 'lastOp'])
+        && next.lastOp is string && next.lastOp.size() > 0 && next.lastOp != resource.data.lastOp
+        && !exists(mkOp(next.lastOp))
+        && next.balance is int && next.balance >= 0
+        && op.kind != 'bonus' && op.from != op.to
+        && ((op.from == uid && next.balance == resource.data.balance - op.amount
+              && (request.auth.uid == uid || op.kind == 'trade'))
+          || (op.to == uid && op.from != uid && next.balance == resource.data.balance + op.amount));
+    }
+
+    // ---- журнал операций
+
+    match /ops/{op} {
+      allow get: if mkSigned()
+        && (resource.data.from == request.auth.uid || resource.data.to == request.auth.uid || resource.data.by == request.auth.uid);
+      allow list: if mkSigned() && (resource.data.from == request.auth.uid || resource.data.to == request.auth.uid);
+      allow create: if mkMember() && op.size() >= 12 && op.size() <= 40
+        && request.resource.data.keys().hasOnly(['kind', 'from', 'to', 'amount', 'asset', 'ref', 'by', 'at'])
+        && request.resource.data.keys().hasAll(['kind', 'from', 'to', 'amount', 'asset', 'ref', 'by', 'at'])
+        && mkNow(request.resource.data.at)
+        && request.resource.data.by == request.auth.uid
+        && mkInt(request.resource.data.amount, 1, 1000000)
+        && mkText(request.resource.data.asset, 120) && mkText(request.resource.data.ref, 120)
+        && mkName(request.resource.data.from, 128) && mkName(request.resource.data.to, 128)
+        && request.resource.data.from != request.resource.data.to
+        && (mkOpBonus() || mkOpBuy(op) || mkOpResale(op) || mkOpTrade(op)
+          || mkOpEscrow(op) || mkOpRelease(op) || mkOpRefund(op));
+    }
+
+    // Для истории: бонус записывается вместе с самим бонусом.
+    function mkOpBonus() {
+      let d = request.resource.data;
+      return d.kind == 'bonus' && d.from == 'bonus' && d.to == request.auth.uid && d.amount == 25
+        && getAfter(mkWallet(request.auth.uid)).data.bonusAt == request.time;
+    }
+    // Покупка у автора: ровно цена ассета, деньги — автору.
+    function mkOpBuy(op) {
+      let d = request.resource.data;
+      let a = get(mkPath('assets', d.asset)).data;
+      return d.kind == 'buy' && d.from == request.auth.uid
+        && a.price > 0 && a.listed == true && d.amount == a.price && d.to == a.uid
+        && getAfter(mkWallet(d.from)).data.lastOp == op
+        && getAfter(mkWallet(d.to)).data.lastOp == op;
+    }
+    // Перепродажа: цена из объявления продавца.
+    function mkOpResale(op) {
+      let d = request.resource.data;
+      let l = get(mkPath('listings', d.to + '_' + d.asset)).data;
+      return d.kind == 'resale' && d.from == request.auth.uid
+        && l.uid == d.to && d.amount == l.price
+        && getAfter(mkWallet(d.from)).data.lastOp == op
+        && getAfter(mkWallet(d.to)).data.lastOp == op;
+    }
+    // Обмен «кредиты за предмет»: проводит тот, кто принимает предложение.
+    function mkOpTrade(op) {
+      let d = request.resource.data;
+      let t = get(mkPath('trades', d.ref)).data;
+      return d.kind == 'trade' && d.to == request.auth.uid
+        && t.to == d.to && t.from == d.from && t.status == 'open' && t.credits == d.amount
+        && getAfter(mkPath('trades', d.ref)).data.status == 'accepted'
+        && getAfter(mkWallet(d.from)).data.lastOp == op
+        && getAfter(mkWallet(d.to)).data.lastOp == op;
+    }
+    // Заказ: заказчик выбрал ставку — её цена замораживается.
+    function mkOpEscrow(op) {
+      let d = request.resource.data;
+      let o = getAfter(mkPath('orders', d.ref)).data;
+      return d.kind == 'escrow' && d.from == request.auth.uid && d.to == 'order:' + d.ref
+        && o.uid == d.from && o.status == 'assigned' && o.price == d.amount
+        && get(mkPath('orders', d.ref)).data.status == 'open'
+        && getAfter(mkWallet(d.from)).data.lastOp == op;
+    }
+    // Заказ принят — замороженное уходит исполнителю.
+    function mkOpRelease(op) {
+      let d = request.resource.data;
+      let before = get(mkPath('orders', d.ref)).data;
+      return d.kind == 'release' && d.from == 'order:' + d.ref
+        && before.status in ['assigned', 'delivered'] && d.to == before.winner && d.amount == before.price
+        && getAfter(mkPath('orders', d.ref)).data.status == 'done'
+        && getAfter(mkWallet(d.to)).data.lastOp == op;
+    }
+    // Заказ сорван — замороженное возвращается заказчику.
+    function mkOpRefund(op) {
+      let d = request.resource.data;
+      let before = get(mkPath('orders', d.ref)).data;
+      return d.kind == 'refund' && d.from == 'order:' + d.ref
+        && before.status == 'assigned' && d.to == before.uid && d.amount == before.price
+        && getAfter(mkPath('orders', d.ref)).data.status == 'refunded'
+        && getAfter(mkWallet(d.to)).data.lastOp == op;
+    }
+
+    // ---- ассеты
+
+    function mkAssetValid(d) {
+      return d.keys().hasOnly(['uid', 'author', 'name', 'summary', 'description', 'kind', 'games', 'engine', 'tags', 'images',
+                               'fileName', 'size', 'sha256', 'chunks', 'preview', 'price', 'supply', 'sold', 'owners',
+                               'listed', 'version', 'created', 'updated'])
+        && d.uid == request.auth.uid
+        && mkName(d.author, 32)
+        && mkName(d.name, 60)
+        && mkText(d.summary, 200)
+        && mkText(d.description, 5000)
+        && d.kind in ['model', 'texture', 'sound', 'code', 'other']
+        && d.games is list && d.games.size() <= 12
+        && mkText(d.engine, 20)
+        && d.tags is list && d.tags.size() <= 6
+        && d.images is list && d.images.size() <= 6
+        && mkText(d.fileName, 120)
+        && mkInt(d.size, 0, 8388608)
+        && mkText(d.sha256, 64)
+        && mkInt(d.chunks, 0, 16)
+        && mkText(d.preview, 4000)
+        && mkInt(d.price, 0, 100000)
+        && mkInt(d.supply, 0, 10000)
+        && d.listed is bool
+        && mkText(d.version, 20)
+        && mkNow(d.updated);
+    }
+
+    match /assets/{id} {
+      allow get, list: if true;
+      allow create: if mkMember()
+        && id.matches('^' + request.auth.uid.lower() + '_[a-z0-9_]{1,60}$')
+        && mkAssetValid(request.resource.data)
+        && request.resource.data.sold == 0 && request.resource.data.owners == 0
+        && mkNow(request.resource.data.created)
+        && (request.resource.data.price == 0 || exists(mkWallet(request.auth.uid)));
+      allow update: if mkMember() && (
+        // Автор меняет карточку; счётчики, тираж и дата создания не трогаются.
+        (resource.data.uid == request.auth.uid
+          && mkAssetValid(request.resource.data)
+          && request.resource.data.created == resource.data.created
+          && request.resource.data.sold == resource.data.sold
+          && request.resource.data.owners == resource.data.owners
+          && request.resource.data.supply == resource.data.supply
+          && (request.resource.data.price == 0 || exists(mkWallet(request.auth.uid))))
+        || mkAssetTake(id)
+        || mkAssetDrop(id));
+      // Удалить можно, пока ни у кого нет копии; иначе — снять с продажи (listed = false).
+      allow delete: if mkMember() && resource.data.uid == request.auth.uid && resource.data.owners == 0;
+    }
+
+    // Покупка или «взять бесплатно»: +1 к sold и owners вместе со своей записью в owns.
+    function mkAssetTake(id) {
+      let mine = mkPath('owns', request.auth.uid + '_' + id);
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sold', 'owners'])
+        && request.resource.data.sold == resource.data.sold + 1
+        && request.resource.data.owners == resource.data.owners + 1
+        && (resource.data.supply == 0 || request.resource.data.sold <= resource.data.supply)
+        && resource.data.listed == true
+        && existsAfter(mine) && !exists(mine);
+    }
+    // Выбросил свою копию — −1 владелец.
+    function mkAssetDrop(id) {
+      let mine = mkPath('owns', request.auth.uid + '_' + id);
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['owners'])
+        && request.resource.data.owners == resource.data.owners - 1
+        && exists(mine) && !existsAfter(mine);
+    }
+
+    match /vault/{chunk} {
+      allow get: if mkSigned() && (resource.data.uid == request.auth.uid
+        || get(mkPath('assets', resource.data.asset)).data.price == 0
+        || exists(mkPath('owns', request.auth.uid + '_' + resource.data.asset)));
+      allow create, update: if mkMember()
+        && chunk.matches('^' + request.auth.uid.lower() + '_.*')
+        && request.resource.data.keys().hasOnly(['uid', 'asset', 'n', 'data'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.asset is string
+        && request.resource.data.asset.matches('^' + request.auth.uid.lower() + '_[a-z0-9_]{1,60}$')
+        && request.resource.data.n is int
+        && request.resource.data.data is string && request.resource.data.data.size() <= 1000000;
+      allow delete: if mkMember() && resource.data.uid == request.auth.uid;
+    }
+
+    // ---- инвентарь: кто чем владеет
+
+    match /owns/{id} {
+      allow get, list: if true;
+      allow create: if mkMember()
+        && request.resource.data.keys().hasOnly(['uid', 'asset', 'serial', 'via', 'op', 'ref', 'prev', 'paid', 'at'])
+        && request.resource.data.keys().hasAll(['uid', 'asset', 'serial', 'via', 'op', 'ref', 'prev', 'paid', 'at'])
+        && id == request.resource.data.uid + '_' + request.resource.data.asset
+        && mkNow(request.resource.data.at)
+        && request.resource.data.serial is int && request.resource.data.paid is int
+        && mkText(request.resource.data.op, 40) && mkText(request.resource.data.ref, 120) && mkText(request.resource.data.prev, 128)
+        && (mkOwnFree() || mkOwnBuy() || mkOwnResale() || mkOwnTrade());
+      // Свою копию можно выбросить; чужую убирает новый владелец (перепродажа, обмен).
+      allow delete: if mkMember() && (resource.data.uid == request.auth.uid || mkOwnMoved(resource.data));
+    }
+
+    function mkOwnMoved(old) {
+      let fresh = getAfter(mkPath('owns', request.auth.uid + '_' + old.asset)).data;
+      return fresh.prev == old.uid && fresh.serial == old.serial;
+    }
+
+    // Новая копия: номер = sold после +1 в том же пакете.
+    function mkOwnNew(d) {
+      let after = getAfter(mkPath('assets', d.asset)).data;
+      return d.uid == request.auth.uid && after.uid != d.uid && after.listed == true
+        && d.serial == after.sold && get(mkPath('assets', d.asset)).data.sold == d.serial - 1
+        && d.paid == after.price && d.prev == '';
+    }
+    function mkOwnFree() {
+      let d = request.resource.data;
+      return d.via == 'free' && d.op == '' && d.ref == '' && d.paid == 0 && mkOwnNew(d);
+    }
+    function mkOwnBuy() {
+      let d = request.resource.data;
+      let o = getAfter(mkOp(d.op)).data;
+      return d.via == 'buy' && d.ref == '' && d.paid > 0 && mkOwnNew(d)
+        && !exists(mkOp(d.op)) && o.kind == 'buy' && o.from == d.uid && o.asset == d.asset;
+    }
+    // Перепродажа: та же копия (serial), объявление и старая запись продавца исчезают.
+    function mkOwnResale() {
+      let d = request.resource.data;
+      let l = get(mkPath('listings', d.prev + '_' + d.asset)).data;
+      let o = getAfter(mkOp(d.op)).data;
+      return d.via == 'resale' && d.uid == request.auth.uid && d.ref == ''
+        && l.serial == d.serial && d.paid == l.price
+        && !exists(mkOp(d.op)) && o.kind == 'resale' && o.from == d.uid && o.to == d.prev && o.asset == d.asset
+        && !existsAfter(mkPath('listings', d.prev + '_' + d.asset))
+        && get(mkPath('owns', d.prev + '_' + d.asset)).data.serial == d.serial
+        && !existsAfter(mkPath('owns', d.prev + '_' + d.asset));
+    }
+    // Обмен: проводит принимающий, обе стороны — из предложения.
+    function mkOwnTrade() {
+      let d = request.resource.data;
+      let t = get(mkPath('trades', d.ref)).data;
+      return d.via == 'trade' && d.op == '' && d.paid == 0
+        && request.auth.uid == t.to && t.status == 'open'
+        && getAfter(mkPath('trades', d.ref)).data.status == 'accepted'
+        && ((d.uid == t.to && d.asset == t.give && d.prev == t.from)
+          || (d.uid == t.from && d.asset == t.take && d.prev == t.to))
+        && get(mkPath('owns', d.prev + '_' + d.asset)).data.serial == d.serial
+        && !existsAfter(mkPath('owns', d.prev + '_' + d.asset));
+    }
+
+    match /listings/{id} {
+      allow get, list: if true;
+      allow create, update: if mkMember()
+        && request.resource.data.keys().hasOnly(['uid', 'asset', 'price', 'serial', 'at'])
+        && request.resource.data.uid == request.auth.uid
+        && id == request.auth.uid + '_' + request.resource.data.asset
+        && mkInt(request.resource.data.price, 1, 1000000)
+        && mkNow(request.resource.data.at)
+        && get(mkPath('owns', id)).data.serial == request.resource.data.serial
+        && exists(mkWallet(request.auth.uid));
+      // Снять своё; объявление покупателя убирает тот, кто купил (копии у продавца больше нет).
+      allow delete: if mkMember()
+        && (resource.data.uid == request.auth.uid || !existsAfter(mkPath('owns', id)));
+    }
+
+    // ---- обмены
+
+    match /trades/{id} {
+      allow get: if mkSigned() && (resource.data.from == request.auth.uid || resource.data.to == request.auth.uid);
+      allow list: if mkSigned() && (resource.data.from == request.auth.uid || resource.data.to == request.auth.uid);
+      allow create: if mkMember()
+        && request.resource.data.keys().hasOnly(['from', 'fromName', 'to', 'toName', 'give', 'giveSerial', 'take', 'takeSerial',
+                                                 'credits', 'text', 'status', 'at', 'updated'])
+        && request.resource.data.from == request.auth.uid
+        && mkName(request.resource.data.to, 128) && request.resource.data.to != request.auth.uid
+        && mkText(request.resource.data.fromName, 32) && mkText(request.resource.data.toName, 32)
+        && mkText(request.resource.data.text, 500)
+        && request.resource.data.status == 'open'
+        && mkNow(request.resource.data.at) && mkNow(request.resource.data.updated)
+        && mkInt(request.resource.data.credits, 0, 1000000)
+        && mkName(request.resource.data.take, 120)
+        && get(mkPath('owns', request.resource.data.to + '_' + request.resource.data.take)).data.serial == request.resource.data.takeSerial
+        && ((request.resource.data.give == '' && request.resource.data.giveSerial == 0 && request.resource.data.credits > 0
+              && exists(mkWallet(request.auth.uid)))
+          || (mkName(request.resource.data.give, 120) && request.resource.data.credits == 0
+              && get(mkPath('owns', request.auth.uid + '_' + request.resource.data.give)).data.serial == request.resource.data.giveSerial));
+      allow update: if mkMember() && resource.data.status == 'open'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updated'])
+        && mkNow(request.resource.data.updated)
+        && ((request.auth.uid == resource.data.from && request.resource.data.status == 'cancelled')
+          || (request.auth.uid == resource.data.to && request.resource.data.status == 'declined')
+          || (request.auth.uid == resource.data.to && request.resource.data.status == 'accepted' && mkTradeDone(id)));
+    }
+
+    // Принять можно только целиком: предмет ушёл, а взамен пришёл предмет или кредиты.
+    function mkTradeDone(id) {
+      let t = resource.data;
+      let took = getAfter(mkPath('owns', t.from + '_' + t.take)).data;
+      return took.via == 'trade' && took.ref == id
+        && !existsAfter(mkPath('owns', t.to + '_' + t.take))
+        && (t.give == ''
+          ? mkTradePaid(id, getAfter(mkWallet(t.from)).data.lastOp)
+          : (getAfter(mkPath('owns', t.to + '_' + t.give)).data.ref == id
+            && !existsAfter(mkPath('owns', t.from + '_' + t.give))));
+    }
+    function mkTradePaid(id, op) {
+      let o = getAfter(mkOp(op)).data;
+      return o.kind == 'trade' && o.ref == id;
+    }
+
+    // ---- живые заказы
+
+    function mkOrderPath(id) {
+      return mkPath('orders', id);
+    }
+    // Изменение заказа подтверждено новой операцией в кошельке uid.
+    function mkOrderPaid(id, uid, kind, amount) {
+      let op = getAfter(mkWallet(uid)).data.lastOp;
+      let o = getAfter(mkOp(op)).data;
+      return !exists(mkOp(op)) && o.kind == kind && o.ref == id && o.amount == amount;
+    }
+
+    match /orders/{id} {
+      allow get, list: if true;
+      allow create: if mkMember()
+        && request.resource.data.keys().hasOnly(['uid', 'author', 'title', 'text', 'game', 'budget', 'closes', 'days', 'status',
+                                                 'bids', 'winner', 'winnerName', 'price', 'due', 'delivery', 'note',
+                                                 'deliveredAt', 'rating', 'created', 'updated'])
+        && request.resource.data.uid == request.auth.uid
+        && mkName(request.resource.data.author, 32)
+        && mkName(request.resource.data.title, 80)
+        && mkText(request.resource.data.text, 3000)
+        && mkText(request.resource.data.game, 40)
+        && mkInt(request.resource.data.budget, 10, 1000000)
+        && request.resource.data.closes is timestamp
+        && request.resource.data.closes > request.time
+        && request.resource.data.closes <= request.time + duration.value(7, 'd')
+        && mkInt(request.resource.data.days, 1, 60)
+        && request.resource.data.status == 'open'
+        && request.resource.data.bids == 0
+        && request.resource.data.winner == '' && request.resource.data.winnerName == ''
+        && request.resource.data.price == 0 && request.resource.data.rating == 0
+        && request.resource.data.delivery == '' && request.resource.data.note == ''
+        && mkNow(request.resource.data.due) && mkNow(request.resource.data.deliveredAt)
+        && mkNow(request.resource.data.created) && mkNow(request.resource.data.updated)
+        && get(mkWallet(request.auth.uid)).data.balance >= request.resource.data.budget;
+      allow update: if mkMember() && (mkBidCount(id) || mkOrderStep(id));
+      // Удалить можно только пустой открытый или отменённый заказ.
+      allow delete: if mkMember() && resource.data.uid == request.auth.uid
+        && (resource.data.status == 'cancelled' || (resource.data.status == 'open' && resource.data.bids == 0));
+
+      match /bids/{uid} {
+        allow get, list: if true;
+        allow create, update: if mkMember() && uid == request.auth.uid
+          && request.resource.data.keys().hasOnly(['uid', 'author', 'price', 'days', 'text', 'at'])
+          && request.resource.data.uid == uid
+          && mkName(request.resource.data.author, 32)
+          && mkText(request.resource.data.text, 500)
+          && mkInt(request.resource.data.days, 1, 60)
+          && mkNow(request.resource.data.at)
+          && mkBidOpen(id)
+          && exists(mkWallet(uid));
+        allow delete: if mkMember() && uid == request.auth.uid && get(mkOrderPath(id)).data.status == 'open';
+      }
+    }
+
+    function mkBidOpen(id) {
+      let o = get(mkOrderPath(id)).data;
+      return o.status == 'open' && request.time < o.closes && o.uid != request.auth.uid
+        && mkInt(request.resource.data.price, 1, o.budget);
+    }
+
+    // Счётчик ставок: ±1 вместе со своей ставкой.
+    function mkBidCount(id) {
+      let bid = /databases/$(database)/documents/orders/$(id)/bids/$(request.auth.uid);
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['bids'])
+        && ((request.resource.data.bids == resource.data.bids + 1 && existsAfter(bid) && !exists(bid))
+          || (request.resource.data.bids == resource.data.bids - 1 && !existsAfter(bid) && exists(bid)));
+    }
+
+    function mkOrderStep(id) {
+      let was = resource.data;
+      let now = request.resource.data;
+      let keys = now.diff(was).affectedKeys();
+      return mkNow(now.updated) && (
+        // Заказчик отменил, пока никого не выбрал.
+        (request.auth.uid == was.uid && was.status == 'open' && now.status == 'cancelled'
+          && keys.hasOnly(['status', 'updated']))
+        // Заказчик выбрал ставку: её цена заморожена в том же пакете.
+        || (request.auth.uid == was.uid && was.status == 'open' && now.status == 'assigned'
+          && keys.hasOnly(['status', 'winner', 'winnerName', 'price', 'due', 'updated'])
+          && mkOrderPick(id, now)
+          && mkOrderPaid(id, was.uid, 'escrow', now.price))
+        // Исполнитель сдал работу.
+        || (request.auth.uid == was.winner && was.status == 'assigned' && now.status == 'delivered'
+          && keys.hasOnly(['status', 'delivery', 'note', 'deliveredAt', 'updated'])
+          && mkName(now.delivery, 200) && mkText(now.note, 1000) && mkNow(now.deliveredAt))
+        // Заказчик принял (с оценкой) — или молчит трое суток после сдачи, и исполнитель забирает сам.
+        || (was.status in ['assigned', 'delivered'] && now.status == 'done'
+          && keys.hasOnly(['status', 'rating', 'updated'])
+          && ((request.auth.uid == was.uid && mkInt(now.rating, 1, 5))
+            || (request.auth.uid == was.winner && was.status == 'delivered' && now.rating == 0
+              && request.time > was.deliveredAt + duration.value(72, 'h')))
+          && mkOrderPaid(id, was.winner, 'release', was.price))
+        // Срок прошёл, а работы нет — деньги назад; исполнитель может отказаться и сам.
+        || (was.status == 'assigned' && now.status == 'refunded'
+          && keys.hasOnly(['status', 'updated'])
+          && ((request.auth.uid == was.uid && request.time > was.due) || request.auth.uid == was.winner)
+          && mkOrderPaid(id, was.uid, 'refund', was.price)));
+    }
+
+    function mkOrderPick(id, now) {
+      let b = get(/databases/$(database)/documents/orders/$(id)/bids/$(now.winner)).data;
+      // Срок сдачи считает программа (часы у всех чуть разные — допуск час).
+      return now.price == b.price && now.winnerName == b.author
+        && now.due is timestamp
+        && now.due > request.time + duration.value(b.days, 'd') - duration.value(1, 'h')
+        && now.due < request.time + duration.value(b.days, 'd') + duration.value(1, 'h');
+    }
+    // ── конец правил ModLaunch Market ───────────────────────────────────

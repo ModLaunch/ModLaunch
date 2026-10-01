@@ -170,6 +170,8 @@ public sealed partial class CreatorPage : Page
             ("if", "if $x > 1 {\n  \n}\nelse {\n  \n}\n"),
             ("write", "write \"MyMod/readme.txt\" = \"текст\"\n"),
             ("copy", "copy \"file.txt\" to \"plugins/MyMod/file.txt\"\n"),
+            ("fn", "fn name value {\n  return $value\n}\n"),
+            ("list", "let items = [ \"a\" \"b\" ]\n"),
         })
         {
             var t = text;
@@ -206,16 +208,18 @@ public sealed partial class CreatorPage : Page
         _check.Children.Add(Ui.Row(8,
             Ui.Dot(errors.Count == 0 ? Ui.Res("Good") : Ui.Res("Bad"), 10),
             Ui.Text(errors.Count == 0 ? I18n.T("cr.ok") : I18n.T("cr.errors", ("n", errors.Count)), "h3")));
-        foreach (var d in errors.Take(12))
+        void Problem(Diag d, IBrush color)
         {
             var line = d.Line;
             var row = Ui.Button($"{I18n.T("cr.line", ("n", line))}: {Msg(d)}", () => GoToLine(line), "ghost");
             row.HorizontalAlignment = HorizontalAlignment.Stretch;
             row.HorizontalContentAlignment = HorizontalAlignment.Left;
-            row.Foreground = Ui.Res("Bad");
+            row.Foreground = color;
             if (row.Content is string text) row.Content = new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap, FontSize = 12.5 };
             _check.Children.Add(row);
         }
+        foreach (var d in errors.Take(12)) Problem(d, Ui.Res("Bad"));
+        foreach (var d in b.Diags.Where(d => d.Warning).Take(6)) Problem(d, Ui.Res("Warn"));
         if (errors.Count > 0) return;
 
         var format = game is null ? "?" : game.Loader switch { LoaderKind.Smapi => "Content Patcher", LoaderKind.Bepinex => "Thunderstore (BepInEx)", _ => "zip" };
@@ -230,6 +234,8 @@ public sealed partial class CreatorPage : Page
         if (b.Configs.Count > 0) Line(I18n.T("cr.r.configs"), b.Configs.Count.ToString());
         if (b.Inis.Count > 0) Line(I18n.T("cr.r.inis"), b.Inis.Count.ToString());
         if (b.Copies.Count > 0) Line(I18n.T("cr.r.files"), b.Copies.Count.ToString());
+        if (b.Assets.Count > 0) Line(I18n.T("cr.r.assets"), b.Assets.Count.ToString());
+        if (b.Uses.Count > 0) Line(I18n.T("cr.r.uses"), string.Join(", ", b.Uses));
         if (game is null) _check.Children.Add(Ui.Text(I18n.T("cr.build.noGame", ("game", b.Game)), "small", color: Ui.Res("Warn"), wrap: true));
         foreach (var log in b.Log.Take(8)) _check.Children.Add(Ui.Text("› " + log, "small", color: Ui.Res("Brand2"), wrap: true));
     }
@@ -312,9 +318,11 @@ public sealed partial class CreatorPage : Page
         var b = ModScript.Compile(code);
         if (!b.Ok) { MainWindow.Current?.Toast(I18n.T("cr.build.hasErrors"), bad: true); return; }
         var dir = _open!.Dir;
+        // use "кусок" — у скачавших его нет: в хаб уходит код с уже вставленными кусками.
+        var published = b.Uses.Count > 0 ? ModScript.Flatten(code) : code;
         HubPublish.Show(new HubDraft
         {
-            Name = b.Name, Summary = b.About, Game = b.Game, Version = b.Version, Code = code,
+            Name = b.Name, Summary = b.About, Game = b.Game, Version = b.Version, Code = published,
             Description = b.About,
         }, fromProject: true, pack: async () => (await Projects.Pack(b, dir)).Zip, done: () => { _tab = "published"; Build(); });
     }
@@ -383,6 +391,8 @@ public sealed partial class CreatorPage : Page
         {
             ("cr.docs.basics", new[] { "mod", "version", "author", "about", "game", "icon", "needs" }),
             ("cr.docs.logic", new[] { "let", "if", "else", "for", "when", "print" }),
+            ("cr.docs.lists", new[] { "list", "functions", "logic", "repeat" }),
+            ("cr.docs.reuse", new[] { "fn", "use", "asset", "warn" }),
             ("cr.docs.stardew", new[] { "edit", "entry", "dialogue", "mail", "image" }),
             ("cr.docs.bepinex", new[] { "config", "ini", "copy", "write", "json" }),
         })

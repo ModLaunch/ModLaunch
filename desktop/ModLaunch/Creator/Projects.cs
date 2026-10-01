@@ -97,6 +97,10 @@ public static partial class Projects
             return File.ReadAllBytes(full);
         }
 
+        // asset "имя" — файл из инвентаря креатора (модель, текстура, звук).
+        byte[] ReadAsset(FileCopy c) =>
+            Inventory.LocalFile(c.From) is { } path ? File.ReadAllBytes(path) : throw new InvalidOperationException(I18n.T("cr.build.noAsset", ("name", c.From)));
+
         string format;
         if (game.Loader == LoaderKind.Smapi)
         {
@@ -118,6 +122,7 @@ public static partial class Projects
             files[folder + "manifest.json"] = Utf8(manifest.ToJsonString(Pretty));
             files[folder + "content.json"] = Utf8(content.ToJsonString(Pretty));
             foreach (var c in b.Copies) files[folder + c.To] = ReadCopy(c);
+            foreach (var c in b.Assets) files[folder + c.To] = ReadAsset(c);
             foreach (var (path, text) in b.Writes) files[folder + path] = Utf8(text);
             if (b.Configs.Count > 0) warnings.Add(I18n.T("cr.warn.configSmapi"));
             if (b.Changes.Count == 0 && b.Copies.Count == 0) warnings.Add(I18n.T("cr.warn.empty"));
@@ -163,6 +168,7 @@ public static partial class Projects
             }
             string Place(string to) => to.StartsWith("plugins/") || to.StartsWith("config/") || to.StartsWith("patchers/") ? to : "plugins/" + to;
             foreach (var c in b.Copies) files[Place(c.To)] = ReadCopy(c);
+            foreach (var c in b.Assets) files[Place(c.To)] = ReadAsset(c);
             foreach (var (path, text) in b.Writes) files[Place(path)] = Utf8(text);
             if (b.Changes.Count > 0) warnings.Add(I18n.T("cr.warn.cpBepinex"));
         }
@@ -170,6 +176,7 @@ public static partial class Projects
         {
             format = "zip";
             foreach (var c in b.Copies) files[c.To] = ReadCopy(c);
+            foreach (var c in b.Assets) files[c.To] = ReadAsset(c);
             foreach (var (path, text) in b.Writes) files[path] = Utf8(text);
             if (b.Changes.Count > 0 || b.Configs.Count > 0) warnings.Add(I18n.T("cr.warn.onlyFiles"));
         }

@@ -23,12 +23,23 @@ public static class Firebase
         var json = Resources.Json("reviews.config.json");
         ProjectId = json.Str("projectId") ?? "";
         ApiKey = json.Str("apiKey") ?? "";
+        // Эмулятор Firestore для проверок правил и рынка: MODLAUNCH_FIRESTORE_EMULATOR=127.0.0.1:8181.
+        Emulator = Environment.GetEnvironmentVariable("MODLAUNCH_FIRESTORE_EMULATOR") is { Length: > 0 } host ? host : null;
+        if (Emulator is not null)
+        {
+            ProjectId = Environment.GetEnvironmentVariable("MODLAUNCH_FIRESTORE_PROJECT") ?? "demo-modlaunch";
+            ApiKey = "emulator";
+        }
     }
+
+    public static readonly string? Emulator;
 
     public static bool Configured => ProjectId != "" && ApiKey != "";
     public static string Documents => $"projects/{ProjectId}/databases/(default)/documents";
     public static string Doc(string relative) => $"{Documents}/{relative}";
-    public static string Url(string suffix = "") => $"https://firestore.googleapis.com/v1/{Documents}{suffix}?key={Uri.EscapeDataString(ApiKey)}";
+    public static string Url(string suffix = "") => Emulator is not null
+        ? $"http://{Emulator}/v1/{Documents}{suffix}"
+        : $"https://firestore.googleapis.com/v1/{Documents}{suffix}?key={Uri.EscapeDataString(ApiKey)}";
 
     /// <summary>Разница часов сервера и наших (по заголовку Date) — для «в сети».</summary>
     public static TimeSpan Skew { get; private set; }
@@ -74,6 +85,7 @@ public static class Firebase
         bool b => new JsonObject { ["booleanValue"] = b },
         int or long => new JsonObject { ["integerValue"] = Convert.ToInt64(value).ToString() },
         double d => new JsonObject { ["doubleValue"] = d },
+        DateTime t => new JsonObject { ["timestampValue"] = t.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", System.Globalization.CultureInfo.InvariantCulture) },
         IEnumerable<string> list => new JsonObject { ["arrayValue"] = new JsonObject { ["values"] = new JsonArray(list.Select(x => ToValue(x)).ToArray()) } },
         _ => new JsonObject { ["stringValue"] = value.ToString() },
     };
