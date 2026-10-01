@@ -22,18 +22,24 @@ public static class GameCard
         _ => I18n.T("games.notSearched"),
     };
 
-    /// <summary>Обложка 2:3 с названием под ней; у найденных игр при наведении — «Играть».</summary>
+    /// <summary>
+    /// Обложка 2:3 с названием под ней; у найденных игр при наведении — «Играть».
+    /// width = 0 — обложка тянется по ширине ячейки (для полок и сеток).
+    /// </summary>
     public static Control Cover(GameState g, double width = 168)
     {
         var found = g.Status == Detect.Found;
-        var height = Math.Round(width * 1.5);
+        var fluid = width <= 0;
         // Внешний слой — подъём и тень при наведении, внутренний — обрезка по скруглению и зум картинки.
         var art = new Border
         {
-            Width = width, Height = height, CornerRadius = new CornerRadius(10), ClipToBounds = true,
+            CornerRadius = new CornerRadius(10), ClipToBounds = true,
             BorderThickness = new Thickness(2), BorderBrush = Brushes.Transparent,
-            Child = Ui.GameImage(g.Def, (int)(width * 2), art: Images.Art.Cover),
+            Child = fluid
+                ? new AspectBox { Ratio = 1.5, Child = Ui.GameImage(g.Def, 400, art: Images.Art.Cover) }
+                : Ui.GameImage(g.Def, (int)(width * 2), art: Images.Art.Cover),
         };
+        if (!fluid) { art.Width = width; art.Height = Math.Round(width * 1.5); }
         var layers = new Panel { Children = { art } };
         if (found && g.LoaderInstalled)
         {
@@ -63,12 +69,13 @@ public static class GameCard
         var card = new Button
         {
             Classes = { "cover-btn" },
-            Width = width,
             Padding = new Thickness(0),
-            Margin = new Thickness(0, 0, 16, 18),
+            Margin = fluid ? new Thickness(0) : new Thickness(0, 0, 16, 18),
+            HorizontalAlignment = fluid ? HorizontalAlignment.Stretch : HorizontalAlignment.Left,
             Opacity = found ? 1 : 0.5,
             Content = Ui.Col(8, new Border { Classes = { "cover-art" }, CornerRadius = new CornerRadius(10), Child = layers }, Ui.Col(1, name, status)),
         };
+        if (!fluid) card.Width = width;
         ToolTip.SetTip(card, g.Def.Name);
         var id = g.Def.Id;
         card.Click += (_, _) => MainWindow.Current?.Navigate(() => new GamePage(id));
@@ -119,9 +126,10 @@ public static class GameCard
     /// <summary>Обложка «Добавить игру» того же размера.</summary>
     public static Control AddCover(double width = 168)
     {
+        var fluid = width <= 0;
         var box = new Border
         {
-            Width = width, Height = Math.Round(width * 1.5), CornerRadius = new CornerRadius(10),
+            CornerRadius = new CornerRadius(10),
             BorderBrush = Ui.Res("Line"), BorderThickness = new Thickness(1.5), Background = Ui.Res("Surface"),
             Child = Ui.Col(10,
                 new Border { Width = 48, Height = 48, CornerRadius = new CornerRadius(24), Background = Ui.Res("Surface2"), Child = Ui.Icon(Icons.Plus, 22, Ui.Res("Muted")), HorizontalAlignment = HorizontalAlignment.Center },
@@ -129,7 +137,12 @@ public static class GameCard
                 new TextBlock { Text = I18n.T("add.tile.text"), HorizontalAlignment = HorizontalAlignment.Center, FontSize = 12, Foreground = Ui.Res("Muted"), TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center, Margin = new Thickness(12, 0) }),
         };
         if (box.Child is Control c) c.VerticalAlignment = VerticalAlignment.Center;
-        var card = new Button { Classes = { "cover-btn" }, Width = width, Padding = new Thickness(0), Margin = new Thickness(0, 0, 16, 18), Content = new Border { Classes = { "cover-art" }, CornerRadius = new CornerRadius(10), Child = box }, VerticalAlignment = VerticalAlignment.Top };
+        Control shape = box;
+        if (fluid) shape = new AspectBox { Ratio = 1.5, Child = box };
+        else { box.Width = width; box.Height = Math.Round(width * 1.5); }
+        var card = new Button { Classes = { "cover-btn" }, Padding = new Thickness(0), Margin = fluid ? new Thickness(0) : new Thickness(0, 0, 16, 18), Content = new Border { Classes = { "cover-art" }, CornerRadius = new CornerRadius(10), Child = shape }, VerticalAlignment = VerticalAlignment.Top };
+        if (fluid) card.HorizontalAlignment = HorizontalAlignment.Stretch;
+        else card.Width = width;
         card.Click += (_, _) => MainWindow.Current?.Navigate(() => new AddGamePage());
         return card;
     }

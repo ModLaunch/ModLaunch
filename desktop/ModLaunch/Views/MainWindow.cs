@@ -66,6 +66,9 @@ public sealed class MainWindow : Window
     readonly Border _bellPanel;
     readonly StackPanel _bellList = new() { Spacing = 8 };
 
+    Splash? _splash;
+    Task _prewarm = Task.CompletedTask;
+
     readonly List<Func<Page>> _history = [];
     int _index = -1;
     Page? _current;
@@ -87,14 +90,14 @@ public sealed class MainWindow : Window
 
         _back = Ui.Button("", GoBack, "icon ghost", Icons.Back, I18n.T("nav.back"));
         _forward = Ui.Button("", GoForward, "icon ghost", Icons.Forward, I18n.T("nav.forward"));
-        _settingsButton = RailIcon(Icons.Settings, () => Navigate(() => new SettingsPage()), I18n.T("nav.settings"));
+        _settingsButton = RailIcon(Icons.Settings, () => Navigate(() => new SettingsPage()), I18n.T("nav.settings"), I18n.T("rail.settings"));
         _friendsButton = RailIcon(Icons.Users, () => Navigate(() => new FriendsPage()), I18n.T("friends.title"));
-        _statsButton = RailIcon(Icons.Chart, () => Navigate(() => new StatsPage()), I18n.T("stats.title"));
+        _statsButton = RailIcon(Icons.Chart, () => Navigate(() => new StatsPage()), I18n.T("stats.title"), I18n.T("rail.stats"));
         _donateButton = RailIcon(Icons.Coffee, () => Navigate(() => new DonatePage()), I18n.T("nav.donate"));
         // Как в Modrinth App: разделы — отдельными пунктами на боковой панели.
-        _libraryButton = RailIcon(Icons.Layers, () => Navigate(() => new LibraryPage()), I18n.T("lib.title"));
-        _modsButton = RailIcon(Icons.Package, () => Navigate(() => new ModsCenterPage()), I18n.T("mc.title"));
-        _creatorButton = RailIcon(Icons.Tools, () => Navigate(() => new CreatorPage()), "Creator Hub");
+        _libraryButton = RailIcon(Icons.Layers, () => Navigate(() => new LibraryPage()), I18n.T("lib.title"), I18n.T("rail.library"));
+        _modsButton = RailIcon(Icons.Package, () => Navigate(() => new ModsCenterPage()), I18n.T("mc.title"), I18n.T("rail.mods"));
+        _creatorButton = RailIcon(Icons.Tools, () => Navigate(() => new CreatorPage()), "Creator Hub", "Creator");
         _friendsBadge.Width = 10; _friendsBadge.Height = 10; _friendsBadge.CornerRadius = new CornerRadius(5);
         _friendsBadge.Background = Ui.Res("Good"); _friendsBadge.HorizontalAlignment = HorizontalAlignment.Right; _friendsBadge.VerticalAlignment = VerticalAlignment.Top;
         _friendsBadge.Margin = new Thickness(0, 6, 6, 0);
@@ -159,7 +162,7 @@ public sealed class MainWindow : Window
         Features.Nxm.Received += OnExternal;
 
         SmoothScroll.Attach(this);
-        Images.Prewarm(AppState.Games.Select(g => g.Def));
+        _prewarm = Images.Prewarm(AppState.Games.Select(g => g.Def));
         Navigate(StartPage());
         RenderRail();
         SetupTray();
@@ -238,7 +241,7 @@ public sealed class MainWindow : Window
 
         var topbar = new Grid
         {
-            ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto,Auto,Auto"),
+            ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto,Auto"),
             Height = 68,
             Background = Brushes.Transparent,
         };
@@ -246,8 +249,14 @@ public sealed class MainWindow : Window
         left.VerticalAlignment = VerticalAlignment.Center;
         left.Margin = new Thickness(20, 0, 0, 0);
         topbar.Children.Add(left);
+        // Поиск — посередине, как в Microsoft Store и Roblox: сжимается на узком окне, но не меньше 220.
         _search.VerticalAlignment = VerticalAlignment.Center;
-        Grid.SetColumn(_search, 2);
+        _search.HorizontalAlignment = HorizontalAlignment.Stretch;
+        _search.Width = double.NaN;
+        _search.MinWidth = 220;
+        _search.MaxWidth = 460;
+        _search.Margin = new Thickness(16, 0);
+        Grid.SetColumn(_search, 1);
         topbar.Children.Add(_search);
         var bigPicture = new Button { Classes = { "icon" }, Content = Ui.Icon(Icons.Tv, 18) };
         ToolTip.SetTip(bigPicture, I18n.T("bp.open") + " (F11)");
@@ -256,11 +265,11 @@ public sealed class MainWindow : Window
         ToolTip.SetTip(_asideToggle, I18n.T("aside.toggle"));
         _asideToggle.Click += (_, _) => { Settings.Data["asideOpen"] = !Settings.Data.Bool("asideOpen", true); Settings.Save(); RenderAside(); };
         var dlWrap = new Border { Child = Ui.Row(10, _updatePill, _bell, _asideToggle, bigPicture, _downloads), Margin = new Thickness(12, 0, 16, 0), VerticalAlignment = VerticalAlignment.Center };
-        Grid.SetColumn(dlWrap, 3);
+        Grid.SetColumn(dlWrap, 2);
         topbar.Children.Add(dlWrap);
         winButtons.VerticalAlignment = VerticalAlignment.Center;
         winButtons.Margin = new Thickness(0, 0, 12, 0);
-        Grid.SetColumn(winButtons, 4);
+        Grid.SetColumn(winButtons, 3);
         topbar.Children.Add(winButtons);
         topbar.PointerPressed += (_, e) =>
         {
@@ -302,11 +311,29 @@ public sealed class MainWindow : Window
         layers.Children.Add(_friendsDock);
         layers.Children.Add(_toasts);
         layers.Children.Add(_overlay);
+        // Заставка — при каждом запуске (кроме тихого старта в трей и снимков экрана).
+        if (Splash.Enabled && !Program.Screenshot && !(Program.Autostarted && Settings.Data.Bool("startMinimized")))
+        {
+            _splash = new Splash();
+            layers.Children.Add(_splash);
+        }
         return layers;
     }
 
-    static Button RailIcon(string icon, Action onClick, string tip)
+    /// <summary>Кнопка боковой панели. С подписью — как разделы в Microsoft Store: значок и слово под ним.</summary>
+    static Button RailIcon(string icon, Action onClick, string tip, string? label = null)
     {
+        if (label is not null)
+        {
+            var labeled = new Button
+            {
+                Classes = { "rail-label" },
+                Content = Ui.Col(4, Ui.Icon(icon, 19), new TextBlock { Text = label, FontSize = 10, LetterSpacing = -0.1, FontWeight = FontWeight.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = 72 }),
+            };
+            labeled.Click += (_, _) => onClick();
+            ToolTip.SetTip(labeled, tip);
+            return labeled;
+        }
         var b = Ui.Button("", onClick, "rail", icon, tip);
         b.HorizontalContentAlignment = HorizontalAlignment.Center;
         b.VerticalContentAlignment = VerticalAlignment.Center;
@@ -382,7 +409,10 @@ public sealed class MainWindow : Window
 
     void RenderGlow()
     {
-        var accent = Color.Parse(_current?.Accent ?? Look.Accent);
+        // 8.0: свечение — только цветом игры на её страницах. Цветной туман акцента
+        // на каждом экране делал программу похожей на тысячу других.
+        if (_current?.Accent is not string gameAccent) { _glow.Child = null; return; }
+        var accent = Color.Parse(gameAccent);
         RadialGradientBrush Spot(double x, double y, byte alpha, double r) => new()
         {
             Center = new RelativePoint(x, y, RelativeUnit.Relative), GradientOrigin = new RelativePoint(x, y, RelativeUnit.Relative),
@@ -793,7 +823,16 @@ public sealed class MainWindow : Window
             Features.Hotkey.Disarm();
             try { Social.Friends.GoOffline().Wait(1500); } catch { }
         };
-        await AppState.DetectAll();
+        // Заставка рассказывает, что происходит: сохранённые пути проверяются сразу,
+        // остальные игры ищутся уже за ней, на главной.
+        _splash?.Step(I18n.T("splash.games"), 0.35);
+        var detect = AppState.DetectAll();
+        _splash?.Step(I18n.T("splash.art"), 0.7);
+        await Task.WhenAny(_prewarm, Task.Delay(2500));
+        _splash?.Step(I18n.T("splash.ready"), 1);
+        _splash?.Finish();
+        _splash = null;
+        await detect;
         _ = Task.Run(async () =>
         {
             try { await Features.Tracking.Check(); } catch { }
@@ -809,6 +848,17 @@ public sealed class MainWindow : Window
             }
             AppState.Notify();
         }
+    }
+
+    /// <summary>Показать заставку на месте (для снимков экрана) или убрать её.</summary>
+    public void DemoSplash(bool on)
+    {
+        if (_layers is null) return;
+        foreach (var old in _layers.Children.OfType<Splash>().ToList()) _layers.Children.Remove(old);
+        if (!on) return;
+        var splash = new Splash();
+        splash.Step(I18n.T("splash.art"), 0.7);
+        _layers.Children.Add(splash);
     }
 
     /// <summary>Прошлый запуск закончился вылетом: сказать об этом и показать, где причина.</summary>

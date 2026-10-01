@@ -11,14 +11,8 @@ namespace ModLaunch.Views;
 /// <summary>Строка мода в каталоге: картинка, название, описание, цифры и кнопка.</summary>
 public static class ModRow
 {
-    /// <summary>Значок «Хит» / «Лучшее» / «Новое», как в ModLaunch 3.</summary>
-    public static Control? Badge(string? kind) => kind switch
-    {
-        "hit" => Tag("🔥 " + I18n.T("badge.hit"), Ui.Hex("#3A1C12"), Ui.Hex("#FF8A5B")),
-        "best" => Tag("🏆 " + I18n.T("badge.best"), Ui.Hex("#3A3212"), Ui.Hex("#F2C25C")),
-        "new" => Tag("✦ " + I18n.T("badge.new"), Ui.Hex("#123A26"), Ui.Hex("#5BD68F")),
-        _ => null,
-    };
+    /// <summary>Значок «Хит» / «Лучшее» / «Новое» — тот же, что на плитках.</summary>
+    public static Control? Badge(string? kind) => Tiles.Badge(kind);
 
     public static Control Build(GameDef game, ModInfo mod, bool installed, bool installing, bool pick, Action install, Action? open = null, string? badge = null)
     {
@@ -79,36 +73,6 @@ public static class ModRow
             if (open is not null) open();
             else if (mod.Url is not null) Ui.OpenUrl(mod.Url);
         };
-        return card;
-    }
-
-    /// <summary>Плитка мода для вида «сеткой» (как в Modrinth): большая картинка, имя, автор, загрузки.</summary>
-    public static Control Tile(GameDef game, ModInfo mod, bool installed, bool installing, Action install, Action open, string? badge = null)
-    {
-        var picture = new Border { Height = 132, CornerRadius = new CornerRadius(12, 12, 0, 0), ClipToBounds = true, Child = Ui.Thumb(mod.Icon, mod.Name, 236, 0, 480) };
-        var layers = new Panel { Children = { picture } };
-        if (Badge(badge) is { } b)
-        {
-            b.Margin = new Thickness(8);
-            b.HorizontalAlignment = HorizontalAlignment.Left;
-            b.VerticalAlignment = VerticalAlignment.Top;
-            layers.Children.Add(b);
-        }
-        Button action;
-        if (installed) action = Ui.Button("", () => { }, "icon", Icons.Check, I18n.T("mod.installed"));
-        else action = Ui.Button("", install, "icon primary", Icons.Download, I18n.T("mod.install"));
-        action.IsEnabled = !installed && !installing;
-        action.VerticalAlignment = VerticalAlignment.Center;
-        var foot = new DockPanel();
-        DockPanel.SetDock(action, Dock.Right);
-        foot.Children.Add(action);
-        foot.Children.Add(Ui.Col(1,
-            new TextBlock { Text = mod.Name, FontWeight = FontWeight.SemiBold, FontSize = 14.5, TextTrimming = TextTrimming.CharacterEllipsis },
-            Ui.Text((mod.Author == "" ? "" : mod.Author + " · ") + (mod.Downloads > 0 ? "↓ " + I18n.Compact(mod.Downloads) : ""), "small muted")));
-        var body = Ui.Col(8, foot, new TextBlock { Text = mod.Description, FontSize = 12.5, Foreground = Ui.Res("Muted"), TextWrapping = TextWrapping.Wrap, MaxLines = 2, TextTrimming = TextTrimming.CharacterEllipsis, Height = 34 });
-        body.Margin = new Thickness(12, 10, 12, 12);
-        var card = new Button { Classes = { "card-btn" }, Width = 238, Padding = new Thickness(0), Margin = new Thickness(0, 0, 14, 14), VerticalContentAlignment = VerticalAlignment.Top, Content = Ui.Col(0, layers, body) };
-        card.Click += (_, _) => open();
         return card;
     }
 

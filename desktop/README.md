@@ -27,3 +27,7 @@ dotnet publish -c Release -r win-x64 -o out    # один exe
 out/ModLaunch.exe --selfcheck                  # живые каталоги и пробная установка
 out/ModLaunch.exe --screenshot shots           # снимки экранов на поддельных данных
 ```
+
+Для снимков есть две переменные: `MODLAUNCH_SHOT_ONLY=1-home,4-catalog` — снять только
+эти экраны (по началу имени), `MODLAUNCH_SHOT_HEIGHT=1500` — окно выше, чтобы страница
+поместилась целиком.

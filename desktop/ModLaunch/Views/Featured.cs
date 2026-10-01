@@ -1,6 +1,5 @@
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Threading;
@@ -10,15 +9,16 @@ using ModLaunch.Sources;
 namespace ModLaunch.Views;
 
 /// <summary>
-/// «Выбор ModLaunch» — большая карусель лучших модов, как в ModLaunch 3:
-/// крупная карточка со свечением цвета игры, стрелки, миниатюры снизу и
-/// автопрокрутка раз в 8 секунд (перерисовывается только сама карусель).
+/// «Выбор редакции» — большая карточка главной, как истории во вкладке
+/// «Сегодня» App Store: фоном — арт игры, поверх — надзаголовок, крупное
+/// название мода, его значок и белая капсула «Установить». Листается сама
+/// раз в 8 секунд; точки внизу — где мы и сколько всего.
 /// </summary>
 public sealed class Featured : UserControl
 {
     readonly List<(GameState Game, ModInfo Mod)> _items;
     readonly ContentControl _card = new();
-    readonly UniformGrid _thumbs = new() { Columns = 4, Margin = new Thickness(0, 12, 0, 0) };
+    readonly StackPanel _dots = new() { Orientation = Orientation.Horizontal, Spacing = 6, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 26, 28) };
     readonly DispatcherTimer _timer;
     int _index;
 
@@ -29,15 +29,17 @@ public sealed class Featured : UserControl
         var next = Arrow(Icons.Forward, () => Show(_index + 1, true));
         prev.HorizontalAlignment = HorizontalAlignment.Left;
         next.HorizontalAlignment = HorizontalAlignment.Right;
-        prev.Margin = new Thickness(10, 0, 0, 0);
-        next.Margin = new Thickness(0, 0, 10, 0);
-        var stage = new Panel { Children = { _card, prev, next } };
-        Content = Ui.Col(0, stage, _thumbs);
+        prev.Margin = new Thickness(12, 0, 0, 0);
+        next.Margin = new Thickness(0, 0, 12, 0);
+        var arrows = new Panel { Children = { prev, next }, Opacity = 0, IsVisible = items.Count > 1 };
+        arrows.Transitions = [new Avalonia.Animation.DoubleTransition { Property = OpacityProperty, Duration = TimeSpan.FromMilliseconds(160) }];
+        Content = new Border { CornerRadius = new CornerRadius(22), ClipToBounds = true, Child = new Panel { Children = { _card, _dots, arrows } } };
         _timer = new DispatcherTimer(TimeSpan.FromSeconds(8), DispatcherPriority.Background, (_, _) => Show(_index + 1, false));
         AttachedToVisualTree += (_, _) => { if (_items.Count > 1 && !Program.Screenshot) _timer.Start(); };
         DetachedFromVisualTree += (_, _) => _timer.Stop();
-        PointerEntered += (_, _) => _timer.Stop(); // пока мышь над каруселью — не листаем
-        PointerExited += (_, _) => { if (_items.Count > 1 && !Program.Screenshot) _timer.Start(); };
+        // Пока мышь над карточкой — не листаем, а стрелки проявляются.
+        PointerEntered += (_, _) => { _timer.Stop(); arrows.Opacity = 1; };
+        PointerExited += (_, _) => { arrows.Opacity = 0; if (_items.Count > 1 && !Program.Screenshot) _timer.Start(); };
         Show(0, false, animate: false);
     }
 
@@ -45,9 +47,8 @@ public sealed class Featured : UserControl
     {
         var b = new Button
         {
-            Classes = { "icon" }, Width = 44, Height = 44, CornerRadius = new CornerRadius(22), VerticalAlignment = VerticalAlignment.Center,
-            Background = Ui.Hex("#CC12141A"), BorderBrush = Ui.Res("Line"), Content = Ui.Icon(icon, 18),
-            HorizontalContentAlignment = HorizontalAlignment.Center, VerticalContentAlignment = VerticalAlignment.Center,
+            Classes = { "icon" }, Width = 40, Height = 40, CornerRadius = new CornerRadius(20), VerticalAlignment = VerticalAlignment.Center,
+            Background = Ui.Hex("#99000000"), BorderThickness = new Thickness(0), Foreground = Brushes.White, Content = Ui.Icon(icon, 16, Brushes.White),
         };
         b.Click += (_, _) => go();
         return b;
@@ -56,112 +57,79 @@ public sealed class Featured : UserControl
     void Show(int index, bool user, bool animate = true)
     {
         if (_items.Count == 0) return;
-        var forward = index >= _index;
         _index = (index % _items.Count + _items.Count) % _items.Count;
         if (user && _timer.IsEnabled) { _timer.Stop(); _timer.Start(); }
         var card = Card(_items[_index]);
         _card.Content = card;
-        if (animate) Animate.From(card, forward ? "translateX(36px)" : "translateX(-36px)", 380, 0, new Avalonia.Animation.Easings.CubicEaseOut(), 0.2);
-        RenderThumbs();
+        if (animate) Animate.From(card, "scale(1.03)", 520, 0, new Avalonia.Animation.Easings.CubicEaseOut(), 0.3);
+        _dots.Children.Clear();
+        for (var i = 0; i < _items.Count; i++)
+        {
+            var at = i;
+            var dot = new Border
+            {
+                Width = i == _index ? 22 : 7, Height = 7, CornerRadius = new CornerRadius(4), Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand),
+                Background = i == _index ? Brushes.White : Ui.Hex("#66FFFFFF"),
+            };
+            dot.PointerPressed += (_, _) => Show(at, true);
+            _dots.Children.Add(dot);
+        }
     }
 
     Control Card((GameState Game, ModInfo Mod) item)
     {
         var (g, mod) = item;
-        var accent = Color.Parse(g.Def.Accent);
         var installed = Actions.IsInstalled(g, mod.Id);
         var busy = Actions.IsBusy(g, mod.Id);
 
-        var pick = new Border
+        var eyebrow = new TextBlock
         {
-            Background = Ui.Res("BrandSoft"), BorderBrush = Ui.Res("Brand"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(999), Padding = new Thickness(10, 3),
-            Child = Ui.Row(6, new Border { Width = 16, Height = 16, CornerRadius = new CornerRadius(4), ClipToBounds = true, Child = new Image { Source = Images.Asset("icon.png", 32) } },
-                new TextBlock { Text = I18n.T("feat.pick"), FontSize = 12, FontWeight = FontWeight.SemiBold, Foreground = Ui.Res("Brand2") }),
+            Text = $"{I18n.T("feat.eyebrow")} · {g.Def.Name}".ToUpperInvariant(),
+            FontSize = 12, FontWeight = FontWeight.Bold, LetterSpacing = 1.2, Foreground = Ui.Hex("#D9FFFFFF"),
         };
-        var game = new Border
-        {
-            Background = Ui.Hex("#99000000"), BorderBrush = Ui.Res("Line"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(999), Padding = new Thickness(4, 3, 10, 3),
-            Child = Ui.Row(6, new Border { Width = 18, Height = 18, CornerRadius = new CornerRadius(9), ClipToBounds = true, Child = Ui.GameImage(g.Def, 40, art: Images.Art.Cover) },
-                new TextBlock { Text = g.Def.Name, FontSize = 12, FontWeight = FontWeight.SemiBold, Foreground = Brushes.White }),
-        };
+        var title = new TextBlock { Text = mod.Name, FontSize = 34, FontWeight = FontWeight.Bold, LetterSpacing = -0.8, Foreground = Brushes.White, TextTrimming = TextTrimming.CharacterEllipsis };
+        var by = new TextBlock { Text = mod.Author == "" ? g.Def.Name : I18n.T("mod.by", ("author", mod.Author)), FontSize = 14, Foreground = Ui.Hex("#CCFFFFFF") };
+        var icon = new Border { CornerRadius = new CornerRadius(16), ClipToBounds = true, BorderBrush = Ui.Hex("#40FFFFFF"), BorderThickness = new Thickness(1), Child = Ui.Thumb(mod.Icon, mod.Name, 64, 16, 200) };
+        var heading = Ui.Row(16, icon, Ui.Col(2, title, by));
+        heading.Children[1].VerticalAlignment = VerticalAlignment.Center;
+        var description = new TextBlock { Text = mod.Description, FontSize = 15, Foreground = Ui.Hex("#E0FFFFFF"), TextWrapping = TextWrapping.Wrap, MaxLines = 2, TextTrimming = TextTrimming.CharacterEllipsis, LineHeight = 22, MaxWidth = 560, HorizontalAlignment = HorizontalAlignment.Left };
 
+        // Белая капсула на арте — как «Получить» на обложках App Store.
         Button action;
         if (installed) action = Ui.Button(I18n.T("mod.installed"), () => MainWindow.Current?.Navigate(() => new GamePage(g.Def.Id, "installed")), "", Icons.Check);
-        else action = Ui.Button(busy ? I18n.T("aside.installing") : I18n.T("mod.install"), async () => { await Actions.Install(g, mod); Show(_index, false, false); }, "primary", Icons.Download);
+        else action = Ui.Button(busy ? I18n.T("tile.installing") : I18n.T("mod.install"), async () => { await Actions.Install(g, mod); Show(_index, false, false); }, "", Icons.Download);
         action.IsEnabled = !busy && g.Status == Detect.Found;
-        action.Padding = new Thickness(26, 13);
-        action.FontSize = 15;
-        action.Background = installed ? null : new SolidColorBrush(accent);
-        var more = Ui.Button(I18n.T("feat.more"), () => MainWindow.Current?.Navigate(() => new ModPage(g.Def.Id, mod)), "");
-        more.Padding = new Thickness(22, 13);
-        more.FontSize = 15;
+        action.Background = Brushes.White;
+        action.Foreground = Ui.Hex("#111113");
+        action.BorderThickness = new Thickness(0);
+        action.CornerRadius = new CornerRadius(999);
+        action.Padding = new Thickness(22, 11);
+        var more = Ui.Button(I18n.T("feat.more"), () => MainWindow.Current?.Navigate(() => new ModPage(g.Def.Id, mod)), "ghost");
+        more.Foreground = Brushes.White;
+        more.Padding = new Thickness(16, 11);
+        var text = Ui.Col(14, eyebrow, heading, description, Ui.Row(8, action, more));
+        text.Margin = new Thickness(32, 0, 32, 30);
+        text.VerticalAlignment = VerticalAlignment.Bottom;
 
-        var facts = Ui.Row(16);
-        if (mod.Downloads > 0) facts.Children.Add(Ui.Row(6, Ui.Icon(Icons.Download, 13, Ui.Hex("#C9CFDB")), Ui.Text(I18n.Compact(mod.Downloads), "small", color: Ui.Hex("#C9CFDB"))));
-        if (mod.UpdatedAt is not null) facts.Children.Add(Ui.Row(6, Ui.Icon(Icons.Refresh, 13, Ui.Hex("#C9CFDB")), Ui.Text(Ui.Ago(mod.UpdatedAt), "small", color: Ui.Hex("#C9CFDB"))));
-
-        var text = Ui.Col(12,
-            Ui.Row(8, pick, game),
-            new TextBlock { Text = mod.Name, FontSize = 34, FontWeight = FontWeight.Bold, Foreground = Brushes.White, TextTrimming = TextTrimming.CharacterEllipsis },
-            new TextBlock { Text = mod.Author == "" ? g.Def.Name : I18n.T("mod.by", ("author", mod.Author)), FontSize = 14, FontWeight = FontWeight.SemiBold, Foreground = new SolidColorBrush(Lighten(accent)) },
-            new TextBlock { Text = mod.Description, FontSize = 15, Foreground = Ui.Hex("#D5DAE5"), TextWrapping = TextWrapping.Wrap, MaxLines = 2, TextTrimming = TextTrimming.CharacterEllipsis, LineHeight = 22 },
-            facts,
-            Ui.Row(10, action, more));
-        text.VerticalAlignment = VerticalAlignment.Center;
-
-        var picture = new Border
-        {
-            Width = 300, Height = 188, CornerRadius = new CornerRadius(16), ClipToBounds = true, VerticalAlignment = VerticalAlignment.Center,
-            BorderBrush = Ui.Hex("#33FFFFFF"), BorderThickness = new Thickness(1), BoxShadow = BoxShadows.Parse("0 20 40 -12 #A0000000"),
-            Child = Ui.Thumb(mod.Icon, mod.Name, 300, 0, 600),
-        };
-
-        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), ColumnSpacing = 30, Margin = new Thickness(66, 34) };
-        grid.Children.Add(text);
-        Grid.SetColumn(picture, 1);
-        grid.Children.Add(picture);
-
-        var bg = new Panel
+        var art = Ui.GameImage(g.Def, 1600, art: Images.Art.Hero);
+        return new Panel
         {
             Children =
             {
+                art,
+                // Затемнение снизу и слева — под текстом, сверху арт остаётся ярким.
                 new Border { Background = new LinearGradientBrush
                 {
-                    StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
-                    GradientStops = { new GradientStop(Color.FromArgb(70, accent.R, accent.G, accent.B), 0), new GradientStop(Color.Parse("#14161D"), 0.55), new GradientStop(Color.FromArgb(55, accent.R, accent.G, accent.B), 1) },
+                    StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(0, 1, RelativeUnit.Relative),
+                    GradientStops = { new GradientStop(Color.Parse("#000B0B0D"), 0.25), new GradientStop(Color.Parse("#B00B0B0D"), 0.7), new GradientStop(Color.Parse("#F00B0B0D"), 1) },
                 } },
-                new Border { Background = new RadialGradientBrush
+                new Border { Background = new LinearGradientBrush
                 {
-                    Center = new RelativePoint(0.78, 0.5, RelativeUnit.Relative), GradientOrigin = new RelativePoint(0.78, 0.5, RelativeUnit.Relative),
-                    RadiusX = new RelativeScalar(0.45, RelativeUnit.Relative), RadiusY = new RelativeScalar(0.8, RelativeUnit.Relative),
-                    GradientStops = { new GradientStop(Color.FromArgb(110, accent.R, accent.G, accent.B), 0), new GradientStop(Color.FromArgb(0, accent.R, accent.G, accent.B), 1) },
+                    StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 0, RelativeUnit.Relative),
+                    GradientStops = { new GradientStop(Color.Parse("#990B0B0D"), 0), new GradientStop(Color.Parse("#000B0B0D"), 0.65) },
                 } },
-                grid,
+                text,
             },
         };
-        return new Border { CornerRadius = new CornerRadius(22), ClipToBounds = true, BorderBrush = Ui.Hex("#2EFFFFFF"), BorderThickness = new Thickness(1), MinHeight = 300, Child = bg };
-    }
-
-    static Color Lighten(Color c) => Color.FromRgb((byte)(c.R + (255 - c.R) * 0.45), (byte)(c.G + (255 - c.G) * 0.45), (byte)(c.B + (255 - c.B) * 0.45));
-
-    void RenderThumbs()
-    {
-        _thumbs.Children.Clear();
-        var count = Math.Min(4, _items.Count);
-        var start = Math.Clamp(_index - 1, 0, Math.Max(0, _items.Count - count));
-        for (var i = start; i < start + count; i++)
-        {
-            var (g, mod) = _items[i];
-            var index = i;
-            var b = new Button
-            {
-                Classes = { "card-btn" }, Padding = new Thickness(8), Margin = new Thickness(0, 0, i < start + count - 1 ? 10 : 0, 0), HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Left,
-                Content = Ui.Row(10, new Border { Width = 64, Height = 40, CornerRadius = new CornerRadius(8), ClipToBounds = true, Child = Ui.Thumb(mod.Icon, mod.Name, 64, 0, 160) },
-                    Ui.Col(1, new TextBlock { Text = mod.Name, FontWeight = FontWeight.SemiBold, FontSize = 13, TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = 130 }, Ui.Text(g.Def.ShortName, "small muted"))),
-            };
-            if (i == _index) { b.BorderBrush = Ui.Res("Brand"); b.Background = Ui.Res("Surface2"); }
-            b.Click += (_, _) => Show(index, true);
-            _thumbs.Children.Add(b);
-        }
     }
 }

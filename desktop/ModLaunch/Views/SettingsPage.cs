@@ -25,29 +25,55 @@ public sealed class SettingsPage : Page
 
     public override string Title => I18n.T("nav.settings");
 
+    /// <summary>
+    /// Разделы: значок в цветном квадрате, как в настройках iPhone и macOS, — цвет
+    /// помогает найти раздел взглядом, не читая. Группы — «Оформление», «Игры», «Программа».
+    /// </summary>
+    static readonly (string Group, (string Id, string Key, string Icon, string Color)[] Tabs)[] Groups =
+    [
+        ("set.group.look", [
+            ("look", "settings.tab.look", Icons.Palette, "#FF375F"),
+            ("interface", "look.tab.interface", Icons.Layers, "#5E5CE6"),
+        ]),
+        ("set.group.games", [
+            ("games", "settings.tab.games", Icons.Folder, "#30B158"),
+            ("launch", "settings.tab.launch", Icons.Play, "#FF9F0A"),
+            ("backups", "settings.tab.backups", Icons.Shield, "#2FB5CF"),
+            ("downloads", "settings.tab.downloads", Icons.Download, "#0A84FF"),
+            ("graphics", "settings.tab.graphics", Icons.Sparkles, "#BF5AF2"),
+        ]),
+        ("set.group.app", [
+            ("system", "sys.tab", Icons.Settings, "#8E8E93"),
+            ("updates", "settings.tab.updates", Icons.ArrowUp, "#32ADE6"),
+            ("accounts", "settings.tab.accounts", Icons.Key, "#E3A008"),
+            ("about", "settings.tab.about", Icons.Star, "#3478F6"),
+        ]),
+    ];
+
+    /// <summary>Значок раздела: белый контур в цветном скруглённом квадрате.</summary>
+    static Control Badge(string icon, string color, double size = 28) => new Border
+    {
+        Width = size, Height = size, CornerRadius = new CornerRadius(size * 0.28), Background = Ui.Hex(color),
+        Child = Ui.Icon(icon, size * 0.55, Brushes.White), VerticalAlignment = VerticalAlignment.Center,
+    };
+
     public override void Build()
     {
-        var tabs = new StackPanel { Spacing = 4, Width = 230 };
-        foreach (var (id, key, icon) in new[]
+        var nav = new StackPanel { Spacing = 2, Width = 236 };
+        foreach (var (group, tabs) in Groups)
         {
-            ("look", "settings.tab.look", Icons.Palette),
-            ("interface", "look.tab.interface", Icons.Layers),
-            ("system", "sys.tab", Icons.Settings),
-            ("games", "settings.tab.games", Icons.Folder),
-            ("launch", "settings.tab.launch", Icons.Play),
-            ("backups", "settings.tab.backups", Icons.Shield),
-            ("downloads", "settings.tab.downloads", Icons.Download),
-            ("graphics", "settings.tab.graphics", Icons.Sparkles),
-            ("updates", "settings.tab.updates", Icons.ArrowUp),
-            ("accounts", "settings.tab.accounts", Icons.Key),
-            ("about", "settings.tab.about", Icons.Star),
-        })
-        {
-            var b = Ui.Button(I18n.T(key), () => { _tab = id; Build(); }, "tab", icon);
-            b.HorizontalAlignment = HorizontalAlignment.Stretch;
-            b.HorizontalContentAlignment = HorizontalAlignment.Left;
-            if (_tab == id) b.Classes.Add("active");
-            tabs.Children.Add(b);
+            var caption = Ui.Text(I18n.T(group).ToUpperInvariant(), "eyebrow");
+            caption.Margin = new Thickness(12, nav.Children.Count == 0 ? 4 : 16, 0, 6);
+            nav.Children.Add(caption);
+            foreach (var (id, key, icon, color) in tabs)
+            {
+                var b = new Button { Classes = { "tab" }, Padding = new Thickness(8, 7), HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Left,
+                    Content = Ui.Row(12, Badge(icon, color), new TextBlock { Text = I18n.T(key), VerticalAlignment = VerticalAlignment.Center }) };
+                var tab = id;
+                b.Click += (_, _) => { _tab = tab; Build(); };
+                if (_tab == id) b.Classes.Add("active");
+                nav.Children.Add(b);
+            }
         }
 
         Control body = _tab switch
@@ -68,27 +94,48 @@ public sealed class SettingsPage : Page
         // На широком окне разделы встают в две колонки «кирпичиками».
         if (body is StackPanel { Children.Count: > 1 } stack)
         {
-            var masonry = new Masonry { Gap = stack.Spacing > 0 ? stack.Spacing : 16 };
+            var masonry = new Masonry { Gap = 22 };
             var items = stack.Children.ToList();
             stack.Children.Clear();
             foreach (var c in items) masonry.Children.Add(c);
             body = masonry;
         }
-        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*"), ColumnSpacing = 24, Margin = new Thickness(34, 26, 34, 34), MaxWidth = 1800 };
-        var side = Ui.Card(tabs, 10);
-        side.VerticalAlignment = VerticalAlignment.Top;
-        grid.Children.Add(side);
-        Grid.SetColumn(body, 1);
-        grid.Children.Add(body);
+
+        // Заголовок страницы: крупный значок, название и одна строка — о чём раздел.
+        var current = Groups.SelectMany(g => g.Tabs).FirstOrDefault(t => t.Id == _tab);
+        if (current.Id is null) current = Groups[0].Tabs[0];
+        var header = Ui.Row(16, Badge(current.Icon, current.Color, 52),
+            Ui.Col(2, Ui.Text(I18n.T(current.Key), "h1"), Ui.Text(I18n.T("set.desc." + current.Id), "muted", wrap: true)));
+        header.Children[1].VerticalAlignment = VerticalAlignment.Center;
+        header.Margin = new Thickness(0, 0, 0, 6);
+        var page = Ui.Col(18, header, body);
+
+        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*"), ColumnSpacing = 32, Margin = new Thickness(28, 24, 34, 40), MaxWidth = 1800 };
+        nav.VerticalAlignment = VerticalAlignment.Top;
+        grid.Children.Add(nav);
+        Grid.SetColumn(page, 1);
+        grid.Children.Add(page);
         Content = new ScrollViewer { Content = grid, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
     }
 
+    /// <summary>
+    /// Группа настроек, как в iOS: заголовок над карточкой, внутри — строки,
+    /// разделённые тонкой линией. Подсказка — под заголовком, мелко.
+    /// </summary>
     static Control Section(string title, string? hint, params Control[] rows)
     {
-        var col = Ui.Col(14, Ui.Text(title, "h2"));
-        if (hint is not null) col.Children.Add(Ui.Text(hint, "muted", wrap: true));
-        col.Children.AddRange(rows);
-        return Ui.Card(col, 24);
+        var head = Ui.Col(3, Ui.Text(title, "h3"));
+        if (hint is not null) head.Children.Add(Ui.Text(hint, "small muted", wrap: true));
+        head.Margin = new Thickness(4, 0, 4, 0);
+        var list = new StackPanel();
+        for (var i = 0; i < rows.Length; i++)
+        {
+            if (i > 0) list.Children.Add(new Border { Height = 1, Background = Ui.Res("Line"), Margin = new Thickness(18, 0, 0, 0) });
+            list.Children.Add(new Border { Padding = new Thickness(18, 14), Child = rows[i] });
+        }
+        var card = new Border { Classes = { "card" }, CornerRadius = new CornerRadius(16), Child = list };
+        // В Border, а не голой колонкой: раскладка «кирпичиками» разбирает колонки на части.
+        return new Border { Child = rows.Length == 0 ? head : Ui.Col(10, head, card) };
     }
 
     /// <summary>Строка «название, пояснение — переключатель».</summary>
@@ -99,13 +146,15 @@ public sealed class SettingsPage : Page
         var row = new DockPanel();
         DockPanel.SetDock(sw, Dock.Right);
         row.Children.Add(sw);
-        row.Children.Add(Ui.Col(3, Ui.Text(title, "h3"), Ui.Text(hint, "small muted", wrap: true)));
+        var text = Ui.Col(3, new TextBlock { Text = title, FontSize = 14.5, FontWeight = FontWeight.SemiBold }, Ui.Text(hint, "small muted", wrap: true));
+        text.Margin = new Thickness(0, 0, 16, 0);
+        row.Children.Add(text);
         return row;
     }
 
     Control LookTab()
     {
-        var lang = new ComboBox { Width = 240 };
+        var lang = new ComboBox { Width = 200 };
         lang.Items.Add("Русский");
         lang.Items.Add("English");
         lang.SelectedIndex = I18n.Lang == "en" ? 1 : 0;
@@ -117,50 +166,96 @@ public sealed class SettingsPage : Page
             I18n.Set(value);
         };
         var col = new StackPanel { Spacing = 16 };
-        col.Children.Add(Section(I18n.T("settings.language"), null, lang));
 
-        // Тема: три карточки-образца.
-        var themes = Ui.Row(12);
+        // Тема: миниатюры окна — боковая панель, шапка и пара карточек в цветах темы.
+        var themes = new WrapPanel();
         foreach (var theme in Look.Themes)
         {
-            var (bg, surface, text) = theme switch { "black" => ("#000000", "#131419", "#ECEEF3"), "light" => ("#F4F5F8", "#FFFFFF", "#161922"), _ => ("#0F1116", "#1E222B", "#E8EBF2") };
-            var sample = new Border
+            var (bg, rail, surface, line, text) = theme switch
             {
-                Width = 150, Height = 84, CornerRadius = new CornerRadius(12), Background = Ui.Hex(bg), Padding = new Thickness(10),
-                BorderThickness = new Thickness(2), BorderBrush = Look.Theme == theme ? Ui.Res("Brand") : Ui.Res("Line"),
-                Child = Ui.Col(6,
-                    new Border { Height = 10, Width = 70, CornerRadius = new CornerRadius(5), Background = Ui.Hex(Look.Accent), HorizontalAlignment = HorizontalAlignment.Left },
-                    new Border { Height = 22, CornerRadius = new CornerRadius(6), Background = Ui.Hex(surface) },
-                    new TextBlock { Text = I18n.T("look.theme." + theme), Foreground = Ui.Hex(text), FontSize = 12, FontWeight = FontWeight.SemiBold }),
+                "black" => ("#000000", "#050505", "#17171A", "#1D1D20", "#F4F4F5"),
+                "light" => ("#F5F5F7", "#ECECF0", "#FFFFFF", "#E0E0E6", "#1D1D1F"),
+                _ => ("#121214", "#0D0D0F", "#222226", "#2A2A2F", "#F4F4F5"),
             };
+            var selected = Look.Theme == theme;
+            var mock = new Grid { ColumnDefinitions = new ColumnDefinitions("22,*"), Background = Ui.Hex(bg) };
+            mock.Children.Add(new Border { Background = Ui.Hex(rail), Child = Ui.Col(5,
+                new Border { Width = 10, Height = 10, CornerRadius = new CornerRadius(3), Background = Ui.Hex(Look.Accent), Margin = new Thickness(0, 7, 0, 0) },
+                new Border { Width = 10, Height = 10, CornerRadius = new CornerRadius(3), Background = Ui.Hex(surface) },
+                new Border { Width = 10, Height = 10, CornerRadius = new CornerRadius(3), Background = Ui.Hex(surface) }) });
+            var cards = new Grid { ColumnDefinitions = new ColumnDefinitions("*,*"), ColumnSpacing = 6 };
+            cards.Children.Add(new Border { Height = 22, CornerRadius = new CornerRadius(5), Background = Ui.Hex(surface), BorderBrush = Ui.Hex(line), BorderThickness = new Thickness(1) });
+            var second = new Border { Height = 22, CornerRadius = new CornerRadius(5), Background = Ui.Hex(surface), BorderBrush = Ui.Hex(line), BorderThickness = new Thickness(1) };
+            Grid.SetColumn(second, 1);
+            cards.Children.Add(second);
+            var content = Ui.Col(6,
+                new Border { Height = 6, Width = 44, CornerRadius = new CornerRadius(3), Background = Ui.Hex(text), Opacity = 0.85, HorizontalAlignment = HorizontalAlignment.Left },
+                new Border { Height = 4, Width = 64, CornerRadius = new CornerRadius(2), Background = Ui.Hex(text), Opacity = 0.35, HorizontalAlignment = HorizontalAlignment.Left },
+                cards,
+                new Border { Height = 12, Width = 44, CornerRadius = new CornerRadius(6), Background = Ui.Hex(Look.Accent), HorizontalAlignment = HorizontalAlignment.Left });
+            content.Margin = new Thickness(8);
+            Grid.SetColumn(content, 1);
+            mock.Children.Add(content);
+            var frame = new Border
+            {
+                Width = 124, Height = 80, CornerRadius = new CornerRadius(12), ClipToBounds = true, Child = mock,
+                BorderThickness = new Thickness(2), BorderBrush = selected ? Ui.Res("Brand") : Ui.Res("Line"),
+            };
+            var label = Ui.Row(6, new Border
+            {
+                Width = 16, Height = 16, CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(selected ? 5 : 1.5),
+                BorderBrush = selected ? Ui.Res("Brand") : Ui.Res("Faint"), VerticalAlignment = VerticalAlignment.Center,
+            }, new TextBlock { Text = I18n.T("look.theme." + theme), FontWeight = FontWeight.SemiBold, VerticalAlignment = VerticalAlignment.Center });
             var t = theme;
-            var b = new Button { Padding = new Thickness(0), Background = Brushes.Transparent, BorderThickness = new Thickness(0), Content = sample };
+            var b = new Button { Classes = { "ghost" }, Padding = new Thickness(3), Margin = new Thickness(0, 0, 6, 4), Content = Ui.Col(10, frame, label) };
             b.Click += (_, _) => { Look.SetTheme(t); Build(); };
             themes.Children.Add(b);
         }
-        col.Children.Add(Section(I18n.T("look.theme"), I18n.T("look.theme.hint"), themes));
 
-        // Цвет акцента.
-        var accents = Ui.Row(10);
+        // Цвет акцента: кружки, у выбранного — галочка.
+        var accents = new WrapPanel();
         foreach (var hex in Look.Accents)
         {
             var h = hex;
+            var on = Look.Accent.Equals(hex, StringComparison.OrdinalIgnoreCase);
             var dot = new Button
             {
-                Width = 36, Height = 36, CornerRadius = new CornerRadius(18), Padding = new Thickness(0), Background = Ui.Hex(hex),
-                BorderThickness = new Thickness(3), BorderBrush = Look.Accent.Equals(hex, StringComparison.OrdinalIgnoreCase) ? Ui.Res("Text") : Brushes.Transparent,
+                Width = 34, Height = 34, CornerRadius = new CornerRadius(17), Padding = new Thickness(0), Background = Ui.Hex(hex), Margin = new Thickness(0, 0, 10, 8),
+                BorderThickness = new Thickness(on ? 3 : 0), BorderBrush = Ui.Res("Text"),
+                HorizontalContentAlignment = HorizontalAlignment.Center, VerticalContentAlignment = VerticalAlignment.Center,
+                Content = on ? Ui.Icon(Icons.Check, 16, Brushes.White) : null,
             };
             dot.Click += (_, _) => { Look.SetAccent(h); Build(); };
             accents.Children.Add(dot);
         }
-        var custom = new TextBox { Width = 120, Text = Look.Accents.Contains(Look.Accent) ? "" : Look.Accent, Watermark = "#RRGGBB" };
+        var custom = new TextBox { Width = 120, Height = 34, Text = Look.Accents.Contains(Look.Accent) ? "" : Look.Accent, Watermark = "#RRGGBB" };
         custom.LostFocus += (_, _) =>
         {
             var v = (custom.Text ?? "").Trim();
             if (System.Text.RegularExpressions.Regex.IsMatch(v, "^#[0-9a-fA-F]{6}$")) { Look.SetAccent(v.ToUpperInvariant()); Build(); }
         };
         accents.Children.Add(custom);
-        col.Children.Add(Section(I18n.T("look.accent"), null, accents));
+
+        col.Children.Add(Section(I18n.T("look.theme"), I18n.T("look.theme.hint"), themes,
+            Ui.Col(10, new TextBlock { Text = I18n.T("look.accent"), FontSize = 14.5, FontWeight = FontWeight.SemiBold }, accents)));
+
+        // Вид модов в каталоге: плитки (по умолчанию) или список.
+        var view = Settings.Data.Str("modView") == "list" ? "list" : "grid";
+        Control ViewChoice(string id, string title, Control preview)
+        {
+            var on = view == id;
+            var frame = new Border { Width = 150, Height = 92, CornerRadius = new CornerRadius(12), Background = Ui.Res("Surface2"), Padding = new Thickness(10), Child = preview, BorderThickness = new Thickness(2), BorderBrush = on ? Ui.Res("Brand") : Ui.Res("Line") };
+            var b = new Button { Classes = { "ghost" }, Padding = new Thickness(4), Margin = new Thickness(0, 0, 8, 0), Content = Ui.Col(8, frame, new TextBlock { Text = title, FontWeight = FontWeight.SemiBold, HorizontalAlignment = HorizontalAlignment.Center }) };
+            b.Click += (_, _) => { Settings.Data["modView"] = id; Settings.Save(); Build(); };
+            return b;
+        }
+        var tilesPreview = new TileGrid { Columns = 3, Gap = 6, RowGap = 6 };
+        for (var i = 0; i < 6; i++) tilesPreview.Children.Add(Ui.Col(3, new Border { Height = 22, CornerRadius = new CornerRadius(4), Background = Ui.Res(i % 2 == 0 ? "Surface3" : "BrandSoft") }, new Border { Height = 3, Width = 22, CornerRadius = new CornerRadius(2), Background = Ui.Res("Faint"), HorizontalAlignment = HorizontalAlignment.Left }));
+        var listPreview = Ui.Col(6);
+        for (var i = 0; i < 4; i++) listPreview.Children.Add(Ui.Row(6, new Border { Width = 14, Height = 12, CornerRadius = new CornerRadius(3), Background = Ui.Res(i % 2 == 0 ? "Surface3" : "BrandSoft") }, new Border { Width = 80, Height = 4, CornerRadius = new CornerRadius(2), Background = Ui.Res("Faint"), VerticalAlignment = VerticalAlignment.Center }));
+        col.Children.Add(Section(I18n.T("look.view"), I18n.T("look.view.hint"),
+            Ui.Row(0, ViewChoice("grid", I18n.T("look.view.tiles"), tilesPreview), ViewChoice("list", I18n.T("look.view.list"), listPreview)),
+            Toggle(I18n.T("look.compact"), I18n.T("look.compact.hint"), Settings.Data.Bool("compactLists"), v => Settings.Data["compactLists"] = v)));
 
         // Масштаб интерфейса.
         var scales = new WrapPanel();
@@ -176,11 +271,18 @@ public sealed class SettingsPage : Page
             chip.Margin = new Thickness(0, 0, 6, 6);
             scales.Children.Add(chip);
         }
-        col.Children.Add(Section(I18n.T("look.scale"), I18n.T("look.scale.hint"), scales,
+        col.Children.Add(Section(I18n.T("look.scale"), I18n.T("look.scale.hint"), scales));
+
+        var langRow = new DockPanel();
+        DockPanel.SetDock(lang, Dock.Right);
+        langRow.Children.Add(lang);
+        langRow.Children.Add(Ui.Col(3, new TextBlock { Text = I18n.T("settings.language"), FontSize = 14.5, FontWeight = FontWeight.SemiBold }, Ui.Text(I18n.T("look.lang.hint"), "small muted", wrap: true)));
+        col.Children.Add(Section(I18n.T("look.feel"), null,
+            langRow,
+            Toggle(I18n.T("look.splash"), I18n.T("look.splash.hint"), Splash.Enabled, v => Settings.Data["splash"] = v),
             Toggle(I18n.T("look.anim"), I18n.T("look.anim.hint"), Look.Animations, v => { Settings.Data["animations"] = v; MainWindow.Current?.Refresh(); }),
             Toggle(I18n.T("look.smooth"), I18n.T("look.smooth.hint"), SmoothScroll.On, v => Settings.Data["smoothScroll"] = v),
-            Toggle(I18n.T("look.friendsDock"), I18n.T("look.friendsDock.hint"), Settings.Data.Bool("friendsDock", true), v => { Settings.Data["friendsDock"] = v; MainWindow.Current?.RefreshFriendsDock(); }),
-            Toggle(I18n.T("look.compact"), I18n.T("look.compact.hint"), Settings.Data.Bool("compactLists"), v => Settings.Data["compactLists"] = v)));
+            Toggle(I18n.T("look.friendsDock"), I18n.T("look.friendsDock.hint"), Settings.Data.Bool("friendsDock", true), v => { Settings.Data["friendsDock"] = v; MainWindow.Current?.RefreshFriendsDock(); })));
         return col;
     }
 
@@ -199,7 +301,7 @@ public sealed class SettingsPage : Page
         var startRow = new DockPanel();
         DockPanel.SetDock(start, Dock.Right);
         startRow.Children.Add(start);
-        startRow.Children.Add(Ui.Col(3, Ui.Text(I18n.T("look.start"), "h3"), Ui.Text(I18n.T("look.start.hint"), "small muted")));
+        startRow.Children.Add(Ui.Col(3, Ui.Text(I18n.T("look.start"), "h3"), Ui.Text(I18n.T("look.start.hint"), "small muted", wrap: true)));
         col.Children.Add(Section(I18n.T("look.start"), null, startRow));
 
         col.Children.Add(Section(I18n.T("look.chrome"), I18n.T("look.chrome.hint"),
@@ -284,12 +386,12 @@ public sealed class SettingsPage : Page
         var toastRow = new DockPanel();
         DockPanel.SetDock(toast, Dock.Right);
         toastRow.Children.Add(toast);
-        toastRow.Children.Add(Ui.Col(3, Ui.Text(I18n.T("sys.toast"), "h3"), Ui.Text(I18n.T("sys.toast.hint"), "small muted")));
+        toastRow.Children.Add(Ui.Col(3, Ui.Text(I18n.T("sys.toast"), "h3"), Ui.Text(I18n.T("sys.toast.hint"), "small muted", wrap: true)));
         col.Children.Add(Section(I18n.T("sys.notify"), null, toastRow,
             Toggle(I18n.T("sys.toastDone"), I18n.T("sys.toastDone.hint"), Settings.Data.Bool("toastOnDone", true), v => Settings.Data["toastOnDone"] = v)));
 
         col.Children.Add(Section(I18n.T("sys.transfer"), I18n.T("sys.transfer.hint"),
-            Ui.Row(10,
+            Wrap(
                 Ui.Button(I18n.T("sys.export"), async () =>
                 {
                     var file = await MainWindow.Current!.PickSaveFile(I18n.T("sys.export"), "modlaunch-settings.json");
@@ -314,6 +416,14 @@ public sealed class SettingsPage : Page
         return col;
     }
 
+    /// <summary>Кнопки, которые переносятся на следующую строку, если не влезли.</summary>
+    static Control Wrap(params Control[] items)
+    {
+        var panel = new WrapPanel();
+        foreach (var c in items) { c.Margin = new Thickness(0, 0, 10, 8); panel.Children.Add(c); }
+        return panel;
+    }
+
     /// <summary>Поиск по настройкам: открыть вкладку, где встречается слово.</summary>
     public override void Search(string text)
     {
@@ -321,7 +431,7 @@ public sealed class SettingsPage : Page
         if (q == "") return;
         var map = new (string Tab, string[] Keys)[]
         {
-            ("look", ["settings.language", "look.theme", "look.accent", "look.scale", "look.anim", "look.compact"]),
+            ("look", ["settings.language", "look.theme", "look.accent", "look.scale", "look.anim", "look.compact", "look.view", "look.splash", "look.smooth", "look.feel"]),
             ("interface", ["look.start", "look.chrome", "look.home", "look.games", "look.brand", "look.rail"]),
             ("system", ["sys.tray", "sys.autostart", "sys.toast", "sys.transfer", "sys.confirm"]),
             ("games", ["settings.games", "games.deep"]),
@@ -396,7 +506,7 @@ public sealed class SettingsPage : Page
         var afterRow = new DockPanel();
         DockPanel.SetDock(after, Dock.Right);
         afterRow.Children.Add(after);
-        afterRow.Children.Add(Ui.Col(3, Ui.Text(I18n.T("launch.after"), "h3"), Ui.Text(I18n.T("launch.after.hint"), "small muted")));
+        afterRow.Children.Add(Ui.Col(3, Ui.Text(I18n.T("launch.after"), "h3"), Ui.Text(I18n.T("launch.after.hint"), "small muted", wrap: true)));
         var rows = new List<Control> { afterRow };
         if (Settings.Data.Str("afterLaunch") == "minimize")
             rows.Add(Toggle(I18n.T("launch.restore"), I18n.T("launch.restore.hint"), Settings.Data.Bool("restoreAfterGame", true), v => Settings.Data["restoreAfterGame"] = v));
@@ -411,7 +521,7 @@ public sealed class SettingsPage : Page
         var keyRow = new DockPanel();
         DockPanel.SetDock(key, Dock.Right);
         keyRow.Children.Add(key);
-        keyRow.Children.Add(Ui.Col(3, Ui.Text(I18n.T("ov.key"), "h3"), Ui.Text(I18n.T("ov.key.hint"), "small muted")));
+        keyRow.Children.Add(Ui.Col(3, Ui.Text(I18n.T("ov.key"), "h3"), Ui.Text(I18n.T("ov.key.hint"), "small muted", wrap: true)));
         var preview = new DockPanel();
         var go = Ui.Button(I18n.T("ov.preview.go"), () =>
         {
@@ -422,7 +532,7 @@ public sealed class SettingsPage : Page
         }, "", Icons.Play);
         DockPanel.SetDock(go, Dock.Right);
         preview.Children.Add(go);
-        preview.Children.Add(Ui.Col(3, Ui.Text(I18n.T("ov.preview"), "h3"), Ui.Text(I18n.T("ov.preview.hint"), "small muted")));
+        preview.Children.Add(Ui.Col(3, Ui.Text(I18n.T("ov.preview"), "h3"), Ui.Text(I18n.T("ov.preview.hint"), "small muted", wrap: true)));
         col.Children.Add(Section(I18n.T("ov.title"), null,
             Toggle(I18n.T("ov.on"), I18n.T("ov.on.hint"), Settings.Data.Bool("overlay", true), v => Settings.Data["overlay"] = v),
             keyRow, preview));
@@ -490,7 +600,7 @@ public sealed class SettingsPage : Page
         var keepRow = new DockPanel();
         DockPanel.SetDock(keep, Dock.Right);
         keepRow.Children.Add(keep);
-        keepRow.Children.Add(Ui.Col(3, Ui.Text(I18n.T("bak.keep"), "h3"), Ui.Text(I18n.T("bak.keep.hint"), "small muted")));
+        keepRow.Children.Add(Ui.Col(3, Ui.Text(I18n.T("bak.keep"), "h3"), Ui.Text(I18n.T("bak.keep.hint"), "small muted", wrap: true)));
         col.Children.Add(Section(I18n.T("settings.tab.backups"), null,
             Toggle(I18n.T("bak.onLaunch"), I18n.T("bak.onLaunch.hint"), Backups.OnLaunch, v => Settings.Data["backupOnLaunch"] = v),
             keepRow,
@@ -679,7 +789,7 @@ public sealed class SettingsPage : Page
 
     Control AccountsTab()
     {
-        var box = new TextBox { Text = Settings.NexusApiKey ?? "", PasswordChar = '•', Watermark = "API key", Width = 420 };
+        var box = new TextBox { Text = Settings.NexusApiKey ?? "", PasswordChar = '•', Watermark = "API key" };
         var check = Ui.Button(I18n.T("settings.nexus.check"), async () =>
         {
             var key = box.Text?.Trim() ?? "";
@@ -699,7 +809,7 @@ public sealed class SettingsPage : Page
         }, "primary", Icons.Check);
         var rows = new List<Control>
         {
-            Ui.Row(10, box, check),
+            KeyRow(box, check),
             Ui.Button("nexusmods.com/users/myaccount?tab=api", () => Ui.OpenUrl("https://www.nexusmods.com/users/myaccount?tab=api"), "ghost", Icons.External),
         };
         if (_keyStatus is not null) rows.Insert(1, Ui.Text(_keyStatus, "small brand"));
@@ -716,6 +826,16 @@ public sealed class SettingsPage : Page
             Ui.Text(registered ? I18n.T("settings.nxm.yes") : I18n.T("settings.nxm.no"), "small", color: registered ? Ui.Res("Good") : Ui.Res("Muted"))));
         rows.Add(nxm);
         return Ui.Col(16, AccountSection(), Section(I18n.T("settings.nexus"), I18n.T("settings.nexus.hint"), rows.ToArray()));
+    }
+
+    /// <summary>Поле и кнопка в одну строку: поле занимает всё, что осталось.</summary>
+    static Control KeyRow(Control box, Control button)
+    {
+        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), ColumnSpacing = 10 };
+        grid.Children.Add(box);
+        Grid.SetColumn(button, 1);
+        grid.Children.Add(button);
+        return grid;
     }
 
     // ---------------------------------------------------------------- аккаунт ModLaunch
@@ -764,7 +884,7 @@ public sealed class SettingsPage : Page
         var col = Ui.Col(12);
         if (_accMode == "reset")
         {
-            col.Children.Add(Ui.Text(I18n.T("acc.reset.title"), "h2"));
+            col.Children.Add(Ui.Text(I18n.T("acc.reset.title"), "h2", wrap: true));
             col.Children.Add(Ui.Text(I18n.T("acc.reset.lead"), "muted", wrap: true));
             col.Children.Add(email);
             col.Children.Add(Ui.Row(10,
@@ -772,7 +892,7 @@ public sealed class SettingsPage : Page
                 Ui.Button(I18n.T("acc.backToSignin"), () => { _accMode = "signin"; Build(); }, "ghost")));
             return Ui.Card(col, 24);
         }
-        col.Children.Add(Ui.Text(I18n.T("acc.out.title"), "h2"));
+        col.Children.Add(Ui.Text(I18n.T("acc.out.title"), "h2", wrap: true));
         col.Children.Add(Ui.Col(4, Ui.Text("✓ " + I18n.T("acc.perk.1"), "small muted"), Ui.Text("✓ " + I18n.T("acc.perk.2"), "small muted"), Ui.Text("✓ " + I18n.T("acc.perk.3"), "small muted")));
         col.Children.Add(tabs);
         if (_accMode == "signup") col.Children.Add(Ui.Col(4, name, Ui.Text(I18n.T("acc.name.hint"), "small muted")));

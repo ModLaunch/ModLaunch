@@ -77,7 +77,11 @@ public static class Program
             .WithInterFont()
             .SetupWithoutStarting();
 
-        var window = new MainWindow { Width = 1366, Height = 800 };
+        // MODLAUNCH_SHOT_HEIGHT — высота окна (страница целиком), MODLAUNCH_SHOT_ONLY — только эти снимки (через запятую, начала имён).
+        var shotHeight = int.TryParse(Environment.GetEnvironmentVariable("MODLAUNCH_SHOT_HEIGHT"), out var hh) && hh > 300 ? hh : 800;
+        var only = (Environment.GetEnvironmentVariable("MODLAUNCH_SHOT_ONLY") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        bool Wanted(string name) => only.Length == 0 || only.Any(o => name.StartsWith(o, StringComparison.OrdinalIgnoreCase));
+        var window = new MainWindow { Width = 1366, Height = shotHeight };
         window.Show();
 
         void Pump(int ms = 600)
@@ -93,11 +97,15 @@ public static class Program
 
         void Save(string name)
         {
+            if (!Wanted(name)) { Dispatcher.UIThread.RunJobs(); return; }
             Pump();
             window.CaptureRenderedFrame()?.Save(Path.Combine(outDir, name + ".png"));
             Console.WriteLine("saved " + name);
         }
 
+        window.DemoSplash(true);
+        Save("0-splash");
+        window.DemoSplash(false);
         Save("1-home");
         window.Navigate(() => new LibraryPage());
         Save("1a-library");
@@ -234,7 +242,7 @@ public static class Program
         window.Navigate(() => new SettingsPage("look"));
         Save("14c-wide-settings");
         window.Width = 1366;
-        window.Height = 800;
+        window.Height = shotHeight;
         Pump(400);
 
         var big = new BigPictureWindow(windowed: true);

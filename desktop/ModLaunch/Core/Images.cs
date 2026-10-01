@@ -63,10 +63,10 @@ public static class Images
     static int Bucket(int width) => Buckets.FirstOrDefault(b => b >= width, Buckets[^1]);
 
     /// <summary>Заранее, в фоне, декодировать обложки и фоны — чтобы страницы открывались без подтормаживаний.</summary>
-    public static void Prewarm(IEnumerable<Games.GameDef> games)
+    public static Task Prewarm(IEnumerable<Games.GameDef> games)
     {
         var list = games.ToList();
-        _ = Task.Run(() =>
+        return Task.Run(() =>
         {
             foreach (var g in list)
             {

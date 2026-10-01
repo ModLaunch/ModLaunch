@@ -23,7 +23,8 @@ public sealed partial class GamePage : Page
     SortBy _sort = SortBy.Popular;
     int _period;
     bool _hideInstalled = Settings.Data.Bool("hideInstalled");
-    string _view = Settings.Data.Str("catalogView") == "grid" ? "grid" : "list";
+    // 8.0: плитки по умолчанию у всех (новый ключ — прежний «список» из 7.x не наследуется).
+    string _view = Settings.Data.Str("modView") == "list" ? "list" : "grid";
     bool _adult = Settings.Data.Bool("showAdult", false);
 
     // Каталог грузится отдельно от перерисовки: перерисовка не должна его сбрасывать.
@@ -320,10 +321,10 @@ public sealed partial class GamePage : Page
             hide.IsCheckedChanged += (_, _) => { _hideInstalled = hide.IsChecked == true; Settings.Data["hideInstalled"] = _hideInstalled; Settings.Save(); RenderList(); };
             Button ViewButton(string id, string icon, string tip)
             {
-                var b = Ui.Button("", () => { _view = id; Settings.Data["catalogView"] = id; Settings.Save(); Build(); }, _view == id ? "icon active" : "icon", icon, tip);
+                var b = Ui.Button("", () => { _view = id; Settings.Data["modView"] = id; Settings.Save(); Build(); }, _view == id ? "icon active" : "icon", icon, tip);
                 return b;
             }
-            var views = new Border { Classes = { "card" }, Padding = new Thickness(3), CornerRadius = new CornerRadius(12), Child = Ui.Row(2, ViewButton("list", Icons.List, I18n.T("cat.list")), ViewButton("grid", Icons.Grid, I18n.T("cat.grid"))) };
+            var views = new Border { Classes = { "card" }, Padding = new Thickness(3), CornerRadius = new CornerRadius(12), Child = Ui.Row(2, ViewButton("grid", Icons.Grid, I18n.T("cat.grid")), ViewButton("list", Icons.List, I18n.T("cat.list"))) };
             var second = new DockPanel();
             DockPanel.SetDock(views, Dock.Right);
             second.Children.Add(views);
@@ -402,7 +403,13 @@ public sealed partial class GamePage : Page
         }
         if (_loading && _mods.Count == 0)
         {
-            for (var i = 0; i < 5; i++) _listHost.Children.Add(Skeleton());
+            if (_view == "grid")
+            {
+                var skeletons = TileGridHost();
+                for (var i = 0; i < 8; i++) skeletons.Children.Add(Tiles.Skeleton());
+                _listHost.Children.Add(skeletons);
+            }
+            else for (var i = 0; i < 5; i++) _listHost.Children.Add(Skeleton());
             return;
         }
         if (!_loading && _mods.Count == 0)
@@ -413,7 +420,7 @@ public sealed partial class GamePage : Page
 
         var picks = _g.Def.Picks.ToHashSet();
         var shown = _hideInstalled ? _mods.Where(m => !IsInstalled(m)).ToList() : _mods;
-        var tiles = _view == "grid" ? new WrapPanel() : null;
+        var tiles = _view == "grid" ? TileGridHost() : null;
         if (tiles is not null) _listHost.Children.Add(tiles);
         for (var i = 0; i < shown.Count; i++)
         {
@@ -421,7 +428,7 @@ public sealed partial class GamePage : Page
             var badge = BadgeFor(mod, i);
             void Install() => _ = Actions.Install(_g, mod);
             void Open() => MainWindow.Current?.Navigate(() => new ModPage(_g.Def.Id, mod));
-            if (tiles is not null) tiles.Children.Add(ModRow.Tile(_g.Def, mod, IsInstalled(mod), IsInstalling(mod), Install, Open, badge));
+            if (tiles is not null) tiles.Children.Add(Tiles.Mod(_g.Def, mod, IsInstalled(mod), IsInstalling(mod), Install, Open, badge, picks.Contains(mod.Id)));
             else _listHost.Children.Add(ModRow.Build(_g.Def, mod, IsInstalled(mod), IsInstalling(mod), picks.Contains(mod.Id), Install, Open, badge));
         }
 
@@ -433,6 +440,9 @@ public sealed partial class GamePage : Page
             _listHost.Children.Add(more);
         }
     }
+
+    /// <summary>Сетка плиток каталога: колонки — по ширине окна (поля плиток — внутри, поэтому сетка чуть шире списка).</summary>
+    static TileGrid TileGridHost() => new() { MinItemWidth = 228, Gap = 6, RowGap = 10, Margin = new Thickness(-8, 0) };
 
     static Control Skeleton() => new Border
     {
@@ -501,9 +511,17 @@ public sealed partial class GamePage : Page
             return;
         }
         var byId = _picks.ToDictionary(m => m.Id, StringComparer.OrdinalIgnoreCase);
+        var grid = _view == "grid" ? TileGridHost() : null;
+        if (grid is not null) _listHost!.Children.Add(grid);
         foreach (var id in _g.Def.Picks)
             if (byId.TryGetValue(id, out var mod))
-                _listHost!.Children.Add(ModRow.Build(_g.Def, mod, IsInstalled(mod), IsInstalling(mod), true, () => _ = Actions.Install(_g, mod), () => MainWindow.Current?.Navigate(() => new ModPage(_g.Def.Id, mod))));
+            {
+                void Install() => _ = Actions.Install(_g, mod);
+                void Open() => MainWindow.Current?.Navigate(() => new ModPage(_g.Def.Id, mod));
+                if (grid is not null) grid.Children.Add(Tiles.Mod(_g.Def, mod, IsInstalled(mod), IsInstalling(mod), Install, Open));
+                else _listHost!.Children.Add(ModRow.Build(_g.Def, mod, IsInstalled(mod), IsInstalling(mod), true, Install, Open));
+            }
+        if (grid is { Children.Count: 0 }) _listHost!.Children.Remove(grid);
         if (_listHost!.Children.Count == 0)
             _listHost.Children.Add(Ui.Card(Ui.Text(_error ?? I18n.T("catalog.error"), "muted", wrap: true), 22));
     }

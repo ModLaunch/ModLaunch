@@ -5,19 +5,19 @@
   <Application.Resources>
     <ResourceDictionary>
       <!-- Цвета — те же токены, что в styles.css версии 3.x. -->
-      <Color x:Key="BgColor">#0F1116</Color>
-      <SolidColorBrush x:Key="Bg" Color="#0F1116"/>
-      <SolidColorBrush x:Key="Rail" Color="#12141A"/>
-      <SolidColorBrush x:Key="Surface" Color="#171A21"/>
-      <SolidColorBrush x:Key="Surface2" Color="#1E222B"/>
-      <SolidColorBrush x:Key="Surface3" Color="#262B36"/>
-      <SolidColorBrush x:Key="Line" Color="#2A2F3B"/>
-      <SolidColorBrush x:Key="Text" Color="#E8EBF2"/>
-      <SolidColorBrush x:Key="Muted" Color="#98A1B2"/>
-      <SolidColorBrush x:Key="Faint" Color="#6B7385"/>
-      <SolidColorBrush x:Key="Brand" Color="#7C5CFF"/>
-      <SolidColorBrush x:Key="Brand2" Color="#9D85FF"/>
-      <SolidColorBrush x:Key="BrandSoft" Color="#2A2350"/>
+      <Color x:Key="BgColor">#121214</Color>
+      <SolidColorBrush x:Key="Bg" Color="#121214"/>
+      <SolidColorBrush x:Key="Rail" Color="#0D0D0F"/>
+      <SolidColorBrush x:Key="Surface" Color="#1A1A1D"/>
+      <SolidColorBrush x:Key="Surface2" Color="#222226"/>
+      <SolidColorBrush x:Key="Surface3" Color="#2D2D32"/>
+      <SolidColorBrush x:Key="Line" Color="#2A2A2F"/>
+      <SolidColorBrush x:Key="Text" Color="#F4F4F5"/>
+      <SolidColorBrush x:Key="Muted" Color="#A1A1AA"/>
+      <SolidColorBrush x:Key="Faint" Color="#71717A"/>
+      <SolidColorBrush x:Key="Brand" Color="#3478F6"/>
+      <SolidColorBrush x:Key="Brand2" Color="#6A9CF8"/>
+      <SolidColorBrush x:Key="BrandSoft" Color="#1A2A46"/>
       <SolidColorBrush x:Key="Good" Color="#3DD68C"/>
       <SolidColorBrush x:Key="Warn" Color="#F2B84B"/>
       <SolidColorBrush x:Key="Bad" Color="#FF6B6B"/>
@@ -29,7 +29,7 @@
   <Application.Styles>
     <FluentTheme>
       <FluentTheme.Palettes>
-        <ColorPaletteResources x:Key="Dark" Accent="#7C5CFF" RegionColor="#0F1116" ErrorText="#FF6B6B"/>
+        <ColorPaletteResources x:Key="Dark" Accent="#3478F6" RegionColor="#121214" ErrorText="#FF6B6B"/>
       </FluentTheme.Palettes>
     </FluentTheme>
     <StyleInclude Source="avares://AvaloniaEdit/Themes/Fluent/AvaloniaEdit.xaml"/>
@@ -41,8 +41,11 @@
     </Style>
 
     <!-- Текст -->
-    <Style Selector="TextBlock.h1"><Setter Property="FontSize" Value="30"/><Setter Property="FontWeight" Value="Bold"/></Style>
-    <Style Selector="TextBlock.h2"><Setter Property="FontSize" Value="20"/><Setter Property="FontWeight" Value="Bold"/></Style>
+    <Style Selector="TextBlock.h1"><Setter Property="FontSize" Value="32"/><Setter Property="FontWeight" Value="Bold"/><Setter Property="LetterSpacing" Value="-0.6"/></Style>
+    <Style Selector="TextBlock.h2"><Setter Property="FontSize" Value="21"/><Setter Property="FontWeight" Value="Bold"/><Setter Property="LetterSpacing" Value="-0.3"/></Style>
+    <!-- 8.0: надзаголовок, как в App Store («ВЫБОР РЕДАКЦИИ», «ЧЕТВЕРГ, 1 ОКТЯБРЯ») -->
+    <Style Selector="TextBlock.eyebrow"><Setter Property="FontSize" Value="11.5"/><Setter Property="FontWeight" Value="Bold"/><Setter Property="LetterSpacing" Value="1.2"/><Setter Property="Foreground" Value="{StaticResource Muted}"/></Style>
+    <Style Selector="TextBlock.display"><Setter Property="FontSize" Value="38"/><Setter Property="FontWeight" Value="Bold"/><Setter Property="LetterSpacing" Value="-1"/></Style>
     <Style Selector="TextBlock.h3"><Setter Property="FontSize" Value="16"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
     <Style Selector="TextBlock.muted"><Setter Property="Foreground" Value="{StaticResource Muted}"/></Style>
     <Style Selector="TextBlock.small"><Setter Property="FontSize" Value="12"/></Style>
@@ -93,7 +96,39 @@
       <Setter Property="Background" Value="{StaticResource Brand}"/>
       <Setter Property="BorderThickness" Value="0"/>
       <Setter Property="Foreground" Value="White"/>
+      <Setter Property="CornerRadius" Value="999"/>
     </Style>
+    <Style Selector="Button.primary.icon"><Setter Property="CornerRadius" Value="12"/></Style>
+
+    <!-- «Получить» из App Store: серая капсула, текст цвета акцента. Для плиток и строк модов. -->
+    <Style Selector="Button.get">
+      <Setter Property="CornerRadius" Value="999"/>
+      <Setter Property="Padding" Value="14,5"/>
+      <Setter Property="MinHeight" Value="30"/>
+      <Setter Property="FontSize" Value="13"/>
+      <Setter Property="FontWeight" Value="Bold"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Background" Value="{StaticResource Surface3}"/>
+      <Setter Property="Foreground" Value="{StaticResource Brand2}"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+    <Style Selector="Button.get:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource Brand}"/>
+      <Setter Property="Foreground" Value="White"/>
+    </Style>
+    <Style Selector="Button.get.done"><Setter Property="Foreground" Value="{StaticResource Muted}"/><Setter Property="Background" Value="Transparent"/></Style>
+    <Style Selector="Button.get.done:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{StaticResource Surface2}"/><Setter Property="Foreground" Value="{StaticResource Text}"/></Style>
+    <Style Selector="Button.get:disabled"><Setter Property="Opacity" Value="1"/></Style>
+
+    <!-- Ссылка «Все ›» у заголовков полок -->
+    <Style Selector="Button.link">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Padding" Value="6,2"/>
+      <Setter Property="Foreground" Value="{StaticResource Brand2}"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+    <Style Selector="Button.link:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{StaticResource Hover}"/><Setter Property="Foreground" Value="{StaticResource Brand2}"/></Style>
     <Style Selector="Button.primary:pointerover /template/ ContentPresenter">
       <Setter Property="Background" Value="{StaticResource Brand2}"/>
       <Setter Property="Foreground" Value="White"/>
@@ -146,14 +181,17 @@
       <Setter Property="Background" Value="{StaticResource Surface}"/>
       <Setter Property="Foreground" Value="{StaticResource Muted}"/>
     </Style>
+    <!-- Выбранный чип — «негатив» (светлый на тёмном), как фильтры в Apple Music и YouTube:
+         акцент остаётся для действий, а не раскрашивает всё подряд. -->
     <Style Selector="Button.chip.active">
-      <Setter Property="Background" Value="{StaticResource Brand}"/>
-      <Setter Property="BorderBrush" Value="{StaticResource Brand}"/>
-      <Setter Property="Foreground" Value="White"/>
+      <Setter Property="Background" Value="{StaticResource Text}"/>
+      <Setter Property="BorderBrush" Value="{StaticResource Text}"/>
+      <Setter Property="Foreground" Value="{StaticResource Bg}"/>
     </Style>
     <Style Selector="Button.chip.active:pointerover /template/ ContentPresenter">
-      <Setter Property="Background" Value="{StaticResource Brand2}"/>
-      <Setter Property="Foreground" Value="White"/>
+      <Setter Property="Background" Value="{StaticResource Text}"/>
+      <Setter Property="BorderBrush" Value="{StaticResource Text}"/>
+      <Setter Property="Foreground" Value="{StaticResource Bg}"/>
     </Style>
 
     <Style Selector="ToggleButton.chip">
@@ -207,6 +245,21 @@
       <Setter Property="ClipToBounds" Value="True"/>
     </Style>
     <Style Selector="Button.rail.active"><Setter Property="BorderBrush" Value="{StaticResource Brand}"/></Style>
+    <!-- Разделы с подписью (Библиотека, Моды, Настройки…) -->
+    <Style Selector="Button.rail-label">
+      <Setter Property="Width" Value="72"/>
+      <Setter Property="Height" Value="56"/>
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="CornerRadius" Value="12"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Foreground" Value="{StaticResource Muted}"/>
+      <Setter Property="HorizontalContentAlignment" Value="Center"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+    <Style Selector="Button.rail-label:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{StaticResource Hover}"/><Setter Property="Foreground" Value="{StaticResource Text}"/></Style>
+    <Style Selector="Button.rail-label.active"><Setter Property="Foreground" Value="{StaticResource Brand2}"/><Setter Property="Background" Value="{StaticResource Hover}"/></Style>
+    <Style Selector="Button.rail-label.active:pointerover /template/ ContentPresenter"><Setter Property="Foreground" Value="{StaticResource Brand2}"/></Style>
     <Style Selector="Button.rail:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{StaticResource Hover}"/></Style>
 
     <!-- Плитки игр -->
@@ -387,6 +440,70 @@
     <Style Selector="Button.bp-row.focused"><Setter Property="Background" Value="#2EFFFFFF"/></Style>
 
     <Style Selector="Border.skeleton"><Setter Property="Background" Value="{StaticResource Surface2}"/></Style>
+
+    <!-- 8.0: плитка мода — без рамки, на фоне страницы (как в App Store и Roblox);
+         при наведении под ней проступает подложка, картинка приподнимается. -->
+    <Style Selector="Button.tile-btn">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="CornerRadius" Value="18"/>
+      <Setter Property="Padding" Value="8"/>
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+      <Setter Property="VerticalContentAlignment" Value="Top"/>
+      <Setter Property="FontWeight" Value="Normal"/>
+      <Setter Property="Transitions"><Transitions/></Setter>
+    </Style>
+    <Style Selector="Button.tile-btn:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{StaticResource Surface}"/></Style>
+    <Style Selector="Border.tile-art">
+      <Setter Property="Transitions">
+        <Transitions>
+          <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.3" Easing="BackEaseOut"/>
+          <BoxShadowsTransition Property="BoxShadow" Duration="0:0:0.25"/>
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Window.juicy Button.tile-btn:pointerover Border.tile-art">
+      <Setter Property="RenderTransform" Value="translateY(-3px)"/>
+      <Setter Property="BoxShadow" Value="0 14 28 -14 #B0000000"/>
+    </Style>
+    <Style Selector="Window.juicy Button.tile-btn:pressed"><Setter Property="RenderTransform" Value="scale(0.98)"/></Style>
+    <Style Selector="Window.juicy Button.tile-btn:pointerover Image.zoom"><Setter Property="RenderTransform" Value="scale(1.06)"/></Style>
+
+    <!-- Большие плитки главной (бенто): лёгкий подъём при наведении -->
+    <Style Selector="Button.bento">
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="CornerRadius" Value="22"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Background" Value="{StaticResource Surface}"/>
+      <Setter Property="ClipToBounds" Value="True"/>
+      <Setter Property="HorizontalAlignment" Value="Stretch"/>
+      <Setter Property="VerticalAlignment" Value="Stretch"/>
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+      <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+      <Setter Property="FontWeight" Value="Normal"/>
+      <Setter Property="Transitions">
+        <Transitions>
+          <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.3" Easing="BackEaseOut"/>
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Button.bento:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{StaticResource Surface}"/></Style>
+    <Style Selector="Window.juicy Button.bento:pointerover"><Setter Property="RenderTransform" Value="translateY(-3px)"/></Style>
+    <Style Selector="Window.juicy Button.bento:pressed"><Setter Property="RenderTransform" Value="scale(0.985)"/></Style>
+    <Style Selector="Window.juicy Button.bento:pointerover Image.zoom"><Setter Property="RenderTransform" Value="scale(1.04)"/></Style>
+
+    <!-- Стрелки полок, как в Microsoft Store -->
+    <Style Selector="Button.pager">
+      <Setter Property="Width" Value="32"/>
+      <Setter Property="Height" Value="32"/>
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="CornerRadius" Value="16"/>
+      <Setter Property="Background" Value="{StaticResource Surface2}"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="HorizontalContentAlignment" Value="Center"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+    <Style Selector="Button.pager:disabled"><Setter Property="Opacity" Value="0.3"/></Style>
     <Style Selector="Button.card-btn.dashed">
       <Setter Property="Background" Value="Transparent"/>
     </Style>

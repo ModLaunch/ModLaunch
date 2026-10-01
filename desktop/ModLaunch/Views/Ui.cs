@@ -193,20 +193,9 @@ public static class Ui
     /// <summary>Картинка по ссылке: пока грузится — буквы на цветном фоне.</summary>
     public static Control Thumb(string? url, string name, double size, double radius = 12, int decode = 160)
     {
-        var initials = string.Concat(name.Split(' ', '-', '_').Where(w => w.Length > 0 && char.IsLetterOrDigit(w[0])).Take(2).Select(w => char.ToUpperInvariant(w[0])));
-        var hue = (int)(name.Aggregate(17u, (h, c) => h * 31 + c) % 360);
-        var fallback = new Border
-        {
-            Background = new LinearGradientBrush
-            {
-                StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative),
-                EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
-                GradientStops = { new GradientStop(HslColor(hue, 0.55, 0.42), 0), new GradientStop(HslColor((hue + 50) % 360, 0.6, 0.3), 1) },
-            },
-            Child = new TextBlock { Text = initials, FontWeight = FontWeight.Bold, FontSize = size * 0.3, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
-        };
+        // 8.0: вместо градиента с буквами — рисованная обложка (см. Tiles.Placeholder).
         var image = new Image { Classes = { "zoom" }, Stretch = Stretch.UniformToFill };
-        var host = new Border { Width = size, Height = size, CornerRadius = new CornerRadius(radius), ClipToBounds = true, Child = new Panel { Children = { fallback, image } } };
+        var host = new Border { Width = size, Height = size, CornerRadius = new CornerRadius(radius), ClipToBounds = true, Child = new Panel { Children = { Tiles.Placeholder(name), image } } };
         if (!string.IsNullOrEmpty(url))
         {
             _ = Images.FromUrl(url, decode).ContinueWith(t =>
@@ -215,13 +204,6 @@ public static class Ui
             });
         }
         return host;
-    }
-
-    public static Color HslColor(double h, double s, double l)
-    {
-        double C = (1 - Math.Abs(2 * l - 1)) * s, X = C * (1 - Math.Abs(h / 60 % 2 - 1)), m = l - C / 2;
-        var (r, g, b) = h switch { < 60 => (C, X, 0d), < 120 => (X, C, 0d), < 180 => (0d, C, X), < 240 => (0d, X, C), < 300 => (X, 0d, C), _ => (C, 0d, X) };
-        return Color.FromRgb((byte)((r + m) * 255), (byte)((g + m) * 255), (byte)((b + m) * 255));
     }
 
     public static string Ago(DateTime? when)

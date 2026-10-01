@@ -11,7 +11,8 @@ namespace ModLaunch.Core;
 public static class Look
 {
     public static readonly string[] Themes = ["dark", "black", "light"];
-    public static readonly string[] Accents = ["#7C5CFF", "#3B82F6", "#14B8A6", "#22C55E", "#EAB308", "#F97316", "#EF4444", "#EC4899"];
+    /// <summary>Первый — по умолчанию. С 8.0 это синий, как кнопки в магазинах: фиолетовый остаётся в выборе.</summary>
+    public static readonly string[] Accents = ["#3478F6", "#7C5CFF", "#14B8A6", "#22C55E", "#EAB308", "#F97316", "#EF4444", "#EC4899"];
     public static readonly double[] Scales = [0.85, 0.9, 1.0, 1.1, 1.25];
 
     public static string Theme => Themes.Contains(Settings.Data.Str("theme")) ? Settings.Data.Str("theme")! : "dark";
@@ -24,22 +25,24 @@ public static class Look
 
     public static event Action? Changed;
 
+    // 8.0: нейтральный графит вместо сине-фиолетового — цвет дают обложки игр и акцент,
+    // а не фон. Светлая тема — в духе App Store: светло-серый фон и белые карточки.
     static readonly Dictionary<string, Dictionary<string, string>> Palettes = new()
     {
         ["dark"] = new()
         {
-            ["Bg"] = "#0F1116", ["Rail"] = "#12141A", ["Surface"] = "#171A21", ["Surface2"] = "#1E222B", ["Surface3"] = "#262B36",
-            ["Line"] = "#2A2F3B", ["Text"] = "#E8EBF2", ["Muted"] = "#98A1B2", ["Faint"] = "#6B7385",
+            ["Bg"] = "#121214", ["Rail"] = "#0D0D0F", ["Surface"] = "#1A1A1D", ["Surface2"] = "#222226", ["Surface3"] = "#2D2D32",
+            ["Line"] = "#2A2A2F", ["Text"] = "#F4F4F5", ["Muted"] = "#A1A1AA", ["Faint"] = "#71717A",
         },
         ["black"] = new()
         {
-            ["Bg"] = "#000000", ["Rail"] = "#050506", ["Surface"] = "#0B0C0F", ["Surface2"] = "#131419", ["Surface3"] = "#1B1D24",
-            ["Line"] = "#1E2027", ["Text"] = "#ECEEF3", ["Muted"] = "#9098A8", ["Faint"] = "#626979",
+            ["Bg"] = "#000000", ["Rail"] = "#050505", ["Surface"] = "#0E0E10", ["Surface2"] = "#17171A", ["Surface3"] = "#222225",
+            ["Line"] = "#1D1D20", ["Text"] = "#F4F4F5", ["Muted"] = "#9A9AA3", ["Faint"] = "#6B6B73",
         },
         ["light"] = new()
         {
-            ["Bg"] = "#F4F5F8", ["Rail"] = "#ECEEF3", ["Surface"] = "#FFFFFF", ["Surface2"] = "#F0F2F6", ["Surface3"] = "#E4E7EE",
-            ["Line"] = "#DADEE7", ["Text"] = "#161922", ["Muted"] = "#5B6474", ["Faint"] = "#8A92A2",
+            ["Bg"] = "#F5F5F7", ["Rail"] = "#ECECF0", ["Surface"] = "#FFFFFF", ["Surface2"] = "#F2F2F5", ["Surface3"] = "#E6E6EB",
+            ["Line"] = "#E0E0E6", ["Text"] = "#1D1D1F", ["Muted"] = "#6E6E73", ["Faint"] = "#A1A1A6",
         },
     };
 
