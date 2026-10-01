@@ -26,6 +26,13 @@ jobs:
         shell: pwsh
         run: Get-ChildItem out | Format-Table Name, @{n='MB';e={[math]::Round($_.Length/1MB,1)}}
 
+      - name: Installer check (installs into ModLaunch, moves the old modhub folder)
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath out/ModLaunch.exe -ArgumentList '--installer-check' -PassThru -Wait -NoNewWindow -RedirectStandardOutput installer.txt
+          Get-Content installer.txt
+          if ($p.ExitCode -ne 0) { throw "installer check failed" }
+
       - name: Self-check (live catalogs, install into a test folder)
         shell: pwsh
         run: |
@@ -46,6 +53,12 @@ jobs:
           $p = Start-Process -FilePath out/ModLaunch.exe -ArgumentList '--screenshot', 'shots' -PassThru -Wait -NoNewWindow
           if ($p.ExitCode -ne 0) { throw "exit $($p.ExitCode)" }
           Get-ChildItem shots
+
+      - name: Installer screens
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath out/ModLaunch.exe -ArgumentList '--setup-shots', 'shots/setup' -PassThru -Wait -NoNewWindow
+          if ($p.ExitCode -ne 0) { throw "exit $($p.ExitCode)" }
 
       - uses: actions/upload-artifact@v4
         with:

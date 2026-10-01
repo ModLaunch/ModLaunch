@@ -650,7 +650,16 @@
   "setup.tip.3": "Правая кнопка на обложке — коллекции и избранное, как в Steam.",
   "setup.tip.4": "Ctrl+K — поиск модов с любой страницы.",
   "setup.tip.5": "В ModLaunch Hub можно публиковать свои моды — без рекламы.",
-  "setup.done.games": "Уже поддерживается 17 игр — и любая другая через «+»"
+  "setup.done.games": "Уже поддерживается 17 игр — и любая другая через «+»",
+  "setup.step.legacy": "Убираю старую версию из прежней папки…",
+  "setup.welcome.legacyTitle": "Нашёл старую версию",
+  "setup.welcome.legacy": "Она лежит в {path}. Перенесу ModLaunch в новую папку, а старую уберу. Настройки, ключ Nexus и моды останутся на месте.",
+  "setup.welcome.where": "Установится сюда",
+  "setup.done.where": "Установлено в {path}",
+  "setup.done.open": "Открыть папку",
+  "setup.done.moved": "Старая версия из {path} убрана, ярлыки теперь ведут в новую папку.",
+  "setup.uninstall.where": "Папка: {path}",
+  "setup.progress.moveHint": "Заодно переношу программу из старой папки."
  },
  "en": {
   "add.title": "Add a game",
@@ -1303,6 +1312,15 @@
   "setup.tip.3": "Right-click a cover for collections and favorites, like Steam.",
   "setup.tip.4": "Ctrl+K searches mods from any page.",
   "setup.tip.5": "Publish your own mods to ModLaunch Hub — no ads.",
-  "setup.done.games": "17 games supported out of the box — and any other via “+”"
+  "setup.done.games": "17 games supported out of the box — and any other via “+”",
+  "setup.step.legacy": "Removing the old version from the previous folder…",
+  "setup.welcome.legacyTitle": "Found an older install",
+  "setup.welcome.legacy": "It lives in {path}. ModLaunch will move to the new folder and the old one will be removed. Settings, the Nexus key and mods stay put.",
+  "setup.welcome.where": "Will be installed to",
+  "setup.done.where": "Installed to {path}",
+  "setup.done.open": "Open folder",
+  "setup.done.moved": "The old version from {path} is gone; shortcuts now point to the new folder.",
+  "setup.uninstall.where": "Folder: {path}",
+  "setup.progress.moveHint": "Moving the app out of the old folder along the way."
  }
 }

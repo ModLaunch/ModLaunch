@@ -11,8 +11,10 @@ public enum SetupMode { None, Install, Update, Uninstall }
 /// Своя установка без отдельного установщика: ModLaunch-Setup.exe — это та же
 /// программа. По имени файла (или --setup) она открывает окно установки,
 /// с --update тихо обновляет установленную копию, с --uninstall — удаляет.
-/// Папка, отметка и записи в реестре — те же, что у 3.x, поэтому новая версия
-/// ставится поверх старой на Electron.
+/// Ставит всегда в папку «ModLaunch». Если рядом найдена старая установка
+/// (3.x на Electron в Programs\modhub), программа переезжает в «ModLaunch»,
+/// а старая папка, её ярлыки и записи в реестре убираются; настройки и моды
+/// лежат отдельно (%APPDATA%\ModHub) и остаются на месте.
 /// </summary>
 public static class Installer
 {
@@ -31,18 +33,28 @@ public static class Installer
         return name.Contains("setup", StringComparison.OrdinalIgnoreCase) ? SetupMode.Install : SetupMode.None;
     }
 
-    static string Local => Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-    public static string DefaultDir => Path.Combine(Local, "Programs", "ModLaunch");
-    static string NsisDir => Path.Combine(Local, "Programs", "modhub");
+    /// <summary>%LOCALAPPDATA%; для проверок установщика подменяется переменной MODLAUNCH_LOCAL.</summary>
+    static string Local => Environment.GetEnvironmentVariable("MODLAUNCH_LOCAL") is { Length: > 0 } fake ? fake : Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+    public const string FolderName = "ModLaunch";
+    const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
+    const string UninstallRoot = @"Software\Microsoft\Windows\CurrentVersion\Uninstall";
+    public static string DefaultDir => Path.Combine(Local, "Programs", FolderName);
+    static string LegacyDir => Path.Combine(Local, "Programs", "modhub");
 
     /// <summary>Установлена ли эта копия (рядом с exe есть отметка установки).</summary>
     public static bool IsInstalledCopy => Environment.ProcessPath is string exe && File.Exists(Path.Combine(Path.GetDirectoryName(exe)!, Marker));
 
+    /// <summary>
+    /// Ставим всегда в свою папку: выбрали «D:\Games» — получится «D:\Games\ModLaunch».
+    /// Прежняя «ModHub» превращается в «ModLaunch» рядом с ней.
+    /// </summary>
     public static string Normalize(string? dir)
     {
-        var full = Path.GetFullPath(string.IsNullOrWhiteSpace(dir) ? DefaultDir : dir.Trim());
-        var name = Path.GetFileName(full.TrimEnd(Path.DirectorySeparatorChar));
-        return name.Equals("ModLaunch", StringComparison.OrdinalIgnoreCase) || name.Equals("ModHub", StringComparison.OrdinalIgnoreCase) ? full : Path.Combine(full, "ModLaunch");
+        var full = Path.GetFullPath(string.IsNullOrWhiteSpace(dir) ? DefaultDir : dir.Trim()).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var name = Path.GetFileName(full);
+        if (name.Equals(FolderName, StringComparison.OrdinalIgnoreCase)) return full;
+        if (name.Equals("ModHub", StringComparison.OrdinalIgnoreCase)) return Path.Combine(Path.GetDirectoryName(full) ?? full, FolderName);
+        return Path.Combine(full, FolderName);
     }
 
     public enum TargetKind { Missing, Empty, Ours, Foreign }
@@ -60,18 +72,39 @@ public static class Installer
         return (TargetKind.Foreign, null);
     }
 
-    /// <summary>Куда ставить: туда, где уже стоит (из реестра или старая папка NSIS), иначе по умолчанию.</summary>
+    static string? KnownDir()
+    {
+        if (!OperatingSystem.IsWindows()) return null;
+        try { return Registry.CurrentUser.OpenSubKey(AppKey)?.GetValue("InstallDir") as string; } catch { return null; }
+    }
+
+    /// <summary>Куда ставить: где уже стоит ModLaunch (если выбирали свою папку), иначе Programs\ModLaunch.</summary>
     public static string SuggestedDir()
     {
-        if (OperatingSystem.IsWindows())
+        var known = KnownDir();
+        if (known is not null && Inspect(known).Kind == TargetKind.Ours) return Normalize(known);
+        return DefaultDir;
+    }
+
+    static bool Same(string a, string b) =>
+        string.Equals(Path.GetFullPath(a).TrimEnd(Path.DirectorySeparatorChar), Path.GetFullPath(b).TrimEnd(Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Старые установки ModLaunch/ModHub, которые не совпадают с целевой папкой и переедут в неё.</summary>
+    public static List<string> FindLegacy(string target)
+    {
+        var found = new List<string>();
+        foreach (var candidate in new[] { LegacyDir, KnownDir() })
         {
+            if (string.IsNullOrWhiteSpace(candidate)) continue;
             try
             {
-                if (Registry.CurrentUser.OpenSubKey(AppKey)?.GetValue("InstallDir") is string known && Inspect(known).Kind == TargetKind.Ours) return Normalize(known);
+                var full = Path.GetFullPath(candidate.Trim());
+                if (Same(full, target) || found.Any(f => Same(f, full))) continue;
+                if (Inspect(full).Kind == TargetKind.Ours) found.Add(full);
             }
             catch { }
         }
-        return Normalize(Inspect(NsisDir).Kind == TargetKind.Ours ? NsisDir : DefaultDir);
+        return found;
     }
 
     static bool Inside(string child, string parent)
@@ -103,8 +136,24 @@ public static class Installer
         if (closed) Thread.Sleep(900);
     }
 
-    public sealed record Result(string Target, string Exe, bool Updated, string? From);
+    public sealed record Result(string Target, string Exe, bool Updated, string? From, string? Moved = null);
 
+    public static long SourceSize => Environment.ProcessPath is string p && File.Exists(p) ? new FileInfo(p).Length : 0;
+
+    /// <summary>Свободное место на диске папки; null, если диск не определился (сетевой путь и т. п.).</summary>
+    public static long? FreeBytes(string dir)
+    {
+        try { return Path.GetPathRoot(Path.GetFullPath(dir)) is string root ? new DriveInfo(root).AvailableFreeSpace : null; }
+        catch { return null; }
+    }
+
+    static bool NoSpace(IOException e) => (e.HResult & 0xFFFF) is 112 or 39;
+
+    /// <summary>
+    /// Установка не оставляет полурабочую копию: сначала новый exe пишется рядом как .part,
+    /// и только когда он целиком на диске, старые файлы заменяются. Не хватило места или
+    /// файл занят — прежняя установка остаётся как была.
+    /// </summary>
     public static async Task<Result> Install(string targetInput, bool desktop, IProgress<(string Step, double Ratio)> progress)
     {
         var dir = Normalize(targetInput);
@@ -112,33 +161,90 @@ public static class Installer
         if (Inside(source, dir)) throw new SetupError("SETUP_TARGET_SELF");
         var (kind, version) = Inspect(dir);
         if (kind == TargetKind.Foreign) throw new SetupError("SETUP_TARGET_FOREIGN");
+        var legacy = FindLegacy(dir).Where(l => !Inside(source, l)).ToList();
+        var size = new FileInfo(source).Length;
+        var exe = Path.Combine(dir, ExeName);
+        var part = exe + ".part";
 
         try
         {
             progress.Report(("close", 0));
-            await Task.Run(() => CloseRunning(dir));
-            if (kind == TargetKind.Ours)
-            {
-                progress.Report(("clean", 0));
-                await Retry(() => { Directory.Delete(dir, true); });
-            }
-            progress.Report(("copy", 0));
-            Directory.CreateDirectory(dir);
-            File.WriteAllText(Path.Combine(dir, Marker), new JsonObject { ["version"] = Http.Version, ["installedAt"] = DateTime.UtcNow.ToString("o") }.ToJsonString());
-            var exe = Path.Combine(dir, ExeName);
-            await CopyWithProgress(source, exe, r => progress.Report(("copy", r)));
+            await Task.Run(() => { CloseRunning(dir); foreach (var l in legacy) CloseRunning(l); });
 
-            progress.Report(("integrate", 1));
+            if (FreeBytes(dir) is long free && free < size * 2 + (50L << 20)) throw new SetupError("SETUP_SPACE");
+            Directory.CreateDirectory(dir);
+            progress.Report(("copy", 0.04));
+            try { await CopyWithProgress(source, part, r => progress.Report(("copy", 0.04 + r * 0.8))); }
+            catch { try { File.Delete(part); } catch { } throw; }
+
+            progress.Report(("clean", 0.86));
+            if (kind == TargetKind.Ours)
+                foreach (var entry in Directory.EnumerateFileSystemEntries(dir).Where(e => !Same(e, part)).ToList())
+                    await Retry(() => { if (Directory.Exists(entry)) Directory.Delete(entry, true); else File.Delete(entry); });
+            await Retry(() => File.Move(part, exe, true));
+            File.WriteAllText(Path.Combine(dir, Marker), new JsonObject { ["version"] = Http.Version, ["installedAt"] = DateTime.UtcNow.ToString("o") }.ToJsonString());
+
+            progress.Report(("integrate", 0.92));
             if (OperatingSystem.IsWindows())
             {
                 Register(dir, exe, (int)(new FileInfo(exe).Length / 1024));
                 Shortcuts(exe, dir, desktop);
+                RepointAutostart(exe);
+            }
+
+            string? moved = null;
+            if (legacy.Count > 0)
+            {
+                progress.Report(("legacy", 0.96));
+                foreach (var l in legacy) if (await Task.Run(() => RemoveLegacy(l))) moved ??= l;
             }
             progress.Report(("done", 1));
-            return new Result(dir, exe, kind == TargetKind.Ours, version);
+            return new Result(dir, exe, kind == TargetKind.Ours, version, moved);
         }
+        catch (IOException e) when (NoSpace(e)) { throw new SetupError("SETUP_SPACE"); }
         catch (IOException) { throw new SetupError("SETUP_BUSY"); }
         catch (UnauthorizedAccessException) { throw new SetupError("SETUP_ACCESS"); }
+    }
+
+    /// <summary>
+    /// Убрать прежнюю установку: папку, ярлыки «ModHub» и запись в «Приложениях Windows».
+    /// Ошибки не мешают установке — новая копия уже стоит и работает.
+    /// </summary>
+    static bool RemoveLegacy(string dir)
+    {
+        var ok = true;
+        try { Directory.Delete(dir, true); }
+        catch { ok = false; }
+        foreach (var folder in new[] { Environment.SpecialFolder.DesktopDirectory, Environment.SpecialFolder.Programs })
+            try { File.Delete(Path.Combine(Environment.GetFolderPath(folder), "ModHub.lnk")); } catch { }
+        if (OperatingSystem.IsWindows())
+        {
+            try
+            {
+                using var root = Registry.CurrentUser.OpenSubKey(UninstallRoot, writable: true);
+                foreach (var name in root?.GetSubKeyNames() ?? [])
+                {
+                    if (name == "ModHub") continue; // эту запись только что записали мы
+                    using var key = root!.OpenSubKey(name);
+                    var text = string.Join("|", new[] { "InstallLocation", "UninstallString", "DisplayIcon" }.Select(v => key?.GetValue(v) as string ?? ""));
+                    if (text.Contains(dir, StringComparison.OrdinalIgnoreCase)) root.DeleteSubKeyTree(name, false);
+                }
+            }
+            catch { }
+        }
+        return ok;
+    }
+
+    /// <summary>Автозапуск с Windows, включённый из старой папки, переводим на новый exe.</summary>
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
+    static void RepointAutostart(string exe)
+    {
+        try
+        {
+            using var run = Registry.CurrentUser.OpenSubKey(RunKey, writable: true);
+            if (run?.GetValue("ModLaunch") is string current) run.SetValue("ModLaunch", $"\"{exe}\"" + (current.Contains("--autostart") ? " --autostart" : ""));
+        }
+        catch { }
     }
 
     static async Task Retry(Action action)
@@ -249,6 +355,12 @@ public static class Installer
             try { Registry.CurrentUser.DeleteSubKeyTree(AppKey, false); } catch { }
             try
             {
+                using var run = Registry.CurrentUser.OpenSubKey(RunKey, writable: true);
+                if (run?.GetValue("ModLaunch") is string auto && auto.Contains(exe, StringComparison.OrdinalIgnoreCase)) run.DeleteValue("ModLaunch", false);
+            }
+            catch { }
+            try
+            {
                 var command = Registry.CurrentUser.OpenSubKey(@"Software\Classes\nxm\shell\open\command")?.GetValue(null) as string;
                 if (command is not null && command.Contains(exe, StringComparison.OrdinalIgnoreCase)) Registry.CurrentUser.DeleteSubKeyTree(@"Software\Classes\nxm", false);
             }
@@ -261,6 +373,11 @@ public static class Installer
         var cmd = Environment.GetEnvironmentVariable("ComSpec") ?? Path.Combine(Environment.SystemDirectory, "cmd.exe");
         var parts = string.Join(" & ", remove.Select(d => $"rmdir /s /q \"{d.Replace("\"", "")}\""));
         Process.Start(new ProcessStartInfo(cmd, $"/d /s /c \"ping 127.0.0.1 -n 4 >nul & {parts}\"") { CreateNoWindow = true, UseShellExecute = false, WorkingDirectory = Path.GetTempPath() });
+    }
+
+    public static void OpenFolder(string dir)
+    {
+        try { Process.Start(new ProcessStartInfo(dir) { UseShellExecute = true }); } catch { }
     }
 
     public static void Launch(string exe)

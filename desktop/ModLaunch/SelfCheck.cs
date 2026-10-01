@@ -14,6 +14,60 @@ namespace ModLaunch;
 /// </summary>
 public static class SelfCheck
 {
+    /// <summary>
+    /// --installer-check: установщик целиком, без сети и без реестра: всегда в «ModLaunch»,
+    /// старая «modhub» переезжает, чужую папку не трогаем, повторная установка — обновление.
+    /// </summary>
+    public static async Task<int> InstallerCheck()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "modlaunch-installer-check-" + Environment.ProcessId);
+        if (Directory.Exists(root)) Directory.Delete(root, true);
+        Environment.SetEnvironmentVariable("MODLAUNCH_LOCAL", Path.Combine(root, "Local"));
+        Environment.SetEnvironmentVariable("MODLAUNCH_DATA", Path.Combine(root, "data"));
+        var failed = 0;
+        void Expect(string name, bool ok, string detail = "")
+        {
+            Console.WriteLine($"{(ok ? "ok  " : "FAIL")} {name}{(detail == "" ? "" : ": " + detail)}");
+            if (!ok) failed++;
+        }
+        var programs = Path.Combine(root, "Local", "Programs");
+        var legacy = Path.Combine(programs, "modhub");
+        var target = Path.Combine(programs, "ModLaunch");
+        var quiet = new Progress<(string, double)>(_ => { });
+
+        // Старая установка 3.x на Electron: exe, resources/app.asar и много всего рядом.
+        Directory.CreateDirectory(Path.Combine(legacy, "resources", "locales"));
+        File.WriteAllText(Path.Combine(legacy, "ModHub.exe"), "old");
+        File.WriteAllText(Path.Combine(legacy, "resources", "app.asar"), "old");
+        File.WriteAllText(Path.Combine(legacy, "resources", "locales", "ru.pak"), "old");
+
+        Expect("normalize: modhub -> ModLaunch", Setup.Installer.Normalize(legacy) == target, Setup.Installer.Normalize(legacy));
+        Expect("normalize: any folder -> folder/ModLaunch", Setup.Installer.Normalize(Path.Combine(root, "Games")) == Path.Combine(root, "Games", "ModLaunch"));
+        Expect("suggested folder is ModLaunch, not the old modhub", Setup.Installer.SuggestedDir() == target, Setup.Installer.SuggestedDir());
+        Expect("old install is found", Setup.Installer.FindLegacy(target).Count == 1);
+
+        var first = await Setup.Installer.Install(target, desktop: false, quiet);
+        Expect("exe lands in ModLaunch", File.Exists(Path.Combine(target, Setup.Installer.ExeName)) && File.Exists(Path.Combine(target, Setup.Installer.Marker)));
+        Expect("old modhub folder is gone", !Directory.Exists(legacy));
+        Expect("result says it moved from modhub", first.Moved is not null && !first.Updated);
+        Expect("no .part left behind", !Directory.EnumerateFiles(target, "*.part").Any());
+
+        File.WriteAllText(Path.Combine(target, "stray.txt"), "x");
+        var again = await Setup.Installer.Install(target, desktop: false, quiet);
+        Expect("second install is an update", again.Updated && again.Moved is null && again.From == Http.Version);
+        Expect("update cleans stray files", !File.Exists(Path.Combine(target, "stray.txt")) && File.Exists(again.Exe));
+
+        var foreign = Path.Combine(root, "Foreign", "ModLaunch");
+        Directory.CreateDirectory(foreign);
+        File.WriteAllText(Path.Combine(foreign, "my-photos.zip"), "mine");
+        try { await Setup.Installer.Install(foreign, desktop: false, quiet); Expect("foreign folder is refused", false); }
+        catch (Setup.SetupError e) { Expect("foreign folder is refused", e.Code == "SETUP_TARGET_FOREIGN" && File.Exists(Path.Combine(foreign, "my-photos.zip"))); }
+
+        try { Directory.Delete(root, true); } catch { }
+        Console.WriteLine(failed == 0 ? "installer: all good" : $"installer: {failed} failed");
+        return failed == 0 ? 0 : 1;
+    }
+
     public static async Task<int> Run()
     {
         var root = Path.Combine(Path.GetTempPath(), "modlaunch-selfcheck");

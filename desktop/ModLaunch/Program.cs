@@ -34,9 +34,12 @@ public static class Program
     public static int Main(string[] args)
     {
         if (args.Contains("--catalog-report")) return CatalogReport.Run().GetAwaiter().GetResult();
+        if (args.Contains("--installer-check")) return SelfCheck.InstallerCheck().GetAwaiter().GetResult();
         if (args.Contains("--selfcheck")) return SelfCheck.Run().GetAwaiter().GetResult();
         var shot = Array.IndexOf(args, "--screenshot");
         if (shot >= 0 && shot + 1 < args.Length) return Screenshots(args[shot + 1]);
+        var setupShots = Array.IndexOf(args, "--setup-shots");
+        if (setupShots >= 0 && setupShots + 1 < args.Length) return SetupShots(args[setupShots + 1]);
 
         // Установка, обновление, удаление — та же программа в другом режиме.
         SetupMode = ModLaunch.Setup.Installer.Detect(args);
@@ -58,8 +61,18 @@ public static class Program
     public static AppBuilder BuildAvaloniaApp() =>
         AppBuilder.Configure<App>().UsePlatformDetect().WithInterFont().LogToTrace();
 
-    /// <summary>Отрисовать главные экраны в PNG — для проверки вида на CI и без Windows.</summary>
-    static int Screenshots(string outDir)
+    static void PumpUi(int ms = 600)
+    {
+        var until = DateTime.UtcNow.AddMilliseconds(ms);
+        while (DateTime.UtcNow < until)
+        {
+            Dispatcher.UIThread.RunJobs();
+            AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+            Thread.Sleep(15);
+        }
+    }
+
+    static void StartHeadless(string outDir)
     {
         Screenshot = true;
         Demo = true;
@@ -73,6 +86,34 @@ public static class Program
             .UseHeadless(new AvaloniaHeadlessPlatformOptions { UseHeadlessDrawing = false })
             .WithInterFont()
             .SetupWithoutStarting();
+    }
+
+    /// <summary>Только окна установщика — все экраны, без установки на самом деле.</summary>
+    static int SetupShots(string outDir)
+    {
+        StartHeadless(outDir);
+        foreach (var (mode, screen) in new[]
+        {
+            (ModLaunch.Setup.SetupMode.Install, "welcome"), (ModLaunch.Setup.SetupMode.Install, "welcome-update"), (ModLaunch.Setup.SetupMode.Install, "welcome-legacy"),
+            (ModLaunch.Setup.SetupMode.Install, "progress"), (ModLaunch.Setup.SetupMode.Install, "done"), (ModLaunch.Setup.SetupMode.Install, "error"), (ModLaunch.Setup.SetupMode.Install, "license"),
+            (ModLaunch.Setup.SetupMode.Uninstall, "uninstall"), (ModLaunch.Setup.SetupMode.Uninstall, "uninstalled"),
+        })
+        {
+            var w = new SetupWindow(mode);
+            w.Show();
+            w.Preview(screen);
+            PumpUi(900);
+            w.CaptureRenderedFrame()?.Save(Path.Combine(outDir, "setup-" + screen + ".png"));
+            Console.WriteLine("saved setup-" + screen);
+            w.Close();
+        }
+        return 0;
+    }
+
+    /// <summary>Отрисовать главные экраны в PNG — для проверки вида на CI и без Windows.</summary>
+    static int Screenshots(string outDir)
+    {
+        StartHeadless(outDir);
 
         var window = new MainWindow { Width = 1366, Height = 800 };
         window.Show();
