@@ -59,8 +59,8 @@ public sealed class SetupWindow : Window
         buttons.Margin = new Thickness(0, 8, 8, 0);
 
         // Слева — «стена» настоящих обложек игр, медленно плывущая вверх, поверх — логотип и что умеет программа.
-        var features = Ui.Col(14);
-        foreach (var (i, icon) in new[] { (1, Icons.Download), (2, Icons.Layers), (3, Icons.Sparkles), (4, Icons.Users), (5, Icons.Shield) })
+        var features = Ui.Col(12);
+        foreach (var (i, icon) in new[] { (1, Icons.Download), (2, Icons.Layers), (3, Icons.Gamepad), (6, Icons.Code), (4, Icons.Users), (5, Icons.Shield) })
         {
             var row = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*"), ColumnSpacing = 12 };
             row.Children.Add(new Border { Width = 34, Height = 34, CornerRadius = new CornerRadius(10), VerticalAlignment = VerticalAlignment.Top, Background = Ui.Hex("#332A2350"), BorderBrush = Ui.Hex("#557C5CFF"), BorderThickness = new Thickness(1), Child = Ui.Icon(icon, 16, Ui.Res("Brand2")) });
@@ -339,7 +339,7 @@ public sealed class SetupWindow : Window
         var tipIndex = 1;
         var tips = new DispatcherTimer(TimeSpan.FromSeconds(3.5), DispatcherPriority.Background, (_, _) =>
         {
-            tipIndex = tipIndex % 5 + 1;
+            tipIndex = tipIndex % 7 + 1;
             tip.Text = T("tip." + tipIndex);
             Animate.From(tip, "translateY(8px)", 300);
         });

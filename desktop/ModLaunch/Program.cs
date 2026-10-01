@@ -34,6 +34,11 @@ public static class Program
     public static int Main(string[] args)
     {
         if (args.Contains("--catalog-report")) return CatalogReport.Run().GetAwaiter().GetResult();
+        if (args.Contains("--creator-check")) return CreatorCheck();
+        var bpShots = Array.IndexOf(args, "--bp-shots");
+        if (bpShots >= 0 && bpShots + 1 < args.Length) return BigPictureShots(args[bpShots + 1]);
+        var creatorShots = Array.IndexOf(args, "--creator-shots");
+        if (creatorShots >= 0 && creatorShots + 1 < args.Length) return CreatorShots(args[creatorShots + 1]);
         if (args.Contains("--installer-check")) return SelfCheck.InstallerCheck().GetAwaiter().GetResult();
         if (args.Contains("--selfcheck")) return SelfCheck.Run().GetAwaiter().GetResult();
         var shot = Array.IndexOf(args, "--screenshot");
@@ -86,6 +91,117 @@ public static class Program
             .UseHeadless(new AvaloniaHeadlessPlatformOptions { UseHeadlessDrawing = false })
             .WithInterFont()
             .SetupWithoutStarting();
+    }
+
+    /// <summary>Creator Hub без сети: нужен Avalonia (значок пакета), поэтому в безголовом режиме и на тестовых данных.</summary>
+    static int CreatorCheck()
+    {
+        StartHeadless(Path.Combine(Path.GetTempPath(), "modlaunch-creator-shots"));
+        return Task.Run(SelfCheck.CreatorCheck).GetAwaiter().GetResult(); // не на потоке интерфейса: там await ждал бы сам себя
+    }
+
+    /// <summary>Все разделы Creator Hub: чужие файлы для примера (картинка, модель, звук) создаются на лету.</summary>
+    static void CreatorScreens(MainWindow window, Action<string> save)
+    {
+        // Ассеты для витрины: настоящая картинка и пара файлов других видов.
+        var tmp = Path.Combine(Path.GetTempPath(), "modlaunch-creator-demo-" + Environment.ProcessId);
+        Directory.CreateDirectory(tmp);
+        using (var icon = Avalonia.Platform.AssetLoader.Open(new Uri("avares://ModLaunch/Assets/icon.png"))) using (var f = File.Create(Path.Combine(tmp, "sword-icon.png"))) icon.CopyTo(f);
+        File.WriteAllBytes(Path.Combine(tmp, "sword.fbx"), new byte[420_000]);
+        File.WriteAllBytes(Path.Combine(tmp, "swing.ogg"), new byte[86_000]);
+        File.WriteAllBytes(Path.Combine(tmp, "mymod.bundle"), new byte[1_900_000]);
+        foreach (var file in Directory.GetFiles(tmp)) Creator.AssetLibrary.Import(file, "");
+
+        window.Navigate(() => new CreatorPage("studio"));
+        save("15a-creator-studio");
+        window.Navigate(() => new CreatorPage("code"));
+        save("15b-creator-code-empty");
+        var lethal = Games.GameCatalog.ById("lethal-company")!;
+        var sample = Creator.CodeProjects.Create("Быстрые ноги", lethal, null, "Maks");
+        Creator.CodeProjects.Create("Больше слотов", Games.GameCatalog.ById("valheim")!, null, "Maks");
+        Creator.CodeProjects.Create("Весенний рынок", Games.GameCatalog.ById("stardew-valley")!, null, "Maks");
+        window.Navigate(() => new CreatorPage("code"));
+        save("15c-creator-code-list");
+        var page = new CreatorPage("code");
+        page.ShowWizard(lethal.Id);
+        window.Navigate(() => page);
+        save("15d-creator-code-wizard");
+        var detail = new CreatorPage("code");
+        detail.ShowCode(sample);
+        window.Navigate(() => detail);
+        save("15e-creator-code-project");
+        window.Navigate(() => new CreatorPage("snippets"));
+        save("15f-creator-snippets");
+        window.Navigate(() => new CreatorPage("assets"));
+        save("15g-creator-assets");
+        var pack = new CreatorPage("pack");
+        pack.DemoPack(sample);
+        window.Navigate(() => pack);
+        save("15h-creator-pack");
+        window.Navigate(() => new CreatorPage("guides"));
+        save("15i-creator-guides");
+        var model = new CreatorPage("guides");
+        model.ShowGuide("model");
+        window.Navigate(() => model);
+        save("15j-creator-guide-model");
+        var check = new CreatorPage("guides");
+        check.ShowGuide("check");
+        window.Navigate(() => check);
+        save("15k-creator-checklist");
+        window.Navigate(() => new CreatorPage("tools"));
+        save("15l-creator-tools");
+        try { Directory.Delete(tmp, true); } catch { }
+    }
+
+    /// <summary>Big Picture: главный экран и все окна-меню (каталог, профили, обновления, друзья, загрузки) на поддельных данных.</summary>
+    static void BigPictureScreens(Action<Avalonia.Controls.Window, string> save)
+    {
+        foreach (var g in AppState.Games.Where(g => g.Status == Detect.Found && g.Registry is not null))
+            try { Features.Profiles.Save(g.Def.Id, "Выживание", g.Registry!); Features.Profiles.Save(g.Def.Id, "Только визуал", g.Registry!); } catch { }
+        Jobs.All.Insert(0, new Job { Title = "Better Sprint", GameName = "Subnautica", Step = "Скачиваю", Ratio = 0.42 });
+        Jobs.All.Insert(1, new Job { Title = "Nautilus", GameName = "Subnautica", Step = "Готово", Ratio = 1, Status = JobStatus.Done });
+        var big = new BigPictureWindow(windowed: true);
+        big.Show();
+        save(big, "13a-bigpicture");
+        big.DemoMods();
+        save(big, "13b-bigpicture-mods");
+        foreach (var (what, file) in new[]
+        {
+            ("sections", "13c-bp-catalog-sections"), ("catalog", "13d-bp-catalog"), ("profiles", "13e-bp-profiles"),
+            ("more", "13f-bp-more"), ("friends", "13g-bp-friends"), ("downloads", "13h-bp-downloads"),
+        })
+        {
+            big.Demo(what);
+            save(big, file);
+        }
+        big.Close();
+    }
+
+    static int BigPictureShots(string outDir)
+    {
+        StartHeadless(outDir);
+        BigPictureScreens((w, name) =>
+        {
+            PumpUi(900);
+            w.CaptureRenderedFrame()?.Save(Path.Combine(outDir, name + ".png"));
+            Console.WriteLine("saved " + name);
+        });
+        return 0;
+    }
+
+    static int CreatorShots(string outDir)
+    {
+        StartHeadless(outDir);
+        var window = new MainWindow { Width = 1500, Height = 900 };
+        window.Show();
+        window.CloseDialog();
+        CreatorScreens(window, name =>
+        {
+            PumpUi(700);
+            window.CaptureRenderedFrame()?.Save(Path.Combine(outDir, name + ".png"));
+            Console.WriteLine("saved " + name);
+        });
+        return 0;
     }
 
     /// <summary>Только окна установщика — все экраны, без установки на самом деле.</summary>
@@ -200,6 +316,7 @@ public static class Program
         Save("10c-creator-examples");
         window.Navigate(() => new CreatorPage("docs"));
         Save("10d-creator-docs");
+        CreatorScreens(window, Save);
         AddGamePage.Demo(
         [
             new Games.FoundGame("Hades", @"D:\SteamLibrary\steamapps\common\Hades", @"x64\Hades.exe", 1145360, "steam", "other"),
@@ -275,16 +392,12 @@ public static class Program
         window.Height = 800;
         Pump(400);
 
-        var big = new BigPictureWindow(windowed: true);
-        big.Show();
-        Pump();
-        big.CaptureRenderedFrame()?.Save(Path.Combine(outDir, "13a-bigpicture.png"));
-        Console.WriteLine("saved 13a-bigpicture");
-        big.DemoMods();
-        Pump();
-        big.CaptureRenderedFrame()?.Save(Path.Combine(outDir, "13b-bigpicture-mods.png"));
-        Console.WriteLine("saved 13b-bigpicture-mods");
-        big.Close();
+        BigPictureScreens((w, name) =>
+        {
+            Pump();
+            w.CaptureRenderedFrame()?.Save(Path.Combine(outDir, name + ".png"));
+            Console.WriteLine("saved " + name);
+        });
 
         var setup = new SetupWindow(ModLaunch.Setup.SetupMode.Install);
         setup.Show();

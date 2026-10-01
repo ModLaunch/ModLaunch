@@ -15,6 +15,112 @@ namespace ModLaunch;
 public static class SelfCheck
 {
     /// <summary>
+    /// --creator-check: Creator Hub без сети — проекты C# под каждый загрузчик, библиотека кода,
+    /// ассеты, упаковщик. Запускается в тестовых данных (Avalonia нужна для значка пакета).
+    /// </summary>
+    public static async Task<int> CreatorCheck()
+    {
+        var failed = 0;
+        void Expect(string name, bool ok, string detail = "")
+        {
+            Console.WriteLine($"{(ok ? "ok  " : "FAIL")} {name}{(detail == "" ? "" : ": " + detail)}");
+            if (!ok) failed++;
+        }
+        var root = Path.Combine(Path.GetTempPath(), "modlaunch-creator-check-" + Environment.ProcessId);
+        Directory.CreateDirectory(root);
+
+        // Проекты C# под все четыре загрузчика.
+        foreach (var (id, kind, entry) in new[]
+        {
+            ("lethal-company", Creator.CodeKind.BepInEx5, "Plugin.cs"), ("gtfo", Creator.CodeKind.BepInEx6, "Plugin.cs"),
+            ("stardew-valley", Creator.CodeKind.Smapi, "ModEntry.cs"), ("hollow-knight", Creator.CodeKind.HkApi, "MainMod.cs"),
+        })
+        {
+            var def = GameCatalog.ById(id)!;
+            Expect($"{id}: kind", Creator.CodeProjects.KindFor(def, null) == kind);
+            var p = Creator.CodeProjects.Create("Test Mod", def, null, "Tester");
+            var csproj = File.ReadAllText(p.Csproj);
+            try { System.Xml.Linq.XDocument.Parse(csproj); Expect($"{id}: csproj is valid XML", true); } catch (Exception e) { Expect($"{id}: csproj is valid XML", false, e.Message); }
+            Expect($"{id}: files", File.Exists(Path.Combine(p.Dir, entry)) && File.Exists(Path.Combine(p.Dir, "README.md")) && Directory.Exists(Path.Combine(p.Dir, "assets")) && csproj.Contains("<ModAssets") || kind == Creator.CodeKind.Smapi, entry);
+            if (Environment.GetEnvironmentVariable("MODLAUNCH_CHECK_KEEP") is { Length: > 0 } keep) Directory.Move(p.Dir, Path.Combine(keep, id));
+            else Creator.CodeProjects.Delete(p);
+        }
+        Expect("identifier from Russian name", Creator.CodeProjects.Identifier("Быстрые ноги") is { Length: > 3 } ident && char.IsLetter(ident[0]), Creator.CodeProjects.Identifier("Быстрые ноги"));
+        Expect("identifier never starts with a digit", !char.IsDigit(Creator.CodeProjects.Identifier("7 days")[0]));
+
+        // Настоящие ссылки на библиотеки игры.
+        var game = Path.Combine(root, "Game");
+        Directory.CreateDirectory(Path.Combine(game, "Lethal Company_Data", "Managed"));
+        foreach (var dll in new[] { "Assembly-CSharp", "UnityEngine", "UnityEngine.CoreModule", "System" }) File.WriteAllText(Path.Combine(game, "Lethal Company_Data", "Managed", dll + ".dll"), "x");
+        var withGame = Creator.CodeProjects.Create("Real Refs", GameCatalog.ById("lethal-company")!, game, "Tester");
+        var text = File.ReadAllText(withGame.Csproj);
+        Expect("csproj references the game's real libraries", text.Contains("UnityEngine.CoreModule.dll") && text.Contains("Assembly-CSharp.dll") && !text.Contains("System.dll"));
+        Expect("csproj uses the game path", text.Contains(game));
+
+        // Библиотека кода: своя запись создаётся, читается и удаляется.
+        Expect("built-in snippets", Creator.Snippets.Builtin.Length >= 25 && Creator.Snippets.Builtin.Select(s => s.Id).Distinct().Count() == Creator.Snippets.Builtin.Length);
+        Expect("every platform has snippets", Creator.Snippets.Platforms.All(p => Creator.Snippets.Builtin.Any(s => s.Platform == p)));
+        Creator.Snippets.Save(null, "unity", "Мой приём", "описание", "var x = 1;");
+        Expect("own snippet saved", Creator.Snippets.Own().Any(s => s.Title == "Мой приём" && s.Code == "var x = 1;"));
+        foreach (var s in Creator.Snippets.Own()) Creator.Snippets.Remove(s.Id);
+        Expect("own snippet removed", Creator.Snippets.Own().Count == 0);
+
+        // Ассеты: тип по расширению, импорт копией, добавление в проекты обоих видов.
+        Expect("asset kinds", Creator.AssetLibrary.KindOf("a.FBX") == Creator.AssetKind.Model && Creator.AssetLibrary.KindOf("a.png") == Creator.AssetKind.Texture
+            && Creator.AssetLibrary.KindOf("a.ogg") == Creator.AssetKind.Sound && Creator.AssetLibrary.KindOf("a.bundle") == Creator.AssetKind.Bundle && Creator.AssetLibrary.KindOf("a.xyz") == Creator.AssetKind.Other);
+        var raw = Path.Combine(root, "sword.fbx");
+        File.WriteAllText(raw, "fbx");
+        var asset = Creator.AssetLibrary.Import(raw, "");
+        var again = Creator.AssetLibrary.Import(raw, "");
+        Expect("import copies and numbers duplicates", File.Exists(raw) && File.Exists(asset.FullPath) && again.File != asset.File && Creator.AssetLibrary.List().Count == 2);
+        var script = Creator.Projects.Create("Asset Mod", Creator.Templates.ById("blank")!.Code);
+        var line = Creator.AssetLibrary.AttachToScript(asset, script);
+        Creator.AssetLibrary.AttachToScript(asset, script);
+        var scriptText = File.ReadAllText(script.Script);
+        Expect("asset added to ModScript project once", File.Exists(Path.Combine(script.Dir, "files", asset.File)) && scriptText.Split(line).Length == 2, line);
+        Expect("asset added to C# project", File.Exists(Path.Combine(withGame.Dir, Creator.AssetLibrary.AttachToCode(asset, withGame))));
+        Creator.AssetLibrary.Remove(asset);
+        Creator.AssetLibrary.Remove(again);
+        Expect("asset removed", Creator.AssetLibrary.List().Count == 0);
+
+        // Упаковщик: SMAPI (без сети) и BepInEx (зависимости берутся из сети — без неё будет предупреждение).
+        var smapiSrc = Path.Combine(root, "smapi-mod");
+        Directory.CreateDirectory(smapiSrc);
+        File.WriteAllText(Path.Combine(smapiSrc, "manifest.json"), "{}");
+        File.WriteAllText(Path.Combine(smapiSrc, "Test.dll"), "x");
+        File.WriteAllText(Path.Combine(smapiSrc, "Test.pdb"), "x");
+        var spec = new Creator.PackSpec { Name = "My Mod!", Version = "1.2.3", Description = "d", Game = "stardew-valley", Source = smapiSrc };
+        Expect("validate warns about the name", Creator.Packager.Validate(spec).Any(p => p.Key == "cr.pack.p.nameFix" && !p.Error));
+        var packed = await Creator.Packager.Pack(spec);
+        using (var zip = System.IO.Compression.ZipFile.OpenRead(packed.Zip))
+            Expect("SMAPI pack layout", zip.Entries.Any(e => e.FullName == "My_Mod/manifest.json") && zip.Entries.Any(e => e.FullName == "My_Mod/Test.dll") && zip.Entries.All(e => !e.FullName.EndsWith(".pdb")), string.Join(", ", packed.Files));
+        var bare = Path.Combine(root, "bare");
+        Directory.CreateDirectory(bare);
+        File.WriteAllText(Path.Combine(bare, "a.txt"), "x");
+        Expect("SMAPI pack needs manifest", Creator.Packager.Validate(new Creator.PackSpec { Name = "X", Game = "stardew-valley", Source = bare }).Any(p => p.Key == "cr.pack.p.noManifest" && p.Error));
+        Expect("validate rejects bad version", Creator.Packager.Validate(new Creator.PackSpec { Name = "X", Version = "1.0", Game = "valheim", Source = root }).Any(p => p.Key == "cr.pack.p.version" && p.Error));
+
+        var bepSrc = Path.Combine(root, "bep-mod");
+        Directory.CreateDirectory(bepSrc);
+        File.WriteAllText(Path.Combine(bepSrc, "Mod.dll"), "x");
+        var bep = await Creator.Packager.Pack(new Creator.PackSpec { Name = "BepMod", Version = "1.0.0", Description = "d", Game = "lethal-company", Source = bepSrc });
+        using (var zip = System.IO.Compression.ZipFile.OpenRead(bep.Zip))
+        {
+            var names = zip.Entries.Select(e => e.FullName).ToList();
+            var manifest = System.Text.Json.Nodes.JsonNode.Parse(new StreamReader(zip.GetEntry("manifest.json")!.Open()).ReadToEnd());
+            Expect("Thunderstore pack layout", names.Contains("manifest.json") && names.Contains("README.md") && names.Contains("icon.png") && names.Contains("plugins/BepMod/Mod.dll"), string.Join(", ", names));
+            Expect("Thunderstore manifest", manifest.Str("name") == "BepMod" && manifest.Str("version_number") == "1.0.0", bep.Warnings.Count > 0 ? "warnings: " + string.Join("; ", bep.Warnings) : "");
+        }
+
+        // Данные Creator Hub: гайды и инструменты заполнены, ссылки — https.
+        Expect("guides and tools", Creator.Guides.All.Length >= 6 && Creator.Guides.All.All(g => g.Steps.Length >= 4) && Creator.Guides.Tools.All(t => t.Url.StartsWith("https://")) && Creator.Guides.Checklist.Length >= 8);
+
+        try { Directory.Delete(root, true); } catch { }
+        Console.WriteLine(failed == 0 ? "creator: all good" : $"creator: {failed} failed");
+        return failed == 0 ? 0 : 1;
+    }
+
+    /// <summary>
     /// --installer-check: установщик целиком, без сети и без реестра: всегда в «ModLaunch»,
     /// старая «modhub» переезжает, чужую папку не трогаем, повторная установка — обновление.
     /// </summary>

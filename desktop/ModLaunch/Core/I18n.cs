@@ -19,9 +19,9 @@ public static class I18n
         try
         {
             // JsonNode, а не JsonSerializer: в урезанной сборке сериализация через отражение выключена.
-            // strings.json — основной словарь, strings5.json — строки версии 5 (дополняют его).
+            // strings.json — основной словарь, strings5.json и strings7.json — строки версий 5 и 7 (дополняют его).
             var tables = new Dictionary<string, Dictionary<string, string>> { ["ru"] = new(), ["en"] = new() };
-            foreach (var file in new[] { "strings.json", "strings5.json" })
+            foreach (var file in new[] { "strings.json", "strings5.json", "strings7.json" })
             {
                 try
                 {

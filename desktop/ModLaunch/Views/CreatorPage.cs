@@ -12,8 +12,10 @@ using ModLaunch.Games;
 namespace ModLaunch.Views;
 
 /// <summary>
-/// Creator Hub: свои моды на языке ModScript — редактор с проверкой на лету,
-/// «примочки» (примеры), сборка в пакет, установка в игру и галерея сообщества.
+/// Creator Hub — студия для тех, кто делает моды: слева разделы, справа рабочее место.
+/// Моды без кода (ModScript) с проверкой на лету, проекты на C# с настоящей сборкой в игру,
+/// библиотека кода, модели и ассеты, упаковщик для Thunderstore и Nexus, гайды и инструменты,
+/// галерея сообщества ModLaunch Hub.
 /// </summary>
 public sealed partial class CreatorPage : Page
 {
@@ -28,7 +30,16 @@ public sealed partial class CreatorPage : Page
     DispatcherTimer? _debounce;
     bool _dirty;
 
-    public CreatorPage(string tab = "hub", string? project = null)
+    /// <summary>Разделы левого меню: группа, затем (id, подпись, значок).</summary>
+    static readonly (string Group, (string Id, string Icon)[] Items)[] Nav =
+    [
+        ("create", [("studio", Icons.Home), ("mine", Icons.Edit), ("code", Icons.Code), ("snippets", Icons.Layers), ("assets", Icons.Package)]),
+        ("release", [("pack", Icons.Upload), ("published", Icons.Flag)]),
+        ("learn", [("guides", Icons.Book), ("tools", Icons.Tools), ("examples", Icons.Wand), ("docs", Icons.List)]),
+        ("community", [("hub", Icons.Globe)]),
+    ];
+
+    public CreatorPage(string tab = "studio", string? project = null)
     {
         _tab = tab;
         if (project is not null) { _tab = "mine"; Open(Projects.Get(project)); }
@@ -44,7 +55,13 @@ public sealed partial class CreatorPage : Page
         DetachedFromVisualTree += (_, _) => { if (_dirty) Save(quiet: true); };
     }
 
-    public override void Search(string text) { _filter = text.Trim(); if (_open is null && _tab is "mine" or "published") _tab = "hub"; Build(); }
+    // Для снимков экрана: открыть нужное состояние раздела без кликов.
+    public void ShowWizard(string game) { _tab = "code"; _wizard = true; _wGame = game; _wName = "Быстрые ноги"; }
+    public void ShowCode(CodeProject p) { _tab = "code"; _codeOpen = p; }
+    public void ShowGuide(string id) { _tab = "guides"; _guide = id; }
+    public void DemoPack(CodeProject p) { _tab = "pack"; _pack = new PackSpec { Name = CodeProjects.Identifier(p.Name), Game = p.Game, Description = "Быстрее бегаем по кораблю", Source = p.Dir }; }
+
+    public override void Search(string text) { _filter = text.Trim(); Build(); }
 
     void Open(Project? p)
     {
@@ -62,37 +79,67 @@ public sealed partial class CreatorPage : Page
         if (!quiet) MainWindow.Current?.Toast(I18n.T("cr.saved"));
     }
 
+    /// <summary>Перейти в раздел левого меню (несохранённый скрипт сохраняется).</summary>
+    void Go(string tab)
+    {
+        if (_dirty) Save(quiet: true);
+        _tab = tab;
+        if (tab != "mine") _open = null;
+        if (tab != "code") _codeOpen = null;
+        _filter = "";
+        Build();
+    }
+
     public override void Build()
     {
-        var content = new StackPanel { Spacing = 18, Margin = new Thickness(34, 26, 34, 34), MaxWidth = 1640 };
-
-        // Шапка: название и вкладки.
-        var tabs = Ui.Row(4);
-        foreach (var (id, key, icon) in new[] { ("hub", "hub.tab", Icons.Globe), ("mine", "cr.tab.mine", Icons.Edit), ("published", "hub.tab.mine", Icons.Upload), ("examples", "cr.tab.examples", Icons.Wand), ("docs", "cr.tab.docs", Icons.Book) })
+        // Левое меню: заголовок студии и группы разделов.
+        var nav = new StackPanel { Spacing = 2, Margin = new Thickness(12, 18, 12, 18) };
+        nav.Children.Add(Ui.Row(12,
+            new Border { Width = 40, Height = 40, CornerRadius = new CornerRadius(12), Background = Ui.Res("BrandSoft"), Child = Ui.Icon(Icons.Code, 20, Ui.Res("Brand2")) },
+            Ui.Col(0, Ui.Text("Creator Hub", "h3"), Ui.Text(I18n.T("cr.subtitle.short"), "small muted"))));
+        nav.Children[0].Margin = new Thickness(6, 0, 6, 14);
+        foreach (var (group, items) in Nav)
         {
-            var b = Ui.Button(I18n.T(key), () => { if (_dirty) Save(quiet: true); _tab = id; _open = id == "mine" ? _open : null; Build(); }, "tab", icon);
-            if (_tab == id) b.Classes.Add("active");
-            tabs.Children.Add(b);
+            var label = Ui.Text(I18n.T("cr.group." + group).ToUpperInvariant(), "small muted");
+            label.FontWeight = FontWeight.SemiBold;
+            label.Margin = new Thickness(10, 14, 0, 4);
+            nav.Children.Add(label);
+            foreach (var (id, icon) in items)
+            {
+                var tab = id;
+                var b = Ui.Button(I18n.T("cr.nav." + id), () => Go(tab), "side", icon);
+                if (_tab == id) b.Classes.Add("active");
+                nav.Children.Add(b);
+            }
         }
-        var title = Ui.Row(12,
-            new Border { Width = 44, Height = 44, CornerRadius = new CornerRadius(12), Background = Ui.Res("BrandSoft"), Child = Ui.Icon(Icons.Code, 22, Ui.Res("Brand2")) },
-            Ui.Col(2, Ui.Text("Creator Hub", "h2"), Ui.Text(I18n.T("cr.subtitle"), "small muted")));
-        var head = new DockPanel();
-        tabs.VerticalAlignment = VerticalAlignment.Center;
-        DockPanel.SetDock(tabs, Dock.Right);
-        head.Children.Add(tabs);
-        head.Children.Add(title);
-        content.Children.Add(head);
+        var navHost = new Border { Width = 232, Background = Ui.Res("Surface"), BorderBrush = Ui.Res("Line"), BorderThickness = new Thickness(0, 0, 1, 0), Child = new ScrollViewer { Content = nav } };
 
+        var content = new StackPanel { Spacing = 18, Margin = new Thickness(34, 26, 34, 34), MaxWidth = 1640 };
+        var editing = _tab == "mine" && _open is not null || _tab == "code" && _codeOpen is not null;
+        if (_tab != "studio" && !editing)
+            content.Children.Add(Ui.Col(2, Ui.Text(I18n.T("cr.nav." + _tab), "h1"), Ui.Text(I18n.T("cr.nav." + _tab + ".sub"), "muted", wrap: true)));
         content.Children.Add(_tab switch
         {
+            "studio" => Studio(),
+            "code" => CodeView(),
+            "snippets" => SnippetsView(),
+            "assets" => AssetsView(),
+            "pack" => PackView(),
+            "guides" => GuidesView(),
+            "tools" => ToolsView(),
             "examples" => Examples(),
             "hub" => HubView(),
             "published" => PublishedView(),
             "docs" => Docs(),
             _ => _open is null ? Mine() : Editor(),
         });
-        Content = new ScrollViewer { Content = content, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+
+        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*") };
+        grid.Children.Add(navHost);
+        var body = new ScrollViewer { Content = content, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+        Grid.SetColumn(body, 1);
+        grid.Children.Add(body);
+        Content = grid;
     }
 
     // ---------------------------------------------------------------- мои моды

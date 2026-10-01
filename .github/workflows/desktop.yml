@@ -33,6 +33,13 @@ jobs:
           Get-Content installer.txt
           if ($p.ExitCode -ne 0) { throw "installer check failed" }
 
+      - name: Creator Hub check (C# projects for every loader, assets, packager)
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath out/ModLaunch.exe -ArgumentList '--creator-check' -PassThru -Wait -NoNewWindow -RedirectStandardOutput creator.txt
+          Get-Content creator.txt
+          if ($p.ExitCode -ne 0) { throw "creator check failed" }
+
       - name: Self-check (live catalogs, install into a test folder)
         shell: pwsh
         run: |

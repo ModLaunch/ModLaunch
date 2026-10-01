@@ -195,6 +195,24 @@
       <Setter Property="Foreground" Value="{StaticResource Text}"/>
     </Style>
 
+    <!-- Боковое меню разделов (Creator Hub) -->
+    <Style Selector="Button.side">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Foreground" Value="{StaticResource Muted}"/>
+      <Setter Property="Padding" Value="12,9"/>
+      <Setter Property="CornerRadius" Value="10"/>
+      <Setter Property="HorizontalAlignment" Value="Stretch"/>
+      <Setter Property="HorizontalContentAlignment" Value="Left"/>
+    </Style>
+    <Style Selector="Button.side.active">
+      <Setter Property="Background" Value="{StaticResource BrandSoft}"/>
+      <Setter Property="Foreground" Value="{StaticResource Text}"/>
+    </Style>
+    <Style Selector="Button.side.active:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource BrandSoft}"/>
+    </Style>
+
     <!-- Кнопки игр на боковой панели -->
     <Style Selector="Button.rail">
       <Setter Property="Width" Value="48"/>

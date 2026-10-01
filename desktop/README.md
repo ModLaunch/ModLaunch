@@ -41,3 +41,14 @@ out/ModLaunch.exe --screenshot shots           # снимки экранов н�
 out/ModLaunch.exe --installer-check      # установка в пробную папку, перенос из modhub, без сети
 out/ModLaunch.exe --setup-shots shots    # снимки всех экранов установщика
 ```
+
+## Creator Hub и Big Picture
+
+- **Creator Hub** (`Views/CreatorPage*.cs`, `Creator/`): студия — моды без кода (ModScript), проекты на C# (`CodeProjects`: BepInEx 5/6, SMAPI, HK Modding API, сборка `dotnet build` с копированием в игру), библиотека кода (`Snippets`), ассеты (`AssetLibrary`), упаковщик (`Packager`), гайды и инструменты (`Guides`), галерея ModLaunch Hub.
+- **Big Picture** (`Views/BigPictureWindow*.cs`): обложки, каталог модов, профили, обновления, друзья и загрузки — геймпадом или клавиатурой.
+
+```
+out/ModLaunch.exe --creator-check        # Creator Hub без сети: проекты под все загрузчики, ассеты, упаковщик
+out/ModLaunch.exe --creator-shots shots  # снимки всех разделов Creator Hub
+out/ModLaunch.exe --bp-shots shots       # снимки Big Picture и его меню
+```

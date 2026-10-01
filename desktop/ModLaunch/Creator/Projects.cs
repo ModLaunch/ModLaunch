@@ -204,14 +204,21 @@ public static partial class Projects
             if (b.Icon is not null && dir is not null)
             {
                 var own = new[] { Path.Combine(dir, "files", b.Icon), Path.Combine(dir, b.Icon) }.FirstOrDefault(File.Exists);
-                if (own is not null) return Resize(File.ReadAllBytes(own));
+                if (own is not null) return IconBytes(File.ReadAllBytes(own));
             }
-            using var stream = Avalonia.Platform.AssetLoader.Open(new Uri("avares://ModLaunch/Assets/icon.png"));
-            using var ms = new MemoryStream();
-            stream.CopyTo(ms);
-            return Resize(ms.ToArray());
+            return IconBytes(null);
         }
         catch { return null; }
+    }
+
+    /// <summary>Значок из своих байтов PNG/JPG или, если их нет, значок ModLaunch — в обоих случаях 256×256.</summary>
+    public static byte[] IconBytes(byte[]? own)
+    {
+        if (own is not null) return Resize(own);
+        using var stream = Avalonia.Platform.AssetLoader.Open(new Uri("avares://ModLaunch/Assets/icon.png"));
+        using var ms = new MemoryStream();
+        stream.CopyTo(ms);
+        return Resize(ms.ToArray());
     }
 
     static byte[] Resize(byte[] png)
