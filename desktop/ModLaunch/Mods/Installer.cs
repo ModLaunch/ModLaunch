@@ -309,13 +309,14 @@ public static partial class Installer
                 case "patchers" or "monomod": parts.Add(head); return ($"BepInEx/{head}/{folder}/{rest}", false);
                 case "config": return ($"BepInEx/config/{rest}", true);
             }
-            if (inLoader || withLoader || head == "core" || LoaderFile().IsMatch(rel)) return null;
+            // Загрузчик не берём; всё остальное рядом (ресурсы, manifest) — в папку мода, как r2modman.
+            if (inLoader || head == "core" || LoaderFile().IsMatch(rel)) return null;
+            if (withLoader && rel.Equals("changelog.txt", StringComparison.OrdinalIgnoreCase)) return null;
             return ($"BepInEx/plugins/{folder}/{rel}", false);
         }
 
         var written = Archive.ExtractMapped(archivePath, registry.GamePath, Map);
-        var files = written.Count(w => !w.StartsWith("BepInEx/config/", StringComparison.OrdinalIgnoreCase));
-        if (files == 0 && written.Count == 0) throw new InvalidOperationException(I18n.T("err.archive.loaderOnly"));
+        if (written.Count == 0) throw new InvalidOperationException(I18n.T("err.archive.loaderOnly"));
         Directory.CreateDirectory(Path.Combine(registry.ModsDir, folder));
 
         return registry.Add(new JsonObject

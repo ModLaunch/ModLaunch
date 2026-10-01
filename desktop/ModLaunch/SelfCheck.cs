@@ -106,7 +106,7 @@ public static class SelfCheck
             return $"BepInEx {version}, installed {n} package(s)";
         });
 
-        await Check("8.1: thunderstore package → BepInEx/plugins/<Owner-Name>, reinstall without duplicates", async () =>
+        await Check("8.1: thunderstore package -> BepInEx/plugins/<Owner-Name>, reinstall without duplicates", async () =>
         {
             var game = GameCatalog.ById("lethal-company")!;
             var dir = Path.Combine(root, "Lethal Company");
@@ -525,7 +525,7 @@ public static class SelfCheck
             return Task.FromResult(pad.Connected ? "gamepad connected" : "no gamepad (expected on CI), polling is safe");
         });
 
-        await Check("8.1: modscript 2 — fn, lists, and/or, nested calls", () =>
+        await Check("8.1: modscript 2 - fn, lists, and/or, nested calls", () =>
         {
             var b = Creator.ModScript.Compile("mod \"T\"\ngame valheim\nfn double x {\n  return $x * 2\n}\nlet items = [ \"a\" \"b\" ]\npush items \"c\"\nlet n = double (len $items)\nif $n == 6 and \"b\" in $items {\n  write \"ok.txt\" = join $items \"-\"\n}\n");
             if (!b.Ok) throw new Exception(string.Join("; ", b.Diags.Select(d => $"{d.Line} {d.Message}")));
