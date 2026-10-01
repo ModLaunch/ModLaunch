@@ -57,6 +57,11 @@ public static class SelfCheck
         Expect("second install is an update", again.Updated && again.Moved is null && again.From == Http.Version);
         Expect("update cleans stray files", !File.Exists(Path.Combine(target, "stray.txt")) && File.Exists(again.Exe));
 
+        File.WriteAllText(Path.Combine(target, Setup.Installer.ExeName + ".part"), "half-written leftover");
+        var third = await Setup.Installer.Install(target, desktop: false, quiet);
+        Expect("leftover .part from a failed run does not break install", third.Updated && !Directory.EnumerateFiles(target, "*.part").Any());
+        Expect("only exe and marker remain", Directory.EnumerateFileSystemEntries(target).Count() == 2);
+
         var foreign = Path.Combine(root, "Foreign", "ModLaunch");
         Directory.CreateDirectory(foreign);
         File.WriteAllText(Path.Combine(foreign, "my-photos.zip"), "mine");

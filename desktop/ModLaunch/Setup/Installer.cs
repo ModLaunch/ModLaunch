@@ -113,13 +113,15 @@ public static class Installer
         return rel == "." || (!rel.StartsWith("..") && !Path.IsPathRooted(rel));
     }
 
-    /// <summary>Закрыть запущенный ModLaunch (и старый ModHub) из этой папки.</summary>
+    /// <summary>
+    /// Закрыть всё, что запущено из этой папки: ModLaunch, старый ModHub и их дочерние процессы
+    /// (у Electron их несколько, и называться они могут по-разному). Берём любой процесс, чей exe лежит в папке.
+    /// </summary>
     public static void CloseRunning(string dir)
     {
         var me = Environment.ProcessId;
         var closed = false;
-        foreach (var name in new[] { "ModLaunch", "ModHub" })
-        foreach (var p in Process.GetProcessesByName(name))
+        foreach (var p in Process.GetProcesses())
         {
             try
             {
@@ -127,13 +129,13 @@ public static class Installer
                 var path = p.MainModule?.FileName;
                 if (path is null || !Inside(path, dir)) continue;
                 p.Kill(entireProcessTree: true);
-                p.WaitForExit(3000);
+                p.WaitForExit(4000);
                 closed = true;
             }
             catch { }
             finally { p.Dispose(); }
         }
-        if (closed) Thread.Sleep(900);
+        if (closed) Thread.Sleep(1200);
     }
 
     public sealed record Result(string Target, string Exe, bool Updated, string? From, string? Moved = null);
@@ -178,10 +180,12 @@ public static class Installer
             catch { try { File.Delete(part); } catch { } throw; }
 
             progress.Report(("clean", 0.86));
+            // Остатки старой версии убираем по возможности: застрявший файл не повод ронять установку.
+            // Важен только exe, и его можно подменить, даже если он ещё запущен (см. ReplaceExe).
             if (kind == TargetKind.Ours)
-                foreach (var entry in Directory.EnumerateFileSystemEntries(dir).Where(e => !Same(e, part)).ToList())
-                    await Retry(() => { if (Directory.Exists(entry)) Directory.Delete(entry, true); else File.Delete(entry); });
-            await Retry(() => File.Move(part, exe, true));
+                foreach (var entry in Directory.EnumerateFileSystemEntries(dir).Where(e => !Same(e, part) && !Same(e, exe)).ToList())
+                    try { await Retry(() => { if (Directory.Exists(entry)) Directory.Delete(entry, true); else File.Delete(entry); }, 6); } catch { }
+            await ReplaceExe(part, exe);
             File.WriteAllText(Path.Combine(dir, Marker), new JsonObject { ["version"] = Http.Version, ["installedAt"] = DateTime.UtcNow.ToString("o") }.ToJsonString());
 
             progress.Report(("integrate", 0.92));
@@ -202,8 +206,23 @@ public static class Installer
             return new Result(dir, exe, kind == TargetKind.Ours, version, moved);
         }
         catch (IOException e) when (NoSpace(e)) { throw new SetupError("SETUP_SPACE"); }
-        catch (IOException) { throw new SetupError("SETUP_BUSY"); }
-        catch (UnauthorizedAccessException) { throw new SetupError("SETUP_ACCESS"); }
+        catch (IOException e) { throw new SetupError("SETUP_BUSY", e.Message); }
+        catch (UnauthorizedAccessException e) { throw new SetupError("SETUP_ACCESS", e.Message); }
+    }
+
+    /// <summary>
+    /// Поставить новый exe на место. Если старый занят (антивирус проверяет файл, программа осталась
+    /// запущенной), подождать; если всё равно занят — переименовать его в сторону: Windows позволяет
+    /// переименовать запущенный exe, хотя удалить и перезаписать нельзя. Хвост «.old» уберёт следующая установка.
+    /// </summary>
+    static async Task ReplaceExe(string part, string exe)
+    {
+        try { await Retry(() => File.Move(part, exe, true), 20); return; }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+        var aside = $"{exe}.{DateTime.UtcNow:yyyyMMddHHmmss}.old";
+        File.Move(exe, aside);
+        await Retry(() => File.Move(part, exe, true), 20);
+        try { File.Delete(aside); } catch { }
     }
 
     /// <summary>
@@ -212,9 +231,12 @@ public static class Installer
     /// </summary>
     static bool RemoveLegacy(string dir)
     {
-        var ok = true;
-        try { Directory.Delete(dir, true); }
-        catch { ok = false; }
+        var ok = false;
+        for (var i = 0; i < 12 && !ok; i++)
+        {
+            try { Directory.Delete(dir, true); ok = true; }
+            catch { Thread.Sleep(400); }
+        }
         foreach (var folder in new[] { Environment.SpecialFolder.DesktopDirectory, Environment.SpecialFolder.Programs })
             try { File.Delete(Path.Combine(Environment.GetFolderPath(folder), "ModHub.lnk")); } catch { }
         if (OperatingSystem.IsWindows())
@@ -247,13 +269,14 @@ public static class Installer
         catch { }
     }
 
-    static async Task Retry(Action action)
+    /// <summary>Повторить, пока файл занят (антивирус, проводник, не успевший закрыться процесс): до tries × 0,4 с.</summary>
+    static async Task Retry(Action action, int tries = 25)
     {
         for (var i = 0; ; i++)
         {
             try { action(); return; }
-            catch (IOException) when (i < 8) { await Task.Delay(250); }
-            catch (UnauthorizedAccessException) when (i < 8) { await Task.Delay(250); }
+            catch (IOException) when (i < tries) { await Task.Delay(400); }
+            catch (UnauthorizedAccessException) when (i < tries) { await Task.Delay(400); }
         }
     }
 

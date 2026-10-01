@@ -659,7 +659,9 @@
   "setup.done.open": "Открыть папку",
   "setup.done.moved": "Старая версия из {path} убрана, ярлыки теперь ведут в новую папку.",
   "setup.uninstall.where": "Папка: {path}",
-  "setup.progress.moveHint": "Заодно переношу программу из старой папки."
+  "setup.progress.moveHint": "Заодно переношу программу из старой папки.",
+  "setup.error.SETUP_BUSY": "Файл занят другой программой:\n{message}\n\nЗакройте ModLaunch (в том числе значок у часов), подождите пару секунд и нажмите «Повторить». Антивирус иногда проверяет новый файл — тогда просто повторите.",
+  "setup.error.SETUP_ACCESS": "Нет доступа к этой папке:\n{message}\n\nВыберите другую — например, предложенную по умолчанию."
  },
  "en": {
   "add.title": "Add a game",
@@ -1321,6 +1323,8 @@
   "setup.done.open": "Open folder",
   "setup.done.moved": "The old version from {path} is gone; shortcuts now point to the new folder.",
   "setup.uninstall.where": "Folder: {path}",
-  "setup.progress.moveHint": "Moving the app out of the old folder along the way."
+  "setup.progress.moveHint": "Moving the app out of the old folder along the way.",
+  "setup.error.SETUP_BUSY": "A file is in use by another program:\n{message}\n\nClose ModLaunch (including the tray icon), wait a couple of seconds and click “Try again”. Antivirus sometimes scans the new file — if so, just retry.",
+  "setup.error.SETUP_ACCESS": "No access to this folder:\n{message}\n\nPick another one, for example the suggested default."
  }
 }
