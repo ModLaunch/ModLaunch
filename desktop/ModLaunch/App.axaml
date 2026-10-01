@@ -59,6 +59,20 @@
       <Setter Property="CornerRadius" Value="16"/>
     </Style>
 
+    <!-- 8.1: вставка внутри карточки и «таблетка» с подписью -->
+    <Style Selector="Border.inset">
+      <Setter Property="Background" Value="{StaticResource Surface2}"/>
+      <Setter Property="BorderBrush" Value="{StaticResource Line}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="CornerRadius" Value="12"/>
+    </Style>
+    <Style Selector="Border.pill">
+      <Setter Property="Background" Value="{StaticResource Surface2}"/>
+      <Setter Property="CornerRadius" Value="999"/>
+      <Setter Property="Padding" Value="10,4"/>
+    </Style>
+    <Style Selector="TextBlock.strong"><Setter Property="FontWeight" Value="SemiBold"/></Style>
+
     <!-- Кнопки: общая основа -->
     <Style Selector="Button">
       <Setter Property="CornerRadius" Value="12"/>

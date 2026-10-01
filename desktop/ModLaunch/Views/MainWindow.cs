@@ -995,8 +995,21 @@ public sealed class MainWindow : Window
 
     // ---------------------------------------------------------------- окна поверх
 
+    Action? _dialogClosed;
+
+    /// <summary>Что сделать, когда текущее окно закроют — кнопкой, Esc, щелчком мимо или другим окном поверх.</summary>
+    public void OnDialogClosed(Action action) => _dialogClosed = action;
+
+    void FireDialogClosed()
+    {
+        var action = _dialogClosed;
+        _dialogClosed = null;
+        try { action?.Invoke(); } catch (Exception e) { CrashLog.Report("dialog", e); }
+    }
+
     public void Dialog(string title, Control body, params Control[] actions)
     {
+        FireDialogClosed();
         var buttons = Ui.Row(10, actions);
         buttons.HorizontalAlignment = HorizontalAlignment.Right;
         var card = new Border
@@ -1023,6 +1036,7 @@ public sealed class MainWindow : Window
     {
         _overlay.IsVisible = false;
         _overlay.Children.Clear();
+        FireDialogClosed();
     }
 
     public Task<string?> PickFolder(string title) => Pickers.Folder(this, title);

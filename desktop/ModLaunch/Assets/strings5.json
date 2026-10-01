@@ -715,7 +715,17 @@
   "rail.library": "Библиотека",
   "rail.mods": "Моды",
   "rail.stats": "Статистика",
-  "rail.settings": "Настройки"
+  "rail.settings": "Настройки",
+  "err.dl.empty": "Файл скачался пустым. Попробуй ещё раз — если повторится, скачай мод вручную и поставь через «Из файла».",
+  "err.dl.notArchive": "Вместо мода скачалась веб-страница (сайт попросил войти или показал ошибку). Скачай файл вручную и поставь через «Из файла».",
+  "err.archive.loaderOnly": "В архиве только сам BepInEx, без мода. Загрузчик ModLaunch ставит сам — этот архив не нужен.",
+  "nexus.wait.expect": "НУЖЕН ИМЕННО ЭТОТ ФАЙЛ",
+  "plan.title": "Вместе с «{mod}»",
+  "plan.text": "Мод не работает без других модов — поставлю ещё {n}:",
+  "plan.pack": "Это сборка: она состоит из других модов — поставлю {n}:",
+  "plan.more": "и ещё {n}",
+  "plan.hint": "Что уже стоит — пропущу.",
+  "plan.go": "Поставить всё ({n})"
  },
  "en": {
   "add.title": "Add a game",
@@ -1433,6 +1443,16 @@
   "rail.library": "Library",
   "rail.mods": "Mods",
   "rail.stats": "Stats",
-  "rail.settings": "Settings"
+  "rail.settings": "Settings",
+  "err.dl.empty": "The download came out empty. Try again — if it repeats, download the mod manually and use “From file”.",
+  "err.dl.notArchive": "A web page was downloaded instead of the mod (the site asked to sign in or showed an error). Download the file manually and use “From file”.",
+  "err.archive.loaderOnly": "This archive holds only BepInEx itself, no mod. ModLaunch installs the loader on its own — you don't need it.",
+  "nexus.wait.expect": "THIS EXACT FILE",
+  "plan.title": "Along with “{mod}”",
+  "plan.text": "This mod needs other mods to work — {n} more will be installed:",
+  "plan.pack": "This is a modpack made of other mods — {n} will be installed:",
+  "plan.more": "and {n} more",
+  "plan.hint": "Anything already installed is skipped.",
+  "plan.go": "Install all ({n})"
  }
 }

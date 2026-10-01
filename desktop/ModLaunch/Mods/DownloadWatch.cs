@@ -5,8 +5,9 @@ namespace ModLaunch.Mods;
 
 /// <summary>
 /// Ждёт, пока браузер докачает архив в «Загрузки» (Nexus без Premium).
-/// Файлы Nexus называются «Имя-номерМода-версия-время.zip», поэтому архив
-/// узнаётся по «-номер-» в имени. Готов — когда размер перестал меняться.
+/// Имя файла Nexus известно заранее — ловим именно его (браузер может
+/// дописать « (1)»); без имени — строго «Имя-номерМода-версия-время.zip».
+/// Готов — когда размер совпал с ожидаемым или перестал меняться.
 /// </summary>
 public static partial class DownloadWatch
 {
@@ -25,13 +26,29 @@ public static partial class DownloadWatch
         return result;
     }
 
-    public static Func<string, bool> NexusMatcher(string modId) => name => name.Contains($"-{modId}-", StringComparison.Ordinal);
+    [GeneratedRegex(@"\s?\(\d+\)$")] private static partial Regex CopySuffix();
+    [GeneratedRegex(@"[^\p{L}\p{N}]+")] private static partial Regex NotAlnum();
 
-    public static async Task<string> WaitForArchive(Func<string, bool> match, CancellationToken ct, string? folder = null, TimeSpan? timeout = null)
+    /// <summary>Имя без расширения, без « (1)» от браузера и без знаков, которые браузер мог заменить.</summary>
+    static string Key(string name) =>
+        NotAlnum().Replace(CopySuffix().Replace(Path.GetFileNameWithoutExtension(name).Trim(), ""), "").ToLowerInvariant();
+
+    public static Func<string, bool> NexusMatcher(string modId, string? fileName = null)
+    {
+        if (fileName is { Length: > 0 })
+        {
+            var want = Key(fileName);
+            if (want.Length > 0) return name => Key(name) == want;
+        }
+        var strict = new Regex($@"-{Regex.Escape(modId)}-[\w-]*\d(\s?\(\d+\))?\.(zip|7z|rar)$", RegexOptions.IgnoreCase);
+        return name => strict.IsMatch(name);
+    }
+
+    public static async Task<string> WaitForArchive(Func<string, bool> match, CancellationToken ct, string? folder = null, TimeSpan? timeout = null, long expectedSize = 0)
     {
         folder ??= Paths.UserDownloads;
         var before = List(folder);
-        var sizes = new Dictionary<string, long>();
+        var sizes = new Dictionary<string, (long Size, int Same)>();
         var until = DateTime.UtcNow + (timeout ?? TimeSpan.FromMinutes(20));
         while (true)
         {
@@ -43,8 +60,11 @@ public static partial class DownloadWatch
                 if (!ArchiveName().IsMatch(name) || Partial().IsMatch(name) || !match(name)) continue;
                 if (before.TryGetValue(name, out var old) && old == info) continue;
                 if (now.ContainsKey(name + ".part")) continue;
-                if (info.Size > 0 && sizes.TryGetValue(name, out var last) && last == info.Size) return Path.Combine(folder, name);
-                sizes[name] = info.Size;
+                // Размер известен — ждём ровно его; иначе — пока не перестанет расти (не совпал с ожидаемым — ждём подольше).
+                var same = sizes.TryGetValue(name, out var last) && last.Size == info.Size ? last.Same + 1 : 0;
+                sizes[name] = (info.Size, same);
+                if (info.Size <= 0) continue;
+                if (expectedSize > 0 ? (info.Size == expectedSize && same >= 1) || same >= 3 : same >= 1) return Path.Combine(folder, name);
             }
         }
     }

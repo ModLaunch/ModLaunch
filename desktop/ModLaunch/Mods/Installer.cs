@@ -83,7 +83,7 @@ public static partial class Installer
                     ["icon"] = entry.Icon,
                     ["requestedBy"] = entry.Id == mod.Id ? null : mod.Id,
                 }, progress, ct);
-                if (entry.Source == "thunderstore" && registry.Game.Loader == LoaderKind.Bepinex) ApplyPackConfig(registry.GamePath, file);
+                if (entry.Source == "thunderstore" && registry.Game.Loader == LoaderKind.Bepinex && IsModpack(entry)) ApplyPackConfig(registry.GamePath, file);
                 Features.DownloadArchive.Add(registry.Game.Id, entry.Id, entry.Version, file);
                 installed++;
             }
@@ -93,7 +93,9 @@ public static partial class Installer
         return installed;
     }
 
-    /// <summary>Настройки из сборок Thunderstore (config/ или BepInEx/config/) — в BepInEx/config.</summary>
+    public static bool IsModpack(ModInfo mod) => mod.Categories.Any(c => c.Contains("modpack", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Настройки сборки Thunderstore (config/ или BepInEx/config/) — в BepInEx/config поверх своих: сборка без них не та.</summary>
     static void ApplyPackConfig(string gamePath, string archive)
     {
         var target = Path.Combine(gamePath, "BepInEx", "config");
@@ -106,6 +108,7 @@ public static partial class Installer
     /// <summary>Любой архив: пресет ReShade ставится как пресет, остальное — как мод.</summary>
     public static async Task<JsonObject> InstallAny(ModRegistry registry, string archivePath, JsonObject meta, IProgress<InstallStep> progress, CancellationToken ct)
     {
+        Archive.EnsureArchive(archivePath);
         if (Features.ReShade.LooksLikePreset(archivePath)) return await InstallPreset(registry, archivePath, meta, progress, ct);
         return InstallArchive(registry, archivePath, meta);
     }
@@ -162,15 +165,44 @@ public static partial class Installer
         catch { }
     }
 
-    /// <summary>Разложить архив мода по папкам и записать в список.</summary>
+    /// <summary>
+    /// Разложить архив мода по папкам и записать в список. При обновлении прошлая
+    /// копия мода убирается целиком (в том числе из другой папки), а его config.json остаётся.
+    /// </summary>
     public static JsonObject InstallArchive(ModRegistry registry, string archivePath, JsonObject meta)
+    {
+        var game = registry.Game;
+        var entries = Archive.Files(archivePath);
+        if (entries.Count == 0) throw new InvalidOperationException(I18n.T("err.archiveStructure"));
+        var metaId = meta.Str("id");
+        var previous = metaId is null ? [] : registry.Family(metaId);
+        var oldPaths = previous.SelectMany(registry.PathsOf).ToList();
+        var configs = SaveConfigs(registry, previous, metaId);
+
+        var records = game.Loader == LoaderKind.Bepinex && BepinexBase(entries) is { } root
+            ? [InstallRouted(registry, archivePath, entries, root, meta)]
+            : InstallRoots(registry, archivePath, meta);
+
+        var keep = records.SelectMany(registry.PathsOf).Select(Full).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var path in oldPaths.Where(p => !keep.Contains(Full(p))))
+            try { registry.DeletePath(path); } catch { }
+        var fresh = records.Select(r => r.Str("id")).ToHashSet();
+        foreach (var old in previous.Where(p => !fresh.Contains(p.Str("id")))) registry.Forget(old.Str("id")!);
+        RestoreConfigs(registry, records, configs, metaId);
+        return records[0];
+    }
+
+    static string Full(string path) => Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar);
+
+    /// <summary>Каждый корень (папка с manifest.json или .dll) — своя папка и своя запись.</summary>
+    static List<JsonObject> InstallRoots(ModRegistry registry, string archivePath, JsonObject meta)
     {
         var game = registry.Game;
         var roots = Archive.FindRoots(archivePath, game.ModMarker, game.ModMarker == "manifest" ? 5 : 4);
         if (roots.Count == 0) throw new InvalidOperationException(I18n.T("err.archiveStructure"));
         Directory.CreateDirectory(registry.ModsDir);
 
-        JsonObject? primary = null;
+        var records = new List<JsonObject>();
         var folders = new List<string>();
         var metaId = meta.Str("id");
         var metaName = meta.Str("name");
@@ -189,10 +221,11 @@ public static partial class Installer
             var files = Archive.Extract(archivePath, destination, root.Prefix);
             folders.Add(folder);
 
-            var record = new JsonObject
+            var first = records.Count == 0;
+            records.Add(registry.Add(new JsonObject
             {
-                ["id"] = primary is not null && metaId is not null ? $"{metaId}#{folder}" : metaId ?? fileMeta.Id ?? folder,
-                ["name"] = primary is not null ? fileMeta.Name ?? folder : metaName ?? fileMeta.Name ?? folder,
+                ["id"] = !first && metaId is not null ? $"{metaId}#{folder}" : metaId ?? fileMeta.Id ?? folder,
+                ["name"] = !first ? fileMeta.Name ?? folder : metaName ?? fileMeta.Name ?? folder,
                 ["version"] = fileMeta.Version ?? meta.Str("version") ?? "",
                 ["author"] = fileMeta.Author ?? meta.Str("author") ?? "",
                 ["source"] = meta.Str("source") ?? "file",
@@ -203,14 +236,137 @@ public static partial class Installer
                 ["dependencies"] = new JsonArray(fileMeta.Dependencies.Select(d => (JsonNode)d).ToArray()),
                 ["uniqueId"] = fileMeta.Id is not null && game.ModMarker == "manifest" ? fileMeta.Id : null,
                 ["requires"] = new JsonArray(),
-                ["requestedBy"] = primary is not null && metaId is not null ? metaId : meta.Str("requestedBy"),
+                ["requestedBy"] = !first && metaId is not null ? metaId : meta.Str("requestedBy"),
                 ["enabled"] = true,
                 ["missing"] = false,
-            };
-            var saved = registry.Add(record);
-            primary ??= saved;
+            }));
         }
-        return primary!;
+        return records;
+    }
+
+    static readonly string[] BepinexFolders = ["bepinex", "plugins", "patchers", "monomod"];
+
+    [GeneratedRegex(@"^(winhttp\.dll|doorstop_config\.ini|\.doorstop_version)$", RegexOptions.IgnoreCase)]
+    private static partial Regex LoaderFile();
+
+    /// <summary>
+    /// Откуда раскладывать архив по-BepInEx: папка, где лежат BepInEx/, plugins/, patchers/
+    /// или monomod/, либо manifest.json пакета Thunderstore рядом с .dll. Не глубже двух
+    /// обёрток; если таких папок несколько (несколько модов в архиве) — null.
+    /// </summary>
+    static string? BepinexBase(List<string> entries)
+    {
+        for (var depth = 0; depth <= 2; depth++)
+        {
+            var found = entries.Select(e => e.Split('/')).Where(p => p.Length > depth)
+                .GroupBy(p => depth == 0 ? "" : string.Join('/', p[..depth]) + "/", StringComparer.OrdinalIgnoreCase)
+                .Where(g =>
+                {
+                    var folders = g.Where(p => p.Length > depth + 1).Select(p => p[depth].ToLowerInvariant()).ToHashSet();
+                    if (folders.Overlaps(BepinexFolders)) return true;
+                    var manifest = g.Any(p => p.Length == depth + 1 && p[depth].Equals("manifest.json", StringComparison.OrdinalIgnoreCase));
+                    return manifest && g.Any(p => p[^1].EndsWith(".dll", StringComparison.OrdinalIgnoreCase));
+                })
+                .Select(g => g.Key).ToList();
+            if (found.Count == 1) return found[0];
+            if (found.Count > 1) return null;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Мод BepInEx одной папкой, как это делает r2modman: plugins/ и файлы пакета —
+    /// в BepInEx/plugins/&lt;мод&gt;, patchers/ и monomod/ — в свои папки BepInEx под тем же
+    /// именем, config/ — в BepInEx/config (свои настройки человека не перезаписываются).
+    /// Сам загрузчик (BepInEx/core, winhttp.dll) из архива не берём — его ставит ModLaunch.
+    /// </summary>
+    static JsonObject InstallRouted(ModRegistry registry, string archivePath, List<string> entries, string root, JsonObject meta)
+    {
+        var game = registry.Game;
+        var manifestEntry = entries.FirstOrDefault(e => e.Equals(root + "manifest.json", StringComparison.OrdinalIgnoreCase));
+        var fileMeta = manifestEntry is null ? new Manifest(null, null, null, null, []) : ReadManifest(game, Archive.ReadText(archivePath, manifestEntry), "");
+        var metaId = meta.Str("id");
+        var folder = Sanitize(meta.Str("source") == "thunderstore" && metaId is not null ? metaId
+            : meta.Str("name") ?? fileMeta.Name ?? Path.GetFileNameWithoutExtension(archivePath));
+        var withLoader = entries.Any(e => e.StartsWith(root + "BepInEx/", StringComparison.OrdinalIgnoreCase));
+
+        foreach (var part in new[] { "plugins", "patchers", "monomod" })
+            registry.DeletePath(Path.Combine(registry.GamePath, "BepInEx", part, folder));
+
+        var parts = new HashSet<string>();
+        (string, bool)? Map(string entry)
+        {
+            if (!entry.StartsWith(root, StringComparison.OrdinalIgnoreCase)) return null;
+            var rel = entry[root.Length..];
+            var inLoader = rel.StartsWith("BepInEx/", StringComparison.OrdinalIgnoreCase);
+            if (inLoader) rel = rel["BepInEx/".Length..];
+            var slash = rel.IndexOf('/');
+            var head = slash < 0 ? "" : rel[..slash].ToLowerInvariant();
+            var rest = slash < 0 ? rel : rel[(slash + 1)..];
+            switch (head)
+            {
+                case "plugins": return ($"BepInEx/plugins/{folder}/{rest}", false);
+                case "patchers" or "monomod": parts.Add(head); return ($"BepInEx/{head}/{folder}/{rest}", false);
+                case "config": return ($"BepInEx/config/{rest}", true);
+            }
+            if (inLoader || withLoader || head == "core" || LoaderFile().IsMatch(rel)) return null;
+            return ($"BepInEx/plugins/{folder}/{rel}", false);
+        }
+
+        var written = Archive.ExtractMapped(archivePath, registry.GamePath, Map);
+        var files = written.Count(w => !w.StartsWith("BepInEx/config/", StringComparison.OrdinalIgnoreCase));
+        if (files == 0 && written.Count == 0) throw new InvalidOperationException(I18n.T("err.archive.loaderOnly"));
+        Directory.CreateDirectory(Path.Combine(registry.ModsDir, folder));
+
+        return registry.Add(new JsonObject
+        {
+            ["id"] = metaId ?? fileMeta.Id ?? folder,
+            ["name"] = meta.Str("name") ?? fileMeta.Name ?? folder,
+            ["version"] = meta.Str("version") is { Length: > 0 } v ? v : fileMeta.Version ?? "",
+            ["author"] = meta.Str("author") ?? fileMeta.Author ?? "",
+            ["source"] = meta.Str("source") ?? "file",
+            ["url"] = meta.Str("url"),
+            ["icon"] = meta.Str("icon"),
+            ["folder"] = folder,
+            ["extra"] = new JsonArray(parts.Order().Select(p => (JsonNode)$"BepInEx/{p}/{folder}").ToArray()),
+            ["fileCount"] = written.Count,
+            ["dependencies"] = new JsonArray(fileMeta.Dependencies.Select(d => (JsonNode)d).ToArray()),
+            ["requires"] = new JsonArray(),
+            ["requestedBy"] = meta.Str("requestedBy"),
+            ["enabled"] = true,
+            ["missing"] = false,
+        });
+    }
+
+    /// <summary>config.json модов SMAPI: игра пишет туда настройки человека, а в архиве его нет.</summary>
+    static Dictionary<string, byte[]> SaveConfigs(ModRegistry registry, List<JsonObject> previous, string? metaId)
+    {
+        var saved = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
+        if (registry.Game.Loader != LoaderKind.Smapi) return saved;
+        foreach (var mod in previous)
+        {
+            var file = Path.Combine(registry.FolderFor(mod), "config.json");
+            try
+            {
+                if (!File.Exists(file)) continue;
+                var bytes = File.ReadAllBytes(file);
+                saved["folder:" + (mod.Str("folder") ?? "")] = bytes;
+                if (mod.Str("id") == metaId) saved["primary"] = bytes;
+            }
+            catch { }
+        }
+        return saved;
+    }
+
+    static void RestoreConfigs(ModRegistry registry, List<JsonObject> records, Dictionary<string, byte[]> saved, string? metaId)
+    {
+        foreach (var mod in records)
+        {
+            var file = Path.Combine(registry.FolderFor(mod), "config.json");
+            if (File.Exists(file)) continue;
+            if (saved.TryGetValue("folder:" + (mod.Str("folder") ?? ""), out var bytes) || (mod.Str("id") == metaId && saved.TryGetValue("primary", out bytes)))
+                try { File.WriteAllBytes(file, bytes); } catch { }
+        }
     }
 
     sealed record Manifest(string? Id, string? Name, string? Version, string? Author, List<string> Dependencies);

@@ -55,6 +55,47 @@ public sealed class ModRegistry
 
     public string FolderFor(JsonObject mod) => Path.Combine(BaseFor(mod, mod.Bool("enabled", true)), mod.Str("folder") ?? "");
 
+    /// <summary>
+    /// Части мода вне его папки (BepInEx/patchers/…, BepInEx/monomod/…): пути от папки игры.
+    /// Выключенные лежат в &lt;игра&gt;/ModHub/disabled-extra/&lt;тот же путь&gt;.
+    /// </summary>
+    public static IEnumerable<string> Extras(JsonObject mod) => mod.Arr("extra").Select(x => x?.ToString()).OfType<string>().Where(SafeRelative);
+
+    static bool SafeRelative(string path) => path.Length > 0 && !Path.IsPathRooted(path) && !path.Split('/', '\\').Contains("..");
+
+    string ExtraPath(string relative, bool enabled) => Path.Combine(enabled ? GamePath : Path.Combine(StorageDir, "disabled-extra"), relative);
+
+    /// <summary>Все папки и файлы мода на диске сейчас: основная папка и части вне её.</summary>
+    public List<string> PathsOf(JsonObject mod)
+    {
+        var enabled = mod.Bool("enabled", true);
+        var list = new List<string>();
+        if (mod.Str("folder") is { Length: > 0 }) list.Add(FolderFor(mod));
+        list.AddRange(Extras(mod).Select(e => ExtraPath(e, enabled)));
+        return list;
+    }
+
+    /// <summary>Мод и записи, которые поставились из того же архива («id#папка»).</summary>
+    public List<JsonObject> Family(string id) =>
+        List().Where(m => m.Str("id") is { } x && (x == id || x.StartsWith(id + "#", StringComparison.Ordinal))).ToList();
+
+    /// <summary>Удалить с диска (папку или файл), не трогая саму папку модов.</summary>
+    public void DeletePath(string path)
+    {
+        var full = Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar);
+        var guard = new[] { GamePath, ModsDir, StorageDir, PresetDir, Path.Combine(GamePath, "BepInEx") }
+            .Select(p => Path.GetFullPath(p).TrimEnd(Path.DirectorySeparatorChar));
+        if (guard.Any(g => string.Equals(g, full, StringComparison.OrdinalIgnoreCase))) return;
+        if (Directory.Exists(full)) Directory.Delete(full, true);
+        else if (File.Exists(full)) File.Delete(full);
+    }
+
+    /// <summary>Убрать запись из списка, не удаляя файлов.</summary>
+    public void Forget(string id)
+    {
+        if (Mods.Remove(id)) _file.Save();
+    }
+
     static bool Exists(string path) => Directory.Exists(path) || File.Exists(path);
 
     static void Move(string from, string to)
@@ -80,6 +121,11 @@ public sealed class ModRegistry
             mod["missing"] = false;
         }
         else mod["missing"] = true;
+        foreach (var extra in Extras(mod))
+        {
+            var source = ExtraPath(extra, !enabled);
+            if (Exists(source)) Move(source, ExtraPath(extra, enabled));
+        }
         mod["enabled"] = enabled;
         _file.Save();
     }
@@ -90,6 +136,7 @@ public sealed class ModRegistry
         var folder = FolderFor(mod);
         if (Directory.Exists(folder)) Directory.Delete(folder, true);
         else if (mod.Str("kind") == "preset" && File.Exists(folder)) File.Delete(folder);
+        foreach (var extra in Extras(mod)) try { DeletePath(ExtraPath(extra, mod.Bool("enabled", true))); } catch { }
         Mods.Remove(id);
         _file.Save();
     }

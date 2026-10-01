@@ -20,8 +20,8 @@ public static class Actions
     /// <summary>Моды Nexus, которые ждём из браузера: «игра:номер» → куда отдать файл (или готовую запись по nxm://).</summary>
     static readonly Dictionary<string, TaskCompletionSource<object>> BrowserWaits = [];
 
-    /// <summary>Окна ожидания файла показываем по одному: иначе человек запутается, какую кнопку нажимать.</summary>
-    static readonly SemaphoreSlim NexusBrowser = new(1);
+    /// <summary>Окна из установки (ждём файл, подтверждаем сборку) показываем по одному: иначе человек запутается, какую кнопку нажимать.</summary>
+    static readonly SemaphoreSlim Modal = new(1);
 
     static MainWindow W => MainWindow.Current!;
 
@@ -48,8 +48,11 @@ public static class Actions
         return true;
     }
 
-    /// <summary>Установить мод из каталога (с зависимостями). Возвращает задачу, чтобы коллекции ставились по очереди.</summary>
-    public static Task Install(GameState g, ModInfo mod, Pin? pin = null, bool reinstall = false)
+    /// <summary>
+    /// Установить мод из каталога (с зависимостями). Возвращает задачу, чтобы коллекции ставились по очереди.
+    /// ask — спросить, если с модом приедет много других (сборка); очереди не спрашивают: список уже видели.
+    /// </summary>
+    public static Task Install(GameState g, ModInfo mod, Pin? pin = null, bool reinstall = false, bool ask = true)
     {
         if (g.Path is null || g.Registry is null || NeedLoader(g)) return Task.CompletedTask;
         var registry = g.Registry;
@@ -62,8 +65,22 @@ public static class Actions
         {
             try
             {
-                if (mod.Source == "nexus") await InstallNexus(g, registry, mod.Id, mod.Name, pin, job, progress, ct, withDeps: pin is null);
-                else await Installer.InstallFromCatalog(registry, mod, progress, ct, reinstall, pin?.Version, pin?.FileName);
+                if (mod.Source == "nexus") await InstallNexus(g, registry, mod.Id, mod.Name, pin, job, progress, ct, withDeps: pin is null, ask);
+                else
+                {
+                    if (ask && pin is null && mod.Source is "thunderstore" or "modlinks")
+                    {
+                        progress.Report(new InstallStep("install.deps", mod.Name));
+                        var (order, _) = await Installer.Plan(g.Def, mod, ct);
+                        var extra = order.Where(m => m.Id != mod.Id && !IsInstalled(g, m.Id)).Select(m => m.Name).ToList();
+                        if (!await ConfirmPlan(mod.Name, extra, Installer.IsModpack(mod) || order.Any(m => m.Id == mod.Id && Installer.IsModpack(m)), ct))
+                        {
+                            job.Cancel.Cancel();
+                            ct.ThrowIfCancellationRequested();
+                        }
+                    }
+                    await Installer.InstallFromCatalog(registry, mod, progress, ct, reinstall, pin?.Version, pin?.FileName);
+                }
             }
             finally
             {
@@ -81,13 +98,18 @@ public static class Actions
     }
 
     /// <summary>Мод с Nexus: сначала недостающие требования, потом сам мод. Premium — напрямую, иначе через браузер.</summary>
-    static async Task InstallNexus(GameState g, ModRegistry registry, string modId, string title, Pin? pin, Job job, IProgress<InstallStep> progress, CancellationToken ct, bool withDeps)
+    static async Task InstallNexus(GameState g, ModRegistry registry, string modId, string title, Pin? pin, Job job, IProgress<InstallStep> progress, CancellationToken ct, bool withDeps, bool ask = false)
     {
         var game = g.Def;
         if (withDeps)
         {
             progress.Report(new InstallStep("install.deps", title));
             var plan = await Deps.NexusPlan(game, registry, modId, ct);
+            if (ask && !await ConfirmPlan(title, plan.Select(p => p.Name).ToList(), false, ct))
+            {
+                job.Cancel.Cancel();
+                ct.ThrowIfCancellationRequested();
+            }
             if (plan.Count > 0)
             {
                 Dispatcher.UIThread.Post(() => W.Toast(I18n.T("deps.first", ("list", string.Join(", ", plan.Select(p => p.Name))))));
@@ -127,15 +149,15 @@ public static class Actions
         }
         else
         {
-            await NexusBrowser.WaitAsync(ct);
+            await Modal.WaitAsync(ct);
             try
             {
-                var got = await WaitFromBrowser(g, modId, mod.Name, file.FileId, job, progress, ct);
+                var got = await WaitFromBrowser(g, modId, mod.Name, file, job, progress, ct);
                 if (got is JsonObject viaNxm) { _ = viaNxm; return; } // пришло по nxm:// и уже установлено
                 archive = (string)got;
                 temporary = false;
             }
-            finally { NexusBrowser.Release(); }
+            finally { Modal.Release(); }
         }
 
         try
@@ -151,17 +173,17 @@ public static class Actions
         }
     }
 
-    static async Task<object> WaitFromBrowser(GameState g, string modId, string name, long fileId, Job job, IProgress<InstallStep> progress, CancellationToken ct)
+    static async Task<object> WaitFromBrowser(GameState g, string modId, string name, NexusFile file, Job job, IProgress<InstallStep> progress, CancellationToken ct)
     {
-        var page = Nexus.FilePageUrl(g.Def.NexusDomain!, modId, fileId);
+        var page = Nexus.FilePageUrl(g.Def.NexusDomain!, modId, file.FileId);
         var waitKey = $"{g.Def.Id}:{modId}";
         var tcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
         lock (BrowserWaits) BrowserWaits[waitKey] = tcs;
         progress.Report(new InstallStep("install.browser", name));
-        await Dispatcher.UIThread.InvokeAsync(() => ShowNexusWait(name, page, job, tcs));
+        await Dispatcher.UIThread.InvokeAsync(() => ShowNexusWait(name, file, page, job, tcs));
         Ui.OpenUrl(page);
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        var watch = DownloadWatch.WaitForArchive(DownloadWatch.NexusMatcher(modId), stop.Token)
+        var watch = DownloadWatch.WaitForArchive(DownloadWatch.NexusMatcher(modId, file.FileName), stop.Token, expectedSize: file.Size)
             .ContinueWith(t => { if (t.IsCompletedSuccessfully) tcs.TrySetResult(t.Result); else if (t.Exception?.InnerException is TimeoutException te) tcs.TrySetException(te); }, TaskScheduler.Default);
         using var reg = ct.Register(() => tcs.TrySetCanceled());
         try { return await tcs.Task; }
@@ -173,10 +195,22 @@ public static class Actions
         }
     }
 
-    static void ShowNexusWait(string mod, string page, Job job, TaskCompletionSource<object> picked)
+    static void ShowNexusWait(string mod, NexusFile file, string page, Job job, TaskCompletionSource<object> picked)
     {
+        // Какой именно файл нажать: у мода на Nexus их бывает десяток (основной, опции, старые версии).
+        var label = file.Name is { Length: > 0 } n ? n : file.FileName ?? mod;
+        if (file.Version is { Length: > 0 } v) label += $" · {v}";
+        var expect = new Border
+        {
+            Classes = { "inset" },
+            Padding = new Avalonia.Thickness(12, 8),
+            CornerRadius = new Avalonia.CornerRadius(10),
+            Child = Ui.Col(2, Ui.Text(I18n.T("nexus.wait.expect"), "eyebrow"), Ui.Text(label, "strong", wrap: true),
+                file.FileName is { Length: > 0 } fn ? Ui.Text(fn, "muted small", wrap: true) : new Control()),
+        };
         var steps = Ui.Col(10,
             Ui.Text("1. " + I18n.T("nexus.wait.step1", ("mod", mod)), wrap: true),
+            expect,
             Ui.Text("2. " + I18n.T("nexus.wait.step2"), wrap: true),
             Ui.Text("3. " + I18n.T("nexus.wait.step3"), wrap: true),
             Ui.Row(10, new ProgressBar { IsIndeterminate = true, Width = 120, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center }, Ui.Text(I18n.T("nexus.wait.status"), "muted small")));
@@ -188,6 +222,38 @@ public static class Actions
                 if (file is not null) picked.TrySetResult(file);
             }, "", Icons.FilePlus),
             Ui.Button(I18n.T("nexus.wait.reopen"), () => Ui.OpenUrl(page), "primary", Icons.External));
+    }
+
+    /// <summary>
+    /// С модом приедут другие — показать список и спросить. Сборку спрашиваем всегда,
+    /// обычный мод — когда за ним тянется три мода и больше (одна-две библиотеки — норма).
+    /// </summary>
+    static async Task<bool> ConfirmPlan(string title, IReadOnlyList<string> names, bool modpack, CancellationToken ct)
+    {
+        if (names.Count == 0 || (!modpack && names.Count < 3)) return true;
+        await Modal.WaitAsync(ct);
+        try
+        {
+            var answer = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                var chips = new WrapPanel { Orientation = Avalonia.Layout.Orientation.Horizontal };
+                foreach (var name in names.Take(40))
+                    chips.Children.Add(new Border { Classes = { "pill" }, Margin = new Avalonia.Thickness(0, 0, 6, 6), Child = Ui.Text(name, "small") });
+                if (names.Count > 40) chips.Children.Add(Ui.Text(I18n.T("plan.more", ("n", names.Count - 40)), "muted small"));
+                var body = Ui.Col(12,
+                    Ui.Text(I18n.T(modpack ? "plan.pack" : "plan.text", ("n", names.Count)), "muted", wrap: true),
+                    new ScrollViewer { MaxHeight = 260, Content = chips },
+                    Ui.Text(I18n.T("plan.hint"), "muted small", wrap: true));
+                W.Dialog(I18n.T("plan.title", ("mod", title)), body,
+                    Ui.Button(I18n.T("common.cancel"), W.CloseDialog),
+                    Ui.Button(I18n.T("plan.go", ("n", names.Count + 1)), () => { answer.TrySetResult(true); W.CloseDialog(); }, "primary", Icons.Download));
+                W.OnDialogClosed(() => answer.TrySetResult(false));
+            });
+            using var reg = ct.Register(() => answer.TrySetResult(false));
+            return await answer.Task;
+        }
+        finally { Modal.Release(); }
     }
 
     // ---------------------------------------------------------------- nxm://
@@ -255,7 +321,7 @@ public static class Actions
             var (mod, pin) = items[i];
             if (IsInstalled(g, mod.Id)) { done++; continue; }
             W.Toast(I18n.T("coll.run", ("name", title), ("i", i + 1), ("n", items.Count)));
-            await Install(g, mod, pin);
+            await Install(g, mod, pin, ask: false);
             if (IsInstalled(g, mod.Id)) done++; else failed.Add(mod.Name);
         }
         if (run.IsCancellationRequested) W.Toast(I18n.T("coll.stopped", ("done", done), ("n", items.Count)));
@@ -325,14 +391,12 @@ public static class Actions
         {
             var wasEnabled = record.Bool("enabled", true);
             if (!wasEnabled) registry.SetEnabled(id, true);
-            var oldFolder = registry.FolderFor(registry.Get(id)!);
             var meta = (JsonObject)record.DeepClone();
             meta["version"] = file.Version;
             meta.Remove("installedAt");
             progress.Report(new InstallStep("install.extract", record.Str("name") ?? id));
+            // Старую копию (в том числе из другой папки) установщик уберёт сам.
             await Installer.InstallAny(registry, file.Path, meta, progress, ct);
-            var fresh = registry.Get(id);
-            if (fresh is not null && registry.FolderFor(fresh) != oldFolder && Directory.Exists(oldFolder)) Directory.Delete(oldFolder, true);
             if (!wasEnabled) registry.SetEnabled(id, false);
             Dispatcher.UIThread.Post(() => W.Toast(I18n.T("v4.reinstalled")));
         });

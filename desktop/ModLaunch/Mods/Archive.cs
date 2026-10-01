@@ -53,7 +53,8 @@ public static partial class Archive
             roots.Add(new ModRoot(prefix, entry, prefix == "" ? Path.GetFileNameWithoutExtension(path) : parts[^2]));
         }
 
-        var filtered = roots.Where(r => !roots.Any(o => o != r && r.Prefix.StartsWith(o.Prefix + "/", StringComparison.Ordinal))).ToList();
+        // Вложенные корни — часть внешнего (в том числе корня архива: «Mod.dll» и «lib/Dep.dll» — один мод).
+        var filtered = roots.Where(r => !roots.Any(o => o != r && (o.Prefix == "" ? r.Prefix != "" : r.Prefix.StartsWith(o.Prefix + "/", StringComparison.Ordinal)))).ToList();
         if (filtered.Count > 0) return filtered;
 
         var top = entries.Select(e => e.Split('/')[0]).Distinct().ToList();
@@ -84,6 +85,47 @@ public static partial class Archive
             written.Add(relative);
         }
         return written;
+    }
+
+    /// <summary>
+    /// Распаковать по карте: map получает путь внутри архива и возвращает путь от root
+    /// (null — пропустить). keep — не перезаписывать уже существующий файл (настройки).
+    /// </summary>
+    public static List<string> ExtractMapped(string path, string root, Func<string, (string Target, bool Keep)?> map)
+    {
+        var full = Path.GetFullPath(root);
+        var written = new List<string>();
+        using var archive = Open(path);
+        foreach (var entry in archive.Entries)
+        {
+            if (entry.IsDirectory || entry.Key is null) continue;
+            var name = Norm(entry.Key);
+            if (Junk().IsMatch(name) || map(name) is not var (relative, keep)) continue;
+            var target = Path.GetFullPath(Path.Combine(full, relative));
+            if (!target.StartsWith(full + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) continue;
+            if (keep && File.Exists(target)) continue;
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            entry.WriteToFile(target, new ExtractionOptions { Overwrite = true });
+            written.Add(relative.Replace('\\', '/'));
+        }
+        return written;
+    }
+
+    /// <summary>
+    /// Проверить, что скачался архив, а не страница сайта: zip, 7z, rar и gzip узнаются
+    /// по первым байтам. HTML, JSON и пустой файл — понятная ошибка вместо «битого архива».
+    /// </summary>
+    public static void EnsureArchive(string path)
+    {
+        var head = new byte[16];
+        int read;
+        using (var stream = File.OpenRead(path)) read = stream.Read(head, 0, head.Length);
+        if (read == 0) throw new InvalidDataException(Core.I18n.T("err.dl.empty"));
+        bool Starts(params byte[] magic) => read >= magic.Length && head.AsSpan(0, magic.Length).SequenceEqual(magic);
+        if (Starts(0x50, 0x4B) || Starts(0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C) || Starts(0x52, 0x61, 0x72, 0x21) || Starts(0x1F, 0x8B)) return;
+        var text = System.Text.Encoding.UTF8.GetString(head, 0, read).TrimStart('\uFEFF', ' ', '\t', '\r', '\n');
+        if (text.StartsWith('<') || text.StartsWith('{') || text.StartsWith('['))
+            throw new InvalidDataException(Core.I18n.T("err.dl.notArchive"));
     }
 
     public static bool HasFolder(string path, string folder)
