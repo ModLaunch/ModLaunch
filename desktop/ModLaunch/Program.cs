@@ -33,6 +33,7 @@ public static class Program
     [STAThread]
     public static int Main(string[] args)
     {
+        Core.CrashLog.Install();
         if (args.Contains("--catalog-report")) return CatalogReport.Run().GetAwaiter().GetResult();
         if (args.Contains("--creator-check")) return CreatorCheck();
         var bpShots = Array.IndexOf(args, "--bp-shots");

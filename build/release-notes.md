@@ -1,11 +1,15 @@
-**English:** download **ModLaunch-Setup-7.2.1.exe** below and run it. If Windows shows "Windows protected your PC", click **More info** → **Run anyway**. More in the [README](https://github.com/ModLaunch/ModLaunch#readme).
+**English:** download **ModLaunch-Setup-7.2.2.exe** below and run it. If Windows shows "Windows protected your PC", click **More info** → **Run anyway**. More in the [README](https://github.com/ModLaunch/ModLaunch#readme).
 
 ## Как скачать
 
-- **ModLaunch-Setup-7.2.1.exe** — установщик. Запустите, нажмите «Установить» — через минуту ModLaunch на рабочем столе и в «Пуске». Старая версия (ModHub 2.x и 3.x из папки `Programs\modhub`) переедет в новую папку `ModLaunch` сама: настройки, аккаунт, друзья и моды сохранятся.
-- **ModLaunch-7.2.1-win-x64.zip** — портативная версия: один файл `ModLaunch.exe`, распакуйте и запустите.
+- **ModLaunch-Setup-7.2.2.exe** — установщик. Запустите, нажмите «Установить» — через минуту ModLaunch на рабочем столе и в «Пуске». Старая версия (ModHub 2.x и 3.x из папки `Programs\modhub`) переедет в новую папку `ModLaunch` сама: настройки, аккаунт, друзья и моды сохранятся.
+- **ModLaunch-7.2.2-win-x64.zip** — портативная версия: один файл `ModLaunch.exe`, распакуйте и запустите.
 
 Если Windows покажет «Система Windows защитила ваш компьютер», нажмите «Подробнее» → «Выполнить в любом случае». Это нужно только один раз.
+
+## Что нового в 7.2.2
+
+- **Ошибка в одном действии больше не закрывает программу.** Она записывается в журнал `%APPDATA%\ModHub\crash.log` (с версией, временем и местом ошибки), а внизу появляется короткое сообщение. Если программа всё же закрылась, причина тоже попадёт в этот файл.
 
 ## Что нового в 7.2.1
 

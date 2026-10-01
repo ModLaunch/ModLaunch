@@ -267,7 +267,8 @@
   "setup.tip.7": "В Big Picture кнопка Y открывает каталог модов — ставьте их геймпадом.",
   "setup.error.holders": "Файл держит: {list}.",
   "setup.error.log": "Журнал установки: {path}",
-  "setup.error.SETUP_BUSY": "Файл занят другой программой:\n{message}\n\nЗакройте то, что названо выше (и ModLaunch, в том числе значок у часов), подождите пару секунд и нажмите «Повторить». Если не помогает — перезагрузите компьютер и запустите установщик первым делом."
+  "setup.error.SETUP_BUSY": "Файл занят другой программой:\n{message}\n\nЗакройте то, что названо выше (и ModLaunch, в том числе значок у часов), подождите пару секунд и нажмите «Повторить». Если не помогает — перезагрузите компьютер и запустите установщик первым делом.",
+  "crash.toast": "Что-то пошло не так: {message}. Подробности — в файле crash.log в папке настроек (%APPDATA%\\ModHub)."
  },
  "en": {
   "cr.nav.studio": "Studio",
@@ -537,6 +538,7 @@
   "setup.tip.7": "In Big Picture the Y button opens the mod catalogue — install mods with the gamepad.",
   "setup.error.holders": "The file is held by: {list}.",
   "setup.error.log": "Setup log: {path}",
-  "setup.error.SETUP_BUSY": "A file is in use by another program:\n{message}\n\nClose whatever is named above (and ModLaunch, including the tray icon), wait a couple of seconds and click “Try again”. If it still fails, restart the PC and run the installer first."
+  "setup.error.SETUP_BUSY": "A file is in use by another program:\n{message}\n\nClose whatever is named above (and ModLaunch, including the tray icon), wait a couple of seconds and click “Try again”. If it still fails, restart the PC and run the installer first.",
+  "crash.toast": "Something went wrong: {message}. Details are in crash.log in the settings folder (%APPDATA%\\ModHub)."
  }
 }
