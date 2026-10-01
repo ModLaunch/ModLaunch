@@ -47,6 +47,26 @@ public static class ModPack
         return pack.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
     }
 
+    /// <summary>Сборка из списка модов каталога (конструктор сборок) — тот же формат файла.</summary>
+    public static string FromList(GameDef game, string name, IEnumerable<Sources.ModInfo> mods)
+    {
+        var pack = new JsonObject
+        {
+            ["format"] = Format,
+            ["version"] = Version,
+            ["app"] = Http.Version,
+            ["game"] = game.Id,
+            ["gameName"] = game.Name,
+            ["name"] = string.IsNullOrWhiteSpace(name) ? game.Name : name.Trim(),
+            ["createdAt"] = DateTime.UtcNow.ToString("o"),
+            ["mods"] = new JsonArray(mods.Select(m => (JsonNode)new JsonObject
+            {
+                ["id"] = m.Id, ["name"] = m.Name, ["version"] = m.Version, ["source"] = m.Source, ["url"] = m.Url, ["enabled"] = true,
+            }).ToArray()),
+        };
+        return pack.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+    }
+
     public static int Count(string json) => JsonNode.Parse(json).Arr("mods").Count;
 
     public static Pack Parse(string text)

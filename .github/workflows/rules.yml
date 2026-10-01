@@ -1,0 +1,28 @@
+name: rules
+
+# Правила Firestore для рынка Creator Hub: каждая попытка обмануть экономику
+# (деньги из воздуха, чужой кошелёк, полуобмен, двойная оплата) — отказ.
+on:
+  push:
+    paths:
+      - 'firebase/**'
+      - '.github/workflows/rules.yml'
+  workflow_dispatch:
+
+jobs:
+  emulator:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Rules tests on the Firestore emulator
+        working-directory: firebase/tests
+        run: |
+          npm install --no-audit --no-fund
+          npm test

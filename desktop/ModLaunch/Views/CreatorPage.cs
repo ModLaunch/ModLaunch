@@ -41,10 +41,25 @@ public sealed partial class CreatorPage : Page
             _debounce.Start();
         };
         _code.SaveRequested += () => Save();
-        DetachedFromVisualTree += (_, _) => { if (_dirty) Save(quiet: true); };
+        DetachedFromVisualTree += (_, _) => { if (_dirty) Save(quiet: true); StopLive(); };
     }
 
-    public override void Search(string text) { _filter = text.Trim(); if (_open is null && _tab is "mine" or "published") _tab = "hub"; Build(); }
+    public override void Search(string text) { _filter = text.Trim(); if (_open is null && _tab is "mine" or "published" or "packs" or "examples" or "docs") _tab = "hub"; Build(); }
+
+    /// <summary>Для скриншотов: открыть ассет, заказ или кошелёк без щелчков.</summary>
+    public void ShowForShot(string what)
+    {
+        if (what == "wallet") { _wallet = Market.DemoWallet; ShowWallet(); return; }
+        if (what.StartsWith("asset:") && Market.DemoAssets?.FirstOrDefault(a => a.Id == what[6..]) is { } a) { OpenAsset(a); return; }
+        if (what.StartsWith("order:"))
+        {
+            _tab = "orders";
+            _orders = Market.DemoOrders;
+            _orderId = what[6..];
+            _bids = Market.DemoBids?.GetValueOrDefault(_orderId) ?? [];
+            Build();
+        }
+    }
 
     void Open(Project? p)
     {
@@ -66,28 +81,52 @@ public sealed partial class CreatorPage : Page
     {
         var content = new StackPanel { Spacing = 18, Margin = new Thickness(34, 26, 34, 34), MaxWidth = 1640 };
 
-        // Шапка: название и вкладки.
-        var tabs = Ui.Row(4);
-        foreach (var (id, key, icon) in new[] { ("hub", "hub.tab", Icons.Globe), ("mine", "cr.tab.mine", Icons.Edit), ("published", "hub.tab.mine", Icons.Upload), ("examples", "cr.tab.examples", Icons.Wand), ("docs", "cr.tab.docs", Icons.Book) })
+        if (_tab != "orders") StopLive();
+        if (Program.Screenshot)
         {
-            var b = Ui.Button(I18n.T(key), () => { if (_dirty) Save(quiet: true); _tab = id; _open = id == "mine" ? _open : null; Build(); }, "tab", icon);
+            // Снимки экрана: всё из демо-данных, без сети.
+            _assets ??= Market.DemoAssets;
+            _orders ??= Market.DemoOrders;
+            _owned ??= Market.DemoOwned;
+            _trades ??= Market.DemoTrades;
+            _wallet ??= Market.DemoWallet;
+        }
+
+        // Шапка: название, кошелёк и вкладки (сообщество · моё · мастерская).
+        var tabs = new WrapPanel { Orientation = Orientation.Horizontal };
+        foreach (var (id, key, icon) in new[]
+        {
+            ("hub", "hub.tab", Icons.Globe), ("assets", "mk.tab", Icons.Bag), ("orders", "ord.tab", Icons.Flame), ("packs", "pb.tab", Icons.Wand),
+            ("inventory", "inv.tab", Icons.Package), ("mine", "cr.tab.mine", Icons.Edit), ("published", "hub.tab.mine", Icons.Upload),
+            ("examples", "cr.tab.examples", Icons.Sparkles), ("docs", "cr.tab.docs", Icons.Book),
+        })
+        {
+            var b = Ui.Button(I18n.T(key), () => { if (_dirty) Save(quiet: true); _tab = id; _open = id == "mine" ? _open : null; if (id != "orders") _orderId = null; Build(); }, "tab", icon);
+            b.Margin = new Thickness(0, 0, 4, 4);
             if (_tab == id) b.Classes.Add("active");
+            if (id == "orders" && _orders?.Count(o => o.Open) is > 0 and var open)
+                b.Content = Ui.Row(6, Ui.Icon(icon, 15), Ui.Text(I18n.T(key)), new Border { Classes = { "pill" }, Padding = new Thickness(6, 0), Background = Ui.Res("Bad"), Child = Ui.Text(open.ToString(), "small", color: Brushes.White) });
             tabs.Children.Add(b);
         }
         var title = Ui.Row(12,
-            new Border { Width = 44, Height = 44, CornerRadius = new CornerRadius(12), Background = Ui.Res("BrandSoft"), Child = Ui.Icon(Icons.Code, 22, Ui.Res("Brand2")) },
-            Ui.Col(2, Ui.Text("Creator Hub", "h2"), Ui.Text(I18n.T("cr.subtitle"), "small muted")));
+            new Border { Width = 44, Height = 44, CornerRadius = new CornerRadius(12), Background = Ui.Res("BrandSoft"), Child = Ui.Icon(Icons.Tools, 22, Ui.Res("Brand2")) },
+            Ui.Col(2, Ui.Text("Creator Hub", "h2"), Ui.Text(I18n.T("cr.subtitle2"), "small muted")));
         var head = new DockPanel();
-        tabs.VerticalAlignment = VerticalAlignment.Center;
-        DockPanel.SetDock(tabs, Dock.Right);
-        head.Children.Add(tabs);
+        var wallet = WalletChip();
+        DockPanel.SetDock(wallet, Dock.Right);
+        head.Children.Add(wallet);
         head.Children.Add(title);
         content.Children.Add(head);
+        content.Children.Add(tabs);
 
         content.Children.Add(_tab switch
         {
             "examples" => Examples(),
             "hub" => HubView(),
+            "assets" => AssetsView(),
+            "orders" => OrdersView(),
+            "packs" => PackBuilderView(),
+            "inventory" => InventoryView(),
             "published" => PublishedView(),
             "docs" => Docs(),
             _ => _open is null ? Mine() : Editor(),

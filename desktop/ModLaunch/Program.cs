@@ -245,6 +245,32 @@ public static class Program
         window.Height = shotHeight;
         Pump(400);
 
+        // 8.1: рынок ассетов, живые заказы, инвентарь креатора, конструктор сборок.
+        Core.Demo.Market();
+        window.Navigate(() => new CreatorPage("assets"));
+        Save("15a-assets");
+        var market = new CreatorPage("assets");
+        window.Navigate(() => market);
+        Pump(300);
+        market.ShowForShot("asset:nox_crown");
+        Save("15b-asset");
+        window.CloseDialog();
+        window.Navigate(() => new CreatorPage("orders"));
+        Save("15c-orders");
+        var orders = new CreatorPage("orders");
+        window.Navigate(() => orders);
+        Pump(300);
+        orders.ShowForShot("order:o1");
+        Save("15d-order");
+        CreatorPage.DemoPlan = Creator.PackBuilder.Build(Games.GameCatalog.ById("subnautica")!, ["qol", "content", "visuals"], 12, false, null).GetAwaiter().GetResult();
+        window.Navigate(() => new CreatorPage("packs"));
+        Save("15e-packs");
+        window.Navigate(() => new CreatorPage("inventory"));
+        Save("15f-inventory");
+        market.ShowForShot("wallet");
+        Save("15g-wallet");
+        window.CloseDialog();
+
         var big = new BigPictureWindow(windowed: true);
         big.Show();
         Pump();

@@ -336,6 +336,16 @@
       </Style.Animations>
     </Style>
 
+    <!-- 8.1: «в эфире» — точка у живых заказов мягко мигает. -->
+    <Style Selector="Border.pulse">
+      <Style.Animations>
+        <Animation Duration="0:0:1.2" IterationCount="INFINITE" PlaybackDirection="Alternate">
+          <KeyFrame Cue="0%"><Setter Property="Opacity" Value="1"/></KeyFrame>
+          <KeyFrame Cue="100%"><Setter Property="Opacity" Value="0.25"/></KeyFrame>
+        </Animation>
+      </Style.Animations>
+    </Style>
+
     <!-- 5.6: спокойный стиль без тяжёлых анимаций — только смена цвета при наведении. -->
     <Style Selector="Border.hero"><Setter Property="Background" Value="{StaticResource Surface}"/></Style>
     <Style Selector="Button.card-btn">

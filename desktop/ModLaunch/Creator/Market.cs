@@ -12,7 +12,7 @@ public sealed record Asset(
     List<string> Tags, List<string> Images, string FileName, long Size, string Sha256, int Chunks, string Preview,
     long Price, long Supply, long Sold, long Owners, bool Listed, string Version, DateTime? Created, DateTime? Updated)
 {
-    public bool Mine => Account.Uid == Uid;
+    public bool Mine => Market.Me == Uid;
     public bool Free => Price == 0;
     public bool Limited => Supply > 0;
     public bool SoldOut => Limited && Sold >= Supply;
@@ -25,7 +25,7 @@ public sealed record Listing(string Uid, string Asset, long Price, long Serial, 
 public sealed record Trade(string Id, string From, string FromName, string To, string ToName, string Give, long GiveSerial,
     string Take, long TakeSerial, long Credits, string Text, string Status, DateTime? At)
 {
-    public bool Incoming => Account.Uid == To;
+    public bool Incoming => Market.Me == To;
 }
 public sealed record Wallet(long Balance, DateTime? BonusAt, string LastOp)
 {
@@ -35,7 +35,7 @@ public sealed record Wallet(long Balance, DateTime? BonusAt, string LastOp)
 }
 public sealed record LedgerOp(string Id, string Kind, string From, string To, long Amount, string Asset, string Ref, DateTime? At)
 {
-    public bool Income => To == Account.Uid;
+    public bool Income => To == Market.Me;
 }
 
 /// <summary>Живой заказ: заказчик описывает мод, креаторы делают ставки, деньги замораживаются до сдачи.</summary>
@@ -44,8 +44,8 @@ public sealed record Order(
     long Bids, string Winner, string WinnerName, long Price, DateTime? Due, string Delivery, string Note, DateTime? DeliveredAt, int Rating,
     DateTime? Created, DateTime? Updated)
 {
-    public bool Mine => Account.Uid == Uid;
-    public bool Working => Account.Uid == Winner;
+    public bool Mine => Market.Me == Uid;
+    public bool Working => Market.Me == Winner;
     public bool Open => Status == "open" && DateTime.UtcNow + Firebase.Skew < Closes;
     public TimeSpan Left => Closes - (DateTime.UtcNow + Firebase.Skew);
     /// <summary>Исполнитель может забрать деньги сам, если заказчик молчит трое суток после сдачи.</summary>
@@ -54,7 +54,7 @@ public sealed record Order(
 }
 public sealed record Bid(string Uid, string Author, long Price, int Days, string Text, DateTime? At)
 {
-    public bool Mine => Account.Uid == Uid;
+    public bool Mine => Market.Me == Uid;
 }
 
 public sealed class AssetDraft
@@ -87,6 +87,9 @@ public sealed class AssetDraft
 public static class Market
 {
     public const string Coin = "◈";
+
+    /// <summary>Кто я: uid аккаунта (в показе без сети — «demoMe»).</summary>
+    public static string? Me => Program.Demo && Account.Uid is null ? "demoMe" : Account.Uid;
     public const long StartBalance = 100;
     public const long Bonus = 25;
 

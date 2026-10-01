@@ -106,6 +106,25 @@ public static class SelfCheck
             return $"BepInEx {version}, installed {n} package(s)";
         });
 
+        await Check("8.1: thunderstore package → BepInEx/plugins/<Owner-Name>, reinstall without duplicates", async () =>
+        {
+            var game = GameCatalog.ById("lethal-company")!;
+            var dir = Path.Combine(root, "Lethal Company");
+            var registry = new ModRegistry(game, dir);
+            var mod = await Thunderstore.Get("lethal-company", "notnotnotswipez-MoreCompany") ?? throw new Exception("no MoreCompany");
+            var steps = new Progress<InstallStep>(_ => { });
+            await Installer.InstallFromCatalog(registry, mod, steps, default);
+            var first = registry.Get(mod.Id) ?? throw new Exception("not in registry");
+            if (first.Str("folder") != mod.Id) throw new Exception("folder " + first.Str("folder"));
+            await Installer.InstallFromCatalog(registry, mod, steps, default, reinstall: true);
+            var plugins = Directory.EnumerateDirectories(registry.ModsDir).Select(Path.GetFileName).ToList();
+            if (plugins.Count(p => p!.Contains("MoreCompany", StringComparison.OrdinalIgnoreCase)) != 1) throw new Exception("folders: " + string.Join(", ", plugins));
+            if (Directory.Exists(Path.Combine(dir, "BepInEx", "plugins", mod.Id, "BepInEx"))) throw new Exception("nested BepInEx folder");
+            var files = Directory.EnumerateFiles(Path.Combine(registry.ModsDir, mod.Id), "*", SearchOption.AllDirectories).Count();
+            registry.Remove(mod.Id);
+            return $"{files} files in plugins/{mod.Id}, one folder after reinstall";
+        });
+
         await Check("valheim bepinex pack", async () =>
         {
             var game = GameCatalog.ById("valheim")!;
@@ -504,6 +523,26 @@ public static class SelfCheck
             var pad = new Features.Gamepad();
             for (var i = 0; i < 3; i++) pad.Tick();
             return Task.FromResult(pad.Connected ? "gamepad connected" : "no gamepad (expected on CI), polling is safe");
+        });
+
+        await Check("8.1: modscript 2 — fn, lists, and/or, nested calls", () =>
+        {
+            var b = Creator.ModScript.Compile("mod \"T\"\ngame valheim\nfn double x {\n  return $x * 2\n}\nlet items = [ \"a\" \"b\" ]\npush items \"c\"\nlet n = double (len $items)\nif $n == 6 and \"b\" in $items {\n  write \"ok.txt\" = join $items \"-\"\n}\n");
+            if (!b.Ok) throw new Exception(string.Join("; ", b.Diags.Select(d => $"{d.Line} {d.Message}")));
+            if (b.Writes.Count != 1 || b.Writes[0].Text != "a-b-c") throw new Exception("writes: " + string.Join(" | ", b.Writes.Select(w => w.Text)));
+            var typo = Creator.ModScript.Compile("mod \"T\"\ngame valheim\npritn 1\n");
+            if (!typo.Diags.Any(d => d.Message == "err.unknownHint|pritn|print")) throw new Exception("no hint");
+            return Task.FromResult("functions, lists, logic and hints ok");
+        });
+        await Check("8.1: pack builder on the live catalog", async () =>
+        {
+            var game = GameCatalog.ById("lethal-company")!;
+            var plan = await Creator.PackBuilder.Build(game, ["qol", "coop"], 12, false, null);
+            var chosen = plan.Chosen.ToList();
+            if (chosen.Count < 8) throw new Exception($"only {chosen.Count} picks");
+            var twins = chosen.SelectMany((a, i) => chosen.Skip(i + 1).Where(x => Creator.PackBuilder.Similar(a.Mod, x.Mod)).Select(x => $"{a.Mod.Name} ~ {x.Mod.Name}")).ToList();
+            if (twins.Count > 0) throw new Exception("similar mods together: " + string.Join(", ", twins));
+            return $"{chosen.Count} mods + {plan.Libraries.Count} libraries: {string.Join(", ", chosen.Take(6).Select(p => p.Mod.Name))}…";
         });
 
         Console.WriteLine(failed == 0 ? "ALL OK" : $"{failed} FAILED");

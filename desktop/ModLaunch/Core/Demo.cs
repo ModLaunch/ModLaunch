@@ -145,4 +145,74 @@ public static class Demo
             M("demo_audio", "Echo", "Живой звук", "Новые звуки шагов и воды", "repo", "package", 3050, 402, 9, 9, "audio"),
         ];
     }
+
+    /// <summary>Рынок Creator Hub для скриншотов: кошелёк, ассеты, заказы со ставками, инвентарь и обмены.</summary>
+    public static void Market()
+    {
+        var now = DateTime.UtcNow;
+        Creator.Asset A(string id, string author, string name, string summary, string kind, long price, long supply, long sold, long owners, int days, string engine, params string[] games) =>
+            new(id, "demo" + author, author, name, summary, "Аккуратная сетка, лёгкие текстуры, LOD для дальних планов.", kind, [.. games], engine, [], [],
+                kind == "code" ? "helpers.mls" : "asset.bundle", kind == "code" ? 2400 : 1_840_000, "", 1,
+                kind == "code" ? "fn price base mult {\n  return $base * $mult\n}\n\nfn shop item cost {\n  edit \"Data/Shops\" $item Price = $cost\n}\n" : "",
+                price, supply, sold, owners, true, "1.2.0", now.AddDays(-days - 20), now.AddDays(-days));
+        Creator.Market.DemoAssets =
+        [
+            A("kira_sword", "Kira", "Рунический меч", "Модель меча с рунами и свечением для игр на Unity", "model", 40, 25, 22, 22, 1, "unity"),
+            A("vega_ui", "Vega", "Тёмные иконки интерфейса", "120 иконок в одном стиле: еда, броня, ресурсы", "texture", 0, 0, 312, 312, 3, "any"),
+            A("echo_rain", "Echo", "Звук дождя и грозы", "Петли дождя, раскаты грома, капли по крыше", "sound", 15, 0, 87, 87, 5, "any"),
+            A("farmer_shop", "Farmer", "Функции для магазинов", "fn shop, fn price — меняйте цены одной строкой", "code", 0, 0, 640, 640, 2, "stardew", "stardew-valley"),
+            A("nox_crown", "Nox", "Корона основателя", "Тираж 10 копий — для первых игроков сервера", "model", 120, 10, 10, 10, 9, "unity", "valheim"),
+            A("alpin_rope", "Alpin", "Верёвка и карабины", "Модели снаряжения для восхождений", "model", 25, 0, 41, 41, 4, "unity", "peak"),
+            A("kira_ai", "Kira", "Умные враги: поведение", "Куски кода: патруль, погоня, отступление", "code", 30, 0, 58, 58, 6, "unity"),
+            A("vega_sky", "Vega", "Небо в 4K", "Скайбоксы рассвет / день / закат / ночь", "texture", 20, 50, 49, 49, 0, "unity"),
+        ];
+        Creator.Market.DemoWallet = new Creator.Wallet(1240, now.AddHours(-23), "");
+        Creator.Market.DemoOwned =
+        [
+            new("demoMe", "nox_crown", 7, "resale", 150, "demoX", now.AddDays(-2)),
+            new("demoMe", "vega_ui", 0, "free", 0, "", now.AddDays(-5)),
+        ];
+        Creator.Order O(string id, string author, string title, string text, string game, long budget, double hoursLeft, int days, string status, long bids, string winner = "", long price = 0) =>
+            new(id, "demo" + author, author, title, text, game, budget, now.AddHours(hoursLeft), days, status, bids, winner == "" ? "" : "demo" + winner, winner, price,
+                now.AddDays(days), "", "", null, 0, now.AddHours(-30), now.AddMinutes(-hoursLeft));
+        Creator.Market.DemoOrders =
+        [
+            O("o1", "Max", "Гроза с молниями для Valheim", "Хочу настоящую грозу: молнии бьют в высокие объекты, гром с задержкой по расстоянию, мокрые поверхности.", "valheim", 300, 2.4, 7, "open", 5),
+            O("o2", "Lina", "Перевод диалогов Stardew на казахский", "Все диалоги жителей и письма. Есть словарь терминов.", "stardew-valley", 500, 26, 14, "open", 3),
+            O("o3", "Dan", "Сборка «хоррор» для 8 игроков", "Lethal Company: страшные монстры, темнее, 8 игроков, без читов.", "lethal-company", 120, 0.6, 3, "open", 8),
+            O("o4", "Oleg", "Скин костюма космонавта", "Белый костюм с нашивками для REPO.", "repo", 80, 50, 5, "open", 1),
+            O("o5", "Max", "Быстрая переноска брёвен", "", "valheim", 60, -20, 4, "assigned", 4, "Kira", 45),
+        ];
+        Creator.Market.DemoBids = new()
+        {
+            ["o1"] =
+            [
+                new("demoKira", "Kira", 220, 5, "Делала погоду для двух модов, покажу видео в процессе.", now.AddMinutes(-3)),
+                new("demoEcho", "Echo", 240, 4, "Возьму звук на себя, гром — пространственный.", now.AddMinutes(-12)),
+                new("demoNox", "Nox", 260, 6, "", now.AddMinutes(-40)),
+                new("demoVega", "Vega", 280, 3, "Шейдер мокрых поверхностей уже есть.", now.AddHours(-1)),
+                new("demoAlpin", "Alpin", 300, 7, "", now.AddHours(-2)),
+            ],
+        };
+        Creator.Market.DemoOrders.Add(O("o9", "Ira", "Новые лица жителей", "", "stardew-valley", 200, -100, 6, "done", 6, "Kira", 180) with { Rating = 5 });
+        Creator.Market.DemoOrders.Add(O("o8", "Pavel", "Мост через реку", "", "valheim", 90, -200, 3, "done", 2, "Kira", 70) with { Rating = 4 });
+        Creator.Market.DemoTrades =
+        [
+            new("t1", "demoLina", "Lina", "demoMe", "Вы", "", 0, "nox_crown", 7, 200, "Очень нужна для сервера!", "open", now.AddHours(-1)),
+        ];
+        Creator.Market.DemoOps =
+        [
+            new("op1", "bonus", "bonus", "demoMe", 25, "", "", now.AddHours(-23)),
+            new("op2", "release", "order:o9", "demoMe", 180, "", "o9", now.AddDays(-1)),
+            new("op3", "resale", "demoMe", "demoX", 150, "nox_crown", "", now.AddDays(-2)),
+        ];
+        Creator.Inventory.DemoItems =
+        [
+            new("i1", "Корона основателя", "model", "hub", "nox_crown", "Nox", ["valheim"], "unity", null, now.AddDays(-2), 7, ""),
+            new("i2", "Тёмные иконки интерфейса", "texture", "hub", "vega_ui", "Vega", [], "any", null, now.AddDays(-5), 0, ""),
+            new("i3", "Мои функции цен", "code", "local", null, "", [], "any", null, now.AddDays(-1), 0, ""),
+            new("i4", "Фонарь (из мода)", "model", "mod", null, "", ["lethal-company"], "unity", null, now.AddDays(-3), 0, "Из мода «Better Lights»"),
+            new("i5", "Шаги по снегу", "sound", "local", null, "", [], "any", null, now.AddDays(-6), 0, ""),
+        ];
+    }
 }

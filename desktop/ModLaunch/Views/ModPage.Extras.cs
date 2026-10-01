@@ -116,6 +116,13 @@ public sealed partial class ModPage
                 if (TopLevel.GetTopLevel(this)?.Clipboard is { } clip) await clip.SetTextAsync(url);
                 MainWindow.Current?.Toast(I18n.T("hub.shared"));
             });
+            // Исходник ModScript открыт всем — его можно взять в инвентарь и подключить через use.
+            if (_hubMod is { IsPackage: false, Code.Length: > 0 } script)
+                Item(I18n.T("inv.takeCode"), () =>
+                {
+                    var item = Creator.Inventory.AddCode(script.Name, script.Code, "hub", script.Author, [script.Game], I18n.T("inv.fromHub", ("name", script.Name), ("author", script.Author)), "mod:" + script.Id);
+                    MainWindow.Current?.Toast(I18n.T("inv.added", ("name", item.Name)));
+                });
             if (_hubMod is { IsPackage: true, Sha256.Length: 64 } pkg)
                 Item(I18n.T("hub.virustotal"), () => Ui.OpenUrl($"https://www.virustotal.com/gui/file/{pkg.Sha256}"));
             Item(I18n.T("hub.report"), Report);

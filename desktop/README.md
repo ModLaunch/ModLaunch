@@ -31,3 +31,25 @@ out/ModLaunch.exe --screenshot shots           # снимки экранов н�
 Для снимков есть две переменные: `MODLAUNCH_SHOT_ONLY=1-home,4-catalog` — снять только
 эти экраны (по началу имени), `MODLAUNCH_SHOT_HEIGHT=1500` — окно выше, чтобы страница
 поместилась целиком.
+
+## Сервер Creator Hub (Firestore)
+
+Своего сервера нет: хаб, рынок и заказы живут в Firestore, а защищают их правила.
+Правила лежат в `firebase/` — их вставляют в консоли Firebase (Firestore Database →
+Правила) внутрь блока `match /databases/{database}/documents { … }`:
+
+- `firebase/creations.rules` — моды хаба, версии, лайки, комментарии, жалобы;
+- `firebase/market.rules` — кошельки, журнал операций, ассеты, копии, перепродажа,
+  обмены и живые заказы. Пока их нет, вкладки «Ассеты» и «Заказы» показывают, что рынок
+  отклонил запрос, а остальная программа работает как раньше.
+
+Проверить правила на эмуляторе (нужны Node.js и Java):
+
+```
+cd firebase/tests
+npm install
+npm test        # 75 сценариев: честные операции проходят, попытки обмана — нет
+```
+
+Код программы против эмулятора: `MODLAUNCH_FIRESTORE_EMULATOR=127.0.0.1:8181`
+(и `MODLAUNCH_FIRESTORE_PROJECT=demo-mk`) направляет запросы Firestore на эмулятор.
