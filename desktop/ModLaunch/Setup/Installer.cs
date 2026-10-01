@@ -166,18 +166,22 @@ public static class Installer
         var legacy = FindLegacy(dir).Where(l => !Inside(source, l)).ToList();
         var size = new FileInfo(source).Length;
         var exe = Path.Combine(dir, ExeName);
-        var part = exe + ".part";
+        var part = $"{exe}.{Environment.ProcessId}.part"; // своё имя на каждый запуск: застрявший .part прошлой попытки не мешает
 
+        SetupLog.Write($"--- install {Http.Version}: {source} -> {dir} (target: {kind}, legacy: {legacy.Count})");
+        var exeFinal = exe;
         try
         {
             progress.Report(("close", 0));
             await Task.Run(() => { CloseRunning(dir); foreach (var l in legacy) CloseRunning(l); });
+            SetupLog.Write("closed running copies");
 
             if (FreeBytes(dir) is long free && free < size * 2 + (50L << 20)) throw new SetupError("SETUP_SPACE");
             Directory.CreateDirectory(dir);
             progress.Report(("copy", 0.04));
             try { await CopyWithProgress(source, part, r => progress.Report(("copy", 0.04 + r * 0.8))); }
             catch { try { File.Delete(part); } catch { } throw; }
+            SetupLog.Write("copied to .part");
 
             progress.Report(("clean", 0.86));
             // Остатки старой версии убираем по возможности: застрявший файл не повод ронять установку.
@@ -185,15 +189,16 @@ public static class Installer
             if (kind == TargetKind.Ours)
                 foreach (var entry in Directory.EnumerateFileSystemEntries(dir).Where(e => !Same(e, part) && !Same(e, exe)).ToList())
                     try { await Retry(() => { if (Directory.Exists(entry)) Directory.Delete(entry, true); else File.Delete(entry); }, 6); } catch { }
-            await ReplaceExe(part, exe);
+            exeFinal = await ReplaceExe(part, exe, dir);
+            SetupLog.Write("exe in place: " + exeFinal);
             File.WriteAllText(Path.Combine(dir, Marker), new JsonObject { ["version"] = Http.Version, ["installedAt"] = DateTime.UtcNow.ToString("o") }.ToJsonString());
 
             progress.Report(("integrate", 0.92));
             if (OperatingSystem.IsWindows())
             {
-                Register(dir, exe, (int)(new FileInfo(exe).Length / 1024));
-                Shortcuts(exe, dir, desktop);
-                RepointAutostart(exe);
+                Register(dir, exeFinal, (int)(new FileInfo(exeFinal).Length / 1024));
+                Shortcuts(exeFinal, dir, desktop);
+                RepointAutostart(exeFinal);
             }
 
             string? moved = null;
@@ -203,26 +208,59 @@ public static class Installer
                 foreach (var l in legacy) if (await Task.Run(() => RemoveLegacy(l))) moved ??= l;
             }
             progress.Report(("done", 1));
-            return new Result(dir, exe, kind == TargetKind.Ours, version, moved);
+            SetupLog.Write("done");
+            return new Result(dir, exeFinal, kind == TargetKind.Ours, version, moved);
         }
-        catch (IOException e) when (NoSpace(e)) { throw new SetupError("SETUP_SPACE"); }
-        catch (IOException e) { throw new SetupError("SETUP_BUSY", e.Message); }
-        catch (UnauthorizedAccessException e) { throw new SetupError("SETUP_ACCESS", e.Message); }
+        catch (IOException e) when (NoSpace(e)) { SetupLog.Error(e); throw new SetupError("SETUP_SPACE"); }
+        catch (IOException e) { SetupLog.Error(e); throw new SetupError("SETUP_BUSY", Explain(e, source, exe, part)); }
+        catch (UnauthorizedAccessException e) { SetupLog.Error(e); throw new SetupError("SETUP_ACCESS", Explain(e, source, exe, part)); }
+    }
+
+    /// <summary>Текст ошибки: что сказала система, какая программа держит файл и где журнал.</summary>
+    static string Explain(Exception e, params string[] files)
+    {
+        var text = e.Message;
+        var holders = FileLocks.Who(files);
+        if (holders.Count > 0) text += "\n" + I18n.T("setup.error.holders", ("list", FileLocks.Describe(holders)));
+        SetupLog.Write("holders: " + (holders.Count == 0 ? "none found" : FileLocks.Describe(holders)));
+        return text + "\n" + I18n.T("setup.error.log", ("path", SetupLog.Path));
     }
 
     /// <summary>
-    /// Поставить новый exe на место. Если старый занят (антивирус проверяет файл, программа осталась
-    /// запущенной), подождать; если всё равно занят — переименовать его в сторону: Windows позволяет
-    /// переименовать запущенный exe, хотя удалить и перезаписать нельзя. Хвост «.old» уберёт следующая установка.
+    /// Поставить новый exe на место и вернуть его путь. По порядку: подождать, пока файл освободится
+    /// (антивирус проверяет новый файл); закрыть копии ModLaunch, которые его держат; переименовать
+    /// старый в сторону (запущенный exe переименовать можно); и если совсем никак — положить новый
+    /// рядом под другим именем: установка всё равно удастся, ярлыки поведут на него, а старый
+    /// файл уберёт следующая установка.
     /// </summary>
-    static async Task ReplaceExe(string part, string exe)
+    static async Task<string> ReplaceExe(string part, string exe, string dir)
     {
-        try { await Retry(() => File.Move(part, exe, true), 20); return; }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+        try { await Retry(() => File.Move(part, exe, true), 12); return exe; }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { SetupLog.Write("replace failed, closing holders: " + e.Message); }
+
+        await Task.Run(() => FileLocks.CloseOurs(exe, part));
+        try { await Retry(() => File.Move(part, exe, true), 6); return exe; }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { SetupLog.Write("replace failed again: " + e.Message); }
+
         var aside = $"{exe}.{DateTime.UtcNow:yyyyMMddHHmmss}.old";
-        File.Move(exe, aside);
-        await Retry(() => File.Move(part, exe, true), 20);
-        try { File.Delete(aside); } catch { }
+        try
+        {
+            File.Move(exe, aside);
+            await Retry(() => File.Move(part, exe, true), 20);
+            try { File.Delete(aside); } catch { }
+            return exe;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            SetupLog.Write("rename aside failed: " + e.Message);
+            if (!File.Exists(exe) && File.Exists(aside)) { try { File.Move(aside, exe); } catch { } } // вернуть как было
+        }
+
+        var alt = Path.Combine(dir, $"ModLaunch-{Http.Version}.exe");
+        if (File.Exists(alt)) alt = Path.Combine(dir, $"ModLaunch-{Http.Version}-{DateTime.UtcNow:HHmmss}.exe");
+        await Retry(() => File.Move(part, alt, true), 20);
+        SetupLog.Write("installed under another name: " + alt);
+        return alt;
     }
 
     /// <summary>
@@ -282,7 +320,14 @@ public static class Installer
 
     static async Task CopyWithProgress(string from, string to, Action<double> report)
     {
-        await using var input = File.OpenRead(from);
+        // Источник читаем так, чтобы не мешать никому (и чтобы не мешали нам): антивирус и проводник часто проверяют свежескачанный файл.
+        FileStream? source = null;
+        for (var i = 0; source is null; i++)
+        {
+            try { source = new FileStream(from, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, 1 << 16, useAsync: true); }
+            catch (IOException) when (i < 25) { await Task.Delay(400); }
+        }
+        await using var input = source;
         await using var output = File.Create(to);
         var buffer = new byte[1 << 20];
         long done = 0;

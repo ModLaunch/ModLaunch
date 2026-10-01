@@ -264,7 +264,10 @@
   "setup.feat.6.title": "Creator Hub",
   "setup.feat.6.text": "Свои моды на C#, модели, текстуры и упаковка для Thunderstore.",
   "setup.tip.6": "Creator Hub собирает мод на C# и кладёт его прямо в игру.",
-  "setup.tip.7": "В Big Picture кнопка Y открывает каталог модов — ставьте их геймпадом."
+  "setup.tip.7": "В Big Picture кнопка Y открывает каталог модов — ставьте их геймпадом.",
+  "setup.error.holders": "Файл держит: {list}.",
+  "setup.error.log": "Журнал установки: {path}",
+  "setup.error.SETUP_BUSY": "Файл занят другой программой:\n{message}\n\nЗакройте то, что названо выше (и ModLaunch, в том числе значок у часов), подождите пару секунд и нажмите «Повторить». Если не помогает — перезагрузите компьютер и запустите установщик первым делом."
  },
  "en": {
   "cr.nav.studio": "Studio",
@@ -531,6 +534,9 @@
   "setup.feat.6.title": "Creator Hub",
   "setup.feat.6.text": "Your own mods in C#, models, textures and packaging for Thunderstore.",
   "setup.tip.6": "Creator Hub builds a C# mod and puts it straight into the game.",
-  "setup.tip.7": "In Big Picture the Y button opens the mod catalogue — install mods with the gamepad."
+  "setup.tip.7": "In Big Picture the Y button opens the mod catalogue — install mods with the gamepad.",
+  "setup.error.holders": "The file is held by: {list}.",
+  "setup.error.log": "Setup log: {path}",
+  "setup.error.SETUP_BUSY": "A file is in use by another program:\n{message}\n\nClose whatever is named above (and ModLaunch, including the tray icon), wait a couple of seconds and click “Try again”. If it still fails, restart the PC and run the installer first."
  }
 }

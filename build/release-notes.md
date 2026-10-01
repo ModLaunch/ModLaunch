@@ -1,11 +1,18 @@
-**English:** download **ModLaunch-Setup-7.2.0.exe** below and run it. If Windows shows "Windows protected your PC", click **More info** → **Run anyway**. More in the [README](https://github.com/ModLaunch/ModLaunch#readme).
+**English:** download **ModLaunch-Setup-7.2.1.exe** below and run it. If Windows shows "Windows protected your PC", click **More info** → **Run anyway**. More in the [README](https://github.com/ModLaunch/ModLaunch#readme).
 
 ## Как скачать
 
-- **ModLaunch-Setup-7.2.0.exe** — установщик. Запустите, нажмите «Установить» — через минуту ModLaunch на рабочем столе и в «Пуске». Старая версия (ModHub 2.x и 3.x из папки `Programs\modhub`) переедет в новую папку `ModLaunch` сама: настройки, аккаунт, друзья и моды сохранятся.
-- **ModLaunch-7.2.0-win-x64.zip** — портативная версия: один файл `ModLaunch.exe`, распакуйте и запустите.
+- **ModLaunch-Setup-7.2.1.exe** — установщик. Запустите, нажмите «Установить» — через минуту ModLaunch на рабочем столе и в «Пуске». Старая версия (ModHub 2.x и 3.x из папки `Programs\modhub`) переедет в новую папку `ModLaunch` сама: настройки, аккаунт, друзья и моды сохранятся.
+- **ModLaunch-7.2.1-win-x64.zip** — портативная версия: один файл `ModLaunch.exe`, распакуйте и запустите.
 
 Если Windows покажет «Система Windows защитила ваш компьютер», нажмите «Подробнее» → «Выполнить в любом случае». Это нужно только один раз.
+
+## Что нового в 7.2.1
+
+- **Установщик не спотыкается о занятые файлы.**
+  - Если новый `ModLaunch.exe` нельзя положить на место (его держит антивирус или чужая программа), установка закрывает копии ModLaunch, которые его держат, а если и это не помогло — кладёт новый файл под другим именем, и ярлыки ведут на него.
+  - В ошибке «файл занят» теперь названа программа, которая его держит (через Restart Manager), и путь к журналу `%TEMP%\ModLaunch-setup.log`.
+  - Скачанный установщик читается так, чтобы антивирус и проводник ему не мешали; у временного файла своё имя на каждый запуск.
 
 ## Что нового в 7.2
 
