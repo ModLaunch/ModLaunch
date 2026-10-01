@@ -112,7 +112,7 @@ public sealed partial class ModPage
         {
             Item(I18n.T("hub.share"), async () =>
             {
-                var url = $"https://modlaunch.github.io/ModLaunch/hub.html#mod={Uri.EscapeDataString(mod.Id)}";
+                var url = $"https://modlaunchapp.com/hub.html#mod={Uri.EscapeDataString(mod.Id)}";
                 if (TopLevel.GetTopLevel(this)?.Clipboard is { } clip) await clip.SetTextAsync(url);
                 MainWindow.Current?.Toast(I18n.T("hub.shared"));
             });

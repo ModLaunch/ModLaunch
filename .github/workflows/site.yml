@@ -1,5 +1,7 @@
 # Сайт ModLaunch (папка site/) — на GitHub Pages.
 # Один раз включить: Settings → Pages → Source: «GitHub Actions».
+# Адрес сайта — https://modlaunchapp.com (файл site/CNAME; домен также указывается
+# в Settings → Pages → Custom domain, а у регистратора — записи DNS на GitHub Pages).
 name: site
 on:
   workflow_dispatch:

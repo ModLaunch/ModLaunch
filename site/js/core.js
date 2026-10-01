@@ -4,7 +4,7 @@
    список игр, появление при прокрутке и доступ к ModLaunch Hub (Firestore). */
 
 const REPO = 'ModLaunch/ModLaunch';
-const SITE = 'https://modlaunch.github.io/ModLaunch/';
+const SITE = 'https://modlaunchapp.com/';
 document.documentElement.classList.add('js');
 
 /* ---------------------------------------------------------------- игры */
