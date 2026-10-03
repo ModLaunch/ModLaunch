@@ -2,3 +2,18 @@ node_modules/
 dist/
 .build/
 tools/selftest-out/
+
+# C# build output
+desktop/ModLaunch/bin/
+desktop/ModLaunch/obj/
+.playwright-cli/
+backups/
+.claude/
+
+# Собранные файлы — в релизы GitHub, не в репозиторий
+out/
+/ModLaunch-Setup-*.exe
+/ModLaunch-*-win-x64.zip
+site/download/
+build/task.log
+build/publish.log

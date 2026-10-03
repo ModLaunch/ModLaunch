@@ -1,4 +1,5 @@
 {
+  "manifest": "https://modlaunchapp.com/update.json",
   "owner": "ModLaunch",
   "repo": "ModLaunch"
 }

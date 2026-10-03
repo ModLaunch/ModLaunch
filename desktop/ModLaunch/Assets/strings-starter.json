@@ -1,0 +1,28 @@
+{
+  "ru": {
+    "starter.title": "Начало работы",
+    "starter.hide": "Скрыть",
+    "starter.1": "Найди свою игру",
+    "starter.1.text": "ModLaunch ищет игры сам. Если твоей нет в списке, добавь её вручную.",
+    "starter.1.go": "Добавить игру",
+    "starter.2": "Поставь первый мод",
+    "starter.2.text": "Открой каталог, выбери мод и нажми «Установить». Нужное доставится само.",
+    "starter.2.go": "Открыть каталог",
+    "starter.3": "Нажми «Играть»",
+    "starter.3.text": "Игра запустится с твоими модами. Если что-то пойдёт не так, во вкладке «Проверка» подскажут, что исправить.",
+    "starter.3.go": "К игре"
+  },
+  "en": {
+    "starter.title": "Getting started",
+    "starter.hide": "Hide",
+    "starter.1": "Find your game",
+    "starter.1.text": "ModLaunch looks for games by itself. If yours is missing, add it by hand.",
+    "starter.1.go": "Add a game",
+    "starter.2": "Install your first mod",
+    "starter.2.text": "Open the catalog, pick a mod and press Install. Whatever it needs comes along.",
+    "starter.2.go": "Open the catalog",
+    "starter.3": "Press Play",
+    "starter.3.text": "The game starts with your mods. If something goes wrong, the Health tab tells you what to fix.",
+    "starter.3.go": "Go to the game"
+  }
+}

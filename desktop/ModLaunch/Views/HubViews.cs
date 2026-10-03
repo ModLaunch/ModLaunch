@@ -1,4 +1,4 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
@@ -82,7 +82,7 @@ public sealed partial class CreatorPage
             tags.Children.Add(chip);
         }
         tags.Margin = new Thickness(0, 0, 0, 12);
-        col.Children.Add(new ScrollViewer { Content = tags, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled });
+        col.Children.Add(new ScrollViewer { Content = tags, HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled });
 
         if (_hubLoading && _hub is null)
         {
@@ -107,11 +107,11 @@ public sealed partial class CreatorPage
 
         // Итоги Hub.
         var authors = all.Select(m => m.Uid).Distinct().Count();
-        col.Children.Add(Ui.Row(22,
-            Stat(Icons.Package, all.Count.ToString("N0"), I18n.T("hub.stat.mods")),
-            Stat(Icons.Users, authors.ToString("N0"), I18n.T("hub.stat.authors")),
-            Stat(Icons.Download, I18n.Compact(all.Sum(m => m.Downloads)), I18n.T("hub.stat.downloads")),
-            Stat(Icons.Heart, I18n.Compact(all.Sum(m => m.Likes)), I18n.T("hub.stat.likes"))));
+        col.Children.Add(Ui.Row(36,
+            Stat(all.Count.ToString("N0"), I18n.T("hub.stat.mods")),
+            Stat(authors.ToString("N0"), I18n.T("hub.stat.authors")),
+            Stat(I18n.Compact(all.Sum(m => m.Downloads)), I18n.T("hub.stat.downloads")),
+            Stat(I18n.Compact(all.Sum(m => m.Likes)), I18n.T("hub.stat.likes"))));
 
         if (Hub.Updates.Count > 0)
         {
@@ -130,9 +130,8 @@ public sealed partial class CreatorPage
         return col;
     }
 
-    static Control Stat(string icon, string value, string label) => Ui.Row(10,
-        new Border { Width = 38, Height = 38, CornerRadius = new CornerRadius(10), Background = Ui.Res("BrandSoft"), Child = Ui.Icon(icon, 18, Ui.Res("Brand2")) },
-        Ui.Col(0, Ui.Text(value, "h3"), Ui.Text(label, "small muted")));
+    static Control Stat(string value, string label) => Ui.Col(0, Ui.Text(value, "h2"), Ui.Text(label, "small muted"));
+
 
     static Control Skeleton()
     {
@@ -214,6 +213,13 @@ public sealed partial class CreatorPage
             Content = new StackPanel { Children = { top, body } },
         };
         card.Click += (_, _) => OpenMod(m);
+        Ctx.Attach(card, () => Ctx.Menu(
+            Ctx.Item(I18n.T("ctx.open"), Icons.Eye, () => OpenMod(m)),
+            Ctx.Item(Hub.Followed(m.Id) ? I18n.T("ctx.unfollow") : I18n.T("ctx.follow"), Icons.Bell, () => { if (Hub.Followed(m.Id)) Hub.Unfollow(m.Id); else Hub.Follow(m.Id, m.Version); }),
+            "-",
+            Ctx.Copy(I18n.T("ctx.copyName"), m.Name),
+            Ctx.Copy(I18n.T("ctx.copyId"), m.Id),
+            m.Code != "" ? Ctx.Copy(I18n.T("ctx.copyCode"), m.Code) : null));
         return card;
     }
 
@@ -228,7 +234,7 @@ public sealed partial class CreatorPage
     }
 
     void PublishArchive() => HubPublish.Show(new HubDraft { Game = _hubGame ?? AppState.Games.FirstOrDefault(g => g.Status == Detect.Found)?.Def.Id ?? "" },
-        fromProject: false, pack: null, done: () => { _tab = "published"; _ = LoadHub(force: true); });
+        fromProject: false, pack: null, done: () => { _tab = "mine"; _minePart = "published"; _ = LoadHub(force: true); });
 
     // ---------------------------------------------------------------- мои публикации
 
@@ -247,11 +253,11 @@ public sealed partial class CreatorPage
         var upload = Ui.Button(I18n.T("hub.upload"), PublishArchive, "primary", Icons.Upload);
         DockPanel.SetDock(upload, Dock.Right);
         head.Children.Add(upload);
-        head.Children.Add(Ui.Row(22,
-            Stat(Icons.Package, mine.Count.ToString(), I18n.T("hub.stat.mods")),
-            Stat(Icons.Download, I18n.Compact(mine.Sum(m => m.Downloads)), I18n.T("hub.stat.downloads")),
-            Stat(Icons.Heart, I18n.Compact(mine.Sum(m => m.Likes)), I18n.T("hub.stat.likes")),
-            Stat(Icons.Chat, I18n.Compact(mine.Sum(m => m.Comments)), I18n.T("hub.stat.comments"))));
+        head.Children.Add(Ui.Row(36,
+            Stat(mine.Count.ToString(), I18n.T("hub.stat.mods")),
+            Stat(I18n.Compact(mine.Sum(m => m.Downloads)), I18n.T("hub.stat.downloads")),
+            Stat(I18n.Compact(mine.Sum(m => m.Likes)), I18n.T("hub.stat.likes")),
+            Stat(I18n.Compact(mine.Sum(m => m.Comments)), I18n.T("hub.stat.comments"))));
         col.Children.Add(head);
         if (_hubError is not null) col.Children.Add(Ui.Card(Ui.Text(_hubError, "muted", wrap: true), 20));
         if (mine.Count == 0 && _hubError is null)

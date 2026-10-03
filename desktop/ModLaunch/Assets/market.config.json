@@ -1,0 +1,6 @@
+{
+  "feePercent": 10,
+  "currency": "₽",
+  "minPayout": 50000,
+  "topUpUrl": ""
+}

@@ -66,7 +66,7 @@ public static class Extras
         foreach (var v in versions ?? [])
         {
             if (v.Changelog.Trim() == "") continue;
-            blocks.Add(new Block("h", v.Date is null ? v.Version : $"{v.Version} · {v.Date:dd.MM.yyyy}"));
+            blocks.Add(new Block("h", v.Date is null ? v.Version : $"{v.Version} · {v.Date!.Value.ToString("d", I18n.Culture)}"));
             foreach (var line in v.Changelog.Split('\n').Select(l => l.Trim().TrimStart('-', '*', '•').Trim()).Where(l => l != ""))
                 blocks.Add(new Block("li", line));
         }

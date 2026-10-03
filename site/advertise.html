@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Реклама в ModLaunch</title>
+    <meta name="description" content="Как разместить рекламу в лаунчере модов ModLaunch: баннер на главной и место в шапке программы." />
+    <meta name="theme-color" content="#0b0c12" />
+    <link rel="icon" href="img/logo.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <style>
+      :root { --bg: #0b0c12; --card: #15161d; --line: #262833; --text: #f2f2f0; --muted: #9c9c98; --accent: #f2483a; }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 Manrope, system-ui, sans-serif; }
+      .wrap { max-width: 860px; margin: 0 auto; padding: 48px 20px 80px; }
+      a { color: var(--text); }
+      .back { color: var(--muted); text-decoration: none; font-size: 14px; }
+      h1 { font-size: clamp(32px, 6vw, 48px); line-height: 1.1; letter-spacing: -1px; margin: 24px 0 12px; }
+      .lead { color: var(--muted); font-size: 18px; max-width: 620px; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin: 36px 0; }
+      .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 22px; }
+      .card h2 { font-size: 18px; margin: 0 0 6px; }
+      .card p { color: var(--muted); margin: 0; font-size: 15px; }
+      .cta { display: inline-block; margin-top: 8px; background: var(--accent); color: #fff; text-decoration: none; font-weight: 700; padding: 13px 22px; border-radius: 10px; }
+      ul { color: var(--muted); padding-left: 20px; }
+      li { margin: 6px 0; }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <a class="back" href="./">← ModLaunch</a>
+      <h1>Реклама в ModLaunch</h1>
+      <p class="lead">ModLaunch — бесплатный лаунчер модов для Windows. Объявление видят игроки, которые прямо сейчас ставят моды и запускают игры.</p>
+
+      <div class="grid">
+        <div class="card">
+          <h2>Баннер на главной</h2>
+          <p>Широкая карточка с картинкой, заголовком и кнопкой — первый экран программы.</p>
+        </div>
+        <div class="card">
+          <h2>Место в шапке</h2>
+          <p>Компактная «таблетка» с логотипом и названием рядом с поиском, видна на всех экранах.</p>
+        </div>
+        <div class="card">
+          <h2>Без пересборки</h2>
+          <p>Объявления меняются на сервере — у всех пользователей сразу, без обновления программы.</p>
+        </div>
+      </div>
+
+      <h2>Что нужно для объявления</h2>
+      <ul>
+        <li>Заголовок до 48 знаков и текст до 80 знаков.</li>
+        <li>Квадратный логотип или картинка (PNG/JPG, https).</li>
+        <li>Ссылка на ваш сайт (только https) и даты показа.</li>
+        <li>Язык аудитории: русский, английский или оба.</li>
+      </ul>
+      <p>Мы не показываем рекламу казино, взломов и сомнительных загрузок — только то, что полезно игрокам.</p>
+      <!-- Адрес для связи: замените на свой, если ящик называется иначе. -->
+      <a class="cta" href="mailto:ads@modlaunchapp.com?subject=%D0%A0%D0%B5%D0%BA%D0%BB%D0%B0%D0%BC%D0%B0%20%D0%B2%20ModLaunch">Написать: ads@modlaunchapp.com</a>
+    </main>
+  </body>
+</html>

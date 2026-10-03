@@ -57,7 +57,7 @@ public static partial class Hub
 
     // ---------------------------------------------------------------- сеть
 
-    static async Task<JsonNode?> Call(string url, HttpMethod method, JsonNode? body, string? token)
+    internal static async Task<JsonNode?> Call(string url, HttpMethod method, JsonNode? body, string? token)
     {
         if (!Firebase.Configured) throw new ServiceError("NOT_CONFIGURED");
         var reply = await Firebase.Send(url, method, body, token);
@@ -71,10 +71,10 @@ public static partial class Hub
         throw new ServiceError("SERVER", reason);
     }
 
-    static Task<JsonNode?> Commit(JsonArray writes, string token) =>
+    internal static Task<JsonNode?> Commit(JsonArray writes, string token) =>
         Call(Firebase.Url(":commit"), HttpMethod.Post, new JsonObject { ["writes"] = writes }, token);
 
-    static async Task<(string Uid, string Token, string Name)> Member()
+    internal static async Task<(string Uid, string Token, string Name)> Member()
     {
         if (!Account.SignedIn) throw new ServiceError("SIGN_IN");
         var (uid, token) = await Account.Token();
@@ -88,7 +88,7 @@ public static partial class Hub
         try { return (await Account.Token()).IdToken; } catch { return null; }
     }
 
-    static JsonObject Increment(string doc, string field, int by) => new()
+    internal static JsonObject Increment(string doc, string field, int by) => new()
     {
         ["transform"] = new JsonObject
         {
@@ -97,7 +97,7 @@ public static partial class Hub
         },
     };
 
-    static JsonObject ServerTime(string field) => new() { ["fieldPath"] = field, ["setToServerValue"] = "REQUEST_TIME" };
+    internal static JsonObject ServerTime(string field) => new() { ["fieldPath"] = field, ["setToServerValue"] = "REQUEST_TIME" };
 
     // ---------------------------------------------------------------- чтение
 

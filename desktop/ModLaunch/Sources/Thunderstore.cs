@@ -51,6 +51,7 @@ public static class Thunderstore
             UpdatedAt = updated,
             Categories = item.Arr("categories").Select(c => c.Str("name")).OfType<string>().ToArray(),
             Adult = item.Bool("is_nsfw"),
+            Deprecated = item.Bool("is_deprecated"),
         };
     }
 
@@ -66,7 +67,7 @@ public static class Thunderstore
         }
         var data = await Http.GetJson($"{Base}/api/cyberstorm/listing/{Uri.EscapeDataString(community)}/?{string.Join('&', args)}", ct, 20);
         var mods = data.Arr("results")
-            .Where(i => i is not null && (q.Adult || !i.Bool("is_nsfw")) && !i.Bool("is_deprecated"))
+            .Where(i => i is not null && (q.Adult || !i.Bool("is_nsfw")))
             .Select(i => ToMod(i!, community))
             .ToList();
         return new Page(mods, data.Long("count"), data?["next"] is JsonValue, q.Page);

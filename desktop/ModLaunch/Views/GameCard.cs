@@ -15,6 +15,7 @@ public static class GameCard
     public static string Status(GameState g) => g.Status switch
     {
         Detect.Searching => I18n.T("games.searching"),
+        Detect.Found when g.Def.IsMinecraft => Minecraft.Mc.CardLine(),
         Detect.Found when !g.LoaderInstalled => I18n.T("home.loaderNeeded", ("loader", g.Def.LoaderName)),
         Detect.Found when g.ModCount > 0 => I18n.T("aside.mods." + I18n.Plural(g.ModCount, "one", "few", "many"), ("n", g.ModCount)),
         Detect.Found => I18n.T("games.loaderReady", ("loader", g.Def.LoaderName)),
@@ -90,10 +91,15 @@ public static class GameCard
         MenuItem Item(string text, string icon, Action run)
         {
             var m = new MenuItem { Header = text, Icon = Ui.Icon(icon, 14) };
-            m.Click += (_, _) => run();
+            m.Click += (_, _) => Guard.Later(run);
             return m;
         }
         if (g.Status == Detect.Found && g.LoaderInstalled) menu.Items.Add(Item(I18n.T("games.play"), Icons.Play, () => Actions.Play(g)));
+        if (g.Def.IsMinecraft && g.Status == Detect.Found)
+        {
+            menu.Items.Add(Item(I18n.T("mine.build.new"), Icons.Plus, () => { MainWindow.Current?.Navigate(() => new MinecraftPage("builds")); MinecraftPage.CreateDialog(); }));
+            menu.Items.Add(Item(I18n.T("mine.tab.catalog"), Icons.Bag, () => MainWindow.Current?.Navigate(() => new MinecraftPage("catalog"))));
+        }
         var fav = Features.GameCollections.IsFavorite(id);
         menu.Items.Add(Item(fav ? I18n.T("lib.unfavorite") : I18n.T("lib.favorite"), Icons.Star, () => { Features.GameCollections.Toggle(Features.GameCollections.Favorites, id); AppState.Notify(); }));
         var collections = new MenuItem { Header = I18n.T("lib.addTo"), Icon = Ui.Icon(Icons.Layers, 14) };

@@ -1,0 +1,20 @@
+{
+  "ru": {
+    "smapi.broken": "Сломан",
+    "smapi.obsolete": "Устарел",
+    "smapi.abandoned": "Заброшен",
+    "smapi.workaround": "Есть обход",
+    "smapi.unofficial": "Неофициальное обновление",
+    "smapi.fix": "Скачать исправление",
+    "smapi.hint": "Так считает SMAPI (smapi.io): работает ли мод с текущей Stardew Valley."
+  },
+  "en": {
+    "smapi.broken": "Broken",
+    "smapi.obsolete": "Obsolete",
+    "smapi.abandoned": "Abandoned",
+    "smapi.workaround": "Has a workaround",
+    "smapi.unofficial": "Unofficial update",
+    "smapi.fix": "Get the fix",
+    "smapi.hint": "This is what SMAPI (smapi.io) says: does the mod work with the current Stardew Valley."
+  }
+}

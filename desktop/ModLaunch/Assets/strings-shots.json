@@ -1,0 +1,18 @@
+{
+  "ru": {
+    "shots.tab": "Скриншоты",
+    "shots.title.one": "{n} скриншот",
+    "shots.title.few": "{n} скриншота",
+    "shots.title.many": "{n} скриншотов",
+    "shots.folder": "Открыть папку",
+    "shots.none": "Скриншотов пока нет. Они берутся из Steam и из папки Screenshots в папке игры."
+  },
+  "en": {
+    "shots.tab": "Screenshots",
+    "shots.title.one": "{n} screenshot",
+    "shots.title.few": "{n} screenshots",
+    "shots.title.many": "{n} screenshots",
+    "shots.folder": "Open folder",
+    "shots.none": "No screenshots yet. They come from Steam and from a Screenshots folder in the game folder."
+  }
+}

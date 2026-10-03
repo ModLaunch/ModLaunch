@@ -19,7 +19,7 @@ public static class HubPublish
         {
             w.Dialog(I18n.T("cr.publish"), Ui.Text(I18n.T("cr.publish.signin"), "muted", wrap: true),
                 Ui.Button(I18n.T("common.cancel"), w.CloseDialog),
-                Ui.Button(I18n.T("acc.title"), () => { w.CloseDialog(); w.Navigate(() => new SettingsPage("accounts")); }, "primary", Icons.User));
+                Ui.Button(I18n.T("acc.title"), () => { w.CloseDialog(); w.Navigate(() => new AccountPage()); }, "primary", Icons.User));
             return;
         }
 

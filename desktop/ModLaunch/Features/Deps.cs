@@ -169,6 +169,10 @@ public static class SmapiIndex
 {
     static readonly JsonFile Cache = new(Path.Combine(Paths.DataDir, "smapi-index.json"), () => new JsonObject { ["items"] = new JsonObject() });
 
+    /// <summary>Что SMAPI думает о моде (из кэша, без сети): ok / optional / unofficial / workaround / broken / obsolete / abandoned. Fix — ссылка на неофициальное обновление.</summary>
+    public static (string Status, string? Fix)? Cached(string? uniqueId) =>
+        uniqueId is not null && Cache.Data.Obj("items")[uniqueId.ToLowerInvariant()] is JsonObject hit && hit.Str("status") is { } s ? (s.ToLowerInvariant(), hit.Str("fix")) : null;
+
     public static async Task<Dictionary<string, (string? NexusId, string? Name)>> Lookup(IEnumerable<string> uniqueIds, CancellationToken ct)
     {
         var items = Cache.Data.Obj("items");
@@ -176,7 +180,7 @@ public static class SmapiIndex
         var ask = new List<string>();
         foreach (var id in uniqueIds.Distinct(StringComparer.OrdinalIgnoreCase))
         {
-            if (items[id.ToLowerInvariant()] is JsonObject hit && DateTime.UtcNow - DateTime.Parse(hit.Str("at") ?? "2000-01-01").ToUniversalTime() < TimeSpan.FromDays(7))
+            if (items[id.ToLowerInvariant()] is JsonObject hit && hit.ContainsKey("status") && DateTime.UtcNow - DateTime.Parse(hit.Str("at") ?? "2000-01-01").ToUniversalTime() < TimeSpan.FromDays(7))
                 result[id] = (hit.Str("nexusId"), hit.Str("name"));
             else ask.Add(id);
         }
@@ -200,7 +204,7 @@ public static class SmapiIndex
                     var meta = item?["metadata"];
                     var nexusId = meta?["nexusID"]?.ToString() ?? meta?["nexusId"]?.ToString();
                     var name = meta.Str("name");
-                    items[id.ToLowerInvariant()] = new JsonObject { ["nexusId"] = nexusId, ["name"] = name, ["at"] = DateTime.UtcNow.ToString("o") };
+                    items[id.ToLowerInvariant()] = new JsonObject { ["nexusId"] = nexusId, ["name"] = name, ["status"] = meta.Str("compatibilityStatus") ?? "unknown", ["fix"] = meta?["unofficial"].Str("url"), ["at"] = DateTime.UtcNow.ToString("o") };
                     result[id] = (nexusId, name);
                 }
                 Cache.Save();

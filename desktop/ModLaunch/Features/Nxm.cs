@@ -41,7 +41,7 @@ public static partial class Nxm
             using var client = new NamedPipeClientStream(".", PipeName, PipeDirection.Out);
             client.Connect(3000);
             using var writer = new StreamWriter(client) { AutoFlush = true };
-            writer.WriteLine(args.FirstOrDefault(a => a.StartsWith("nxm://", StringComparison.OrdinalIgnoreCase)) ?? "--show");
+            writer.WriteLine(args.FirstOrDefault(IsLink) ?? "--show");
         }
         catch { }
         return false;
@@ -63,26 +63,53 @@ public static partial class Nxm
         }
     }
 
-    public static bool IsRegistered()
+    /// <summary>Ссылка, которую программа открывает: nxm://, modlaunch:// или ror2mm://.</summary>
+    public static bool IsLink(string arg) =>
+        arg.StartsWith("nxm://", StringComparison.OrdinalIgnoreCase) || ModLink.IsAppLink(arg);
+
+    public static bool IsRegistered(string scheme = "nxm")
     {
         if (!OperatingSystem.IsWindows()) return false;
         try
         {
-            var command = Registry.CurrentUser.OpenSubKey(@"Software\Classes\nxm\shell\open\command")?.GetValue(null) as string;
+            var command = Registry.CurrentUser.OpenSubKey($@"Software\Classes\{scheme}\shell\open\command")?.GetValue(null) as string;
             return command is not null && command.Contains(Environment.ProcessPath ?? "\0", StringComparison.OrdinalIgnoreCase);
         }
         catch { return false; }
     }
 
-    /// <summary>Сделать ModLaunch обработчиком nxm:// для текущего пользователя (без прав администратора).</summary>
-    public static void Register()
+    /// <summary>Сделать ModLaunch обработчиком ссылок (nxm://, modlaunch://, ror2mm://) для текущего пользователя, без прав администратора.</summary>
+    public static void Register(string scheme = "nxm")
     {
         if (!OperatingSystem.IsWindows() || Environment.ProcessPath is not string exe) return;
-        using var key = Registry.CurrentUser.CreateSubKey(@"Software\Classes\nxm");
-        key.SetValue(null, "URL:NXM Protocol");
+        using var key = Registry.CurrentUser.CreateSubKey($@"Software\Classes\{scheme}");
+        // Ссылки открывала другая программа (r2modman, Vortex) — запоминаем её, чтобы потом вернуть.
+        using (var old = key.OpenSubKey(@"shell\open\command"))
+            if (old?.GetValue(null) is string was && was != "" && !was.Contains(exe, StringComparison.OrdinalIgnoreCase)) key.SetValue(PreviousValue, was);
+        key.SetValue(null, $"URL:{scheme} Protocol");
         key.SetValue("URL Protocol", "");
         using (var icon = key.CreateSubKey("DefaultIcon")) icon.SetValue(null, $"\"{exe}\",0");
         using var command = key.CreateSubKey(@"shell\open\command");
         command.SetValue(null, $"\"{exe}\" \"%1\"");
+    }
+
+    const string PreviousValue = "ModLaunchPrevious";
+
+    /// <summary>Отдать ссылки обратно: прежней программе, если мы её запомнили, иначе просто убрать себя.</summary>
+    public static void Unregister(string scheme)
+    {
+        if (!OperatingSystem.IsWindows() || !IsRegistered(scheme)) return;
+        var path = $@"Software\Classes\{scheme}";
+        using (var key = Registry.CurrentUser.OpenSubKey(path, true))
+        {
+            if (key?.GetValue(PreviousValue) is string was)
+            {
+                using (var command = key.CreateSubKey(@"shell\open\command")) command.SetValue(null, was);
+                key.DeleteSubKeyTree("DefaultIcon", false); // наша иконка — после удаления программы её не будет
+                key.DeleteValue(PreviousValue, false);
+                return;
+            }
+        }
+        Registry.CurrentUser.DeleteSubKeyTree(path, false);
     }
 }

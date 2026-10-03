@@ -1,4 +1,4 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Shapes;
@@ -46,6 +46,7 @@ public static class Icons
     public const string Save = "M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z M17 21v-8H7v8 M7 3v5h8";
     public const string Link = "M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71 M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71";
     public const string Stop = "M6 6h12v12H6z";
+    public const string Pause = "M7 4h3v16H7z M14 4h3v16h-3z";
     public const string Sparkles = "M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2z";
     public const string Users = "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M23 21v-2a4 4 0 0 0-3-3.87 M16 3.13a4 4 0 0 1 0 7.75";
     public const string Chart = "M18 20V10 M12 20V4 M6 20v-6";
@@ -63,6 +64,9 @@ public static class Icons
     public const string EyeOff = "M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94 M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19 M1 1l22 22";
     /// <summary>Молоток и отвёртка крест-накрест — Creator Hub.</summary>
     public const string Tools = "M3.5 7.5l4-4 4 4-4 4z M9.5 9.5L20.5 20.5 M17 3l4 4-2.5 2.5-4-4z M16.5 7.5L6 18 M6 18l-2.5 2.5";
+    /// <summary>Кубик мода с искрой — логотип Creator Hub.</summary>
+    public const string Creator = "M11 3.5l-7 4v8l7 4 7-4v-8z M4 7.5l7 4 7-4 M11 11.5v8 M19.5 1.5v4 M17.5 3.5h4";
+    public const string ChevronDown = "M6 9l6 6 6-6";
     public const string Gamepad = "M6 11h4 M8 9v4 M15 12h.01 M18 10h.01 M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z";
     public const string Tv = "M2 7a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z M8 22h8 M12 19v3";
     public const string Sidebar = "M3 4h18v16H3z M15 4v16";
@@ -80,11 +84,36 @@ public static class Icons
     public const string Video = "M23 7l-7 5 7 5V7z M1 5h15v14H1z";
     public const string Image = "M3 3h18v18H3z M8.5 10a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z M21 15l-5-5L5 21";
     public const string Key = "M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.78 7.78 5.5 5.5 0 0 1 7.78-7.78zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4";
+    /// <summary>Пульс — «Проверка игры».</summary>
+    public const string Activity = "M22 12h-4l-3 9L9 3l-3 9H2";
+    // 8.4
+    public const string Megaphone = "M3 11l18-5v12L3 14v-3z M11.6 16.8a3 3 0 1 1-5.8-1.6";
+    public const string More = "M12 12.5a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1z M19 12.5a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1z M5 12.5a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1z";
+    public const string Sliders = "M4 21v-7 M4 10V3 M12 21v-9 M12 8V3 M20 21v-5 M20 12V3 M1 14h6 M9 8h6 M17 16h6";
+    public const string Server = "M2 3h20v7H2z M2 14h20v7H2z M6 6.5h.01 M6 17.5h.01";
+    public const string Zap = "M13 2L3 14h9l-1 8 10-12h-9l1-8z";
+    public const string Bug = "M8 2l1.9 1.9 M16 2l-1.9 1.9 M9 7.1V6a3 3 0 1 1 6 0v1.1 M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6z M12 20v-9 M6.5 13H3 M21 13h-3.5 M6 17l-3 2 M18 17l3 2 M6 9L3 7 M18 9l3-2";
+    public const string Undo = "M3 7v6h6 M21 17a9 9 0 0 0-15-6.7L3 13";
+    public const string Cube = "M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z M3.3 7L12 12l8.7-5 M12 22V12";
+    public const string Copy = "M9 9h13v13H9z M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1";
 }
 
 /// <summary>Небольшие строительные блоки интерфейса, чтобы экраны читались как разметка.</summary>
 public static class Ui
 {
+    /// <summary>
+    /// Шкала отступов: все зазоры в программе берём только отсюда, тогда экраны выглядят
+    /// ровно и «в одном ритме». Каждый шаг — 4 или 8 пикселей сверху предыдущего.
+    /// </summary>
+    public static class Space
+    {
+        public const double Xs = 4, S = 8, M = 12, L = 16, Xl = 24, Xxl = 32;
+    }
+
+    /// <summary>Поля страницы по краям и максимальная ширина содержимого на широких экранах.</summary>
+    public static readonly Thickness PagePadding = new(Space.Xxl, Space.Xl, Space.Xxl, Space.Xxl);
+    public const double PageMaxWidth = 1440;
+
     public static IBrush Res(string key) =>
         Application.Current!.TryGetResource(key, Application.Current.ActualThemeVariant, out var v) && v is IBrush b ? b : Brushes.Magenta;
 
@@ -150,6 +179,28 @@ public static class Ui
 
     public static Border Card(Control child, double padding = 20) => new Border { Child = child, Padding = new Thickness(padding), Classes = { "card" } };
 
+    /// <summary>Вкладки одной строкой с подчёркиванием; если не влезают — строка прокручивается вбок.</summary>
+    public static Control TabBar(params Control[] tabs)
+    {
+        var row = new StackPanel { Orientation = Orientation.Horizontal };
+        foreach (var t in tabs)
+        {
+            if (t is Button b) b.Classes.Add("line");
+            row.Children.Add(t);
+        }
+        return new Border
+        {
+            BorderBrush = Res("Line"),
+            BorderThickness = new Thickness(0, 0, 0, 1),
+            Child = new ScrollViewer
+            {
+                Content = row,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            },
+        };
+    }
+
     public static Border Dot(IBrush color, double size = 8) => new Border { Width = size, Height = size, CornerRadius = new CornerRadius(size), Background = color, VerticalAlignment = VerticalAlignment.Center };
 
     /// <summary>
@@ -185,20 +236,29 @@ public static class Ui
     }
 
     /// <summary>Картинка по ссылке: пока грузится — буквы на цветном фоне.</summary>
-    public static Control Thumb(string? url, string name, double size, double radius = 12, int decode = 160)
+    public static Control Thumb(string? url, string name, double size, double radius = 12, int decode = 160, bool person = false)
     {
-        var initials = string.Concat(name.Split(' ', '-', '_').Where(w => w.Length > 0 && char.IsLetterOrDigit(w[0])).Take(2).Select(w => char.ToUpperInvariant(w[0])));
-        var hue = (int)(name.Aggregate(17u, (h, c) => h * 31 + c) % 360);
-        var fallback = new Border
+        Border fallback;
+        if (person)
         {
-            Background = new LinearGradientBrush
+            var initials = string.Concat(name.Split(' ', '-', '_').Where(w => w.Length > 0 && char.IsLetterOrDigit(w[0])).Take(2).Select(w => char.ToUpperInvariant(w[0])));
+            var hue = (int)(name.Aggregate(17u, (h, c) => h * 31 + c) % 360);
+            fallback = new Border
             {
-                StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative),
-                EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
-                GradientStops = { new GradientStop(HslColor(hue, 0.55, 0.42), 0), new GradientStop(HslColor((hue + 50) % 360, 0.6, 0.3), 1) },
-            },
-            Child = new TextBlock { Text = initials, FontWeight = FontWeight.Bold, FontSize = size * 0.3, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
-        };
+                Background = new LinearGradientBrush
+                {
+                    StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative),
+                    EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
+                    GradientStops = { new GradientStop(HslColor(hue, 0.55, 0.42), 0), new GradientStop(HslColor((hue + 50) % 360, 0.6, 0.3), 1) },
+                },
+                Child = new TextBlock { Text = initials, FontWeight = FontWeight.Bold, FontSize = size * 0.3, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
+            };
+        }
+        else
+        {
+            // Мод или игра без картинки: нейтральный фон и значок коробки вместо цветных букв.
+            fallback = new Border { Background = Res("Surface3"), Child = Icon(Icons.Package, Math.Max(14, size * 0.36), Res("Faint")) };
+        }
         var image = new Image { Classes = { "zoom" }, Stretch = Stretch.UniformToFill };
         var host = new Border { Width = size, Height = size, CornerRadius = new CornerRadius(radius), ClipToBounds = true, Child = new Panel { Children = { fallback, image } } };
         if (!string.IsNullOrEmpty(url))
@@ -224,6 +284,14 @@ public static class Ui
         var days = (int)(DateTime.UtcNow - w).TotalDays;
         if (days <= 0) return I18n.T("time.today");
         return I18n.T("time.daysAgo." + I18n.Plural(days, "one", "few", "many"), ("n", days));
+    }
+
+    /// <summary>Короткий путь для показа: «…\Games\Subnautica». Полный — в подсказке.</summary>
+    public static string ShortPath(string path)
+    {
+        var sep = System.IO.Path.DirectorySeparatorChar;
+        var parts = path.Split(sep, StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length <= 2 ? path : "…" + sep + string.Join(sep, parts[^2..]);
     }
 
     public static void OpenUrl(string url)

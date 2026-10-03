@@ -25,7 +25,7 @@ public static class Installer
     {
         if (args.Contains("--uninstall")) return SetupMode.Uninstall;
         if (args.Contains("--update")) return SetupMode.Update;
-        if (args.Contains("--setup")) return SetupMode.Install;
+        if (args.Contains("--setup") || args.Contains("--silent")) return SetupMode.Install;
         if (args.Contains("--portable")) return SetupMode.None;
         var name = Path.GetFileName(Environment.ProcessPath ?? "");
         return name.Contains("setup", StringComparison.OrdinalIgnoreCase) ? SetupMode.Install : SetupMode.None;
@@ -67,12 +67,15 @@ public static class Installer
         {
             try
             {
-                if (Registry.CurrentUser.OpenSubKey(AppKey)?.GetValue("InstallDir") is string known && Inspect(known).Kind == TargetKind.Ours) return Normalize(known);
+                if (Registry.CurrentUser.OpenSubKey(AppKey)?.GetValue("InstallDir") is string known && !InTemp(known) && Inspect(known).Kind == TargetKind.Ours) return Normalize(known);
             }
             catch { }
         }
         return Normalize(Inspect(NsisDir).Kind == TargetKind.Ours ? NsisDir : DefaultDir);
     }
+
+    /// <summary>Временная папка (например, от проверок) — ставить туда программу нельзя: Windows её чистит.</summary>
+    static bool InTemp(string path) { try { return Inside(path, Path.GetTempPath()); } catch { return false; } }
 
     static bool Inside(string child, string parent)
     {
@@ -105,40 +108,118 @@ public static class Installer
 
     public sealed record Result(string Target, string Exe, bool Updated, string? From);
 
-    public static async Task<Result> Install(string targetInput, bool desktop, IProgress<(string Step, double Ratio)> progress)
+    /// <summary>Журнал установки: лежит во временной папке, по нему можно понять, что пошло не так.</summary>
+    public static string LogPath => Path.Combine(Path.GetTempPath(), "modlaunch-setup.log");
+
+    public static void Log(string line)
+    {
+        try { File.AppendAllText(LogPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}  {line}{Environment.NewLine}"); } catch { }
+    }
+
+    /// <summary>Хватит ли места: копия, запасная копия на время замены и немного про запас.</summary>
+    public static void CheckSpace(string dir, long needBytes)
+    {
+        try
+        {
+            var root = Path.GetPathRoot(Path.GetFullPath(dir));
+            if (root is null) return;
+            if (new DriveInfo(root).AvailableFreeSpace < needBytes * 2 + 50L * 1024 * 1024) throw new SetupError("SETUP_SPACE");
+        }
+        catch (SetupError) { throw; }
+        catch { /* диск не опросился — пробуем так */ }
+    }
+
+    internal static bool SameFile(string a, string b)
+    {
+        using var x = File.OpenRead(a);
+        using var y = File.OpenRead(b);
+        if (x.Length != y.Length) return false;
+        return System.Security.Cryptography.SHA256.HashData(x).AsSpan().SequenceEqual(System.Security.Cryptography.SHA256.HashData(y));
+    }
+
+    /// <summary>
+    /// Установка «с запасным выходом»: новая копия сначала целиком ложится рядом и проверяется,
+    /// потом папки меняются местами. Если что-то сорвалось — старая версия возвращается на место,
+    /// и у человека всегда остаётся рабочий ModLaunch.
+    /// </summary>
+    public static async Task<Result> Install(string targetInput, bool desktop, IProgress<(string Step, double Ratio)> progress, bool autostart = false)
     {
         var dir = Normalize(targetInput);
         var source = Environment.ProcessPath ?? throw new InvalidOperationException("no exe");
         if (Inside(source, dir)) throw new SetupError("SETUP_TARGET_SELF");
         var (kind, version) = Inspect(dir);
         if (kind == TargetKind.Foreign) throw new SetupError("SETUP_TARGET_FOREIGN");
+        Log($"install {Http.Version} to {dir} (was {kind} {version})");
+        CheckSpace(dir, new FileInfo(source).Length);
 
+        var staging = dir + ".new";
+        var backup = dir + ".old";
+        var swapped = false;
         try
         {
             progress.Report(("close", 0));
             await Task.Run(() => CloseRunning(dir));
-            if (kind == TargetKind.Ours)
-            {
-                progress.Report(("clean", 0));
-                await Retry(() => { Directory.Delete(dir, true); });
-            }
+
             progress.Report(("copy", 0));
-            Directory.CreateDirectory(dir);
-            File.WriteAllText(Path.Combine(dir, Marker), new JsonObject { ["version"] = Http.Version, ["installedAt"] = DateTime.UtcNow.ToString("o") }.ToJsonString());
-            var exe = Path.Combine(dir, ExeName);
-            await CopyWithProgress(source, exe, r => progress.Report(("copy", r)));
+            if (Directory.Exists(staging)) await Retry(() => Directory.Delete(staging, true));
+            Directory.CreateDirectory(staging);
+            File.WriteAllText(Path.Combine(staging, Marker), new JsonObject { ["version"] = Http.Version, ["installedAt"] = DateTime.UtcNow.ToString("o") }.ToJsonString());
+            var stagedExe = Path.Combine(staging, ExeName);
+            await CopyWithProgress(source, stagedExe, r => progress.Report(("copy", r)));
+
+            progress.Report(("verify", 1));
+            if (!await Task.Run(() => SameFile(source, stagedExe))) throw new SetupError("SETUP_VERIFY");
+
+            progress.Report(("clean", 1));
+            if (Directory.Exists(backup)) await Retry(() => Directory.Delete(backup, true));
+            var hadOld = Directory.Exists(dir);
+            if (hadOld) await Retry(() => Directory.Move(dir, backup));
+            try { await Retry(() => Directory.Move(staging, dir)); swapped = true; }
+            catch { if (hadOld) try { Directory.Move(backup, dir); } catch { } throw; }
 
             progress.Report(("integrate", 1));
-            if (OperatingSystem.IsWindows())
+            var exe = Path.Combine(dir, ExeName);
+            try
             {
-                Register(dir, exe, (int)(new FileInfo(exe).Length / 1024));
-                Shortcuts(exe, dir, desktop);
+                if (OperatingSystem.IsWindows() && Environment.GetEnvironmentVariable("MODLAUNCH_SETUP_TEST") != "1") // проверки установщика не трогают реестр и ярлыки
+                {
+                    Register(dir, exe, (int)(new FileInfo(exe).Length / 1024));
+                    Shortcuts(exe, dir, desktop);
+                    if (autostart) Features.Autostart.Set(true, exe);
+                }
             }
+            catch
+            {
+                // Ярлыки или реестр не записались — возвращаем прежнюю версию целиком.
+                if (hadOld) { try { Directory.Delete(dir, true); Directory.Move(backup, dir); } catch { } }
+                throw;
+            }
+            if (Directory.Exists(backup)) { try { await Retry(() => Directory.Delete(backup, true)); } catch { Log("old copy left at " + backup); } }
+            Log("done");
             progress.Report(("done", 1));
             return new Result(dir, exe, kind == TargetKind.Ours, version);
         }
-        catch (IOException) { throw new SetupError("SETUP_BUSY"); }
-        catch (UnauthorizedAccessException) { throw new SetupError("SETUP_ACCESS"); }
+        catch (SetupError e) { Log("error " + e.Code); throw; }
+        catch (IOException e) { Log("io error " + e.Message); throw new SetupError("SETUP_BUSY"); }
+        catch (UnauthorizedAccessException e) { Log("access error " + e.Message); throw new SetupError("SETUP_ACCESS"); }
+        finally
+        {
+            if (!swapped) try { if (Directory.Exists(staging)) Directory.Delete(staging, true); } catch { }
+        }
+    }
+
+    /// <summary>Установка без окна, для скриптов и администраторов: --silent [--dir путь] [--no-desktop] [--no-launch] [--autostart]; с --uninstall — удаление (--wipe — вместе с данными).</summary>
+    public static int RunSilent(string[] args)
+    {
+        string? Arg(string name) { var i = Array.IndexOf(args, name); return i >= 0 && i + 1 < args.Length ? args[i + 1] : null; }
+        try
+        {
+            if (args.Contains("--uninstall")) { Uninstall(args.Contains("--wipe")); return 0; }
+            var result = Install(Arg("--dir") ?? SuggestedDir(), !args.Contains("--no-desktop"), new Progress<(string, double)>(), args.Contains("--autostart")).GetAwaiter().GetResult();
+            if (!args.Contains("--no-launch")) Launch(result.Exe);
+            return 0;
+        }
+        catch (Exception e) { Log("silent failed: " + e.Message); return 1; }
     }
 
     static async Task Retry(Action action)
@@ -247,12 +328,10 @@ public static class Installer
         {
             try { Registry.CurrentUser.DeleteSubKeyTree(UninstallKey, false); } catch { }
             try { Registry.CurrentUser.DeleteSubKeyTree(AppKey, false); } catch { }
-            try
-            {
-                var command = Registry.CurrentUser.OpenSubKey(@"Software\Classes\nxm\shell\open\command")?.GetValue(null) as string;
-                if (command is not null && command.Contains(exe, StringComparison.OrdinalIgnoreCase)) Registry.CurrentUser.DeleteSubKeyTree(@"Software\Classes\nxm", false);
-            }
-            catch { }
+            // Ссылки nxm://, modlaunch:// и ror2mm://, если они наши: отдаём прежней программе или убираем,
+            // иначе браузер звал бы уже удалённый ModLaunch.exe.
+            foreach (var scheme in new[] { "nxm", "modlaunch", "ror2mm" })
+                try { Features.Nxm.Unregister(scheme); } catch { }
         }
         var remove = new List<string>();
         if (File.Exists(Path.Combine(dir, Marker))) remove.Add(dir);
@@ -272,4 +351,37 @@ public static class Installer
 public sealed class SetupError(string code, string? detail = null) : Exception(detail ?? code)
 {
     public string Code { get; } = code;
+}
+
+static class InstallerChecks
+{
+    [SelfTest]
+    static string VerifyCatchesBadCopy()
+    {
+        var dir = Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "modlaunch-installer-test")).FullName;
+        try
+        {
+            var a = Path.Combine(dir, "a.bin");
+            var b = Path.Combine(dir, "b.bin");
+            File.WriteAllBytes(a, [1, 2, 3, 4]);
+            File.WriteAllBytes(b, [1, 2, 3, 4]);
+            if (!Installer.SameFile(a, b)) throw new Exception("equal files reported different");
+            File.WriteAllBytes(b, [1, 2, 3, 5]);
+            if (Installer.SameFile(a, b)) throw new Exception("flipped byte not noticed");
+            File.WriteAllBytes(b, [1, 2, 3]);
+            if (Installer.SameFile(a, b)) throw new Exception("short copy not noticed");
+            Installer.CheckSpace(dir, 1024); // место есть — не бросает
+            return "identical copy passes; flipped byte and truncated copy are caught";
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
+
+    [SelfTest]
+    static string NormalizeAddsFolder()
+    {
+        var p = Installer.Normalize(Path.Combine(Path.GetTempPath(), "Games"));
+        if (!p.EndsWith("ModLaunch")) throw new Exception(p);
+        if (Installer.Normalize(p) != p) throw new Exception("not idempotent");
+        return "target folder always ends in ModLaunch, never doubled";
+    }
 }

@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
@@ -28,10 +28,11 @@ public static class Aside
 
     public static Control Stat(string value, string label) => new Border
     {
-        Background = Ui.Res("Surface"), BorderBrush = Ui.Res("Line"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(12), Padding = new Thickness(8, 10),
+        Background = Ui.Res("Surface"), CornerRadius = new CornerRadius(12), Padding = new Thickness(6, 10),
         Child = Ui.Col(2,
             new TextBlock { Text = value, FontSize = 20, FontWeight = FontWeight.Bold, HorizontalAlignment = HorizontalAlignment.Center },
-            new TextBlock { Text = label, FontSize = 11.5, Foreground = Ui.Res("Muted"), HorizontalAlignment = HorizontalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis }),
+            // Длинная подпись («установлено») чуть уменьшается, а не рвётся посередине слова.
+            new Viewbox { Stretch = Avalonia.Media.Stretch.Uniform, StretchDirection = StretchDirection.DownOnly, Child = new TextBlock { Text = label, FontSize = 11.5, Foreground = Ui.Res("Muted") } }),
     };
 
     public static Control Stats(params (string Value, string Label)[] items)
@@ -69,8 +70,13 @@ public static class Aside
         var info = Ui.Col(1, new TextBlock { Text = mod.Name, FontWeight = FontWeight.SemiBold, FontSize = 13.5, TextTrimming = TextTrimming.CharacterEllipsis },
             Ui.Text(mod.Downloads > 0 ? "↓ " + I18n.Compact(mod.Downloads) : mod.Author, "small muted"));
         info.VerticalAlignment = VerticalAlignment.Center;
-        var row = new DockPanel { Children = { install, Ui.Row(10, Ui.Thumb(mod.Icon, mod.Name, 38, 9), info) } };
+        var thumb = Ui.Thumb(mod.Icon, mod.Name, 38, 9);
+        thumb.Margin = new Thickness(0, 0, 10, 0);
+        DockPanel.SetDock(thumb, Dock.Left);
+        install.Margin = new Thickness(8, 0, 0, 0);
+        var row = new DockPanel { Children = { install, thumb, info } };
         var b = new Button { Classes = { "ghost" }, Padding = new Thickness(4), HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch, Content = row };
+        ToolTip.SetTip(b, mod.Name);
         b.Click += (_, _) => MainWindow.Current?.Navigate(() => new ModPage(g.Def.Id, mod));
         return b;
     }
@@ -112,7 +118,7 @@ public static class Aside
             var friends = Social.Friends.View().Friends;
             var online = friends.Where(f => f.State != "offline").ToList();
             var account = Section(I18n.T("aside.account"), Icons.User,
-                Ui.Row(12, Ui.Thumb(null, profile.Name ?? "?", 44, 22), Ui.Col(2, Ui.Text(profile.Name ?? "", "h3"),
+                Ui.Row(12, Ui.Thumb(null, profile.Name ?? "?", 44, 22, person: true), Ui.Col(2, Ui.Text(profile.Name ?? "", "h3"),
                     Ui.Text(I18n.T("aside.friendsOnline", ("n", online.Count), ("all", friends.Count)), "small muted"))));
             col.Children.Add(account);
             if (online.Count > 0)
@@ -198,9 +204,6 @@ public static class Aside
             Pair(I18n.T("aside.source"), SourceName(mod.Source)));
         if (mod.Version != "") facts.Children.Add(Pair(I18n.T("aside.version"), mod.Version));
         if (versions > 0) facts.Children.Add(Pair(I18n.T("aside.versions"), versions.ToString()));
-        if (mod.Downloads > 0) facts.Children.Add(Pair(I18n.T("aside.downloads"), mod.Downloads.ToString("N0")));
-        if (mod.UpdatedAt is not null) facts.Children.Add(Pair(I18n.T("aside.updated"), mod.UpdatedAt.Value.ToLocalTime().ToString("dd.MM.yyyy")));
-        if (details is { Requirements.Count: > 0 }) facts.Children.Add(Pair(I18n.T("mt.reqs"), details.Requirements.Count.ToString()));
         col.Children.Add(Section(I18n.T("aside.aboutMod"), Icons.Info, facts));
         if (mod.Categories.Length > 0)
         {
@@ -212,12 +215,6 @@ public static class Aside
                 tags.Children.Add(t);
             }
             col.Children.Add(tags);
-        }
-        if (mod.Url is not null)
-        {
-            var open = Ui.Button(I18n.T("aside.openOn", ("site", SourceName(mod.Source))), () => Ui.OpenUrl(mod.Url), "", Icons.External);
-            open.HorizontalAlignment = HorizontalAlignment.Stretch;
-            col.Children.Add(open);
         }
         if (mod.Author != "")
             col.Children.Add(Ui.Col(6, Divider(), Pair(I18n.T("aside.author"), mod.Author, Ui.Res("Brand2"))));

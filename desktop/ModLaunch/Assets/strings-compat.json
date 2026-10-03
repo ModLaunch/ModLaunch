@@ -1,0 +1,18 @@
+{
+  "ru": {
+    "badge.deprecated": "Устарел",
+    "compat.deprecated": "Автор пометил этот мод как устаревший: он может не работать с новой версией игры. Поищи замену в каталоге.",
+    "compat.foreign.title": "Мод для другого загрузчика",
+    "compat.foreign.text": "{mod} нужен {loader}, а {game} работает на другом. Скорее всего, мод не заработает. Всё равно поставить?",
+    "compat.foreign.go": "Всё равно поставить",
+    "compat.foreign.skipped": "{mod} пропущен: нужен {loader}"
+  },
+  "en": {
+    "badge.deprecated": "Deprecated",
+    "compat.deprecated": "The author marked this mod as deprecated: it may not work with the current game version. Look for a replacement in the catalog.",
+    "compat.foreign.title": "Mod for a different loader",
+    "compat.foreign.text": "{mod} needs {loader}, but {game} runs on another one. It will most likely not work. Install anyway?",
+    "compat.foreign.go": "Install anyway",
+    "compat.foreign.skipped": "{mod} skipped: needs {loader}"
+  }
+}

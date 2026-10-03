@@ -1,4 +1,4 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
@@ -26,6 +26,8 @@ public abstract class Page : UserControl
     public virtual IEnumerable<(string Text, Action? Open)> Crumbs => [(Title, null)];
     /// <summary>Правая панель со сведениями о том, что на экране (как в ModLaunch 3). null — панели нет.</summary>
     public virtual Control? Aside() => null;
+    /// <summary>Тот же экран, что и предыдущий (другая вкладка той же игры): без въезда всей страницы.</summary>
+    public virtual bool SameScreenAs(Page? previous) => false;
     /// <summary>Цвет свечения фона: у страниц игры — цвет игры.</summary>
     public virtual string? Accent => GameId is string id ? AppState.Game(id).Def.Accent : null;
 }
@@ -34,24 +36,33 @@ public abstract class Page : UserControl
 /// Окно со своей рамкой: слева — главная, игры и настройки, сверху — навигация,
 /// поиск, загрузки и кнопки окна. Страница меняется в середине.
 /// </summary>
-public sealed class MainWindow : Window
+public sealed partial class MainWindow : Window
 {
     public static MainWindow? Current { get; private set; }
 
     readonly ContentControl _page = new() { Name = "Page" };
-    readonly StackPanel _railGames = new() { Spacing = 10, HorizontalAlignment = HorizontalAlignment.Center };
+    readonly StackPanel _railGames = new() { Spacing = 10, HorizontalAlignment = HorizontalAlignment.Stretch };
     readonly TextBlock _title = new() { FontWeight = FontWeight.SemiBold, VerticalAlignment = VerticalAlignment.Center, FontSize = 14 };
     readonly StackPanel _crumbs = new() { Orientation = Orientation.Horizontal, Spacing = 6, VerticalAlignment = VerticalAlignment.Center };
     readonly ContentControl _aside = new();
     readonly Border _asideHost = new() { Width = 304, BorderThickness = new Thickness(1, 0, 0, 0) };
     readonly Border _glow = new() { IsHitTestVisible = false };
+    readonly Backdrop _backdrop = new();
     Button? _asideToggle;
     FriendsDock? _friendsDock;
-    readonly TextBox _search = new() { Width = 320, Height = 40 };
-    readonly Button _back, _forward, _downloads, _settingsButton, _friendsButton, _statsButton, _donateButton, _creatorButton, _libraryButton, _modsButton;
+    readonly TextBox _search = new() { Width = 340, Height = 40 };
+    readonly Button _more = new() { Classes = { "icon", "ghost" } };
+    readonly Avalonia.Controls.Shapes.Arc _dlRing = new()
+    {
+        Width = 34, Height = 34, StartAngle = -90, SweepAngle = 0, StrokeThickness = 2.5, IsVisible = false,
+        StrokeLineCap = PenLineCap.Round, IsHitTestVisible = false, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+    };
+    Border? _adWrap;
+    readonly Button _back, _forward, _downloads, _settingsButton, _friendsButton, _statsButton, _donateButton, _creatorButton, _libraryButton, _modsButton, _panelButton;
     readonly LayoutTransformControl _scale = new();
     Control? _railHost;
     Control? _brandWord;
+    Border? _brandSep;
     Panel? _layers;
     Border? _logo;
     readonly Button _updatePill = new() { Classes = { "chip" }, IsVisible = false, VerticalAlignment = VerticalAlignment.Center };
@@ -69,6 +80,8 @@ public sealed class MainWindow : Window
     readonly List<Func<Page>> _history = [];
     int _index = -1;
     Page? _current;
+    /// <summary>Страница на экране.</summary>
+    public Page? CurrentPage => _current;
 
     public MainWindow()
     {
@@ -94,7 +107,8 @@ public sealed class MainWindow : Window
         // Как в Modrinth App: разделы — отдельными пунктами на боковой панели.
         _libraryButton = RailIcon(Icons.Layers, () => Navigate(() => new LibraryPage()), I18n.T("lib.title"));
         _modsButton = RailIcon(Icons.Package, () => Navigate(() => new ModsCenterPage()), I18n.T("mc.title"));
-        _creatorButton = RailIcon(Icons.Tools, () => Navigate(() => new CreatorPage()), "Creator Hub");
+        _creatorButton = RailIcon(Icons.Creator, () => Navigate(() => new CreatorPage()), "Creator Hub");
+        _panelButton = RailIcon(Icons.Grid, () => Navigate(() => new ControlPanelPage()), I18n.T("cp.title"));
         _friendsBadge.Width = 10; _friendsBadge.Height = 10; _friendsBadge.CornerRadius = new CornerRadius(5);
         _friendsBadge.Background = Ui.Res("Good"); _friendsBadge.HorizontalAlignment = HorizontalAlignment.Right; _friendsBadge.VerticalAlignment = VerticalAlignment.Top;
         _friendsBadge.Margin = new Thickness(0, 6, 6, 0);
@@ -105,22 +119,25 @@ public sealed class MainWindow : Window
 
         _downloads = new Button
         {
-            Classes = { "icon" },
-            Content = new Panel { Children = { Ui.Icon(Icons.Download, 18), _dlBadge } },
+            Classes = { "icon", "ghost" },
+            // Кольцо вокруг значка — общий прогресс всех загрузок (как в браузере).
+            Content = new Panel { Children = { _dlRing, Ui.Icon(Icons.Download, 18), _dlBadge } },
         };
+        _dlRing.Stroke = Ui.Res("Brand");
         _dlBadge.Classes.Add("pulse");
         _dlBadge.RenderTransform = new ScaleTransform();
         _dlBadge.Width = 10; _dlBadge.Height = 10; _dlBadge.CornerRadius = new CornerRadius(5);
         _dlBadge.Background = Ui.Res("Brand2"); _dlBadge.HorizontalAlignment = HorizontalAlignment.Right; _dlBadge.VerticalAlignment = VerticalAlignment.Top;
         _dlBadge.Margin = new Thickness(0, -4, -4, 0);
-        _downloads.Click += (_, _) => { _downloadsPanel!.IsVisible = !_downloadsPanel.IsVisible; _bellPanel!.IsVisible = false; };
+        _downloads.Click += (_, _) => { TogglePanel(_downloadsPanel!); _bellPanel!.IsVisible = false; };
         ToolTip.SetTip(_downloads, I18n.T("dl.button"));
 
         _bellBadge.Width = 10; _bellBadge.Height = 10; _bellBadge.CornerRadius = new CornerRadius(5);
         _bellBadge.Background = Ui.Res("Bad"); _bellBadge.HorizontalAlignment = HorizontalAlignment.Right; _bellBadge.VerticalAlignment = VerticalAlignment.Top;
         _bellBadge.Margin = new Thickness(0, -4, -4, 0);
         _bell.Content = new Panel { Children = { Ui.Icon(Icons.Bell, 18), _bellBadge } };
-        _bell.Click += (_, _) => { _bellPanel!.IsVisible = !_bellPanel.IsVisible; _downloadsPanel!.IsVisible = false; RenderBell(); };
+        _bell.Classes.Add("ghost");
+        _bell.Click += (_, _) => { TogglePanel(_bellPanel!); _downloadsPanel!.IsVisible = false; RenderBell(); };
         ToolTip.SetTip(_bell, I18n.T("nx.notify"));
         _bellPanel = new Border
         {
@@ -142,15 +159,20 @@ public sealed class MainWindow : Window
             VerticalAlignment = VerticalAlignment.Top,
             IsVisible = false,
             BoxShadow = BoxShadows.Parse("0 18 50 0 #80000000"),
-            Child = Ui.Col(12, Ui.Text(I18n.T("dl.title"), "h3"), new ScrollViewer { Content = _downloadsList, MaxHeight = 440 }),
+            Child = DownloadsContent(),
         };
 
+        InitPlay();
+        InitDrop();
         _scale.Child = BuildLayout();
         Content = _scale;
         ApplyScale();
+        UpdateAdVisibility();
         Look.Changed += () => { ApplyScale(); RenderRail(); _current?.Build(); RenderAside(); RenderGlow(); };
+        Look.GlowChanged += () => _glow.Opacity = Look.Glow;
+        _glow.Opacity = Look.Glow;
 
-        I18n.Changed += () => { RebuildChrome(); _current?.Build(); };
+        I18n.Changed += () => { FlowDirection = I18n.IsRtl ? Avalonia.Media.FlowDirection.RightToLeft : Avalonia.Media.FlowDirection.LeftToRight; RebuildChrome(); _current?.Build(); };
         AppState.Changed += OnStateChanged;
         Jobs.Changed += _ => RenderDownloads();
         Jobs.Finished += OnJobFinished;
@@ -161,6 +183,7 @@ public sealed class MainWindow : Window
         SmoothScroll.Attach(this);
         Images.Prewarm(AppState.Games.Select(g => g.Def));
         Navigate(StartPage());
+        WhatsNew.MaybeShow();
         RenderRail();
         SetupTray();
         RenderBell();
@@ -193,13 +216,16 @@ public sealed class MainWindow : Window
         // Главная — по логотипу (одна кнопка вместо двух).
         _logo = logo;
         ToolTip.SetTip(logo, I18n.T("nav.menu"));
-        var top = Ui.Col(8, logo, _libraryButton, _modsButton, new Border { Height = 1, Background = Ui.Res("Line"), Margin = new Thickness(14, 6, 14, 0) });
-        top.Margin = new Thickness(0, 14, 0, 10);
+        // 8.5: сверху — главное меню (логотип) и панель управления, за чертой — игры,
+        // в самом низу — Creator Hub, поддержка проекта и аккаунт. Остальное — в «⋯» и панели управления.
+        var top = Ui.Col(8, logo, Slot(_panelButton), RailRule(new Thickness(16, 8, 16, 2)));
+        top.Margin = new Thickness(0, 14, 0, 6);
         top.HorizontalAlignment = HorizontalAlignment.Center;
         DockPanel.SetDock(top, Dock.Top);
-        // Друзья — внизу окна (как «Друзья и чат» в Steam), на панели остаются инструменты.
-        var bottom = Ui.Col(8, _creatorButton, _statsButton, _settingsButton);
-        bottom.Margin = new Thickness(0, 10, 0, 16);
+        // Аватар — по центру панели, как и значки над ним (они стоят в «слотах» шириной с панель).
+        _accountButton.HorizontalAlignment = HorizontalAlignment.Center;
+        var bottom = Ui.Col(8, RailRule(new Thickness(16, 2, 16, 6)), Slot(_statsButton), Slot(_creatorButton), Slot(_donateButton), _accountButton);
+        bottom.Margin = new Thickness(0, 6, 0, 16);
         bottom.HorizontalAlignment = HorizontalAlignment.Center;
         DockPanel.SetDock(bottom, Dock.Bottom);
         rail.Children.Add(top);
@@ -212,7 +238,14 @@ public sealed class MainWindow : Window
         // Верхняя строка: тянется за неё всё окно.
         _search.Watermark = I18n.T("search.home");
         _search.InnerLeftContent = new Border { Padding = new Thickness(12, 0, 0, 0), Child = Ui.Icon(Icons.Search, 16, Ui.Res("Muted")) };
-        _search.KeyDown += (_, e) => { if (e.Key == Key.Enter) _current?.Search(_search.Text ?? ""); };
+        _search.KeyDown += (_, e) =>
+        {
+            if (e.Key != Key.Enter) return;
+            // Вставили ссылку на мод — сразу его страница.
+            if (Features.ModLink.Parse(_search.Text ?? "") is not null) { OpenLink(_search.Text!); return; }
+            _current?.Search(_search.Text ?? "");
+        };
+        _search.TextChanged += (_, _) => OnSearchTyping();
 
         _brandWord = new TextBlock
             {
@@ -221,7 +254,8 @@ public sealed class MainWindow : Window
             };
         // Минимализм: по умолчанию в шапке только название экрана, логотип — на боковой панели.
         // Как в ModLaunch 3: слово-логотип, разделитель и «хлебные крошки».
-        var brand = Ui.Row(14, _brandWord, new Border { Width = 1, Height = 22, Background = Ui.Res("Line"), VerticalAlignment = VerticalAlignment.Center }, _crumbs);
+        _brandSep = new Border { Width = 1, Height = 20, Background = Ui.Res("Line"), VerticalAlignment = VerticalAlignment.Center };
+        var brand = Ui.Row(12, _brandWord, _brandSep, _crumbs);
         _brandWord.IsVisible = Settings.Data.Bool("showBrand", true);
         _brandWord.Cursor = new Cursor(StandardCursorType.Hand);
         _brandWord.PointerPressed += (_, _) => Navigate(() => new HomePage());
@@ -236,32 +270,47 @@ public sealed class MainWindow : Window
             WinButton(Icons.Maximize, () => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized, I18n.T("win.maximize")),
             WinButton(Icons.Close, Close, I18n.T("win.close"), "close"));
 
+        // 8.4: шапка без лишнего. Слева — «назад/вперёд» одной парой и где мы; справа — поиск,
+        // реклама, уведомления, загрузки с кольцом прогресса и «⋯» со всем остальным
+        // (панель сведений, Big Picture, панель управления, горячие клавиши…).
         var topbar = new Grid
         {
-            ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto,Auto,Auto"),
-            Height = 68,
+            // Левая часть (навигация и «где мы») занимает остаток и обрезается первой — кнопки окна всегда видны.
+            ColumnDefinitions = new ColumnDefinitions("*,Auto,Auto,Auto"),
+            Height = 64,
             Background = Brushes.Transparent,
         };
-        var left = Ui.Row(6, _back, _forward, new Border { Width = 8 }, brand);
+        _back.Width = _back.Height = _forward.Width = _forward.Height = 34;
+        _back.CornerRadius = _forward.CornerRadius = new CornerRadius(9);
+        var navPair = new Border { Classes = { "nav-pair" }, Child = Ui.Row(0, _back, _forward), VerticalAlignment = VerticalAlignment.Center };
+        var left = Ui.Row(14, navPair, brand);
         left.VerticalAlignment = VerticalAlignment.Center;
-        left.Margin = new Thickness(20, 0, 0, 0);
+        left.ClipToBounds = true;
+        left.Margin = new Thickness(18, 0, 0, 0);
         topbar.Children.Add(left);
         _search.VerticalAlignment = VerticalAlignment.Center;
-        Grid.SetColumn(_search, 2);
+        _search.Classes.Add("top-search");
+        _search.Margin = new Thickness(16, 0, 0, 0);
+        Grid.SetColumn(_search, 1);
         topbar.Children.Add(_search);
-        var bigPicture = new Button { Classes = { "icon" }, Content = Ui.Icon(Icons.Tv, 18) };
-        ToolTip.SetTip(bigPicture, I18n.T("bp.open") + " (F11)");
-        bigPicture.Click += (_, _) => BigPictureWindow.Open();
         _asideToggle = new Button { Classes = { "icon" }, Content = Ui.Icon(Icons.Sidebar, 18) };
-        ToolTip.SetTip(_asideToggle, I18n.T("aside.toggle"));
-        _asideToggle.Click += (_, _) => { Settings.Data["asideOpen"] = !Settings.Data.Bool("asideOpen", true); Settings.Save(); RenderAside(); };
-        var dlWrap = new Border { Child = Ui.Row(10, _updatePill, _bell, _asideToggle, bigPicture, _downloads), Margin = new Thickness(12, 0, 16, 0), VerticalAlignment = VerticalAlignment.Center };
-        Grid.SetColumn(dlWrap, 3);
+        _asideToggle.Click += (_, _) => ToggleAside();
+        _more.Content = Ui.Icon(Icons.More, 20);
+        ToolTip.SetTip(_more, I18n.T("top.more"));
+        _more.Click += (_, _) => MoreMenu().ShowAt(_more, true);
+        _adWrap = new Border { Child = AdSlot.Pill(), VerticalAlignment = VerticalAlignment.Center };
+        var tools = Ui.Row(4, _updatePill, _adWrap, _bell, _downloads, _more);
+        tools.VerticalAlignment = VerticalAlignment.Center;
+        var dlWrap = new Border { Child = tools, Margin = new Thickness(10, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center };
+        Grid.SetColumn(dlWrap, 2);
         topbar.Children.Add(dlWrap);
+        var divider = new Border { Width = 1, Height = 22, Background = Ui.Res("Line"), Margin = new Thickness(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center };
         winButtons.VerticalAlignment = VerticalAlignment.Center;
-        winButtons.Margin = new Thickness(0, 0, 12, 0);
-        Grid.SetColumn(winButtons, 4);
-        topbar.Children.Add(winButtons);
+        winButtons.Margin = new Thickness(0, 0, 10, 0);
+        var winHost = Ui.Row(0, divider, winButtons);
+        winHost.VerticalAlignment = VerticalAlignment.Center;
+        Grid.SetColumn(winHost, 3);
+        topbar.Children.Add(winHost);
         topbar.PointerPressed += (_, e) =>
         {
             if (e.Source is Visual v && v.FindAncestorOfType<Button>(true) is null && v.FindAncestorOfType<TextBox>(true) is null)
@@ -281,10 +330,25 @@ public sealed class MainWindow : Window
         DockPanel.SetDock(_asideHost, Dock.Right);
         main.Children.Add(_asideHost);
         main.Children.Add(new Panel { Children = { _glow, _page } });
+        // Правый клик по пустому месту страницы: навигация и быстрые переходы.
+        Ctx.Attach(_page, () => Ctx.Menu(
+            Ctx.Item(I18n.T("ctx.back"), Icons.Back, GoBack, _index > 0, "Alt+Left"),
+            Ctx.Item(I18n.T("ctx.forward"), Icons.Forward, GoForward, _index < _history.Count - 1, "Alt+Right"),
+            Ctx.Item(I18n.T("ctx.reload"), Icons.Refresh, () => _current?.Build(), gesture: "F5"),
+            "-",
+            Ctx.Item(I18n.T("cp.title"), Icons.Grid, () => Navigate(() => new ControlPanelPage()), gesture: "Ctrl+Shift+P"),
+            Ctx.Item(I18n.T("nav.menu"), Icons.Home, () => Navigate(() => new HomePage())),
+            Ctx.Item("Creator Hub", Icons.Creator, () => Navigate(() => new CreatorPage()), gesture: "Ctrl+Shift+C"),
+            Ctx.Item("Minecraft", Icons.Cube, () => Navigate(() => new MinecraftPage()), gesture: "Ctrl+Shift+M"),
+            Ctx.Item(I18n.T("acc.page"), Icons.User, () => Navigate(() => new AccountPage())),
+            "-",
+            Ctx.Item(I18n.T("look.title"), Icons.Palette, () => Navigate(() => new SettingsPage("look"))),
+            Ctx.Item(I18n.T("nav.settings"), Icons.Settings, () => Navigate(() => new SettingsPage()), gesture: "Ctrl+OemComma")));
         SizeChanged += (_, _) =>
         {
             if (Look.AutoScale && Math.Abs(EffectiveScale() - _appliedScale) > 0.001) ApplyScale();
             UpdateAsideVisibility();
+            UpdateAdVisibility();
         };
 
         var root = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*") };
@@ -298,8 +362,10 @@ public sealed class MainWindow : Window
         layers.Children.Add(root);
         layers.Children.Add(_downloadsPanel);
         layers.Children.Add(_bellPanel);
+        layers.Children.Add(_accountPanel);
         _friendsDock = new FriendsDock();
         layers.Children.Add(_friendsDock);
+        layers.Children.Add(_launchLayer);
         layers.Children.Add(_toasts);
         layers.Children.Add(_overlay);
         return layers;
@@ -312,6 +378,32 @@ public sealed class MainWindow : Window
         b.VerticalContentAlignment = VerticalAlignment.Center;
         b.Foreground = Ui.Res("Muted");
         return b;
+    }
+
+    /// <summary>Черта на боковой панели: тонкая, к краям растворяется в фон.</summary>
+    static Control RailRule(Thickness margin) => new Border
+    {
+        Height = 1, Margin = margin, Width = 44, HorizontalAlignment = HorizontalAlignment.Center,
+        // Цвет — из темы (меняется вместе с ней), края гасит маска.
+        Background = Ui.Res("Line"),
+        OpacityMask = new LinearGradientBrush
+        {
+            StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 0, RelativeUnit.Relative),
+            GradientStops = { new GradientStop(Colors.Transparent, 0), new GradientStop(Colors.Black, 0.25), new GradientStop(Colors.Black, 0.75), new GradientStop(Colors.Transparent, 1) },
+        },
+    };
+
+    readonly List<(Panel Slot, Button Button)> _railSlots = [];
+
+    /// <summary>Пункт боковой панели с «пилюлей» слева: растёт при наведении и у выбранного.</summary>
+    Control Slot(Button b)
+    {
+        var slot = new Panel { Classes = { "rail-item" }, Width = 76, Children = { new Border { Classes = { "rail-pip" } }, b } };
+        b.HorizontalAlignment = HorizontalAlignment.Center;
+        b.PropertyChanged += (_, e) => { if (e.Property == IsVisibleProperty) slot.IsVisible = b.IsVisible; };
+        slot.IsVisible = b.IsVisible;
+        _railSlots.Add((slot, b));
+        return slot;
     }
 
     static Button WinButton(string icon, Action onClick, string tip, string extra = "")
@@ -372,32 +464,20 @@ public sealed class MainWindow : Window
         Control? content = null;
         try { content = _current?.Aside(); } catch { }
         _aside.Content = content;
-        _asideToggle?.Classes.Set("active", Settings.Data.Bool("asideOpen", true));
+        _asideToggle?.Classes.Set("active", Settings.Data.Bool("asideOpen", false));
         if (_asideToggle is not null) _asideToggle.IsVisible = content is not null;
         UpdateAsideVisibility();
     }
 
     void UpdateAsideVisibility() =>
-        _asideHost.IsVisible = _aside.Content is not null && Settings.Data.Bool("asideOpen", true) && Bounds.Width / Math.Max(0.5, _appliedScale) >= 1180;
+        _asideHost.IsVisible = _aside.Content is not null && Settings.Data.Bool("asideOpen", false) && Bounds.Width / Math.Max(0.5, _appliedScale) >= 1180;
 
     void RenderGlow()
     {
         var accent = Color.Parse(_current?.Accent ?? Look.Accent);
-        RadialGradientBrush Spot(double x, double y, byte alpha, double r) => new()
-        {
-            Center = new RelativePoint(x, y, RelativeUnit.Relative), GradientOrigin = new RelativePoint(x, y, RelativeUnit.Relative),
-            RadiusX = new RelativeScalar(r, RelativeUnit.Relative), RadiusY = new RelativeScalar(r * 0.9, RelativeUnit.Relative),
-            GradientStops = { new GradientStop(Color.FromArgb(alpha, accent.R, accent.G, accent.B), 0), new GradientStop(Color.FromArgb(0, accent.R, accent.G, accent.B), 1) },
-        };
-        var light = Look.Theme == "light";
-        _glow.Child = new Panel
-        {
-            Children =
-            {
-                new Border { Background = Spot(0.12, 0.0, (byte)(light ? 26 : 40), 0.75) },
-                new Border { Background = Spot(0.95, 1.0, (byte)(light ? 16 : 26), 0.7) },
-            },
-        };
+        var bg = Ui.Res("Bg") is SolidColorBrush b ? b.Color : Colors.Black;
+        if (_glow.Child is not Backdrop) _glow.Child = _backdrop;
+        _backdrop.Set(accent, bg, Look.IsLight, Look.Studio ? "studio" : Look.Backdrop);
     }
 
     void RenderRail()
@@ -406,23 +486,38 @@ public sealed class MainWindow : Window
         foreach (var g in RailGames())
         {
             var id = g.Def.Id;
+            var art = new Border { CornerRadius = new CornerRadius(11), ClipToBounds = true, Child = Ui.GameImage(g.Def, 120, art: Images.Art.Cover) };
+            var running = Features.Launcher.IsRunning(id);
             var b = new Button
             {
                 Classes = { "rail" },
-                Content = new Border { CornerRadius = new CornerRadius(11), ClipToBounds = true, Child = Ui.GameImage(g.Def, 120, art: Images.Art.Cover) },
+                // Запущенная игра — с зелёной точкой, как «в игре» у друзей.
+                Content = running
+                    ? new Panel { Children = { art, new Border
+                        {
+                            Width = 14, Height = 14, CornerRadius = new CornerRadius(7), Background = Ui.Res("Good"), Classes = { "pulse" },
+                            BorderBrush = Ui.Res("Rail"), BorderThickness = new Thickness(2), Margin = new Thickness(0, 0, 1, 1),
+                            HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom,
+                        } } }
+                    : art,
             };
             if (_current?.GameId == id) b.Classes.Add("active");
             b.Click += (_, _) => Navigate(() => new GamePage(id));
             b.ContextFlyout = GameCard.Menu(g);
-            ToolTip.SetTip(b, g.Def.Name);
-            _railGames.Children.Add(b);
+            ToolTip.SetTip(b, running ? $"{g.Def.Name} · {I18n.T("run.running")}" : g.Def.Name);
+            b.HorizontalAlignment = HorizontalAlignment.Center;
+            var slot = new Panel { Classes = { "rail-item" }, Width = 76, Children = { new Border { Classes = { "rail-pip" } }, b } };
+            slot.Classes.Set("active", _current?.GameId == id);
+            _railGames.Children.Add(slot);
         }
         var plus = RailIcon(Icons.Plus, () => Navigate(() => new AddGamePage()), I18n.T("add.title"));
         plus.Classes.Set("active", _current is AddGamePage);
-        _railGames.Children.Add(plus);
+        plus.HorizontalAlignment = HorizontalAlignment.Center;
+        _railGames.Children.Add(new Panel { Classes = { "rail-item" }, Width = 76, Children = { new Border { Classes = { "rail-pip" } }, plus } });
         _creatorButton.Classes.Set("active", _current is CreatorPage);
         _libraryButton.Classes.Set("active", _current is LibraryPage);
         _modsButton.Classes.Set("active", _current is ModsCenterPage);
+        _panelButton.Classes.Set("active", _current is ControlPanelPage);
         _friendsButton.IsVisible = Settings.Data.Bool("railFriends", true);
         if (_logo is not null) _logo.BorderBrush = _current is HomePage ? Ui.Res("Brand") : Brushes.Transparent;
         _settingsButton.Classes.Set("active", _current is SettingsPage);
@@ -430,6 +525,8 @@ public sealed class MainWindow : Window
         _statsButton.Classes.Set("active", _current is StatsPage);
         _donateButton.Classes.Set("active", _current is DonatePage);
         _statsButton.IsVisible = Settings.Data.Bool("ownerStats");
+        foreach (var (slot, button) in _railSlots) slot.Classes.Set("active", button.Classes.Contains("active"));
+        RenderAccount();
         var view = Social.Friends.View();
         _friendsBadge.IsVisible = view.Incoming.Count > 0 || view.Friends.Any(f => f.State != "offline");
         _friendsBadge.Background = view.Incoming.Count > 0 ? Ui.Res("Warn") : Ui.Res("Good");
@@ -500,6 +597,7 @@ public sealed class MainWindow : Window
         _appliedScale = k;
         _scale.LayoutTransform = Math.Abs(k - 1) < 0.001 ? null : new ScaleTransform(k, k);
         if (_brandWord is not null) _brandWord.IsVisible = Settings.Data.Bool("showBrand", true);
+        if (_brandSep is not null) _brandSep.IsVisible = Settings.Data.Bool("showBrand", true);
         if (_railHost is not null) _railHost.IsVisible = !Settings.Data.Bool("railHidden");
     }
 
@@ -555,7 +653,7 @@ public sealed class MainWindow : Window
         {
             var item = new NativeMenuItem(I18n.T("tray.play", ("game", g.Def.Name)));
             var gs = g;
-            item.Click += (_, _) => Actions.Play(gs);
+            item.Click += (_, _) => Guard.Later(() => Actions.Play(gs));
             menu.Items.Add(item);
         }
         menu.Items.Add(new NativeMenuItemSeparator());
@@ -584,11 +682,18 @@ public sealed class MainWindow : Window
         var commands = new List<(string Title, string Icon, Action Run)>
         {
             (I18n.T("nav.menu"), Icons.Home, () => Navigate(() => new HomePage())),
-            ("Creator Hub", Icons.Code, () => Navigate(() => new CreatorPage())),
+            ("Creator Hub", Icons.Creator, () => Navigate(() => new CreatorPage())),
             (I18n.T("add.title"), Icons.Plus, () => Navigate(() => new AddGamePage())),
             (I18n.T("nav.settings"), Icons.Settings, () => Navigate(() => new SettingsPage())),
             (I18n.T("look.title"), Icons.Palette, () => Navigate(() => new SettingsPage("look"))),
             (I18n.T("friends.title"), Icons.Users, () => Navigate(() => new FriendsPage())),
+            (I18n.T("acc.page"), Icons.User, () => Navigate(() => new AccountPage())),
+            (I18n.T("mk.tab"), Icons.Bag, () => Navigate(() => new CreatorPage("market"))),
+            ("Minecraft", Icons.Cube, () => Navigate(() => new MinecraftPage())),
+            ("Minecraft · " + I18n.T("mine.tab.catalog"), Icons.Bag, () => Navigate(() => new MinecraftPage("catalog"))),
+            ("Minecraft · " + I18n.T("mine.build.new"), Icons.Plus, () => { Navigate(() => new MinecraftPage("builds")); MinecraftPage.CreateDialog(); }),
+            (I18n.T("cp.title"), Icons.Grid, () => Navigate(() => new ControlPanelPage())),
+            (I18n.T("new.title"), Icons.Sparkles, WhatsNew.Show),
             (I18n.T("cmd.rail"), Icons.Layers, () => ToggleRail()),
             (I18n.T("cmd.theme"), Icons.Eye, () => Look.SetTheme(Look.Themes[(Array.IndexOf(Look.Themes, Look.Theme) + 1) % Look.Themes.Length])),
             (I18n.T("keys.title"), Icons.Key, () => Shortcuts()),
@@ -634,7 +739,8 @@ public sealed class MainWindow : Window
         foreach (var (keys, what) in new[]
         {
             ("Ctrl+P", "keys.palette"), ("Ctrl+K", "keys.search"), ("Ctrl+J", "keys.downloads"), ("Ctrl+B", "keys.rail"),
-            ("Ctrl+,", "keys.settings"), ("Ctrl+Shift+C", "keys.creator"), ("Alt+← / Alt+→", "keys.history"), ("F1", "keys.help"), ("Esc", "keys.close"),
+            ("Ctrl+,", "keys.settings"), ("Ctrl+Shift+P", "cp.title"), ("Ctrl+L", "lib.title"), ("Ctrl+U", "mc.title"), ("Ctrl+Shift+M", "keys.minecraft"),
+            ("Ctrl+Shift+C", "keys.creator"), ("Ctrl+I", "keys.aside"), ("F11", "bp.open"), ("Alt+← / Alt+→", "keys.history"), ("F1", "keys.help"), ("Esc", "keys.close"),
         })
         {
             var row = new DockPanel();
@@ -651,6 +757,7 @@ public sealed class MainWindow : Window
 
     public void Navigate(Func<Page> make)
     {
+        CloseAccountPanel();
         if (_index < _history.Count - 1) _history.RemoveRange(_index + 1, _history.Count - _index - 1);
         _history.Add(make);
         _index = _history.Count - 1;
@@ -662,6 +769,10 @@ public sealed class MainWindow : Window
 
     void Show(Page page)
     {
+        // У Minecraft своя страница (сборки, версии, загрузчики) — любые ссылки на «игру» ведут туда.
+        if (page is GamePage gp && gp.GameId == Minecraft.Mc.Id) page = new MinecraftPage(gp.Tab, gp.Query);
+        var same = page.SameScreenAs(_current);
+        if (same) page.Classes.Add("quiet");
         _current = page;
         if (page.GameId is string gid) { Settings.Data["lastGame"] = gid; Settings.Save(); }
         page.Build();
@@ -670,7 +781,7 @@ public sealed class MainWindow : Window
         RenderCrumbs();
         RenderAside();
         RenderGlow();
-        Animate.PageIn(page);
+        if (!same) Animate.PageIn(page);
         _title.Text = page.Title;
         _search.Text = "";
         _search.Watermark = page.SearchHint;
@@ -746,14 +857,25 @@ public sealed class MainWindow : Window
         if (e.KeyModifiers == KeyModifiers.Alt && e.Key == Key.Left) GoBack();
         else if (e.KeyModifiers == KeyModifiers.Alt && e.Key == Key.Right) GoForward();
         else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.K) { _search.Focus(); _search.SelectAll(); }
-        else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.J) _downloadsPanel.IsVisible = !_downloadsPanel.IsVisible;
+        else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.J) TogglePanel(_downloadsPanel);
         else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.P) CommandPalette();
         else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.B) ToggleRail();
+        else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.I && _aside.Content is not null) ToggleAside();
         else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.OemComma) Navigate(() => new SettingsPage());
+        else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.L) Navigate(() => new LibraryPage());
+        else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.U) Navigate(() => new ModsCenterPage());
         else if (e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift) && e.Key == Key.C) Navigate(() => new CreatorPage());
+        else if (e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift) && e.Key == Key.P) Navigate(() => new ControlPanelPage());
+        else if (e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift) && e.Key == Key.M) Navigate(() => new MinecraftPage());
+        else if (e.Key == Key.F5 && e.KeyModifiers == KeyModifiers.None) _current?.Build();
         else if (e.Key == Key.F1) Shortcuts();
         else if (e.Key == Key.F11) BigPictureWindow.Open();
-        else if (e.Key == Key.Escape) { if (_overlay.IsVisible) CloseDialog(); else _downloadsPanel.IsVisible = false; }
+        else if (e.Key == Key.Escape)
+        {
+            if (_overlay.IsVisible) CloseDialog();
+            else if (_launchLayer.IsVisible) (_launchLayer.Children.FirstOrDefault() as LaunchScreen)?.Close();
+            else { _downloadsPanel.IsVisible = false; CloseAccountPanel(); }
+        }
     }
 
     async Task StartUp()
@@ -788,6 +910,8 @@ public sealed class MainWindow : Window
             Features.Hotkey.Disarm();
             try { Social.Friends.GoOffline().Wait(1500); } catch { }
         };
+        // Программа закрылась, пока шла игра «без модов», — возвращаем загрузчик на место.
+        try { Features.Vanilla.RestoreLeftovers(); } catch { }
         await AppState.DetectAll();
         _ = Task.Run(async () =>
         {
@@ -795,7 +919,7 @@ public sealed class MainWindow : Window
             try { await Creator.Hub.All(); } catch { }
             Dispatcher.UIThread.Post(RenderBell);
         });
-        if (Program.StartupLink is string link) Actions.InstallNxm(link);
+        if (Program.StartupLink is string link) OnExternal(link);
         if (Features.ModUpdates.OnStart)
         {
             foreach (var g in AppState.Games.Where(g => g.Status == Detect.Found && g.ModCount > 0))
@@ -803,6 +927,7 @@ public sealed class MainWindow : Window
                 try { await Features.ModUpdates.Check(g); } catch { }
             }
             AppState.Notify();
+            Actions.AutoUpdate();
         }
     }
 
@@ -815,6 +940,9 @@ public sealed class MainWindow : Window
             WindowState = WindowState.Normal;
         if (counted) Toast(I18n.T("time.session", ("game", game.Def.Name), ("time", Features.PlayTime.Format(ms))));
         AppState.Notify();
+        // Закрылась сама и быстро — возможно, вылет: смотрим лог.
+        if (Features.Launcher.LastExit(gameId) is { ByUser: false } exit && exit.Ms < 90_000 && Settings.Data.Bool("crashHelper", true))
+            _ = CheckCrash(game, exit);
     }
 
     /// <summary>Второй запуск программы передал нам ссылку nxm:// (или просто просит показаться).</summary>
@@ -823,6 +951,7 @@ public sealed class MainWindow : Window
         if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
         Activate();
         if (line.StartsWith("nxm://", StringComparison.OrdinalIgnoreCase)) Actions.InstallNxm(line);
+        else if (Features.ModLink.IsAppLink(line)) OpenLink(line);
     }
 
     /// <summary>Окно «Вышел ModLaunch X»: что нового и кнопка обновления.</summary>
@@ -858,29 +987,6 @@ public sealed class MainWindow : Window
 
     // ---------------------------------------------------------------- загрузки и уведомления
 
-    void RenderDownloads()
-    {
-        _dlBadge.IsVisible = Jobs.Running > 0;
-        _downloadsList.Children.Clear();
-        _downloadsList.Children.Add(Ui.Button(I18n.T("nx.history"), ShowHistory, "ghost", Icons.Clock));
-        if (Jobs.All.Count == 0)
-        {
-            _downloadsList.Children.Add(Ui.Col(6, Ui.Text(I18n.T("dl.empty"), "h3"), Ui.Text(I18n.T("dl.empty.text"), "muted small", wrap: true)));
-            return;
-        }
-        foreach (var job in Jobs.All.Take(30))
-        {
-            var bar = new ProgressBar { Minimum = 0, Maximum = 1, Value = Math.Max(0, job.Ratio), IsIndeterminate = job.Status == JobStatus.Running && job.Ratio < 0 };
-            var color = job.Status switch { JobStatus.Done => Ui.Res("Good"), JobStatus.Failed => Ui.Res("Bad"), _ => Ui.Res("Muted") };
-            var col = Ui.Col(6,
-                Ui.Text(job.Title, "h3"),
-                Ui.Text($"{job.GameName} · {job.Step}", "small", color: color));
-            if (job.Status == JobStatus.Running) col.Children.Add(bar);
-            if (job.Error is not null) col.Children.Add(Ui.Text(job.Error, "small muted", wrap: true));
-            _downloadsList.Children.Add(new Border { Background = Ui.Res("Surface2"), CornerRadius = new CornerRadius(12), Padding = new Thickness(12), Child = col });
-        }
-    }
-
     /// <summary>История загрузок за всё время (как «Download history» на Nexus).</summary>
     public void ShowHistory()
     {
@@ -891,7 +997,7 @@ public sealed class MainWindow : Window
         foreach (var h in items.Take(150))
         {
             var row = new DockPanel();
-            var when = Ui.Text(h.At.ToLocalTime().ToString("dd.MM HH:mm"), "small muted");
+            var when = Ui.Text(h.At.ToLocalTime().ToString("g", I18n.Culture), "small muted");
             DockPanel.SetDock(when, Dock.Right);
             row.Children.Add(when);
             row.Children.Add(Ui.Row(8, Ui.Dot(h.Ok ? Ui.Res("Good") : Ui.Res("Bad")), Ui.Text($"{h.Title} · {h.Game}", "small")));
@@ -932,18 +1038,23 @@ public sealed class MainWindow : Window
 
     // ---------------------------------------------------------------- окна поверх
 
-    public void Dialog(string title, Control body, params Control[] actions)
+    public void Dialog(string title, Control body, params Control[] actions) => Dialog(title, body, 520, actions);
+
+    /// <summary>Окно поверх страницы нужной ширины (для списков, которым тесно в обычном).</summary>
+    public void Dialog(string title, Control body, double width, params Control[] actions)
     {
         var buttons = Ui.Row(10, actions);
         buttons.HorizontalAlignment = HorizontalAlignment.Right;
         var card = new Border
         {
             Classes = { "card" },
-            Width = 520,
+            Width = width,
             Padding = new Thickness(24),
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
             BoxShadow = BoxShadows.Parse("0 24 70 0 #99000000"),
+            // Диалог — всегда непрозрачный, даже при стеклянных карточках.
+            Background = Ui.Res("Surface"),
             Child = Ui.Col(16, Ui.Text(title, "h2", wrap: true), body, buttons),
         };
         var shade = new Border { Background = new SolidColorBrush(Color.Parse("#99000000")) };
@@ -964,8 +1075,12 @@ public sealed class MainWindow : Window
 
     public Task<string?> PickFolder(string title) => Pickers.Folder(this, title);
     public Task<string?> PickFile(string title, bool json = false) => Pickers.File(this, title, json);
+    public Task<List<string>> PickModFiles(string title) => Pickers.ModFiles(this, title);
+    public Task<string?> PickProfileFile(string title) => Pickers.ProfileFile(this, title);
     public Task<string?> PickSaveFile(string title, string suggested) => Pickers.Save(this, title, suggested);
     public Task<string?> PickExe(string title) => Pickers.Exe(this, title);
+    public Task<string?> PickSaveAny(string title, string suggested, string ext, string label) => Pickers.SaveAny(this, title, suggested, ext, label);
+    public Task<string?> PickAny(string title, string[] patterns, string label) => Pickers.Typed(this, title, patterns, label);
 }
 
 static class Pickers
@@ -985,6 +1100,37 @@ static class Pickers
         return result.FirstOrDefault()?.TryGetLocalPath();
     }
 
+    /// <summary>Любой файл (товар маркета: модель, архив, исходник).</summary>
+    public static async Task<string?> AnyFile(TopLevel top, string title)
+    {
+        var result = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions { Title = title, AllowMultiple = false });
+        return result.FirstOrDefault()?.TryGetLocalPath();
+    }
+
+    /// <summary>Файл сборки r2modman / Gale (.r2z).</summary>
+    public static async Task<string?> ProfileFile(TopLevel top, string title)
+    {
+        var result = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = title,
+            AllowMultiple = false,
+            FileTypeFilter = [new FilePickerFileType("r2modman / Gale") { Patterns = ["*.r2z", "*.zip"] }],
+        });
+        return result.FirstOrDefault()?.TryGetLocalPath();
+    }
+
+    /// <summary>Несколько модов сразу: архивы и .dll.</summary>
+    public static async Task<List<string>> ModFiles(TopLevel top, string title)
+    {
+        var result = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = title,
+            AllowMultiple = true,
+            FileTypeFilter = [new FilePickerFileType(I18n.T("dialog.archives")) { Patterns = ["*.zip", "*.7z", "*.rar", "*.dll"] }],
+        });
+        return result.Select(f => f.TryGetLocalPath()).OfType<string>().ToList();
+    }
+
     public static async Task<string?> Exe(TopLevel top, string title)
     {
         var result = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
@@ -996,14 +1142,33 @@ static class Pickers
         return result.FirstOrDefault()?.TryGetLocalPath();
     }
 
+    /// <summary>Файл своего типа (.mlcfg и т.п.).</summary>
+    public static async Task<string?> Typed(TopLevel top, string title, string[] patterns, string label)
+    {
+        var result = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions { Title = title, AllowMultiple = false, FileTypeFilter = [new FilePickerFileType(label) { Patterns = patterns }] });
+        return result.FirstOrDefault()?.TryGetLocalPath();
+    }
+
+    public static async Task<string?> SaveAny(TopLevel top, string title, string suggested, string ext, string label)
+    {
+        var result = await top.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = title, SuggestedFileName = suggested, DefaultExtension = ext,
+            FileTypeChoices = [new FilePickerFileType(label) { Patterns = ["*." + ext] }],
+        });
+        return result?.TryGetLocalPath();
+    }
+
     public static async Task<string?> Save(TopLevel top, string title, string suggested)
     {
+        // .r2z (сборка r2modman) — со своим фильтром, иначе Windows допишет «.json»: «Сборка.r2z.json».
+        var r2z = suggested.EndsWith(".r2z", StringComparison.OrdinalIgnoreCase);
         var result = await top.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
             Title = title,
             SuggestedFileName = suggested,
-            DefaultExtension = "json",
-            FileTypeChoices = [new FilePickerFileType(I18n.T("dialog.pack")) { Patterns = ["*.json"] }],
+            DefaultExtension = r2z ? "r2z" : "json",
+            FileTypeChoices = [r2z ? new FilePickerFileType("r2modman / Gale") { Patterns = ["*.r2z"] } : new FilePickerFileType(I18n.T("dialog.pack")) { Patterns = ["*.json"] }],
         });
         return result?.TryGetLocalPath();
     }

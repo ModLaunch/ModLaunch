@@ -1,0 +1,72 @@
+{
+  "ru": {
+    "compat.install": "«{mod}» сделан для {loader}, а в этой игре стоит {ours}. Мод не заработает, поэтому ставить его не стали.",
+    "compat.page": "Этому моду нужен {loader}, а ModLaunch ставит для этой игры {ours}. Скорее всего, мод не заработает.",
+    "compat.only": "Только рабочие",
+    "compat.only.hint": "Прятать моды для старой версии игры и моды для другого загрузчика",
+
+    "feed.trending": "В тренде",
+    "feed.new": "Новые",
+    "feed.updated": "Обновлённые",
+    "feed.hide": "Скрыть полку",
+    "feed.hidden": "Полку скрыли. Вернуть можно в настройках.",
+    "feed.setting": "Полка «В тренде» в каталоге",
+    "feed.setting.hint": "Над списком модов: что сейчас популярно, новые и недавно обновлённые моды",
+
+    "gsearch.title": "Поиск",
+    "gsearch.lead": "Ищем сразу во всех твоих играх. Можно вставить ссылку на мод с Nexus или Thunderstore.",
+    "gsearch.hint": "Название мода или ссылка на него",
+    "gsearch.start": "Что ищем?",
+    "gsearch.start.text": "Начни печатать — покажем моды из всех твоих игр ({n}).",
+    "gsearch.noGames": "Пока нет игр",
+    "gsearch.found": "Нашлось: {n}",
+    "gsearch.all": "Все результаты",
+    "gsearch.nothing.text": "Попробуй другое слово или английское название мода.",
+    "gsearch.link": "Это ссылка на мод",
+    "gsearch.openLink": "Открыть мод",
+
+    "link.unknown": "Не понимаю эту ссылку. Подходят ссылки Nexus, Thunderstore и ModLaunch Hub.",
+    "link.looking": "Ищу мод по ссылке…",
+    "link.notFound": "Мод по ссылке не нашёлся. Может, игра ещё не найдена на этом компьютере?",
+    "link.ror2mm": "Кнопка Thunderstore «Install with Mod Manager»",
+    "link.ror2mm.yes": "Открывается в ModLaunch",
+    "link.ror2mm.no": "Сейчас её открывает другая программа (например, r2modman) или никакая",
+    "link.ror2mm.take": "Открывать в ModLaunch",
+    "link.ror2mm.give": "Вернуть прежней программе"
+  },
+  "en": {
+    "compat.install": "“{mod}” is made for {loader}, but this game uses {ours}. The mod won’t work, so it wasn’t installed.",
+    "compat.page": "This mod needs {loader}, but ModLaunch installs {ours} for this game. It most likely won’t work.",
+    "compat.only": "Working only",
+    "compat.only.hint": "Hide mods for an old game version and mods for a different loader",
+
+    "feed.trending": "Trending",
+    "feed.new": "New",
+    "feed.updated": "Just updated",
+    "feed.hide": "Hide shelf",
+    "feed.hidden": "Shelf hidden. You can bring it back in Settings.",
+    "feed.setting": "“Trending” shelf in the catalogue",
+    "feed.setting.hint": "Above the mod list: what’s popular now, new and just-updated mods",
+
+    "gsearch.title": "Search",
+    "gsearch.lead": "Searching all your games at once. You can also paste a Nexus or Thunderstore mod link.",
+    "gsearch.hint": "Mod name or link",
+    "gsearch.start": "What are we looking for?",
+    "gsearch.start.text": "Start typing — we’ll show mods from all your games ({n}).",
+    "gsearch.noGames": "No games yet",
+    "gsearch.found": "Found: {n}",
+    "gsearch.all": "All results",
+    "gsearch.nothing.text": "Try another word or the mod’s English name.",
+    "gsearch.link": "This is a mod link",
+    "gsearch.openLink": "Open mod",
+
+    "link.unknown": "I don’t understand this link. Nexus, Thunderstore and ModLaunch Hub links work.",
+    "link.looking": "Looking up the mod…",
+    "link.notFound": "Couldn’t find the mod from this link. Maybe the game isn’t found on this PC yet?",
+    "link.ror2mm": "Thunderstore “Install with Mod Manager” button",
+    "link.ror2mm.yes": "Opens in ModLaunch",
+    "link.ror2mm.no": "Another program (like r2modman) or nothing opens it right now",
+    "link.ror2mm.take": "Open in ModLaunch",
+    "link.ror2mm.give": "Give it back"
+  }
+}

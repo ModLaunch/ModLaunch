@@ -1,4 +1,4 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
@@ -64,6 +64,7 @@ public sealed class FriendsDock : Panel
         var pillHost = new Panel { HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom, Children = { _pill } };
         Children.Add(pillHost);
 
+        I18n.Changed += () => Dispatcher.UIThread.Post(Render);
         Friends.Changed += () => Dispatcher.UIThread.Post(Render);
         Account.Changed += () => Dispatcher.UIThread.Post(Render);
         Render();
@@ -94,7 +95,7 @@ public sealed class FriendsDock : Panel
         var faces = new Panel { Width = Math.Max(1, Math.Min(3, online.Count)) * 16 + 10, Height = 26 };
         for (var i = 0; i < Math.Min(3, online.Count); i++)
         {
-            var t = Ui.Thumb(null, online[i].Name, 26, 13);
+            var t = Ui.Thumb(null, online[i].Name, 26, 13, person: true);
             t.Margin = new Thickness(i * 16, 0, 0, 0);
             t.HorizontalAlignment = HorizontalAlignment.Left;
             faces.Children.Add(new Border { Child = t, CornerRadius = new CornerRadius(14), BorderThickness = new Thickness(2), BorderBrush = Ui.Res("Surface"), Margin = t.Margin, HorizontalAlignment = HorizontalAlignment.Left });
@@ -156,7 +157,7 @@ public sealed class FriendsDock : Panel
     static Control Row(string name, string line, IBrush color, Control? right)
     {
         var dot = new Border { Width = 10, Height = 10, CornerRadius = new CornerRadius(5), Background = color, BorderBrush = Ui.Res("Surface"), BorderThickness = new Thickness(2), HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom };
-        var face = new Panel { Width = 36, Height = 36, Children = { Ui.Thumb(null, name, 36, 18), dot } };
+        var face = new Panel { Width = 36, Height = 36, Children = { Ui.Thumb(null, name, 36, 18, person: true), dot } };
         var info = Ui.Col(1, new TextBlock { Text = name, FontWeight = FontWeight.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis },
             new TextBlock { Text = line, FontSize = 12, Foreground = color, TextTrimming = TextTrimming.CharacterEllipsis });
         info.VerticalAlignment = VerticalAlignment.Center;

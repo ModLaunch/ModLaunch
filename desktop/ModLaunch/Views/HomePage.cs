@@ -11,16 +11,15 @@ namespace ModLaunch.Views;
 /// Главная в духе Modrinth App: продолжить игру, ваши (найденные) игры,
 /// популярные моды и избранное. Все остальные игры — в «Библиотеке».
 /// </summary>
-public sealed class HomePage : Page
+public sealed partial class HomePage : Page
 {
     public override string Title => I18n.T("nav.menu");
     public override Control? Aside() => Views.Aside.Home();
 
     public override void Search(string text)
     {
-        var game = AppState.Games.FirstOrDefault(g => g.Status == Detect.Found);
-        if (game is null) { MainWindow.Current?.Toast(I18n.T("search.noGames")); return; }
-        MainWindow.Current?.Navigate(() => new GamePage(game.Def.Id, "catalog", text));
+        // Поиск сразу по всем своим играм.
+        MainWindow.Current?.Navigate(() => new SearchPage(text));
     }
 
     Control Intro(Control c, int index) { if (!Shown) Animate.Rise(c, index); return c; }
@@ -29,6 +28,8 @@ public sealed class HomePage : Page
     {
         var content = new StackPanel { Spacing = 30, Margin = new Thickness(32, 26, 32, 32), MaxWidth = 1680 };
 
+        // Новичку: три шага «найти игру, поставить мод, играть».
+        // (карточка строится ниже, когда известен список игр)
         // Продолжить игру — последние запущенные.
         var recent = AppState.Games
             .Select(g => (Game: g, Played: Features.PlayTime.Get(g.Def.Id)))
@@ -48,6 +49,16 @@ public sealed class HomePage : Page
             section.Children.Add(Ui.Text(searching ? I18n.T("games.searching") : I18n.T("home.noGames"), "muted", wrap: true));
         section.Children.Add(games);
         content.Children.Add(section);
+
+        if (Starter(mine) is { } starter) content.Children.Insert(0, Intro(starter, 0));
+
+        // 8.4: место под рекламу (пока нет своей рекламы — объявления ModLaunch).
+        if (Ads.Enabled)
+        {
+            _ad ??= AdSlot.Banner();
+            if (_ad.Parent is Panel was) was.Children.Remove(_ad);
+            content.Children.Add(Intro(_ad, 3));
+        }
 
         // «Выбор ModLaunch» — карусель лучших модов для ваших игр.
         if (_featured is null) { if (!_featuredLoading) { _featuredLoading = true; Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = LoadFeatured(mine)); } }
@@ -98,6 +109,7 @@ public sealed class HomePage : Page
     // Карусель и её данные живут весь сеанс: перерисовка главной не сбрасывает прокрутку.
     static List<(GameState Game, Sources.ModInfo Mod)>? _featured;
     Featured? _featuredView;
+    Control? _ad;
     static bool _featuredLoading;
     string _topGame = "all";
 

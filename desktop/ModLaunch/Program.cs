@@ -1,4 +1,4 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Headless;
 using Avalonia.Threading;
 using ModLaunch.Core;
@@ -35,11 +35,13 @@ public static class Program
     {
         if (args.Contains("--catalog-report")) return CatalogReport.Run().GetAwaiter().GetResult();
         if (args.Contains("--selfcheck")) return SelfCheck.Run().GetAwaiter().GetResult();
+        if (args.Contains("--selftest")) { Hooks.PrepareSelfTest(); StartHeadless(); return Hooks.SelfTest(); }
         var shot = Array.IndexOf(args, "--screenshot");
-        if (shot >= 0 && shot + 1 < args.Length) return Screenshots(args[shot + 1]);
+        if (shot >= 0 && shot + 1 < args.Length) return Screenshots(args[shot + 1], args.Contains("--only"));
 
         // Установка, обновление, удаление — та же программа в другом режиме.
         SetupMode = ModLaunch.Setup.Installer.Detect(args);
+        if (SetupMode != ModLaunch.Setup.SetupMode.None && args.Contains("--silent")) return ModLaunch.Setup.Installer.RunSilent(args);
         if (SetupMode != ModLaunch.Setup.SetupMode.None)
         {
             BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
@@ -49,8 +51,10 @@ public static class Program
         // Один экземпляр: второй запуск (в том числе по ссылке nxm://) передаёт ссылку первому.
         if (!Features.Nxm.Claim(args)) return 0;
         Autostarted = args.Contains("--autostart");
-        StartupLink = args.FirstOrDefault(a => a.StartsWith("nxm://", StringComparison.OrdinalIgnoreCase));
+        StartupLink = args.FirstOrDefault(Features.Nxm.IsLink);
         try { if (!Features.Nxm.IsRegistered()) Features.Nxm.Register(); } catch { }
+        // Свои ссылки modlaunch:// (кнопка «Открыть в ModLaunch» на сайте Hub) — всегда наши.
+        try { if (!Features.Nxm.IsRegistered("modlaunch")) Features.Nxm.Register("modlaunch"); } catch { }
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
         return 0;
     }
@@ -58,8 +62,19 @@ public static class Program
     public static AppBuilder BuildAvaloniaApp() =>
         AppBuilder.Configure<App>().UsePlatformDetect().WithInterFont().LogToTrace();
 
-    /// <summary>Отрисовать главные экраны в PNG — для проверки вида на CI и без Windows.</summary>
-    static int Screenshots(string outDir)
+    /// <summary>Интерфейс без окна на экране: для снимков и быстрых проверок.</summary>
+    static void StartHeadless() =>
+        AppBuilder.Configure<App>()
+            .UseSkia()
+            .UseHeadless(new AvaloniaHeadlessPlatformOptions { UseHeadlessDrawing = false })
+            .WithInterFont()
+            .SetupWithoutStarting();
+
+    /// <summary>
+    /// Отрисовать главные экраны в PNG — для проверки вида на CI и без Windows.
+    /// С --only — только снимки функций с меткой [DemoShots] (быстро, чтобы проверить одну функцию).
+    /// </summary>
+    static int Screenshots(string outDir, bool featuresOnly = false)
     {
         Screenshot = true;
         Demo = true;
@@ -68,11 +83,7 @@ public static class Program
         if (Directory.Exists(root)) Directory.Delete(root, true);
         Core.Demo.Prepare(root);
 
-        AppBuilder.Configure<App>()
-            .UseSkia()
-            .UseHeadless(new AvaloniaHeadlessPlatformOptions { UseHeadlessDrawing = false })
-            .WithInterFont()
-            .SetupWithoutStarting();
+        StartHeadless();
 
         var window = new MainWindow { Width = 1366, Height = 800 };
         window.Show();
@@ -94,6 +105,34 @@ public static class Program
             window.CaptureRenderedFrame()?.Save(Path.Combine(outDir, name + ".png"));
             Console.WriteLine("saved " + name);
         }
+
+        if (!featuresOnly) BuiltInShots(window, outDir, Pump, Save);
+
+        // Снимки новых функций: у каждой свой метод с меткой [DemoShots], окно — в начальном виде.
+        var kit = new Shots(window, Save, ms => Pump(ms), outDir);
+        var filter = Environment.GetEnvironmentVariable("MODLAUNCH_SHOTS");
+        foreach (var m in Hooks.Marked<DemoShotsAttribute>())
+        {
+            if (!string.IsNullOrEmpty(filter) && !m.Name.Contains(filter, StringComparison.OrdinalIgnoreCase)) continue;
+            window.Width = 1366;
+            window.Height = 800;
+            window.CloseDialog();
+            I18n.Set("ru");
+            window.Navigate(() => new HomePage());
+            Pump(200);
+            m.Invoke(null, [kit]);
+        }
+        if (featuresOnly) return 0;
+
+        I18n.Set("en");
+        window.Navigate(() => new HomePage());
+        Save("8-home-en");
+        return 0;
+    }
+
+    static void BuiltInShots(MainWindow window, string outDir, Action<int> pump, Action<string> Save)
+    {
+        void Pump(int ms = 600) => pump(ms);
 
         Save("1-home");
         window.Navigate(() => new LibraryPage());
@@ -155,6 +194,8 @@ public static class Program
         Save("10a-creator-editor");
         window.Navigate(() => new CreatorPage("mine"));
         Save("10b-creator-mine");
+        window.Navigate(() => new CreatorPage("published"));
+        Save("10b2-creator-published");
         window.Navigate(() => new CreatorPage("examples"));
         Save("10c-creator-examples");
         window.Navigate(() => new CreatorPage("docs"));
@@ -199,6 +240,12 @@ public static class Program
         CreatorPage.DemoHub(demoHub);
         window.Navigate(() => new CreatorPage("hub"));
         Save("11b-hub");
+        window.Navigate(() => new CreatorPage());
+        Save("11i-creator-home");
+        Look.SetTheme("light");
+        window.Navigate(() => new CreatorPage());
+        Save("11j-creator-home-light");
+        Look.SetTheme("dark");
         window.Navigate(() => new ModPage(demoHub[0].Game, Creator.Hub.ToModInfo(demoHub[0])));
         Save("11c-hub-mod");
         window.Navigate(() => new CreatorPage("examples"));
@@ -219,6 +266,39 @@ public static class Program
         Save("12c-mods-center");
         window.Navigate(() => new CreatorPage("docs"));
         Save("11h-docs");
+
+        // 8.0: экран запуска, «Запущено», помощник при вылете, меню аккаунта, подсказка поверх игры.
+        var sub = AppState.Game("subnautica");
+        window.Navigate(() => new GamePage("subnautica", "installed"));
+        Pump(200);
+        var launch = window.ShowLaunch(sub);
+        launch.DemoProgress();
+        Save("15a-launch");
+        launch.DemoDone();
+        Save("15b-launched");
+        window.HideLaunch();
+        Features.Launcher.DemoRunning("subnautica", true, TimeSpan.FromMinutes(12.5));
+        AppState.Notify();
+        window.Navigate(() => new GamePage("subnautica", "installed"));
+        Save("15c-running");
+        Features.Launcher.DemoRunning("subnautica", false);
+        AppState.Notify();
+        window.ShowCrash(sub, 12_000, -532462766,
+        [
+            new MainWindow.Culprit("Nautilus", "NullReferenceException: Object reference not set to an instance of an object at Nautilus.Handlers.CraftDataHandler.Awake()", null),
+            new MainWindow.Culprit("Slot Extender", "Could not load type 'SlotExtender.Patches.uGUI_QuickSlots_Patch' from assembly 'SlotExtender'", null),
+        ]);
+        Save("15d-crash");
+        window.CloseDialog();
+        window.OpenAccountPanel();
+        Save("15e-account");
+        window.CloseAccountPanel();
+        var hint = new GameHintWindow("Subnautica", "Ctrl+Shift+M");
+        hint.Show();
+        Pump();
+        hint.CaptureRenderedFrame()?.Save(Path.Combine(outDir, "15f-hint.png"));
+        Console.WriteLine("saved 15f-hint");
+        hint.Close();
 
         // Широкий монитор 2560×1440: авто-масштаб и раскладка без пустых полей.
         window.Width = 2560;
@@ -260,10 +340,5 @@ public static class Program
         overlay.CaptureRenderedFrame()?.Save(Path.Combine(outDir, "9g-overlay.png"));
         Console.WriteLine("saved 9g-overlay");
         overlay.Hide();
-
-        I18n.Set("en");
-        window.Navigate(() => new HomePage());
-        Save("8-home-en");
-        return 0;
     }
 }

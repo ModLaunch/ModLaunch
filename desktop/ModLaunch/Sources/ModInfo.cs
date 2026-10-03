@@ -19,13 +19,15 @@ public sealed class ModInfo
     public string? Sha256 { get; init; }
     public List<string> Dependencies { get; set; } = [];
     public bool Adult { get; init; }
+    /// <summary>Автор пометил мод как устаревший (Thunderstore).</summary>
+    public bool Deprecated { get; init; }
 
     /// <summary>Копия с другой версией и ссылкой — для установки старой версии.</summary>
     public ModInfo WithVersion(string version, string? url) => new()
     {
         Source = Source, Id = Id, Name = Name, Author = Author, Version = version, Description = Description, Icon = Icon, Url = Url,
         Downloads = Downloads, Rating = Rating, UpdatedAt = UpdatedAt, Categories = Categories, DownloadUrl = url ?? DownloadUrl,
-        Sha256 = null, Dependencies = [.. Dependencies],
+        Sha256 = null, Dependencies = [.. Dependencies], Adult = Adult, Deprecated = Deprecated,
     };
 }
 

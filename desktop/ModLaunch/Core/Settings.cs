@@ -8,7 +8,7 @@ public static class Settings
     static readonly JsonFile File = new(Paths.SettingsFile, () => new JsonObject
     {
         ["gamePaths"] = new JsonObject(),
-        ["language"] = "ru",
+        ["language"] = "auto",
         ["onboardingDone"] = false,
     });
 
@@ -17,7 +17,7 @@ public static class Settings
 
     public static string Language
     {
-        get => Data.Str("language") == "en" ? "en" : "ru";
+        get => Data.Str("language") is { Length: > 0 } l ? l : "auto";
         set { Data["language"] = value; Save(); }
     }
 

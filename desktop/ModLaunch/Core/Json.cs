@@ -57,6 +57,7 @@ public static class JsonExt
     {
         if (node is not JsonObject o || !o.TryGetPropertyValue(key, out var v) || v is not JsonValue jv) return 0;
         if (jv.TryGetValue<long>(out var l)) return l;
+        if (jv.TryGetValue<int>(out var i)) return i;
         if (jv.TryGetValue<double>(out var d)) return (long)d;
         if (jv.TryGetValue<string>(out var s) && long.TryParse(s, out l)) return l;
         return 0;

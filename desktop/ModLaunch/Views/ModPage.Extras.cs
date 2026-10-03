@@ -95,7 +95,7 @@ public sealed partial class ModPage
         void Item(string text, Action run)
         {
             var item = new MenuItem { Header = text };
-            item.Click += (_, _) => run();
+            item.Click += (_, _) => Guard.Later(run);
             menu.Items.Add(item);
         }
         var tracked = Tracking.Has(_g.Def.Id, mod);

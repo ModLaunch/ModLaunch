@@ -1,0 +1,22 @@
+{
+  "ru": {
+    "cfg.tab": "Настройки модов",
+    "cfg.none": "Файлов настроек пока нет",
+    "cfg.none.text": "Мод создаёт свой файл настроек при первом запуске игры. Запусти игру один раз, и они появятся здесь.",
+    "cfg.hint": "Здесь настройки модов с описанием. Изменения сохраняются сразу, но игру нужно перезапустить.",
+    "cfg.search": "Поиск настройки",
+    "cfg.empty": "Ничего не нашлось",
+    "cfg.open": "Открыть папку",
+    "cfg.reset": "Вернуть как было: {v}"
+  },
+  "en": {
+    "cfg.tab": "Mod settings",
+    "cfg.none": "No settings files yet",
+    "cfg.none.text": "A mod creates its settings file the first time you run the game. Run the game once and they will show up here.",
+    "cfg.hint": "Mod settings with descriptions. Changes save at once, but restart the game to apply them.",
+    "cfg.search": "Search settings",
+    "cfg.empty": "Nothing found",
+    "cfg.open": "Open folder",
+    "cfg.reset": "Reset to default: {v}"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "ru": {
+    "setup.welcome.autostart": "Запускать вместе с Windows",
+    "setup.step.verify": "Проверяю, что файлы скопировались без ошибок…",
+    "setup.error.SETUP_VERIFY": "Скопированный файл не совпал с оригиналом (возможно, сбой диска). Старая версия осталась на месте. Попробуйте ещё раз.",
+    "setup.error.log": "Подробности записаны в журнал: {path}"
+  },
+  "en": {
+    "setup.welcome.autostart": "Start with Windows",
+    "setup.step.verify": "Checking that the files were copied correctly…",
+    "setup.error.SETUP_VERIFY": "The copied file did not match the original (maybe a disk problem). Your old version was left untouched. Please try again.",
+    "setup.error.log": "Details are in the log: {path}"
+  }
+}

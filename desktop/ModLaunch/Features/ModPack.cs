@@ -101,4 +101,7 @@ public static class Versions
 
     public static bool IsNewer(string? latest, string? installed) =>
         !string.IsNullOrEmpty(latest) && !string.IsNullOrEmpty(installed) && Compare(latest, installed) > 0;
+
+    /// <summary>Та же версия: «1.2», «1.2.0» и «v1.2.0» — одно и то же.</summary>
+    public static bool Same(string? a, string? b) => Compare(a, b) == 0;
 }

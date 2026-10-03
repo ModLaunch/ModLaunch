@@ -28,7 +28,7 @@
         "applicationCategory": "GameApplication",
         "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
         "downloadUrl": "https://github.com/ModLaunch/ModLaunch/releases/latest",
-        "softwareVersion": "7.1.0",
+        "softwareVersion": "7.0.0",
         "description": "Бесплатный лаунчер модов: 17 игр, 100 000+ модов в один клик, ModLaunch Hub и язык модов ModScript."
       }
     </script>
@@ -62,12 +62,12 @@
       <!-- Первый экран -->
       <section class="hero wrap">
         <div class="hero__text">
-          <a class="chip reveal" href="#news"><span class="chip__dot"></span><span data-t="hero.chip">Вышла версия</span> <b class="js-version">7.1</b> <span class="hide-sm">· <span data-t="hero.chip2">плавная прокрутка, широкие экраны и друзья внизу</span></span></a>
+          <a class="chip reveal" href="#news"><span class="chip__dot"></span><span data-t="hero.chip">Вышла версия</span> <b class="js-version">8.5</b> <span class="hide-sm">· <span data-t="hero.chip2">полная поддержка Minecraft: Fabric, Forge, NeoForge и модпаки</span></span></a>
           <h1 class="reveal">
             <span data-t="hero.title1">Моды в один клик.</span>
             <span class="grad" data-t="hero.title2">И свой хаб модов.</span>
           </h1>
-          <p class="lead reveal" data-t="hero.lead">ModLaunch сам находит игры, ставит загрузчик, подтягивает зависимости и следит за обновлениями. Библиотека с настоящими обложками, режим Big Picture для геймпада, ModLaunch Hub без рекламы и свой язык модов ModScript.</p>
+          <p class="lead reveal" data-t="hero.lead">ModLaunch сам находит игры, ставит загрузчик, подтягивает зависимости и следит за обновлениями. Теперь и Minecraft — сборки, Fabric, Forge, NeoForge и каталог Modrinth. Библиотека с настоящими обложками, режим Big Picture для геймпада, ModLaunch Hub без рекламы и свой язык модов ModScript.</p>
           <div class="hero__cta reveal" id="download">
             <a class="btn btn--primary btn--lg js-setup" href="https://github.com/ModLaunch/ModLaunch/releases/latest">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19h14" /></svg>
@@ -79,7 +79,7 @@
             </a>
           </div>
           <ul class="hero__facts reveal">
-            <li><b>17</b><span data-t="hero.games">игр</span></li>
+            <li><b>18</b><span data-t="hero.games">игр</span></li>
             <li><b>100K+</b><span data-t="hero.mods">модов</span></li>
             <li><b>0 ₽</b><span data-t="hero.free">навсегда</span></li>
           </ul>
@@ -108,7 +108,7 @@
       <!-- Цифры -->
       <div class="band">
         <div class="wrap band__in">
-          <div class="reveal"><b data-count="17">17</b><span data-t="band.games">игр</span></div>
+          <div class="reveal"><b data-count="18">18</b><span data-t="band.games">игр</span></div>
           <div class="reveal"><b class="js-total" data-count="0">100 000+</b><span data-t="band.mods">модов в каталогах</span></div>
           <div class="reveal"><b data-count="29">29</b><span data-t="band.examples">готовых примочек ModScript</span></div>
           <div class="reveal"><b class="js-hubcount">0</b><span data-t="band.hub">модов в ModLaunch Hub</span></div>
@@ -118,7 +118,7 @@
       <!-- Игры -->
       <section class="games wrap" id="games">
         <span class="eyebrow" data-t="games.eyebrow">Поддерживаемые игры</span>
-        <h2 class="reveal" data-t="games.title">17 игр — и любая другая</h2>
+        <h2 class="reveal" data-t="games.title">18 игр, включая Minecraft, — и любая другая</h2>
         <p class="sub reveal" data-t="games.sub">Загрузчик ставится сам, моды — из всех каталогов сразу. Нет вашей игры? Кнопка «+» найдёт её на диске и подберёт моды.</p>
         <div class="games__grid" id="gamesGrid"></div>
       </section>
@@ -294,9 +294,7 @@
         <div class="tabs reveal" role="tablist">
           <button class="tab is-on" role="tab" data-shot="home" data-t="sc.home">Главная</button>
           <button class="tab" role="tab" data-shot="library" data-t="sc.library">Библиотека</button>
-          <button class="tab" role="tab" data-shot="wide" data-t="sc.wide">Широкий экран</button>
           <button class="tab" role="tab" data-shot="bigpicture" data-t="sc.bp">Big Picture</button>
-          <button class="tab" role="tab" data-shot="setup" data-t="sc.setup">Установщик</button>
           <button class="tab" role="tab" data-shot="mod-stats" data-t="sc.modtabs">Вкладки мода</button>
           <button class="tab" role="tab" data-shot="mods-center" data-t="sc.center">Центр модов</button>
           <button class="tab" role="tab" data-shot="hub" data-t="sc.hub">Hub</button>
@@ -323,12 +321,11 @@
         <span class="eyebrow" data-t="news.eyebrow">Что нового</span>
         <h2 class="reveal" data-t="news.title">Последние версии</h2>
         <div class="news" id="newsList">
-          <article class="reveal"><span class="ver">7.1</span><h3 data-t="news.71">Плавность</h3><ul><li data-t="news.71a">Плавная прокрутка в такт монитору</li><li data-t="news.71b">Авто-масштаб для 1440p, 4K и ультрашироких</li><li data-t="news.71c">Друзья внизу окна, как в Steam</li><li data-t="news.71d">Новый установщик и широкие настройки</li></ul></article>
+          <article class="reveal"><span class="ver">8.5</span><h3 data-t="news.85">Minecraft</h3><ul><li data-t="news.85a">Fabric, Quilt, Forge и NeoForge — ставятся сами</li><li data-t="news.85b">Сборки со своими модами и мирами</li><li data-t="news.85c">Каталог Modrinth под версию и загрузчик</li><li data-t="news.85d">Модпаки, .mrpack и обновления в один клик</li></ul></article>
           <article class="reveal"><span class="ver">7.0</span><h3 data-t="news.70">Дизайн ModLaunch 3</h3><ul><li data-t="news.70a">Крошки, правая панель и свечение цвета игры</li><li data-t="news.70b">Карусель «Выбор ModLaunch» и топ модов</li><li data-t="news.70c">Каталог сеткой, «Хит» и «Скрыть установленные»</li><li data-t="news.70d">Коллекции и сортировка, как в Steam</li></ul></article>
           <article class="reveal"><span class="ver">6.0</span><h3 data-t="news.60">Big Picture</h3><ul><li data-t="news.60a">Режим Big Picture и управление ПК геймпадом</li><li data-t="news.60b">Библиотека с обложками, как в Steam</li><li data-t="news.60c">Вкладки мода и «Центр модов», как на Nexus</li><li data-t="news.60d">Логотип — главная, Creator Hub внизу</li></ul></article>
           <article class="reveal"><span class="ver">5.5</span><h3 data-t="news.55">ModLaunch Hub</h3><ul><li data-t="news.55a">Свой сайт модов в программе</li><li data-t="news.55b">Редактор ModScript с подсветкой</li><li data-t="news.55c">Версии, отслеживание, моды автора</li><li data-t="news.55d">Silksong, GTFO и Outward</li></ul></article>
           <article class="reveal"><span class="ver">5.0</span><h3 data-t="news.50">Creator Hub</h3><ul><li data-t="news.50a">Язык модов ModScript</li><li data-t="news.50b">Кнопка «+» для любых игр</li><li data-t="news.50c">Шесть новых игр</li><li data-t="news.50d">Темы и гибкие настройки</li></ul></article>
-          <article class="reveal"><span class="ver">4.0</span><h3 data-t="news.40">Новый движок</h3><ul><li data-t="news.40a">C# и Avalonia вместо Electron</li><li data-t="news.40b">Файл в 4 раза меньше</li><li data-t="news.40c">Несколько каталогов у игры</li><li data-t="news.40d">Фишки Vortex и Modrinth App</li></ul></article>
         </div>
         <p style="text-align:center;margin-top:22px"><a class="final__zip" href="https://github.com/ModLaunch/ModLaunch/releases" target="_blank" rel="noopener" data-t="news.all">Все версии и полный список изменений</a></p>
       </section>

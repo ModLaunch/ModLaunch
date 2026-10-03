@@ -1,4 +1,4 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
@@ -134,8 +134,8 @@ public sealed class BigPictureWindow : Window
         hints.HorizontalAlignment = HorizontalAlignment.Right;
         hints.Margin = new Thickness(56, 0, 56, 22);
 
-        _clock.Text = DateTime.Now.ToString("HH:mm");
-        DispatcherTimer.Run(() => { _clock.Text = DateTime.Now.ToString("HH:mm"); return IsVisible; }, TimeSpan.FromSeconds(10));
+        _clock.Text = DateTime.Now.ToString("t", I18n.Culture);
+        DispatcherTimer.Run(() => { _clock.Text = DateTime.Now.ToString("t", I18n.Culture); return IsVisible; }, TimeSpan.FromSeconds(10));
 
         var empty = new TextBlock
         {
@@ -330,7 +330,7 @@ public sealed class BigPictureWindow : Window
 
     void Play(GameState g)
     {
-        Actions.Play(g);
+        Actions.Play(g, animate: false);
         Toast(I18n.T("bp.starting", ("game", g.Def.Name)));
         DispatcherTimer.RunOnce(() => Select(_game), TimeSpan.FromSeconds(3));
     }
@@ -339,6 +339,7 @@ public sealed class BigPictureWindow : Window
 
     void OpenMods(GameState g)
     {
+        if (g.Def.IsMinecraft) { OpenMinecraftMods(g); return; }
         var registry = g.Registry;
         var items = new List<(string, string?, Action, bool)>();
         foreach (var m in registry?.List() ?? [])
@@ -362,6 +363,31 @@ public sealed class BigPictureWindow : Window
             }, on));
         }
         ShowModal(I18n.T("bp.mods.title", ("game", g.Def.Name)), items, I18n.T("bp.mods.none"), toggles: true);
+    }
+
+    /// <summary>Minecraft: моды выбранной сборки — включить и выключить геймпадом.</summary>
+    void OpenMinecraftMods(GameState g)
+    {
+        var items = new List<(string, string?, Action, bool)>();
+        if (Minecraft.Mc.Active is { } a)
+        {
+            foreach (var m in Minecraft.McContent.List(a, "mod"))
+            {
+                var item = m;
+                items.Add((m.Name, m.Version is { Length: > 0 } v ? "v" + v : null, () =>
+                {
+                    try { Minecraft.McContent.SetEnabled(a, item, !item.Enabled); }
+                    catch (Exception e) { Toast(Jobs.Explain(e)); }
+                    AppState.Notify();
+                    var keep = _modalIndex;
+                    OpenMinecraftMods(g);
+                    _modalIndex = Math.Min(keep, _modalItems.Count - 1);
+                    RenderModal();
+                }, m.Enabled));
+            }
+        }
+        var title = Minecraft.Mc.Active is { } b ? $"{g.Def.Name} · {b.Name}" : g.Def.Name;
+        ShowModal(I18n.T("bp.mods.title", ("game", title)), items, I18n.T("bp.mods.none"), toggles: true);
     }
 
     void OpenPower()

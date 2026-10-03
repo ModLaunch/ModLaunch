@@ -8,6 +8,20 @@ public static class GameCatalog
 
     public static readonly GameDef[] Builtin =
     [
+        // Minecraft: Java Edition — сборки, Fabric/Quilt/Forge/NeoForge и каталог Modrinth (8.5).
+        new()
+        {
+            Id = "minecraft", Name = "Minecraft", ShortName = "Minecraft", SteamAppId = 0, ArtKey = "minecraft",
+            FolderNames = [".minecraft"], Accent = "#3FB950",
+            Loader = LoaderKind.Minecraft, LoaderName = "Fabric · Quilt · Forge · NeoForge", LoaderSite = "https://fabricmc.net",
+            Catalog = CatalogKind.Modrinth, BrowseUrl = "https://modrinth.com/mods",
+            Sections = [],
+            SignatureDirs = ["versions"],
+            Executables = ["MinecraftLauncher.exe"],
+            SavesDir = root => Minecraft.Mc.SavesDir(root) ?? Path.Combine(root, "saves"),
+            ModMarker = "jar",
+            ReShadeApi = "opengl",
+        },
         new()
         {
             Id = "stardew-valley", Name = "Stardew Valley", ShortName = "Stardew", SteamAppId = 413150,

@@ -20,6 +20,35 @@ public static class Templates
             # config "BepInEx.cfg" [Logging.Console] Enabled = true
             """),
 
+        new("code-style", "valheim", """
+            # ModScript в стиле Python и C++: функции, циклы, списки и стандартная библиотека.
+            # Полный список функций — «Справка → Стандартная библиотека», подсказки — Ctrl+Пробел.
+            import math
+            using namespace std
+
+            mod "Баланс оружия"
+            version 1.0.0
+            author "Я"
+            about "Урон считается формулой, а не руками"
+            game valheim
+
+            def damage(level, base = 10) {
+                return round(base * math.pow(1.15, level - 1))
+            }
+
+            let tiers = ["bronze", "iron", "silver", "black_metal"]
+            for i in range(len(tiers)) {
+                let name = tiers[i]
+                let dmg = std::clamp(damage(i + 1), 10, 200)
+                config "weapons.cfg" [$name] Damage = $dmg
+                print(format("{:<12} → {}", name, dmg))
+            }
+
+            let rarity = weighted_choice(["common", "rare", "epic"], [70, 25, 5])
+            let id = slug("Баланс оружия") + "-" + sha256(today())[0:6]
+            print("id:", id, "rarity:", rarity)
+            """),
+
         new("sdv-seeds", "stardew-valley", """
             # Stardew Valley: весенние семена вдвое дешевле.
             # Собирается в пакет Content Patcher — его ставит сам ModLaunch.

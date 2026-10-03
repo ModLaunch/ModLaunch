@@ -1,4 +1,4 @@
-using System.Text.Json.Nodes;
+﻿using System.Text.Json.Nodes;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
@@ -42,11 +42,17 @@ public sealed partial class GamePage : Page
         // Своя игра могла быть убрана — тогда «назад» ведёт на первую игру.
         _g = AppState.Games.FirstOrDefault(g => g.Def.Id == gameId) ?? AppState.Games[0];
         _query = query;
+        // Minecraft показывает своя страница (MainWindow.Show подменяет): здесь ничего не грузим.
+        if (_g.Def.IsMinecraft) { _tab = tab; return; }
         _tab = tab != "" ? tab : _g.ModCount > 0 || !_g.Def.HasCatalog ? "installed" : "catalog";
         if (_tab == "catalog" && !_g.Def.HasCatalog) _tab = "installed";
         if (_g.Def.Picks.Length > 0 && _query == "") _section = "picks";
         if (_tab == "catalog") _ = Load(reset: true);
     }
+
+    /// <summary>Вкладка и запрос — для подмены страницей Minecraft.</summary>
+    internal string Tab => _tab;
+    internal string Query => _query;
 
     public override string Title => _tab == "catalog" && _g.Status == Detect.Found ? I18n.T("games.market") : _g.Def.Name;
     public override Control? Aside() => Views.Aside.Game(_g);
@@ -60,6 +66,9 @@ public sealed partial class GamePage : Page
             "saves" => I18n.T("games.saves"),
             "tools" => I18n.T("v4.tools"),
             "log" => I18n.T("games.log"),
+            "health" => I18n.T("health.tab"),
+            "config" => I18n.T("cfg.tab"),
+            "shots" => I18n.T("shots.tab"),
             _ => I18n.T("games.downloads"),
         }, null),
     ];
@@ -78,24 +87,48 @@ public sealed partial class GamePage : Page
 
     public override void Build()
     {
-        var content = new StackPanel { Spacing = 18, Margin = new Thickness(34, 22, 34, 34), MaxWidth = 1640 };
+        var content = new StackPanel { Spacing = 24, Margin = new Thickness(40, 26, 40, 40), MaxWidth = 1640 };
         content.Children.Add(Header());
         if (_g.Status == Detect.Found)
         {
+            if (PurgeBanner() is { } banner) content.Children.Add(banner);
             content.Children.Add(Tabs());
-            content.Children.Add(_tab switch
+            var body = _tab switch
             {
                 "catalog" => CatalogView(),
                 "profiles" => ProfilesView(),
                 "saves" => SavesView(),
                 "log" => LogView(),
                 "tools" => ToolsView(),
+                "health" => HealthView(),
+                "config" => ConfigView(),
+                "shots" => ShotsView(),
                 _ => InstalledView(),
-            });
+            };
+            content.Children.Add(body);
+            // Первый показ вкладки: содержимое поднимается волной (при перерисовке — нет).
+            if (!Shown) Stagger(body, TabSwitch ? 0 : 140);
         }
         else content.Children.Add(NotFoundView());
-        Content = new ScrollViewer { Content = content, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+
+        // Прокрутка одна на всю страницу: после перерисовки (включили мод, пришла загрузка)
+        // список остаётся на месте, а не прыгает наверх. Сброс — только при смене вкладки.
+        _scroll ??= new ScrollViewer { HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+        if (_scrollTab != _tab) { _scroll.Offset = default; _scrollTab = _tab; }
+        _scroll.Content = content;
+        _root ??= new Panel { Children = { _scroll } };
+        while (_root.Children.Count > 1) _root.Children.RemoveAt(1);
+        if (BulkBar() is { } bar)
+        {
+            content.Margin = new Thickness(content.Margin.Left, content.Margin.Top, content.Margin.Right, 110);
+            _root.Children.Add(bar);
+        }
+        Content = _root;
     }
+
+    ScrollViewer? _scroll;
+    Panel? _root;
+    string? _scrollTab;
 
     // ---------------------------------------------------------------- шапка
 
@@ -114,14 +147,14 @@ public sealed partial class GamePage : Page
         var logo = Images.GameAsset(_g.Def, Images.Art.Logo, 640);
         Control title = logo is null
             ? new TextBlock { Text = _g.Def.Name, FontSize = 30, FontWeight = FontWeight.Bold, Foreground = Brushes.White }
-            : new Image { Source = logo, MaxHeight = 96, MaxWidth = 340, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Left };
+            : new Image { Source = logo, MaxHeight = 70, MaxWidth = 260, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Left };
         if (logo is not null) ToolTip.SetTip(title, _g.Def.Name);
         var info = Ui.Col(10,
             title,
             Ui.Row(8, Ui.Dot(status.Item1), Ui.Text(status.Item2, "small", color: Ui.Hex("#D5DAE5"))));
         if (_g.Path is not null)
         {
-            var line = Ui.Row(16, Ui.Row(8, Ui.Icon(Icons.Folder, 13, Ui.Hex("#AAB2C2")), Ui.Text(ShortPath(_g.Path), "small", color: Ui.Hex("#AAB2C2"))));
+            var line = Ui.Row(16, Ui.Row(8, Ui.Icon(Icons.Folder, 13, Ui.Hex("#AAB2C2")), Ui.Text(Ui.ShortPath(_g.Path), "small", color: Ui.Hex("#AAB2C2"))));
             var played = Features.PlayTime.Get(_g.Def.Id);
             if (played.Running) line.Children.Add(Ui.Row(8, Ui.Icon(Icons.Clock, 13, Ui.Res("Good")), Ui.Text(I18n.T("time.running"), "small", color: Ui.Res("Good"))));
             else if (played.TotalMs > 0) line.Children.Add(Ui.Row(8, Ui.Icon(Icons.Clock, 13, Ui.Hex("#AAB2C2")), Ui.Text(I18n.T("time.total", ("time", Features.PlayTime.Format(played.TotalMs))), "small", color: Ui.Hex("#AAB2C2"))));
@@ -136,18 +169,19 @@ public sealed partial class GamePage : Page
             buttons.Children.Add(Ui.Button(I18n.T("games.openFolder"), () => Actions.OpenFolder(_g.Path), "", Icons.Folder));
             if (_g.LoaderInstalled)
             {
-                var running = Features.Launcher.IsRunning(_g.Def.Id);
-                var play = running
-                    ? Ui.Button(I18n.T("v4.stop"), () => { Features.Launcher.Stop(_g.Def.Id); MainWindow.Current?.Toast(I18n.T("v4.stopped")); }, "primary", Icons.Stop)
-                    : Ui.Button(I18n.T("games.play"), () => Actions.Play(_g), "primary", Icons.Play);
-                if (running) play.Background = Ui.Hex("#E5484D");
-                play.FontSize = 17;
-                play.Padding = new Thickness(30, 13);
-                buttons.Children.Add(play);
+                if (Features.Launcher.IsRunning(_g.Def.Id))
+                {
+                    // Как в Modrinth App: «● Запущено 12:34» и рядом «Остановить».
+                    buttons.Children.Add(PlayControls.RunningPill(_g.Def.Id));
+                    var stop = Ui.Button(I18n.T("v4.stop"), () => { Features.Launcher.Stop(_g.Def.Id); MainWindow.Current?.Toast(I18n.T("v4.stopped")); }, "", Icons.Stop);
+                    stop.Padding = new Thickness(20, 13);
+                    buttons.Children.Add(stop);
+                }
+                else buttons.Children.Add(PlayControls.PlayButton(_g));
             }
             else
             {
-                var busy = Jobs.All.Any(j => j.Status == JobStatus.Running && j.Title == _g.Def.LoaderName && j.GameName == _g.Def.Name);
+                var busy = Jobs.All.Any(j => j.Active && j.Title == _g.Def.LoaderName && j.GameName == _g.Def.Name);
                 var install = Ui.Button(busy ? I18n.T("aside.installing") : I18n.T("games.installLoader", ("loader", _g.Def.LoaderName)), () => Actions.InstallLoader(_g), "primary", Icons.Download);
                 install.IsEnabled = !busy;
                 install.Padding = new Thickness(24, 13);
@@ -160,18 +194,26 @@ public sealed partial class GamePage : Page
         Grid.SetColumn(buttons, 1);
         grid.Children.Add(buttons);
 
+        var hero = Ui.GameImage(_g.Def, 1400, art: Images.Art.Hero);
+        if (!Shown && !TabSwitch)
+        {
+            // Вход на страницу игры: картинка мягко «отъезжает», надписи и кнопки выезжают.
+            Animate.From(hero, "scale(1.12)", 1400, 0, new Avalonia.Animation.Easings.QuadraticEaseOut(), 1);
+            Animate.From(info, "translateX(-28px)", 520, 120);
+            Animate.From(buttons, "translateX(28px)", 520, 180);
+        }
         return new Border
         {
             CornerRadius = new CornerRadius(20),
             ClipToBounds = true,
             BorderBrush = Ui.Res("Line"),
             BorderThickness = new Thickness(1),
-            Height = 240,
+            Height = 184,
             Child = new Panel
             {
                 Children =
                 {
-                    Ui.GameImage(_g.Def, 1400, art: Images.Art.Hero),
+                    hero,
                     new Border { Background = new LinearGradientBrush { StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(0, 1, RelativeUnit.Relative), GradientStops = { new GradientStop(Color.Parse("#100F1116"), 0), new GradientStop(Color.Parse("#700F1116"), 0.5), new GradientStop(Color.Parse("#F00F1116"), 1) } } },
                     new Border { Background = new LinearGradientBrush { StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 0, RelativeUnit.Relative), GradientStops = { new GradientStop(Color.Parse("#A00F1116"), 0), new GradientStop(Color.Parse("#000F1116"), 0.7) } } },
                     grid,
@@ -180,36 +222,149 @@ public sealed partial class GamePage : Page
         };
     }
 
-    static string ShortPath(string path)
+
+    /// <summary>Переход между вкладками той же игры: шапка не въезжает заново, меняется только содержимое.</summary>
+    bool TabSwitch;
+    public override bool SameScreenAs(Page? previous)
     {
-        var parts = path.Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
-        return parts.Length <= 2 ? path : "…" + Path.DirectorySeparatorChar + string.Join(Path.DirectorySeparatorChar, parts[^2..]);
+        TabSwitch = previous is GamePage gp && gp.GameId == GameId;
+        return TabSwitch;
     }
 
+    /// <summary>Где был индикатор вкладок у каждой игры — чтобы он «переехал» к новой, а не появился.</summary>
+    static readonly Dictionary<string, (double X, double W)> TabMark = [];
+
+    /// <summary>
+    /// Вкладки (8.4): главные — всегда на виду (Моды, Каталог, Настройки, Профили), редкие —
+    /// в «Ещё» (Сохранения, Инструменты, Скриншоты, Лог, Проверка). Под выбранной ездит
+    /// индикатор, у «Ещё» — точка, если проверка нашла проблемы.
+    /// </summary>
     Control Tabs()
     {
-        Button Tab(string id, string text, string icon, string? badge)
+        var updates = Features.ModUpdates.Found.TryGetValue(_g.Def.Id, out var found) && found.Count > 0 ? found.Count : 0;
+        var profiles = Features.Profiles.List(_g.Def.Id).Count;
+        var saves = Features.Backups.List(_g.Def.Id).Count;
+        var tools = Features.Tools.For(_g.Def.Id).Count;
+        var shots = ShotFiles().Count;
+        var health = Features.Health.Count(_g);
+        var configs = Features.CfgFile.Files(_g.Registry!).Count;
+
+        var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2 };
+        Button? active = null;
+
+        Button Tab(string id, string text, string icon, string? badge, string? badgeClass = null)
         {
             var content = Ui.Row(8, Ui.Icon(icon, 16), new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center });
             if (badge is not null)
-                content.Children.Add(new Border { Background = Ui.Res("Surface3"), CornerRadius = new CornerRadius(999), Padding = new Thickness(8, 2), Child = Ui.Text(badge, "small") });
-            var b = new Button { Classes = { "tab" }, Content = content };
-            if (_tab == id) b.Classes.Add("active");
-            b.Click += (_, _) => { if (_tab != id) MainWindow.Current?.Navigate(() => new GamePage(_g.Def.Id, id)); };
+                content.Children.Add(new Border { Classes = { "tab-badge" }, Child = Ui.Text(badge, "tiny") });
+            if (badgeClass is not null && content.Children[^1] is Border bb) bb.Classes.Add(badgeClass);
+            var b = new Button { Classes = { "gtab" }, Content = content };
+            if (_tab == id) { b.Classes.Add("active"); active = b; }
+            b.Click += (_, _) => Go(id);
             return b;
         }
 
-        var updates = Features.ModUpdates.Found.TryGetValue(_g.Def.Id, out var found) && found.Count > 0 ? $" · ↑{found.Count}" : "";
-        var profiles = Features.Profiles.List(_g.Def.Id).Count;
-        var saves = Features.Backups.List(_g.Def.Id).Count;
-        var bar = new WrapPanel { Children = {
-            Tab("installed", I18n.T("games.downloads"), Icons.List, _g.ModCount + updates),
-            _g.Def.HasCatalog ? Tab("catalog", I18n.T("games.market"), Icons.Bag, _total > 0 ? I18n.Compact(_total) : null) : new Control { IsVisible = false },
-            Tab("profiles", I18n.T("games.profiles"), Icons.Layers, profiles > 0 ? profiles.ToString() : null),
-            Tab("saves", I18n.T("games.saves"), Icons.Shield, saves > 0 ? saves.ToString() : null),
-            Tab("tools", I18n.T("v4.tools"), Icons.Settings, Features.Tools.For(_g.Def.Id).Count is > 0 and var t ? t.ToString() : null),
-            Tab("log", I18n.T("games.log"), Icons.Alert, null) } };
-        return new Border { Classes = { "card" }, Padding = new Thickness(6), CornerRadius = new CornerRadius(16), Child = bar, HorizontalAlignment = HorizontalAlignment.Left };
+        row.Children.Add(Tab("installed", I18n.T("tab.mods"), Icons.Package, _g.ModCount > 0 ? _g.ModCount.ToString() : null));
+        if (updates > 0 && row.Children[^1] is Button { Content: StackPanel modsRow })
+            modsRow.Children.Add(new Border { Classes = { "tab-badge", "good" }, Child = Ui.Text("↑" + updates, "tiny") });
+        if (_g.Def.HasCatalog) row.Children.Add(Tab("catalog", I18n.T("games.market"), Icons.Bag, _total > 0 ? I18n.Compact(_total) : null));
+        row.Children.Add(Tab("config", I18n.T("tab.config"), Icons.Sliders, configs > 0 ? configs.ToString() : null));
+        row.Children.Add(Tab("profiles", I18n.T("games.profiles"), Icons.Layers, profiles > 0 ? profiles.ToString() : null));
+
+        // «Ещё»: редкие вкладки. Если открыта одна из них — кнопка показывает её имя.
+        var extra = new List<(string Id, string Text, string Icon, string? Badge)>
+        {
+            ("saves", I18n.T("games.saves"), Icons.Shield, saves > 0 ? saves.ToString() : null),
+            ("tools", I18n.T("v4.tools"), Icons.Wrench, tools > 0 ? tools.ToString() : null),
+        };
+        if (shots > 0) extra.Add(("shots", I18n.T("shots.tab"), Icons.Image, shots.ToString()));
+        extra.Add(("log", I18n.T("games.log"), Icons.Alert, null));
+        extra.Add(("health", I18n.T("health.tab"), Icons.Activity, health > 0 ? health.ToString() : null));
+        var current = extra.FirstOrDefault(e => e.Id == _tab);
+        var moreContent = Ui.Row(8,
+            Ui.Icon(current.Id is null ? Icons.More : current.Icon, 16),
+            new TextBlock { Text = current.Id is null ? I18n.T("tab.more") : current.Text, VerticalAlignment = VerticalAlignment.Center },
+            Ui.Icon(Icons.ChevronDown, 13));
+        if (health > 0) moreContent.Children.Add(new Border { Classes = { "tab-badge", "bad" }, Child = Ui.Text(health.ToString(), "tiny") });
+        var more = new Button { Classes = { "gtab" }, Content = moreContent };
+        if (current.Id is not null) { more.Classes.Add("active"); active = more; }
+        more.Click += (_, _) =>
+        {
+            var menu = Ctx.Menu(extra.Select(e => (object?)Ctx.Item(e.Badge is null ? e.Text : $"{e.Text}  ·  {e.Badge}", e.Icon, () => Go(e.Id))).ToArray());
+            menu.Placement = PlacementMode.BottomEdgeAlignedLeft;
+            menu.ShowAt(more);
+        };
+        row.Children.Add(more);
+
+        // Индикатор под выбранной вкладкой: едет от прежнего места.
+        var indicator = new Border
+        {
+            Classes = { "tab-ink" }, Height = 2.5, CornerRadius = new CornerRadius(2), Width = 0,
+            HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Bottom, IsHitTestVisible = false,
+        };
+        var bar = new Panel { Children = { row, indicator } };
+        var id = _g.Def.Id;
+        void Place(bool animate)
+        {
+            if (active is null || active.Bounds.Width <= 0) return;
+            var p = active.TranslatePoint(new Point(0, 0), row) ?? new Point();
+            var target = (X: p.X + 10, W: Math.Max(0, active.Bounds.Width - 20));
+            if (animate && Animate.On && TabMark.TryGetValue(id, out var was) && Math.Abs(was.X - target.X) > 1)
+            {
+                indicator.Transitions = null;
+                indicator.Width = was.W;
+                indicator.RenderTransform = Avalonia.Media.Transformation.TransformOperations.Parse($"translateX({was.X.ToString(System.Globalization.CultureInfo.InvariantCulture)}px)");
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    indicator.Transitions =
+                    [
+                        new Avalonia.Animation.DoubleTransition { Property = Layoutable.WidthProperty, Duration = TimeSpan.FromMilliseconds(320), Easing = new Avalonia.Animation.Easings.CubicEaseOut() },
+                        new Avalonia.Animation.TransformOperationsTransition { Property = Visual.RenderTransformProperty, Duration = TimeSpan.FromMilliseconds(360), Easing = new Avalonia.Animation.Easings.BackEaseOut() },
+                    ];
+                    indicator.Width = target.W;
+                    indicator.RenderTransform = Avalonia.Media.Transformation.TransformOperations.Parse($"translateX({target.X.ToString(System.Globalization.CultureInfo.InvariantCulture)}px)");
+                }, Avalonia.Threading.DispatcherPriority.Background);
+            }
+            else
+            {
+                indicator.Transitions = null;
+                indicator.Width = target.W;
+                indicator.RenderTransform = Avalonia.Media.Transformation.TransformOperations.Parse($"translateX({target.X.ToString(System.Globalization.CultureInfo.InvariantCulture)}px)");
+            }
+            TabMark[id] = target;
+        }
+        var placed = false;
+        row.LayoutUpdated += (_, _) =>
+        {
+            if (placed) return;
+            if (active is null || active.Bounds.Width <= 0) return;
+            placed = true;
+            Place(animate: true);
+        };
+        row.SizeChanged += (_, _) => { if (placed) Place(animate: false); };
+
+        return new Border
+        {
+            Classes = { "gtabs" },
+            Child = new ScrollViewer
+            {
+                Content = bar,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            },
+        };
+
+        void Go(string tab) { if (_tab != tab) MainWindow.Current?.Navigate(() => new GamePage(_g.Def.Id, tab)); }
+    }
+
+    /// <summary>Содержимое вкладки поднимается волной: первые элементы по очереди.</summary>
+    internal static void Stagger(Control body, int delay)
+    {
+        if (!Animate.On) return;
+        var items = body is Panel p ? p.Children.ToList() : body is Border { Child: Panel inner } ? inner.Children.ToList() : [];
+        if (items.Count == 0) { Animate.From(body, "translateY(14px)", 380, delay); return; }
+        for (var i = 0; i < Math.Min(items.Count, 12); i++)
+            Animate.From(items[i], "translateY(16px)", 420, delay + i * 45, new Avalonia.Animation.Easings.CubicEaseOut());
     }
 
     // ---------------------------------------------------------------- игра не найдена
@@ -237,6 +392,7 @@ public sealed partial class GamePage : Page
 
         // Источники: основной каталог и дополнительные (как в Vortex — моды с разных сайтов).
         var source = _source ?? _g.Def.PrimarySource;
+        DockPanel? sourceDock = null; // в одну строку с источниками уходят переключатели «скрыть установленные», «только рабочие» и вид списка
         if (_g.Def.Sources.Length > 1)
         {
             if (_sourceTotals.Count < _g.Def.Sources.Length && !Program.Demo) _ = LoadSourceTotals();
@@ -249,7 +405,9 @@ public sealed partial class GamePage : Page
                 if (src == source) b.Classes.Add("active");
                 sources.Children.Add(b);
             }
-            col.Children.Add(sources);
+            sourceDock = new DockPanel { LastChildFill = true };
+            sourceDock.Children.Add(sources);
+            col.Children.Add(sourceDock);
         }
 
         var chips = new WrapPanel();
@@ -323,7 +481,7 @@ public sealed partial class GamePage : Page
                 var b = Ui.Button("", () => { _view = id; Settings.Data["catalogView"] = id; Settings.Save(); Build(); }, _view == id ? "icon active" : "icon", icon, tip);
                 return b;
             }
-            var views = new Border { Classes = { "card" }, Padding = new Thickness(3), CornerRadius = new CornerRadius(12), Child = Ui.Row(2, ViewButton("list", Icons.List, I18n.T("cat.list")), ViewButton("grid", Icons.Grid, I18n.T("cat.grid"))) };
+            var views = new Border { Classes = { "card" }, Margin = new Thickness(16, 0, 0, 0), Padding = new Thickness(3), CornerRadius = new CornerRadius(12), Child = Ui.Row(2, ViewButton("list", Icons.List, I18n.T("cat.list")), ViewButton("grid", Icons.Grid, I18n.T("cat.grid"))) };
             var second = new DockPanel();
             DockPanel.SetDock(views, Dock.Right);
             second.Children.Add(views);
@@ -331,13 +489,31 @@ public sealed partial class GamePage : Page
             hideLabel.VerticalAlignment = VerticalAlignment.Center;
             var hideRow = Ui.Row(10, hide, hideLabel);
             hideRow.VerticalAlignment = VerticalAlignment.Center;
+            // «Только рабочие»: прячем моды для старой версии игры (есть там, где известно, когда игра сломала старые моды).
+            if (Features.Compat.CanFilter(_g.Def))
+            {
+                var works = new ToggleSwitch { IsChecked = OnlyWorking, OnContent = "", OffContent = "", MinWidth = 0, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(18, 0, 0, 0) };
+                works.IsCheckedChanged += (_, _) => { Settings.Data["onlyWorkingMods"] = works.IsChecked == true; Settings.Save(); RenderList(); };
+                var worksLabel = Ui.Text(I18n.T("compat.only"), "muted");
+                worksLabel.VerticalAlignment = VerticalAlignment.Center;
+                ToolTip.SetTip(worksLabel, I18n.T("compat.only.hint"));
+                hideRow.Children.Add(works);
+                hideRow.Children.Add(worksLabel);
+            }
             second.Children.Add(hideRow);
-            col.Children.Add(second);
+            if (sourceDock is not null)
+            {
+                DockPanel.SetDock(second, Dock.Right);
+                sourceDock.Children.Insert(0, second);
+            }
+            else col.Children.Add(second);
         }
 
-        _listHost = new StackPanel { Spacing = 10 };
+        var host = new StackPanel { Spacing = 10 };
+        _listHost = host;
         RenderList();
-        col.Children.Add(_listHost);
+        // Если за это время страницу уже перестроили, этот список больше не нужен.
+        if (ReferenceEquals(_listHost, host)) col.Children.Add(host);
         return col;
     }
 
@@ -411,8 +587,10 @@ public sealed partial class GamePage : Page
             return;
         }
 
+        if (FeedShelf() is { } feed) _listHost.Children.Add(feed);
         var picks = _g.Def.Picks.ToHashSet();
         var shown = _hideInstalled ? _mods.Where(m => !IsInstalled(m)).ToList() : _mods;
+        if (OnlyWorking && Features.Compat.CanFilter(_g.Def)) shown = shown.Where(m => Features.Compat.Works(_g.Def, m)).ToList();
         var tiles = _view == "grid" ? new WrapPanel() : null;
         if (tiles is not null) _listHost.Children.Add(tiles);
         for (var i = 0; i < shown.Count; i++)
@@ -434,9 +612,9 @@ public sealed partial class GamePage : Page
         }
     }
 
-    static Control Skeleton() => new Border
+    internal static Control Skeleton() => new Border
     {
-        Classes = { "card" },
+        Classes = { "card", "shimmer" },
         Height = 118,
         Child = new Border { Width = 88, Height = 88, Margin = new Thickness(14), CornerRadius = new CornerRadius(14), Background = Ui.Res("Surface2"), HorizontalAlignment = HorizontalAlignment.Left },
     };
@@ -482,6 +660,9 @@ public sealed partial class GamePage : Page
 
     async Task LoadPicks()
     {
+        // Сначала дать дорисоваться текущему экрану: иначе Build() изнутри RenderList
+        // перестраивал страницу посреди сборки и каталог оставался пустым.
+        await Task.Yield();
         if (_picks is not null) { RenderList(); return; }
         try
         {

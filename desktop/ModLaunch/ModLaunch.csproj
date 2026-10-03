@@ -15,7 +15,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <AssemblyName>ModLaunch</AssemblyName>
     <RootNamespace>ModLaunch</RootNamespace>
-    <Version>7.1.0</Version>
+    <Version>8.5.0</Version>
     <Product>ModLaunch</Product>
     <Company>ModLaunch</Company>
     <Copyright>ModLaunch</Copyright>
@@ -34,6 +34,9 @@
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
     <PublishTrimmed>true</PublishTrimmed>
     <TrimMode>partial</TrimMode>
+    <!-- 8.4.1: сериализация через отражение остаётся включённой — иначе любое
+         JsonSerializer.Serialize или JsonArray.Add(строка) роняло программу в выпуске. -->
+    <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
     <DebugType>none</DebugType>
   </PropertyGroup>
 

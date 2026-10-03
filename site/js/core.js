@@ -11,6 +11,7 @@ document.documentElement.classList.add('js');
 
 // Число модов — по всем каталогам игры (Thunderstore, Nexus, ModLinks), данные самопроверки 5.5.
 const GAMES = [
+  { id: 'minecraft', color: '#3FB950', name: 'Minecraft: Java Edition', steam: 'minecraft', loader: 'Fabric · Quilt · Forge · NeoForge', src: 'Modrinth', mods: 19000, fresh: true },
   { id: 'lethal-company', color: '#C9A227', name: 'Lethal Company', steam: 1966720, loader: 'BepInEx', src: 'Thunderstore · Nexus', mods: 39275 },
   { id: 'stardew-valley', color: '#6BAA3C', name: 'Stardew Valley', steam: 413150, loader: 'SMAPI', src: 'Nexus Mods', mods: 32660 },
   { id: 'valheim', color: '#E09F3E', name: 'Valheim', steam: 892970, loader: 'BepInEx', src: 'Thunderstore · Nexus', mods: 9276 },
@@ -31,7 +32,7 @@ const GAMES = [
 ];
 const TOTAL_MODS = GAMES.reduce((s, g) => s + g.mods, 0);
 const gameById = (id) => GAMES.find((g) => g.id === id);
-const steamArt = (id, kind = 'library_600x900') => `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${id}/${kind}.jpg`;
+const steamArt = (id, kind = 'library_600x900') => typeof id !== 'number' ? `img/art/${id}.webp` : `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${id}/${kind}.jpg`;
 const steamHeader = (id) => `https://cdn.akamai.steamstatic.com/steam/apps/${id}/header.jpg`;
 
 /* ---------------------------------------------------------------- язык */

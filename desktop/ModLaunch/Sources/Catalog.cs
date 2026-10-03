@@ -108,6 +108,7 @@ public static partial class Catalog
         "thunderstore" => "Thunderstore",
         "modlinks" => "ModLinks",
         "hub" => "ModLaunch Hub",
+        "modrinth" => "Modrinth",
         _ => "Nexus Mods",
     };
 }

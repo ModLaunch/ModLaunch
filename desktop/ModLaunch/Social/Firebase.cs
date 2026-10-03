@@ -41,7 +41,7 @@ public static class Firebase
         cts.CancelAfter(TimeSpan.FromSeconds(15));
         using var request = new HttpRequestMessage(method, url);
         request.Headers.Accept.ParseAdd("application/json");
-        request.Headers.TryAddWithoutValidation("X-Firebase-Locale", I18n.Lang == "en" ? "en" : "ru");
+        request.Headers.TryAddWithoutValidation("X-Firebase-Locale", I18n.Lang.Split('-')[0]);
         if (token is not null) request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
         if (form is not null) request.Content = new StringContent(form, Encoding.UTF8, "application/x-www-form-urlencoded");
         else if (body is not null) request.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
@@ -125,7 +125,11 @@ public static class Firebase
     {
         if (e is not ServiceError s) return Jobs.Explain(e);
         var key = $"err.{service}.{s.Code}";
-        return I18n.Has(key) ? I18n.T(key, ("reason", s.Message)) : I18n.T($"err.{service}.SERVER", ("reason", s.Message));
+        var text = I18n.Has(key) ? I18n.T(key, ("reason", s.Message)) : I18n.T($"err.{service}.SERVER", ("reason", s.Message));
+        // «Временно недоступно» само по себе причину не называет — добавляем ответ сервера, чтобы её было видно.
+        if (s.Code is "NOT_ENABLED" or "BUSY" or "BAD_KEY" && !string.IsNullOrWhiteSpace(s.Message) && s.Message != s.Code && !text.Contains(s.Message))
+            text = text.TrimEnd() + " (" + s.Message.Trim() + ")";
+        return text;
     }
 
     public static DateTime? Time(string? value) => DateTime.TryParse(value, null, System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal, out var d) ? d : null;

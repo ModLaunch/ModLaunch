@@ -126,7 +126,16 @@ public static partial class Account
                     if (slot == "user") { Changed?.Invoke(); throw; }
                 }
             }
-            if (slot == "user") throw new ServiceError("SESSION");
+            if (slot == "user")
+            {
+                // Сохранённый вход не прочитать (вход из старой версии, другой пользователь Windows):
+                // выходим, чтобы программа не висела «вошедшей» без доступа к друзьям и отзывам.
+                File.Data.Remove(slot);
+                Live.Remove(slot);
+                File.Save();
+                Changed?.Invoke();
+                throw new ServiceError("SESSION");
+            }
             var data = await Request(IdentityUrl("accounts:signUp"), new JsonObject { ["returnSecureToken"] = true });
             return Remember("anon", data.Str("localId")!, data.Str("idToken")!, data.Str("refreshToken")!, data.Str("expiresIn"));
         }
@@ -172,15 +181,19 @@ public static partial class Account
         JsonNode? created = null;
         string? createdUid = null;
         // Анонимный пользователь становится настоящим — его отзывы остаются за ним.
+        // Почту привязываем через accounts:signUp с idToken: accounts:update с почтой Firebase
+        // запрещает при включённой «защите от перебора почт» (OPERATION_NOT_ALLOWED).
         if (Open(Slot("anon")?["refreshToken"]) is not null)
         {
             try
             {
                 var anon = await Token();
-                created = await Request(IdentityUrl("accounts:update"), new JsonObject { ["idToken"] = anon.IdToken, ["email"] = mail, ["password"] = pass, ["returnSecureToken"] = true });
+                created = await Request(IdentityUrl("accounts:signUp"), new JsonObject { ["idToken"] = anon.IdToken, ["email"] = mail, ["password"] = pass, ["returnSecureToken"] = true });
                 createdUid = created.Str("localId") ?? anon.Uid;
             }
-            catch (ServiceError e) when (e.Code == "SESSION") { created = null; }
+            // Ошибки самого пользователя (почта занята, слабый пароль, нет сети) показываем как есть;
+            // всё прочее — создаём аккаунт обычным путём, без переноса анонимных отзывов.
+            catch (ServiceError e) when (e.Code is not ("EMAIL_EXISTS" or "BAD_EMAIL" or "WEAK_PASSWORD" or "TOO_MANY" or "OFFLINE")) { created = null; }
         }
         if (created is null)
         {

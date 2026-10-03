@@ -149,7 +149,7 @@ public sealed partial class GamePage
     {
         var dir = Features.ReShade.DirOf(_g.Def, _g.Path!);
         var state = Features.ReShade.Detect(dir);
-        var busy = Jobs.All.Any(j => j.Status == JobStatus.Running && j.Title == "ReShade" && j.GameName == _g.Def.Name);
+        var busy = Jobs.All.Any(j => j.Active && j.Title == "ReShade" && j.GameName == _g.Def.Name);
         Control button = state.Dll is not null
             ? Ui.Button(I18n.T("games.openFolder"), () => Actions.OpenFolder(dir), "", Icons.Folder)
             : Ui.Button(busy ? I18n.T("rs.installing") : I18n.T("rs.install"), () =>

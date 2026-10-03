@@ -13,6 +13,8 @@ public static class Loader
         LoaderKind.Smapi => File.Exists(Path.Combine(gamePath, "StardewModdingAPI.exe")) || File.Exists(Path.Combine(gamePath, "StardewModdingAPI.dll")),
         LoaderKind.HkApi => HkApi.IsInstalled(gamePath),
         LoaderKind.None => true,
+        // Minecraft готов, если есть его папка: загрузчик у каждой сборки свой и ставится перед игрой.
+        LoaderKind.Minecraft => Directory.Exists(gamePath),
         _ => Directory.Exists(Path.Combine(gamePath, "BepInEx", "core")) && (!OperatingSystem.IsWindows() || File.Exists(Path.Combine(gamePath, "winhttp.dll"))),
     };
 
@@ -21,6 +23,7 @@ public static class Loader
         LoaderKind.Smapi => Smapi.Install(gamePath, progress, ct),
         LoaderKind.HkApi => HkApi.Install(gamePath, progress, ct),
         LoaderKind.None => Task.FromResult(""),
+        LoaderKind.Minecraft => Minecraft.Mc.Active is { } active ? Minecraft.McInstall.EnsureVersion(active, progress, ct) : Task.FromResult(""),
         _ => BepInEx.Install(game, gamePath, progress, ct),
     };
 }

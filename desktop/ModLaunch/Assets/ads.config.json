@@ -1,5 +1,5 @@
 {
-  "feedUrl": "",
-  "advertiseUrl": "",
+  "feedUrl": "https://modlaunchapp.com/ads.json",
+  "advertiseUrl": "https://modlaunchapp.com/advertise.html",
   "rotateSeconds": 15
 }

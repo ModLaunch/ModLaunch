@@ -218,7 +218,7 @@ public sealed class StatsPage : Page
 
             var table = Ui.Col(6, TableRow(I18n.T("stats.col.version"), I18n.T("stats.col.date"), I18n.T("stats.col.setup"), I18n.T("stats.col.total"), true));
             foreach (var r in Enumerable.Reverse(_releases))
-                table.Children.Add(TableRow(r.Version, r.Published?.ToString("d", System.Globalization.CultureInfo.GetCultureInfo(I18n.Lang == "en" ? "en-US" : "ru-RU")) ?? "", r.Setup.ToString(), r.Total.ToString(), false));
+                table.Children.Add(TableRow(r.Version, r.Published?.ToString("d", I18n.Culture) ?? "", r.Setup.ToString(), r.Total.ToString(), false));
             col.Children.Add(Ui.Card(Ui.Col(12, Ui.Text(I18n.T("stats.table"), "h2"), table), 22));
         }
         else if (_releases is not null) col.Children.Add(Ui.Card(Ui.Text(I18n.T("stats.noReleases"), "muted"), 18));

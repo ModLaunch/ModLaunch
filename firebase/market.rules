@@ -1,0 +1,172 @@
+    // ── Маркет Creator Hub (ModLaunch 7.2) ──────────────────────────────
+    // Вставить в консоли Firebase (Firestore Database → Правила) внутрь блока
+    // match /databases/{database}/documents { … }, рядом с правилами Hub.
+    //
+    // Суммы в копейках (int). Комиссия площадки mFee() % — та же, что feePercent
+    // в desktop/ModLaunch/Assets/market.config.json. Поменяли там — поменяйте здесь.
+    //
+    // market/{id}                — лоты (видят все; скрытые — только продавец)
+    // market/{id}/files/{n}      — файл товара кусками (продавец и купившие)
+    // market/{id}/sales/{buyer}  — продажа (покупатель и продавец)
+    // market/{id}/reviews/{uid}  — отзывы купивших
+    // wallets/{uid}              — баланс; wallets/_platform — комиссия площадки
+    // wallets/{uid}/purchases    — свои покупки
+    // payouts, topups            — заявки на вывод и пополнение (решает админ)
+
+    function mFee() { return 10; }
+    function mAdmin() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/admins/$(request.auth.token.get('email', '-')));
+    }
+    function mMember() { return request.auth != null && request.auth.token.get('email', '') != ''; }
+    function mText(v, max) { return v is string && v.size() <= max; }
+    function mOnly(keys) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys); }
+    function mListing(id) { return get(/databases/$(database)/documents/market/$(id)).data; }
+    function mSale(id, buyer) { return /databases/$(database)/documents/market/$(id)/sales/$(buyer); }
+    function mNewSale(id, buyer) { return existsAfter(mSale(id, buyer)) && !exists(mSale(id, buyer)); }
+    function mSaleAfter(id, buyer) { return getAfter(mSale(id, buyer)).data; }
+    function mWallet(uid) { return /databases/$(database)/documents/wallets/$(uid); }
+    function mPayout(pid) { return /databases/$(database)/documents/payouts/$(pid); }
+    function mValid(d) {
+      return d.keys().hasOnly(['uid', 'author', 'title', 'summary', 'description', 'kind', 'game', 'price', 'license',
+                               'version', 'preview', 'tags', 'images', 'size', 'sha256', 'chunks', 'fileName',
+                               'status', 'sales', 'created', 'updated'])
+        && d.uid == request.auth.uid
+        && mText(d.author, 32) && d.author.size() > 0
+        && mText(d.title, 60) && d.title.size() > 0
+        && mText(d.summary, 200) && mText(d.description, 5000) && mText(d.game, 40)
+        && d.kind in ['model', 'code', 'script', 'asset', 'pack']
+        && d.license in ['personal', 'commercial', 'open']
+        && d.price is int && d.price >= 0 && d.price <= 100000000
+        && mText(d.version, 20) && mText(d.preview, 4000)
+        && d.tags is list && d.tags.size() <= 6 && d.images is list && d.images.size() <= 6
+        && d.size is int && d.size <= 8388608 && d.chunks is int && d.chunks <= 16
+        && mText(d.sha256, 64) && mText(d.fileName, 120)
+        && d.status in ['active', 'hidden']
+        && d.updated == request.time;
+    }
+
+    match /market/{id} {
+      allow get, list: if resource.data.status == 'active'
+        || (request.auth != null && resource.data.uid == request.auth.uid) || mAdmin();
+      allow create: if mMember()
+        && id.matches('^' + request.auth.uid.lower() + '_[a-z0-9_]{1,60}$')
+        && mValid(request.resource.data)
+        && request.resource.data.sales == 0 && request.resource.data.created == request.time;
+      allow update: if
+        (mMember() && resource.data.uid == request.auth.uid && mValid(request.resource.data)
+          && request.resource.data.sales == resource.data.sales
+          && request.resource.data.created == resource.data.created)
+        // +1 продажа — только вместе с созданием своей продажи.
+        || (mMember() && mOnly(['sales'])
+          && request.resource.data.sales == resource.data.sales + 1
+          && mNewSale(id, request.auth.uid));
+      allow delete: if request.auth != null && resource.data.uid == request.auth.uid && resource.data.sales == 0;
+
+      match /files/{n} {
+        allow get: if request.auth != null
+          && (mListing(id).uid == request.auth.uid || exists(mSale(id, request.auth.uid)));
+        allow create, update: if mMember() && mListing(id).uid == request.auth.uid
+          && request.resource.data.uid == request.auth.uid && request.resource.data.data is string;
+        allow delete: if request.auth != null && mListing(id).uid == request.auth.uid;
+      }
+
+      match /sales/{buyer} {
+        allow get: if request.auth != null && (buyer == request.auth.uid || mListing(id).uid == request.auth.uid || mAdmin());
+        allow list: if request.auth != null && (mListing(id).uid == request.auth.uid || mAdmin());
+        // Продажа: цена из лота, комиссия по формуле, деньги разнесены в этой же пачке.
+        allow create: if mMember() && buyer == request.auth.uid
+          && mListing(id).status == 'active' && mListing(id).uid != buyer
+          && request.resource.data.keys().hasOnly(['buyerName', 'seller', 'title', 'price', 'fee', 'created'])
+          && request.resource.data.price == mListing(id).price
+          && request.resource.data.fee == math.floor(request.resource.data.price * mFee() / 100)
+          && request.resource.data.seller == mListing(id).uid
+          && mText(request.resource.data.buyerName, 32) && mText(request.resource.data.title, 60)
+          && request.resource.data.created == request.time
+          && getAfter(mWallet(buyer)).data.balance == get(mWallet(buyer)).data.balance - request.resource.data.price
+          && getAfter(mWallet(mListing(id).uid)).data.balance
+               == get(mWallet(mListing(id).uid)).data.balance + request.resource.data.price - request.resource.data.fee
+          && getAfter(mWallet('_platform')).data.balance == get(mWallet('_platform')).data.balance + request.resource.data.fee;
+      }
+
+      match /reviews/{uid} {
+        allow get, list: if true;
+        allow create, update: if mMember() && uid == request.auth.uid && exists(mSale(id, uid))
+          && request.resource.data.keys().hasOnly(['author', 'stars', 'text', 'created'])
+          && request.resource.data.stars is int && request.resource.data.stars >= 1 && request.resource.data.stars <= 5
+          && mText(request.resource.data.text, 1000) && mText(request.resource.data.author, 32)
+          && request.resource.data.created == request.time;
+        allow delete: if request.auth != null && (uid == request.auth.uid || mAdmin());
+      }
+    }
+
+    function mWalletNew() {
+      return request.resource.data.keys().hasOnly(['balance', 'earned', 'spent', 'paidOut'])
+        && request.resource.data.balance == 0 && request.resource.data.earned == 0
+        && request.resource.data.spent == 0 && request.resource.data.paidOut == 0;
+    }
+
+    match /wallets/{w} {
+      allow get: if request.auth != null && (w == request.auth.uid || w == '_platform' || mAdmin());
+      allow create: if mMember() && (w == request.auth.uid || w == '_platform') && mWalletNew();
+      allow update: if
+        // Покупатель: списание ровно на цену своей новой покупки.
+        (w == request.auth.uid && mOnly(['balance', 'spent', 'lastSale'])
+          && mNewSale(request.resource.data.lastSale, w)
+          && request.resource.data.balance == resource.data.balance - mSaleAfter(request.resource.data.lastSale, w).price
+          && request.resource.data.spent == resource.data.spent + mSaleAfter(request.resource.data.lastSale, w).price
+          && request.resource.data.balance >= 0)
+        // Продавец: цена за вычетом комиссии.
+        || (w != request.auth.uid && w != '_platform' && mOnly(['balance', 'earned', 'lastSale', 'lastBuyer'])
+          && request.resource.data.lastBuyer == request.auth.uid
+          && mNewSale(request.resource.data.lastSale, request.auth.uid)
+          && mSaleAfter(request.resource.data.lastSale, request.auth.uid).seller == w
+          && request.resource.data.balance == resource.data.balance
+               + mSaleAfter(request.resource.data.lastSale, request.auth.uid).price
+               - mSaleAfter(request.resource.data.lastSale, request.auth.uid).fee
+          && request.resource.data.earned == resource.data.earned
+               + mSaleAfter(request.resource.data.lastSale, request.auth.uid).price
+               - mSaleAfter(request.resource.data.lastSale, request.auth.uid).fee)
+        // Площадка: комиссия.
+        || (w == '_platform' && mOnly(['balance', 'earned', 'lastSale', 'lastBuyer'])
+          && request.resource.data.lastBuyer == request.auth.uid
+          && mNewSale(request.resource.data.lastSale, request.auth.uid)
+          && request.resource.data.balance == resource.data.balance + mSaleAfter(request.resource.data.lastSale, request.auth.uid).fee
+          && request.resource.data.earned == resource.data.earned + mSaleAfter(request.resource.data.lastSale, request.auth.uid).fee)
+        // Вывод: списание ровно на сумму своей новой заявки.
+        || (w == request.auth.uid && mOnly(['balance', 'paidOut', 'lastPayout'])
+          && existsAfter(mPayout(request.resource.data.lastPayout)) && !exists(mPayout(request.resource.data.lastPayout))
+          && getAfter(mPayout(request.resource.data.lastPayout)).data.uid == w
+          && request.resource.data.balance == resource.data.balance - getAfter(mPayout(request.resource.data.lastPayout)).data.amount
+          && request.resource.data.paidOut == resource.data.paidOut + getAfter(mPayout(request.resource.data.lastPayout)).data.amount
+          && request.resource.data.balance >= 0)
+        // Админ: пополнения, возвраты, бонусы.
+        || mAdmin();
+
+      match /purchases/{id} {
+        allow get, list: if request.auth != null && w == request.auth.uid;
+        allow create: if request.auth != null && w == request.auth.uid && mNewSale(id, w)
+          && request.resource.data.keys().hasOnly(['title', 'kind', 'seller', 'price', 'created']);
+      }
+    }
+
+    match /payouts/{pid} {
+      allow get, list: if request.auth != null && (resource.data.uid == request.auth.uid || mAdmin());
+      allow create: if mMember() && pid.matches('^' + request.auth.uid + '_[0-9]{14}$')
+        && request.resource.data.keys().hasOnly(['uid', 'author', 'amount', 'method', 'status', 'note', 'created'])
+        && request.resource.data.uid == request.auth.uid && request.resource.data.status == 'pending'
+        && request.resource.data.amount is int && request.resource.data.amount >= 100
+        && mText(request.resource.data.method, 300) && request.resource.data.created == request.time
+        && getAfter(mWallet(request.auth.uid)).data.lastPayout == pid;
+      allow update: if mAdmin() && mOnly(['status', 'note']);
+    }
+
+    match /topups/{tid} {
+      allow get, list: if request.auth != null && (resource.data.uid == request.auth.uid || mAdmin());
+      allow create: if mMember() && tid.matches('^' + request.auth.uid + '_[0-9]{14}$')
+        && request.resource.data.keys().hasOnly(['uid', 'author', 'amount', 'reference', 'status', 'created'])
+        && request.resource.data.uid == request.auth.uid && request.resource.data.status == 'pending'
+        && request.resource.data.amount is int && request.resource.data.amount > 0
+        && mText(request.resource.data.reference, 300) && request.resource.data.created == request.time;
+      allow update: if mAdmin() && mOnly(['status', 'note']);
+    }

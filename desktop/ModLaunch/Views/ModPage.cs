@@ -1,4 +1,4 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
@@ -62,7 +62,7 @@ public sealed partial class ModPage : Page
 
     public override void Build()
     {
-        var col = new StackPanel { Spacing = 18, Margin = new Thickness(34, 22, 34, 34), MaxWidth = 1500 };
+        var col = new StackPanel { Spacing = 24, Margin = new Thickness(40, 26, 40, 40), MaxWidth = 1500 };
         col.Children.Add(Header());
         col.Children.Add(Tabs());
         col.Children.Add(TabContent());
@@ -90,7 +90,7 @@ public sealed partial class ModPage : Page
             stat is null ? I18n.T("mod.rate") : I18n.T("rev.count." + I18n.Plural(stat.Count, "one", "few", "many"), ("n", stat.Count))));
         if (mod.Downloads > 0) tiles.Children.Add(Tile(Big(I18n.Compact(mod.Downloads)), I18n.T("mt.stats.downloads")));
         if (mod.Rating > 0) tiles.Children.Add(Tile(Big(I18n.Compact(mod.Rating)), mod.Source == "nexus" ? I18n.T("mt.stats.endorse") : I18n.T("mt.stats.likes")));
-        if (mod.UpdatedAt is not null) tiles.Children.Add(Tile(Big(mod.UpdatedAt.Value.ToLocalTime().ToString("MMM yyyy", System.Globalization.CultureInfo.GetCultureInfo(I18n.Lang == "en" ? "en-US" : "ru-RU"))), I18n.T("mod.updatedTile")));
+        if (mod.UpdatedAt is not null) tiles.Children.Add(Tile(Big(mod.UpdatedAt.Value.ToLocalTime().ToString("MMM yyyy", I18n.Culture)), I18n.T("mod.updatedTile")));
         if (_details is { Requirements.Count: > 0 }) tiles.Children.Add(Tile(Big(_details.Requirements.Count.ToString()), I18n.T("mod.depsTile")));
 
         var category = mod.Categories.FirstOrDefault();
@@ -123,6 +123,19 @@ public sealed partial class ModPage : Page
             buttons);
         if (mod.Source == "nexus" && !installed) info.Children.Add(Ui.Row(8, Ui.Icon(Icons.Info, 14, Ui.Res("Muted")), Ui.Text(I18n.T("mod.nexusHint"), "small muted", wrap: true)));
         if (_g.Def.IsLegacy(mod.UpdatedAt)) info.Children.Add(ModRow.Tag(I18n.T("badge.old.hint"), Ui.Hex("#3A2A12"), Ui.Res("Warn")));
+        if (mod.Deprecated)
+            info.Children.Add(new Border
+            {
+                Background = Ui.Hex("#3A1A1A"), CornerRadius = new CornerRadius(12), Padding = new Thickness(12, 8), HorizontalAlignment = HorizontalAlignment.Left,
+                Child = Ui.Row(8, Ui.Icon(Icons.Alert, 15, Ui.Res("Bad")), Ui.Text(I18n.T("compat.deprecated"), "small", wrap: true)),
+            });
+        // «Заработает ли?»: мод просит другой загрузчик.
+        if (Features.Compat.Foreign(_g.Def, mod.Dependencies) is { } loader)
+            info.Children.Add(new Border
+            {
+                Background = Ui.Hex("#3A2A12"), CornerRadius = new CornerRadius(12), Padding = new Thickness(12, 8), HorizontalAlignment = HorizontalAlignment.Left,
+                Child = Ui.Row(8, Ui.Icon(Icons.Alert, 15, Ui.Res("Warn")), Ui.Text(I18n.T("compat.page", ("loader", loader), ("ours", _g.Def.LoaderName)), "small", wrap: true)),
+            });
         info.VerticalAlignment = VerticalAlignment.Center;
 
         var cover = _details?.Images.FirstOrDefault() ?? mod.Icon;

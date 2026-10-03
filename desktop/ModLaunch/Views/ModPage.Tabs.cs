@@ -1,4 +1,4 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
@@ -33,9 +33,7 @@ public sealed partial class ModPage
         }
         var d = _details;
         var reviews = _brief.Source == "hub" ? _comments?.Count ?? 0 : Social.Reviews.Stats().GetValueOrDefault($"{_g.Def.Id}|{Mod.Id}")?.Count ?? 0;
-        var bar = new WrapPanel();
-        foreach (var t in new[]
-        {
+        return Ui.TabBar(
             Tab("about", I18n.T("mt.about"), Icons.Book),
             Tab("files", I18n.T("mt.files"), Icons.Layers, _versions?.Count),
             Tab("changes", I18n.T("mt.changes"), Icons.Refresh),
@@ -43,9 +41,7 @@ public sealed partial class ModPage
             Tab("images", I18n.T("mt.images"), Icons.Image, d?.Images.Count),
             Tab("videos", I18n.T("mt.videos"), Icons.Video, d?.Videos.Count),
             Tab("reviews", _brief.Source == "hub" ? I18n.T("mt.comments") : I18n.T("mt.reviews"), Icons.Chat, reviews),
-            Tab("stats", I18n.T("mt.stats"), Icons.Chart),
-        }) bar.Children.Add(t);
-        return new Border { Classes = { "card" }, Padding = new Thickness(6), CornerRadius = new CornerRadius(16), Child = bar, HorizontalAlignment = HorizontalAlignment.Left };
+            Tab("stats", I18n.T("mt.stats"), Icons.Chart));
     }
 
     Control TabContent()
@@ -113,7 +109,7 @@ public sealed partial class ModPage
             DockPanel.SetDock(open, Dock.Right);
             var row = new DockPanel();
             row.Children.Add(open);
-            row.Children.Add(Ui.Row(12, Ui.Thumb(null, r.Name, 40, 10),
+            row.Children.Add(Ui.Row(12, Ui.Thumb(null, r.Name, 40, 10, person: true),
                 Ui.Col(2, Ui.Text(r.Name, "h3"), Ui.Text(have ? I18n.T("mod.deps.have") : I18n.T("mod.deps.will"), "small", color: have ? Ui.Res("Good") : Ui.Res("Muted")))));
             col.Children.Add(new Border { Background = Ui.Res("Surface2"), CornerRadius = new CornerRadius(12), Padding = new Thickness(12, 10), Child = row });
         }
@@ -181,7 +177,7 @@ public sealed partial class ModPage
         tiles.Children.Add(Tile(mod.Rating > 0 ? mod.Rating.ToString("N0") : "—", mod.Source == "nexus" ? I18n.T("mt.stats.endorse") : I18n.T("mt.stats.likes")));
         tiles.Children.Add(Tile(versions.Count > 0 ? versions.Count.ToString() : "—", I18n.T("mt.stats.versions")));
         tiles.Children.Add(Tile(stat is null ? "—" : $"{stat.Avg:0.0} ★", I18n.T("mt.stats.rating", ("n", stat?.Count ?? 0))));
-        tiles.Children.Add(Tile(first is null ? "—" : first.Value.ToLocalTime().ToString("dd.MM.yyyy"), I18n.T("mt.stats.first")));
+        tiles.Children.Add(Tile(first is null ? "—" : first.Value.ToLocalTime().ToString("d", I18n.Culture), I18n.T("mt.stats.first")));
         tiles.Children.Add(Tile(mod.UpdatedAt is null ? "—" : Ui.Ago(mod.UpdatedAt), I18n.T("mt.stats.updated")));
         var col = Ui.Col(14, Ui.Text(I18n.T("mt.stats"), "h2"), tiles);
 
@@ -206,7 +202,7 @@ public sealed partial class ModPage
                 n.HorizontalAlignment = HorizontalAlignment.Right;
                 Grid.SetColumn(n, 2);
                 grid.Children.Add(n);
-                ToolTip.SetTip(grid, $"{v.Version}: {v.Downloads:N0} · {(v.Date is null ? "" : v.Date.Value.ToLocalTime().ToString("dd.MM.yyyy"))}");
+                ToolTip.SetTip(grid, $"{v.Version}: {v.Downloads:N0} · {(v.Date is null ? "" : v.Date.Value.ToLocalTime().ToString("d", I18n.Culture))}");
                 bars.Children.Add(grid);
             }
             col.Children.Add(Ui.Text(I18n.T("mt.stats.perVersion"), "h3"));

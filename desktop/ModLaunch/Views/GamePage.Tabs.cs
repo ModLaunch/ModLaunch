@@ -61,6 +61,10 @@ public sealed partial class GamePage
             list.Children.Add(new Border { Background = Ui.Res("Surface2"), CornerRadius = new CornerRadius(12), Padding = new Thickness(14, 10), Child = row });
         }
         col.Children.Add(Ui.Card(Ui.Col(14, Ui.Text(I18n.T("prof.title"), "h2"), Ui.Text(I18n.T("prof.hint"), "muted"), bar, list), 22));
+        // Код сборки (Thunderstore), история «как было», перенос из r2modman и Gale.
+        if (Features.ProfileCode.Supported(_g.Def)) col.Children.Add(ShareCard());
+        if (ManagersCard() is { } managers) col.Children.Add(managers);
+        if (HistoryCard() is { } history) col.Children.Add(history);
 
         col.Children.Add(Ui.Card(Ui.Col(14,
             Ui.Text(I18n.T("pack.title"), "h2"),
@@ -75,6 +79,7 @@ public sealed partial class GamePage
     {
         try
         {
+            Snapshots.Take(_g, "profile");
             var (on, off, missing) = Profiles.Apply(_g.Def.Id, name, _g.Registry!);
             Mods.Installer.SyncPreset(_g.Registry!, null);
             MainWindow.Current?.Toast(missing > 0
@@ -84,6 +89,7 @@ public sealed partial class GamePage
         catch (Exception e) { MainWindow.Current?.Toast(Jobs.Explain(e), bad: true); }
         _missing = null;
         AppState.Notify();
+        OfferProfileFix(name);
     }
 
     void Overwrite(string name)
@@ -168,6 +174,7 @@ public sealed partial class GamePage
         var go = Ui.Button(I18n.T("pack.installN." + I18n.Plural(n, "one", "few", "many"), ("n", n)), async () =>
         {
             w.CloseDialog();
+            Snapshots.Take(g, "import");
             var ids = toInstall.Select(m => g.Def.CatalogId(m.Id)!).ToList();
             var mods = Program.Demo ? Demo.Many(g.Def, ids) : await Catalog.Many(g.Def, ids);
             await Actions.InstallQueue(g, pack.Name, mods.Select(m => (m, (Pin?)null)).ToList());
@@ -220,7 +227,7 @@ public sealed partial class GamePage
             col.Children.Add(Ui.Card(Ui.Col(6, Ui.Text(I18n.T("bak.empty"), "h3"), Ui.Text(I18n.T("bak.empty.text"), "muted", wrap: true)), 22));
         foreach (var b in items)
         {
-            var text = Ui.Col(4, Ui.Text(b.At.ToString("d MMMM yyyy, HH:mm", System.Globalization.CultureInfo.GetCultureInfo(I18n.Lang == "en" ? "en-US" : "ru-RU")), "h3"),
+            var text = Ui.Col(4, Ui.Text(b.At.ToString("d MMMM yyyy, HH:mm", I18n.Culture), "h3"),
                 Ui.Text($"{I18n.T("bak.reason." + b.Reason)} · {Size(b.Size)}", "small muted"));
             text.VerticalAlignment = VerticalAlignment.Center;
             var name = b.Name;
@@ -296,7 +303,7 @@ public sealed partial class GamePage
             col.Children.Add(Ui.Text(I18n.T("log.none"), "muted", wrap: true));
             return Ui.Card(col, 22);
         }
-        col.Children.Add(Ui.Text(I18n.T("log.updated", ("time", report.Modified?.ToString("g", System.Globalization.CultureInfo.GetCultureInfo(I18n.Lang == "en" ? "en-US" : "ru-RU")) ?? "")) + " · " + report.Path, "small muted", wrap: true));
+        col.Children.Add(Ui.Text(I18n.T("log.updated", ("time", report.Modified?.ToString("g", I18n.Culture) ?? "")) + " · " + report.Path, "small muted", wrap: true));
 
         // Переключатель: «виновники» или весь лог с поиском (как в Modrinth App).
         var modes = Ui.Row(6,

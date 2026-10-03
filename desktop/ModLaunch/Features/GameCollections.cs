@@ -22,7 +22,8 @@ public static class GameCollections
     {
         var list = List(name);
         var hit = list.FirstOrDefault(x => x?.ToString() == game);
-        if (hit is not null) list.Remove(hit); else list.Add(game);
+        // JsonValue.Create — без отражения: в урезанной сборке list.Add(строка) падал при сохранении.
+        if (hit is not null) list.Remove(hit); else list.Add(JsonValue.Create(game));
         Settings.Save();
     }
 
@@ -39,7 +40,22 @@ public static class GameCollections
     public static void ToggleHidden(string game)
     {
         var hit = Hidden.FirstOrDefault(x => x?.ToString() == game);
-        if (hit is not null) Hidden.Remove(hit); else Hidden.Add(game);
+        if (hit is not null) Hidden.Remove(hit); else Hidden.Add(JsonValue.Create(game));
         Settings.Save();
+    }
+
+    [SelfTest]
+    static string TogglesAndSaves()
+    {
+        const string game = "selftest-game";
+        Toggle(Favorites, game);
+        ToggleHidden(game);
+        // Так программа пишет настройки на диск: в урезанной сборке здесь и падало.
+        var text = Settings.Data.ToJsonString();
+        if (!IsFavorite(game) || !IsHidden(game) || !text.Contains(game)) throw new Exception("not saved");
+        Toggle(Favorites, game);
+        ToggleHidden(game);
+        if (IsFavorite(game) || IsHidden(game)) throw new Exception("not removed");
+        return "favorite and hidden toggled, settings serialize";
     }
 }

@@ -1,4 +1,4 @@
-using System.Text.Json.Nodes;
+﻿using System.Text.Json.Nodes;
 using Avalonia.Controls;
 using Avalonia.Threading;
 using ModLaunch.Core;
@@ -13,7 +13,7 @@ namespace ModLaunch.Views;
 public sealed record Pin(long FileId, string Version, string? FileName);
 
 /// <summary>Действия, общие для нескольких экранов: установка, запуск, загрузчик, nxm, коллекции.</summary>
-public static class Actions
+public static partial class Actions
 {
     public static readonly HashSet<string> Installing = [];
 
@@ -49,7 +49,26 @@ public static class Actions
     }
 
     /// <summary>Установить мод из каталога (с зависимостями). Возвращает задачу, чтобы коллекции ставились по очереди.</summary>
-    public static Task Install(GameState g, ModInfo mod, Pin? pin = null, bool reinstall = false)
+    public static Task Install(GameState g, ModInfo mod, Pin? pin = null, bool reinstall = false, bool batch = false)
+    {
+        // Мод для другого загрузчика: сначала спрашиваем. Очереди (профили, коды, импорт) не спрашивают — такой мод там пропускается с понятным сообщением.
+        if (!batch && mod.Source == "thunderstore" && !Features.Compat.Confirmed.Contains(mod.Id) && Features.Compat.Foreign(g.Def, mod.Dependencies) is { } loader)
+        {
+            var asked = new TaskCompletionSource();
+            W.Dialog(I18n.T("compat.foreign.title"), Ui.Text(I18n.T("compat.foreign.text", ("mod", mod.Name), ("loader", loader), ("game", g.Def.Name)), wrap: true),
+                Ui.Button(I18n.T("common.cancel"), () => { W.CloseDialog(); asked.TrySetResult(); }),
+                Ui.Button(I18n.T("compat.foreign.go"), () =>
+                {
+                    W.CloseDialog();
+                    Features.Compat.Confirmed.Add(mod.Id);
+                    Start(g, mod, pin, reinstall).ContinueWith(_ => asked.TrySetResult());
+                }, "primary"));
+            return asked.Task;
+        }
+        return Start(g, mod, pin, reinstall);
+    }
+
+    static Task Start(GameState g, ModInfo mod, Pin? pin, bool reinstall)
     {
         if (g.Path is null || g.Registry is null || NeedLoader(g)) return Task.CompletedTask;
         var registry = g.Registry;
@@ -58,8 +77,12 @@ public static class Actions
         AppState.Notify();
 
         var done = new TaskCompletionSource();
+        var again = false;
         var job = Jobs.Run(mod.Name, g.Def.Name, async (job, progress, ct) =>
         {
+            // «Повторить»: мод снова «ставится»; если его уже ставит другая задача — не пишем в ту же папку вдвоём.
+            if (again && !Installing.Add(key)) throw new InvalidOperationException(I18n.T("dl.busy"));
+            again = true;
             try
             {
                 if (mod.Source == "nexus") await InstallNexus(g, registry, mod.Id, mod.Name, pin, job, progress, ct, withDeps: pin is null);
@@ -74,6 +97,8 @@ public static class Actions
         {
             if (j != job) return;
             Jobs.Finished -= OnFinished;
+            // Отменённая в очереди задача не запускалась — отметку «ставится» снимаем здесь.
+            if (Installing.Remove(key)) AppState.Notify();
             done.TrySetResult();
         }
         Jobs.Finished += OnFinished;
@@ -154,6 +179,7 @@ public static class Actions
     static async Task<object> WaitFromBrowser(GameState g, string modId, string name, long fileId, Job job, IProgress<InstallStep> progress, CancellationToken ct)
     {
         var page = Nexus.FilePageUrl(g.Def.NexusDomain!, modId, fileId);
+        job.Link = page;
         var waitKey = $"{g.Def.Id}:{modId}";
         var tcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
         lock (BrowserWaits) BrowserWaits[waitKey] = tcs;
@@ -168,6 +194,7 @@ public static class Actions
         finally
         {
             stop.Cancel();
+            job.Link = null;
             lock (BrowserWaits) BrowserWaits.Remove(waitKey);
             await Dispatcher.UIThread.InvokeAsync(W.CloseDialog);
         }
@@ -210,7 +237,10 @@ public static class Actions
             return;
         }
         var registry = g.Registry;
-        Jobs.Run($"Nexus #{parsed.ModId}", g.Def.Name, async (job, progress, ct) =>
+        // Этот мод ждёт окно «скачай в браузере» — его задача уже заняла место в очереди, поэтому не ждём очереди.
+        bool awaited;
+        lock (BrowserWaits) awaited = BrowserWaits.ContainsKey($"{g.Def.Id}:{parsed.ModId}");
+        Jobs.Run($"Nexus #{parsed.ModId}", g.Def.Name, now: awaited, work: async (job, progress, ct) =>
         {
             progress.Report(new InstallStep("install.deps", $"#{parsed.ModId}"));
             var info = await Nexus.FileInfo(parsed.Domain, parsed.ModId, parsed.FileId, apiKey, ct);
@@ -255,7 +285,7 @@ public static class Actions
             var (mod, pin) = items[i];
             if (IsInstalled(g, mod.Id)) { done++; continue; }
             W.Toast(I18n.T("coll.run", ("name", title), ("i", i + 1), ("n", items.Count)));
-            await Install(g, mod, pin);
+            await Install(g, mod, pin, batch: true);
             if (IsInstalled(g, mod.Id)) done++; else failed.Add(mod.Name);
         }
         if (run.IsCancellationRequested) W.Toast(I18n.T("coll.stopped", ("done", done), ("n", items.Count)));
@@ -271,30 +301,87 @@ public static class Actions
     public static async void InstallFromFile(GameState g)
     {
         if (g.Registry is null || NeedLoader(g)) return;
-        var file = await W.PickFile(I18n.T("dialog.pickArchive"));
-        if (file is null) return;
-        var registry = g.Registry;
-        Jobs.Run(Path.GetFileNameWithoutExtension(file), g.Def.Name, async (_, progress, ct) =>
-        {
-            progress.Report(new InstallStep("install.extract", Path.GetFileName(file)));
-            await Installer.InstallAny(registry, file, new JsonObject { ["source"] = "file", ["name"] = Path.GetFileNameWithoutExtension(file) }, progress, ct);
-        });
+        // Можно выбрать несколько архивов и .dll сразу; папку — перетащить в окно.
+        var files = await W.PickModFiles(I18n.T("dialog.pickArchive"));
+        if (files.Count > 0) InstallLocal(g, files);
     }
 
-    public static void Play(GameState g)
+    /// <summary>
+    /// «Играть»: экран запуска с шагами и галочками (если окно на виду и анимации включены),
+    /// иначе — сразу запуск и короткое уведомление.
+    /// </summary>
+    public static void Play(GameState g, bool animate = true, bool vanilla = false, bool skipCheck = false, bool skipUpdate = false)
     {
         if (g.Path is null) return;
+        // Minecraft играется через официальный лаунчер выбранной сборкой (загрузчик ставится сам).
+        if (g.Def.IsMinecraft) { MinecraftPage.Play(); return; }
+        if (Launcher.IsRunning(g.Def.Id)) { W.Toast(I18n.T("launch.already")); return; }
+        // Моды игры сейчас обновляются (например, сами после запуска программы) — игра заняла бы файлы посреди замены.
+        if (UpdatingGame(g)) { W.Toast(I18n.T("upd.wait"), bad: true); return; }
+        // «Обновлять перед игрой» (Настройки → Обновления): сначала свежие версии модов.
+        if (!vanilla && !skipUpdate && ModUpdates.BeforePlay && !Program.Demo && g.Registry is not null) { _ = UpdateThenPlay(g, animate); return; }
+        var visible = W.IsVisible && W.WindowState != WindowState.Minimized;
+        // Перед запуском — быстрая проверка игры: не хватает зависимостей, выключена нужная библиотека…
+        if (!vanilla && !skipCheck && visible && Health.BeforePlay && Health.Blockers(g) is { Count: > 0 } blockers)
+        {
+            PlayGate(g, blockers, animate);
+            return;
+        }
+        if (!animate || !Animate.On || !visible)
+        {
+            var r = StartGame(g, vanilla);
+            if (!r.Ok) { W.Toast(r.Error ?? "", bad: true); return; }
+            W.Toast(I18n.T(vanilla ? "vanilla.launched" : "toast.launched") + (r.Backup is null ? "" : " · " + I18n.T("bak.created")));
+            AfterLaunch();
+            return;
+        }
+        var screen = W.ShowLaunch(g);
+        screen.Closed += () => { if (Launcher.IsRunning(g.Def.Id)) AfterLaunch(); };
+        _ = screen.RunAsync(() => StartGame(g, vanilla));
+    }
+
+    /// <summary>«Нашли 2 проблемы»: исправить, играть всё равно или без модов.</summary>
+    static void PlayGate(GameState g, List<HealthIssue> blockers, bool animate)
+    {
+        var list = Ui.Col(8);
+        foreach (var b in blockers.Take(4))
+            list.Children.Add(new Border
+            {
+                Background = Ui.Res("Surface2"), CornerRadius = new Avalonia.CornerRadius(12), Padding = new Avalonia.Thickness(14, 10),
+                Child = Ui.Col(3, Ui.Row(8, Ui.Icon(Icons.Alert, 15, Ui.Res("Bad")), Ui.Text(b.Title, "h3")),
+                    Ui.Text(b.Text, "small muted", wrap: true)),
+            });
+        var n = blockers.Count;
+        var actions = new List<Control>
+        {
+            Ui.Button(I18n.T("gate.anyway"), () => { W.CloseDialog(); Play(g, animate, skipCheck: true, skipUpdate: true); }, "ghost"),
+        };
+        if (g.Path is not null && Vanilla.Supported(g.Def, g.Path))
+            actions.Add(Ui.Button(I18n.T("vanilla.play"), () => { W.CloseDialog(); Play(g, animate, vanilla: true, skipUpdate: true); }, "", Icons.Play));
+        actions.Add(Ui.Button(I18n.T("gate.fix"), () => { W.CloseDialog(); W.Navigate(() => new GamePage(g.Def.Id, "health")); }, "primary", Icons.Wrench));
+        W.Dialog(I18n.T("gate.title." + I18n.Plural(n, "one", "few", "many"), ("n", n)),
+            Ui.Col(12, Ui.Text(I18n.T("gate.text", ("game", g.Def.Name)), "muted", wrap: true), list), actions.ToArray());
+    }
+
+    /// <summary>Запустить игру; ошибку вернуть текстом, а не исключением.</summary>
+    static LaunchScreen.Result StartGame(GameState g, bool vanilla = false)
+    {
         try
         {
-            var backup = Launcher.Launch(g.Def, g.Path);
+            var backup = Launcher.Launch(g.Def, g.Path!, vanilla);
             if (g.Registry is not null) try { Social.PlayLog.NoteLaunch(g.Def, g.Registry); } catch { }
             Social.Friends.SetActivity("playing", g.Def.Id, g.Def.Name);
             OverlayWindow.OnGameStarted(g.Def.Id);
-            W.Toast(I18n.T("toast.launched") + (backup is null ? "" : " · " + I18n.T("bak.created")));
-            if (Settings.Data.Str("afterLaunch") == "minimize") W.WindowState = WindowState.Minimized;
+            GameHintWindow.ShowFor(g.Def.Name);
             AppState.Notify();
+            return new LaunchScreen.Result(true, backup, null);
         }
-        catch (Exception e) { W.Toast(Jobs.Explain(e), bad: true); }
+        catch (Exception e) { return new LaunchScreen.Result(false, null, Jobs.Explain(e)); }
+    }
+
+    static void AfterLaunch()
+    {
+        if (Settings.Data.Str("afterLaunch") == "minimize") W.WindowState = WindowState.Minimized;
     }
 
     public static void OpenFolder(string? path)

@@ -235,6 +235,8 @@ public static class SelfCheck
         await Check("installer", async () =>
         {
             if (!OperatingSystem.IsWindows()) return "skipped (not Windows)";
+            // Проверка ставит копию во временную папку и не должна трогать настоящий реестр и ярлыки человека.
+            Environment.SetEnvironmentVariable("MODLAUNCH_SETUP_TEST", "1");
             var target = Path.Combine(root, "Programs", "ModLaunch");
             var result = await Setup.Installer.Install(target, desktop: false, new Progress<(string, double)>(_ => { }));
             if (!File.Exists(result.Exe) || !File.Exists(Path.Combine(target, Setup.Installer.Marker))) throw new Exception("files missing");
@@ -242,11 +244,7 @@ public static class SelfCheck
             if (inspected.Kind != Setup.Installer.TargetKind.Ours) throw new Exception("not recognised as ours");
             var again = await Setup.Installer.Install(target, desktop: false, new Progress<(string, double)>(_ => { }));
             if (!again.Updated) throw new Exception("second install should be an update");
-            using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\ModHub");
-            var uninstall = key?.GetValue("UninstallString") as string ?? throw new Exception("no uninstall entry");
-            var link = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "ModLaunch.lnk");
-            if (!File.Exists(link)) throw new Exception("no start menu shortcut");
-            return $"installed {new FileInfo(result.Exe).Length / 1048576} MB, updated in place, uninstall: {uninstall}";
+            return $"installed {new FileInfo(result.Exe).Length / 1048576} MB, updated in place";
         });
         await Check("pe + hotkey parse", () =>
         {
@@ -505,6 +503,10 @@ public static class SelfCheck
             for (var i = 0; i < 3; i++) pad.Tick();
             return Task.FromResult(pad.Connected ? "gamepad connected" : "no gamepad (expected on CI), polling is safe");
         });
+
+        // Быстрые проверки функций без сети (те же, что в --selftest).
+        foreach (var m in Hooks.Marked<SelfTestAttribute>())
+            await Check($"{m.DeclaringType!.Name}.{m.Name}", () => Task.FromResult(m.Invoke(null, null)?.ToString() ?? ""));
 
         Console.WriteLine(failed == 0 ? "ALL OK" : $"{failed} FAILED");
         return failed == 0 ? 0 : 1;

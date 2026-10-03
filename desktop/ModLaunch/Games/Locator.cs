@@ -218,6 +218,7 @@ public static class Locator
     public static Task<Located?> Locate(GameDef game, bool deep = false, IProgress<string>? progress = null, CancellationToken ct = default) =>
         Task.Run(() =>
         {
+            if (game.IsMinecraft) return Minecraft.Mc.Locate() is string mc ? new Located(mc, "minecraft") : null;
             var libraries = SteamLibraries();
             if (FindSteamApp(game.SteamAppId, libraries) is string steam) return new Located(steam, "steam");
             foreach (var library in libraries)
@@ -235,6 +236,7 @@ public static class Locator
     public static string? Validate(GameDef game, string dir)
     {
         if (!Directory.Exists(dir)) return "err.pathNotExists";
+        if (game.IsMinecraft) return Minecraft.Mc.LooksLikeRoot(dir) ? null : "mine.err.notRoot";
         if (game.MatchesSignature(dir)) return null;
         if (GameCatalog.All.Any(g => g != game && g.MatchesSignature(dir))) return "err.notGameFolder";
         if (game.Executables.Any(e => File.Exists(Path.Combine(dir, e)))) return null;

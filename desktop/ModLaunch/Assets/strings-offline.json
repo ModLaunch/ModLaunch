@@ -1,0 +1,16 @@
+{
+  "ru": {
+    "offline.title": "Офлайн-режим",
+    "offline.hint": "Выключает интернет для ModLaunch: каталоги, обновления и скачивание. Игры, установленные моды и архив загрузок работают как обычно.",
+    "offline.on": "Офлайн-режим включён",
+    "offline.off": "Офлайн-режим выключен",
+    "offline.err": "Включён офлайн-режим, интернет не используется. Выключи его в Настройки → Система."
+  },
+  "en": {
+    "offline.title": "Offline mode",
+    "offline.hint": "Turns the internet off for ModLaunch: catalogs, updates and downloads. Games, installed mods and the download archive work as usual.",
+    "offline.on": "Offline mode is on",
+    "offline.off": "Offline mode is off",
+    "offline.err": "Offline mode is on, the internet is not used. Turn it off in Settings → System."
+  }
+}

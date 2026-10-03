@@ -1,4 +1,4 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
@@ -10,7 +10,7 @@ using ModLaunch.Sources;
 namespace ModLaunch.Views;
 
 /// <summary>Настройки: те же разделы и те же ключи settings.json, что в 3.x.</summary>
-public sealed class SettingsPage : Page
+public sealed partial class SettingsPage : Page
 {
     string _tab;
     string? _keyStatus;
@@ -25,31 +25,115 @@ public sealed class SettingsPage : Page
 
     public override string Title => I18n.T("nav.settings");
 
+    /// <summary>Разделы настроек по группам: id, название, иконка, цвет значка.</summary>
+    static readonly (string Group, (string Id, string Key, string Icon, string Color)[] Items)[] Groups =
+    [
+        ("set.g.personal", [
+            ("look", "settings.tab.look", Icons.Palette, "#A78BFA"),
+            ("interface", "look.tab.interface", Icons.Layers, "#60A5FA"),
+        ]),
+        ("set.g.games", [
+            ("games", "settings.tab.games", Icons.Gamepad, "#34D399"),
+            ("launch", "settings.tab.launch", Icons.Play, "#22C55E"),
+            ("backups", "settings.tab.backups", Icons.Shield, "#2DD4BF"),
+            ("graphics", "settings.tab.graphics", Icons.Sparkles, "#F472B6"),
+        ]),
+        ("set.g.system", [
+            ("system", "sys.tab", Icons.Settings, "#94A3B8"),
+            ("downloads", "settings.tab.downloads", Icons.Download, "#38BDF8"),
+            ("updates", "settings.tab.updates", Icons.ArrowUp, "#FBBF24"),
+            ("services", "svc.title", Icons.Server, "#22D3EE"),
+        ]),
+        ("set.g.account", [
+            ("accounts", "settings.tab.accounts", Icons.Key, "#FB923C"),
+            ("about", "settings.tab.about", Icons.Star, "#F87171"),
+        ]),
+    ];
+
+    string _filter = "";
+
+    static Border Badge(string icon, string color, double size)
+    {
+        // «Студия»: значки монохромные — цвет не спорит с текстом.
+        if (Look.Studio) return new Border { Width = size, Height = size, CornerRadius = new CornerRadius(size * 0.26), Background = Ui.Res("Surface2"), BorderBrush = Ui.Res("Line"), BorderThickness = new Thickness(1), Child = Ui.Icon(icon, size * 0.46, Ui.Res("Text")), VerticalAlignment = VerticalAlignment.Center };
+        var c = Color.Parse(color);
+        return new Border
+        {
+            Width = size, Height = size, CornerRadius = new CornerRadius(size * 0.32),
+            Background = new LinearGradientBrush
+            {
+                StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
+                GradientStops = { new GradientStop(Color.FromArgb(70, c.R, c.G, c.B), 0), new GradientStop(Color.FromArgb(30, c.R, c.G, c.B), 1) },
+            },
+            BorderBrush = new SolidColorBrush(Color.FromArgb(60, c.R, c.G, c.B)), BorderThickness = new Thickness(1),
+            Child = Ui.Icon(icon, size * 0.48, new SolidColorBrush(c)),
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+    }
+
     public override void Build()
     {
-        var tabs = new StackPanel { Spacing = 4, Width = 230 };
-        foreach (var (id, key, icon) in new[]
+        // ---- боковое меню: поиск, группы, пункты с иконкой и подписью
+        var nav = new StackPanel { Spacing = 2 };
+        var search = new TextBox { Watermark = I18n.T("set.search"), Text = _filter, Margin = new Thickness(4, 0, 4, 10) };
+        search.InnerLeftContent = new Border { Padding = new Thickness(10, 0, 2, 0), Child = Ui.Icon(Icons.Search, 15, Ui.Res("Muted")) };
+        var navItems = new StackPanel { Spacing = 2 };
+        void FillNav()
         {
-            ("look", "settings.tab.look", Icons.Palette),
-            ("interface", "look.tab.interface", Icons.Layers),
-            ("system", "sys.tab", Icons.Settings),
-            ("games", "settings.tab.games", Icons.Folder),
-            ("launch", "settings.tab.launch", Icons.Play),
-            ("backups", "settings.tab.backups", Icons.Shield),
-            ("downloads", "settings.tab.downloads", Icons.Download),
-            ("graphics", "settings.tab.graphics", Icons.Sparkles),
-            ("updates", "settings.tab.updates", Icons.ArrowUp),
-            ("accounts", "settings.tab.accounts", Icons.Key),
-            ("about", "settings.tab.about", Icons.Star),
-        })
-        {
-            var b = Ui.Button(I18n.T(key), () => { _tab = id; Build(); }, "tab", icon);
-            b.HorizontalAlignment = HorizontalAlignment.Stretch;
-            b.HorizontalContentAlignment = HorizontalAlignment.Left;
-            if (_tab == id) b.Classes.Add("active");
-            tabs.Children.Add(b);
+            navItems.Children.Clear();
+            var q = (search.Text ?? "").Trim();
+            foreach (var (group, items) in Groups)
+            {
+                var shown = items.Where(i => q == "" || I18n.T(i.Key).Contains(q, StringComparison.OrdinalIgnoreCase) || I18n.T("set.d." + i.Id).Contains(q, StringComparison.OrdinalIgnoreCase) || SearchHit(i.Id, q)).ToList();
+                if (shown.Count == 0) continue;
+                var caption = Ui.Text(Look.Studio ? I18n.T(group) : I18n.T(group).ToUpperInvariant(), "small muted");
+                caption.FontWeight = FontWeight.Bold;
+                caption.FontSize = 11;
+                caption.Margin = new Thickness(12, navItems.Children.Count == 0 ? 2 : 14, 0, 6);
+                navItems.Children.Add(caption);
+                foreach (var (id, key, icon, color) in shown)
+                {
+                    var tab = id;
+                    var active = _tab == id;
+                    var words = Ui.Col(1, Ui.Text(I18n.T(key), "", size: 13.5), Ui.Text(I18n.T("set.d." + id), "small muted"));
+                    ((TextBlock)words.Children[0]).FontWeight = active ? FontWeight.Bold : FontWeight.SemiBold;
+                    ((TextBlock)words.Children[1]).TextTrimming = TextTrimming.CharacterEllipsis;
+                    ((TextBlock)words.Children[1]).FontSize = 11.5;
+                    words.VerticalAlignment = VerticalAlignment.Center;
+                    var b = new Button
+                    {
+                        Classes = { "tab" }, Padding = new Thickness(8, 7), HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Left,
+                        Content = Ui.Row(11, Badge(icon, color, 34), words),
+                    };
+                    if (active) b.Classes.Add("active");
+                    b.Click += (_, _) => { _tab = tab; _filter = search.Text ?? ""; Build(); };
+                    navItems.Children.Add(b);
+                }
+            }
+            if (navItems.Children.Count == 0) navItems.Children.Add(Ui.Text(I18n.T("cr.lib.none"), "small muted"));
         }
+        search.TextChanged += (_, _) => FillNav();
+        search.KeyDown += (_, e) =>
+        {
+            if (e.Key != Avalonia.Input.Key.Enter) return;
+            var first = Groups.SelectMany(g => g.Items).FirstOrDefault(i => I18n.T(i.Key).Contains(search.Text ?? "", StringComparison.OrdinalIgnoreCase) || SearchHit(i.Id, search.Text ?? ""));
+            if (first.Id is not null) { _tab = first.Id; _filter = search.Text ?? ""; Build(); }
+        };
+        FillNav();
 
+        var logo = new Image { Source = Images.Asset("icon.png", 64), Width = 38, Height = 38 };
+        var who = Ui.Col(1, Ui.Text("ModLaunch", "h3"), Ui.Text(I18n.T("upd.app.version", ("version", Http.Version)), "small muted"));
+        who.VerticalAlignment = VerticalAlignment.Center;
+        var head = Ui.Row(10, logo, who);
+        head.Margin = new Thickness(8, 4, 8, 14);
+        nav.Children.Add(head);
+        nav.Children.Add(search);
+        nav.Children.Add(navItems);
+        var side = Ui.Card(new ScrollViewer { Content = nav, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled }, 10);
+        side.Width = 278;
+        side.Margin = new Thickness(34, 26, 0, 26);
+
+        // ---- содержимое раздела
         Control body = _tab switch
         {
             "games" => GamesTab(),
@@ -62,9 +146,9 @@ public sealed class SettingsPage : Page
             "about" => AboutTab(),
             "interface" => InterfaceTab(),
             "system" => SystemTab(),
+            "services" => ServicesTab(),
             _ => LookTab(),
         };
-
         // На широком окне разделы встают в две колонки «кирпичиками».
         if (body is StackPanel { Children.Count: > 1 } stack)
         {
@@ -74,24 +158,52 @@ public sealed class SettingsPage : Page
             foreach (var c in items) masonry.Children.Add(c);
             body = masonry;
         }
-        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*"), ColumnSpacing = 24, Margin = new Thickness(34, 26, 34, 34), MaxWidth = 1800 };
-        var side = Ui.Card(tabs, 10);
-        side.VerticalAlignment = VerticalAlignment.Top;
+
+        var current = Groups.SelectMany(g => g.Items).FirstOrDefault(i => i.Id == _tab);
+        if (current.Id is null) current = Groups[0].Items[0];
+        var title = new TextBlock { Text = I18n.T(current.Key), FontSize = 30, FontWeight = FontWeight.Bold };
+        var titleWords = Ui.Col(4, title, Ui.Text(I18n.T("set.d." + current.Id + ".long"), "muted", wrap: true));
+        titleWords.VerticalAlignment = VerticalAlignment.Center;
+        var pageHead = new DockPanel { Margin = new Thickness(0, 0, 0, 6) };
+        var crumbs = Ui.Text(I18n.T(Groups.First(g => g.Items.Any(i => i.Id == current.Id)).Group), "small muted");
+        crumbs.VerticalAlignment = VerticalAlignment.Top;
+        DockPanel.SetDock(crumbs, Dock.Right);
+        pageHead.Children.Add(crumbs);
+        pageHead.Children.Add(Ui.Row(16, Badge(current.Icon, current.Color, 56), titleWords));
+
+        var right = new StackPanel { Spacing = 18, Margin = new Thickness(24, 26, 34, 34), MaxWidth = 1500 };
+        right.Children.Add(pageHead);
+        right.Children.Add(body);
+        Animate.From(right, "none", 180);
+
+        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*") };
         grid.Children.Add(side);
-        Grid.SetColumn(body, 1);
-        grid.Children.Add(body);
-        Content = new ScrollViewer { Content = grid, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+        var scroll = new ScrollViewer { Content = right, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+        Grid.SetColumn(scroll, 1);
+        grid.Children.Add(scroll);
+        Content = grid;
     }
+
+    /// <summary>Попадает ли запрос в раздел по ключам его настроек (как в поиске сверху).</summary>
+    static bool SearchHit(string tab, string q) => q.Trim() != "" && SearchMap.Any(m => m.Tab == tab && m.Keys.Any(k => I18n.T(k).Replace((char)160, ' ').Contains(q.Trim(), StringComparison.OrdinalIgnoreCase)));
 
     static Control Section(string title, string? hint, params Control[] rows)
     {
-        var col = Ui.Col(14, Ui.Text(title, "h2"));
+        var marker = new Border { Width = Look.Studio ? 0 : 4, Height = 20, CornerRadius = new CornerRadius(2), Background = Ui.Res("Brand"), VerticalAlignment = VerticalAlignment.Center, IsVisible = !Look.Studio };
+        var col = Ui.Col(14, Ui.Row(10, marker, Ui.Text(title, "h2")));
         if (hint is not null) col.Children.Add(Ui.Text(hint, "muted", wrap: true));
-        col.Children.AddRange(rows);
+        // Между соседними строками-переключателями — тонкая линия, чтобы строки не слипались.
+        Control? prev = null;
+        foreach (var row in rows)
+        {
+            if ((prev is Border { Tag: "toggle" } or DockPanel) && (row is Border { Tag: "toggle" } or DockPanel)) col.Children.Add(new Border { Height = 1, Background = Ui.Res("Line"), Opacity = 0.6 });
+            col.Children.Add(row);
+            prev = row;
+        }
         return Ui.Card(col, 24);
     }
 
-    /// <summary>Строка «название, пояснение — переключатель».</summary>
+    /// <summary>Строка «название, пояснение — переключатель»; вся строка кликабельна и подсвечивается.</summary>
     Control Toggle(string title, string hint, bool value, Action<bool> set)
     {
         var sw = new ToggleSwitch { IsChecked = value, OnContent = "", OffContent = "", MinWidth = 0, VerticalAlignment = VerticalAlignment.Center };
@@ -100,33 +212,47 @@ public sealed class SettingsPage : Page
         DockPanel.SetDock(sw, Dock.Right);
         row.Children.Add(sw);
         row.Children.Add(Ui.Col(3, Ui.Text(title, "h3"), Ui.Text(hint, "small muted", wrap: true)));
-        return row;
+        var box = new Border { Tag = "toggle", Child = row, Padding = new Thickness(10, 8), Margin = new Thickness(-10, -4), CornerRadius = new CornerRadius(12), Background = Brushes.Transparent, Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand) };
+        box.PointerEntered += (_, _) => box.Background = Ui.Res("Surface2");
+        box.PointerExited += (_, _) => box.Background = Brushes.Transparent;
+        box.PointerReleased += (_, e) =>
+        {
+            if (e.Source is Visual v && Avalonia.VisualTree.VisualExtensions.FindAncestorOfType<ToggleSwitch>(v, true) is not null) return;
+            sw.IsChecked = sw.IsChecked != true;
+        };
+        return box;
     }
 
     Control LookTab()
     {
-        var lang = new ComboBox { Width = 240 };
-        lang.Items.Add("Русский");
-        lang.Items.Add("English");
-        lang.SelectedIndex = I18n.Lang == "en" ? 1 : 0;
+        // Первым — «как в системе», дальше все найденные языки (свои переводы из папки languages тоже).
+        var languages = I18n.Available();
+        var lang = new ComboBox { Width = 300 };
+        lang.Items.Add(I18n.T("lang.auto", ("name", languages.FirstOrDefault(l => l.Code == I18n.Detect())?.Native ?? "English")));
+        foreach (var l in languages) lang.Items.Add(l.Coverage < 100 ? $"{l.Native} · {l.Coverage}%" : l.Native);
+        var saved = Settings.Language;
+        lang.SelectedIndex = saved == "auto" ? 0 : Math.Max(0, languages.FindIndex(l => l.Code.Equals(saved, StringComparison.OrdinalIgnoreCase)) + 1);
         lang.SelectionChanged += (_, _) =>
         {
-            var value = lang.SelectedIndex == 1 ? "en" : "ru";
-            if (value == I18n.Lang) return;
+            if (lang.SelectedIndex < 0) return;
+            var value = lang.SelectedIndex == 0 ? "auto" : languages[lang.SelectedIndex - 1].Code;
+            if (value == Settings.Language) return;
             Settings.Language = value;
             I18n.Set(value);
         };
+        var langHint = Ui.Text(I18n.T("lang.hint"), "small muted", wrap: true);
+        var langFolder = Ui.Button(I18n.T("lang.folder"), () => Actions.OpenFolder(Directory.CreateDirectory(Path.Combine(Paths.DataDir, "languages")).FullName), "ghost", Icons.Folder);
         var col = new StackPanel { Spacing = 16 };
-        col.Children.Add(Section(I18n.T("settings.language"), null, lang));
+        col.Children.Add(Section(I18n.T("settings.language"), null, lang, langHint, langFolder));
 
-        // Тема: три карточки-образца.
-        var themes = Ui.Row(12);
+        // Тема: карточки-образцы.
+        var themes = new WrapPanel();
         foreach (var theme in Look.Themes)
         {
-            var (bg, surface, text) = theme switch { "black" => ("#000000", "#131419", "#ECEEF3"), "light" => ("#F4F5F8", "#FFFFFF", "#161922"), _ => ("#0F1116", "#1E222B", "#E8EBF2") };
+            var (bg, surface, text) = Look.Sample(theme);
             var sample = new Border
             {
-                Width = 150, Height = 84, CornerRadius = new CornerRadius(12), Background = Ui.Hex(bg), Padding = new Thickness(10),
+                Width = 150, Height = 84, CornerRadius = new CornerRadius(12), Background = Ui.Hex(bg), Padding = new Thickness(10), Margin = new Thickness(0, 0, 12, 12),
                 BorderThickness = new Thickness(2), BorderBrush = Look.Theme == theme ? Ui.Res("Brand") : Ui.Res("Line"),
                 Child = Ui.Col(6,
                     new Border { Height = 10, Width = 70, CornerRadius = new CornerRadius(5), Background = Ui.Hex(Look.Accent), HorizontalAlignment = HorizontalAlignment.Left },
@@ -140,14 +266,92 @@ public sealed class SettingsPage : Page
         }
         col.Children.Add(Section(I18n.T("look.theme"), I18n.T("look.theme.hint"), themes));
 
+        // Дизайн: «Студия» (строгий) или «Аврора» (живой фон и стекло).
+        var designs = Ui.Row(10);
+        foreach (var dz in Look.Designs)
+        {
+            var d = dz;
+            var card = new Button { Classes = { "card-btn" }, Width = 250, Padding = new Thickness(16), HorizontalContentAlignment = HorizontalAlignment.Left,
+                Content = Ui.Col(4, Ui.Text(I18n.T("look.design." + dz), "h3"), Ui.Text(I18n.T("look.design." + dz + ".text"), "small muted", wrap: true)) };
+            if (Look.Design == dz) { card.BorderBrush = Ui.Res("Text"); card.BorderThickness = new Thickness(2); }
+            card.Click += (_, _) => { Look.SetDesign(d); Build(); };
+            designs.Children.Add(card);
+        }
+        col.Children.Insert(1, Section(I18n.T("look.design"), I18n.T("look.design.hint"), designs));
+
+        // Шрифт, скругление и свечение фона.
+        var font = new ComboBox { Width = 260, ItemsSource = Look.Fonts, SelectedItem = Look.Font };
+        font.SelectionChanged += (_, _) => { if (font.SelectedItem is string f && f != Look.Font) Look.SetFont(f); };
+        var radii = Ui.Row(6);
+        foreach (var r in Look.Radii)
+        {
+            var rr = r;
+            var chip = Ui.Button(I18n.T("look.radius." + r), () => { Look.SetRadius(rr); Build(); }, Look.Radius == r ? "chip active" : "chip");
+            radii.Children.Add(chip);
+        }
+        var backdrops = new WrapPanel();
+        foreach (var bd in Look.Backdrops)
+        {
+            var v = bd;
+            var chip = Ui.Button(I18n.T("look.bg." + bd), () => { Look.SetBackdrop(v); Build(); }, Look.Backdrop == bd ? "chip active" : "chip");
+            chip.Margin = new Thickness(0, 0, 6, 6);
+            backdrops.Children.Add(chip);
+        }
+        var glow = new Slider { Minimum = 0, Maximum = 1, Value = Look.Glow, Width = 260, TickFrequency = 0.1, IsSnapToTickEnabled = true };
+        glow.ValueChanged += (_, e) => Look.SetGlow(e.NewValue);
+        col.Children.Add(Section(I18n.T("look.style"), I18n.T("look.style.hint"),
+            Ui.Col(6, Ui.Text(I18n.T("look.font"), "small muted"), font),
+            Ui.Col(6, Ui.Text(I18n.T("look.radius"), "small muted"), radii),
+            Ui.Col(6, Ui.Text(I18n.T("look.bg"), "small muted"), backdrops),
+            Ui.Col(6, Ui.Text(I18n.T("look.glow"), "small muted"), glow)));
+
+        // Наборы оформления: сохранить, применить, поделиться кодом.
+        var presets = Ui.Col(8);
+        foreach (var (name, code) in Look.Presets())
+        {
+            var n = name;
+            var c = code;
+            var row = new DockPanel();
+            var actions = Ui.Row(6,
+                Ui.Button(I18n.T("look.preset.apply"), () => { Look.Import(c); Build(); }, "primary", Icons.Check),
+                Ui.Button("", () => { Look.DeletePreset(n); Build(); }, "icon ghost", Icons.Trash, I18n.T("ctx.delete")));
+            DockPanel.SetDock(actions, Dock.Right);
+            row.Children.Add(actions);
+            row.Children.Add(Ui.Text(n, "h3"));
+            presets.Children.Add(row);
+        }
+        if (presets.Children.Count == 0) presets.Children.Add(Ui.Text(I18n.T("look.preset.none"), "small muted"));
+        var presetName = new TextBox { Watermark = I18n.T("look.preset.name"), Width = 220, MaxLength = 40 };
+        var shareCode = new TextBox { Watermark = "ML-LOOK:…", Width = 360 };
+        col.Children.Add(Section(I18n.T("look.presets"), I18n.T("look.presets.hint"),
+            presets,
+            Ui.Row(8, presetName, Ui.Button(I18n.T("look.preset.save"), () =>
+            {
+                var n = (presetName.Text ?? "").Trim();
+                if (n == "") return;
+                Look.SavePreset(n);
+                Build();
+            }, "", Icons.Save)),
+            Ui.Row(8, shareCode,
+                Ui.Button(I18n.T("look.share.import"), () =>
+                {
+                    if (Look.Import(shareCode.Text ?? "")) { MainWindow.Current?.Toast(I18n.T("look.share.done")); Build(); }
+                    else MainWindow.Current?.Toast(I18n.T("look.share.bad"), bad: true);
+                }, "", Icons.Download),
+                Ui.Button(I18n.T("look.share.copy"), async () =>
+                {
+                    if (MainWindow.Current?.Clipboard is { } cb) { await cb.SetTextAsync(Look.Export()); MainWindow.Current.Toast(I18n.T("ctx.copied")); }
+                }, "ghost", Icons.List)),
+            Ui.Button(I18n.T("look.reset"), () => { Look.Reset(); MainWindow.Current?.Refresh(); Build(); }, "ghost", Icons.Refresh)));
+
         // Цвет акцента.
-        var accents = Ui.Row(10);
+        var accents = new WrapPanel();
         foreach (var hex in Look.Accents)
         {
             var h = hex;
             var dot = new Button
             {
-                Width = 36, Height = 36, CornerRadius = new CornerRadius(18), Padding = new Thickness(0), Background = Ui.Hex(hex),
+                Width = 36, Height = 36, CornerRadius = new CornerRadius(18), Padding = new Thickness(0), Background = Ui.Hex(hex), Margin = new Thickness(0, 0, 10, 10),
                 BorderThickness = new Thickness(3), BorderBrush = Look.Accent.Equals(hex, StringComparison.OrdinalIgnoreCase) ? Ui.Res("Text") : Brushes.Transparent,
             };
             dot.Click += (_, _) => { Look.SetAccent(h); Build(); };
@@ -210,7 +414,8 @@ public sealed class SettingsPage : Page
         col.Children.Add(Section(I18n.T("look.home"), I18n.T("look.home.hint"),
             Toggle(I18n.T("v4.continue"), I18n.T("v4.continue.text"), Settings.Data.Bool("homeContinue", true), v => Settings.Data["homeContinue"] = v),
             Toggle(I18n.T("home.favorites"), I18n.T("home.favorites.text"), Settings.Data.Bool("homeFavorites", true), v => Settings.Data["homeFavorites"] = v),
-            Toggle(I18n.T("look.home.popular"), I18n.T("look.home.popular.hint"), Settings.Data.Bool("homePopular", true), v => Settings.Data["homePopular"] = v)));
+            Toggle(I18n.T("look.home.popular"), I18n.T("look.home.popular.hint"), Settings.Data.Bool("homePopular", true), v => Settings.Data["homePopular"] = v),
+            Toggle(I18n.T("feed.setting"), I18n.T("feed.setting.hint"), Settings.Data.Bool("catalogFeeds", true), v => Settings.Data["catalogFeeds"] = v)));
 
         // Какие игры показывать и в каком порядке.
         var list = new StackPanel { Spacing = 6 };
@@ -274,6 +479,7 @@ public sealed class SettingsPage : Page
     {
         var col = new StackPanel { Spacing = 16 };
         col.Children.Add(Section(I18n.T("sys.tab"), null,
+            Toggle(I18n.T("offline.title"), I18n.T("offline.hint"), Offline.On, v => { Offline.Set(v); MainWindow.Current?.Toast(I18n.T(v ? "offline.on" : "offline.off")); }),
             Toggle(I18n.T("sys.tray"), I18n.T("sys.tray.hint"), Settings.Data.Bool("closeToTray"), v => { Settings.Data["closeToTray"] = v; Settings.Save(); MainWindow.Current?.UpdateTray(); }),
             Toggle(I18n.T("sys.autostart"), I18n.T("sys.autostart.hint"), Features.Autostart.Enabled, v => Features.Autostart.Set(v)),
             Toggle(I18n.T("sys.minimized"), I18n.T("sys.minimized.hint"), Settings.Data.Bool("startMinimized"), v => Settings.Data["startMinimized"] = v),
@@ -319,24 +525,27 @@ public sealed class SettingsPage : Page
     {
         var q = text.Trim();
         if (q == "") return;
-        var map = new (string Tab, string[] Keys)[]
-        {
-            ("look", ["settings.language", "look.theme", "look.accent", "look.scale", "look.anim", "look.compact"]),
+        var hit = SearchMap.FirstOrDefault(m => m.Keys.Any(k => I18n.T(k).Replace((char)160, ' ').Contains(q, StringComparison.OrdinalIgnoreCase) || k.Contains(q, StringComparison.OrdinalIgnoreCase)));
+        if (hit.Tab is null) { MainWindow.Current?.Toast(I18n.T("sys.search.none", ("q", q))); return; }
+        _tab = hit.Tab;
+        _filter = "";
+        Build();
+    }
+
+    /// <summary>Какие настройки в каком разделе — для поиска.</summary>
+    static readonly (string Tab, string[] Keys)[] SearchMap =
+        [
+            ("look", ["settings.language", "look.theme", "look.accent", "look.scale", "look.anim", "look.compact", "look.font", "look.radius", "look.bg", "look.glow", "look.presets"]),
             ("interface", ["look.start", "look.chrome", "look.home", "look.games", "look.brand", "look.rail"]),
             ("system", ["sys.tray", "sys.autostart", "sys.toast", "sys.transfer", "sys.confirm"]),
             ("games", ["settings.games", "games.deep"]),
             ("launch", ["settings.tab.launch", "ov.title", "launch.args", "launch.time"]),
             ("backups", ["settings.tab.backups", "bak.keep"]),
-            ("downloads", ["v4.archive"]),
+            ("downloads", ["v4.archive", "dl.parallel"]),
             ("graphics", ["settings.tab.graphics"]),
-            ("updates", ["settings.tab.updates"]),
+            ("updates", ["settings.tab.updates", "upd.auto", "upd.beforePlay"]),
             ("accounts", ["settings.tab.accounts", "acc.title"]),
-        };
-        var hit = map.FirstOrDefault(m => m.Keys.Any(k => I18n.T(k).Contains(q, StringComparison.OrdinalIgnoreCase) || k.Contains(q, StringComparison.OrdinalIgnoreCase)));
-        if (hit.Tab is null) { MainWindow.Current?.Toast(I18n.T("sys.search.none", ("q", q))); return; }
-        _tab = hit.Tab;
-        Build();
-    }
+        ];
 
     public override string SearchHint => I18n.T("sys.search");
 
@@ -347,12 +556,13 @@ public sealed class SettingsPage : Page
         {
             var status = g.Status switch
             {
-                Detect.Found => g.Path!,
+                Detect.Found => Ui.ShortPath(g.Path!),
                 Detect.Searching => g.SearchingWhere is null ? I18n.T("games.searching") : I18n.T("games.searchingWhere", ("where", g.SearchingWhere)),
                 Detect.NotFound => I18n.T("games.notDetected"),
                 _ => I18n.T("games.notSearched"),
             };
             var info = Ui.Col(4, Ui.Text(g.Def.Name, "h3"), Ui.Text(status, "small muted"));
+            if (g.Path is not null) ToolTip.SetTip(info, g.Path);
             info.VerticalAlignment = VerticalAlignment.Center;
             var buttons = Ui.Row(6,
                 Ui.Button("", () => Actions.PickGameFolder(g), "icon", Icons.Folder, I18n.T("games.setPath")),
@@ -401,6 +611,8 @@ public sealed class SettingsPage : Page
         if (Settings.Data.Str("afterLaunch") == "minimize")
             rows.Add(Toggle(I18n.T("launch.restore"), I18n.T("launch.restore.hint"), Settings.Data.Bool("restoreAfterGame", true), v => Settings.Data["restoreAfterGame"] = v));
         rows.Add(Toggle(I18n.T("launch.track"), I18n.T("launch.track.hint"), PlayTime.Track, v => Settings.Data["trackPlaytime"] = v));
+        rows.Add(Toggle(I18n.T("crash.setting"), I18n.T("crash.setting.hint"), Settings.Data.Bool("crashHelper", true), v => Settings.Data["crashHelper"] = v));
+        rows.Add(Toggle(I18n.T("set.checkBeforePlay"), I18n.T("set.checkBeforePlay.hint"), Health.BeforePlay, v => Settings.Data["checkBeforePlay"] = v));
         col.Children.Add(Section(I18n.T("settings.tab.launch"), null, rows.ToArray()));
 
         // Оверлей в игре.
@@ -425,6 +637,7 @@ public sealed class SettingsPage : Page
         preview.Children.Add(Ui.Col(3, Ui.Text(I18n.T("ov.preview"), "h3"), Ui.Text(I18n.T("ov.preview.hint"), "small muted")));
         col.Children.Add(Section(I18n.T("ov.title"), null,
             Toggle(I18n.T("ov.on"), I18n.T("ov.on.hint"), Settings.Data.Bool("overlay", true), v => Settings.Data["overlay"] = v),
+            Toggle(I18n.T("launch.hint.setting"), I18n.T("launch.hint.setting.hint"), Settings.Data.Bool("overlayHint", true), v => Settings.Data["overlayHint"] = v),
             keyRow, preview));
 
         // Параметры запуска по играм.
@@ -526,13 +739,19 @@ public sealed class SettingsPage : Page
         DockPanel.SetDock(limit, Dock.Right);
         limitRow.Children.Add(limit);
         limitRow.Children.Add(Ui.Text(I18n.T("v4.archive.limit"), "h3"));
-        return Section(I18n.T("v4.archive"), I18n.T("v4.archive.hint"),
+        var parallel = new NumericUpDown { Minimum = 1, Maximum = 6, Value = Jobs.Limit, Width = 140, FormatString = "0", Increment = 1, VerticalAlignment = VerticalAlignment.Center };
+        parallel.ValueChanged += (_, _) => { Settings.Data["maxParallel"] = (int)(parallel.Value ?? 3); Settings.Save(); Jobs.LimitChanged(); };
+        var parallelRow = new DockPanel();
+        DockPanel.SetDock(parallel, Dock.Right);
+        parallelRow.Children.Add(parallel);
+        parallelRow.Children.Add(Ui.Col(2, Ui.Text(I18n.T("dl.parallel"), "h3"), Ui.Text(I18n.T("dl.parallel.hint"), "small muted", wrap: true)));
+        return Ui.Col(16, Section(I18n.T("dl.title"), null, parallelRow), Section(I18n.T("v4.archive"), I18n.T("v4.archive.hint"),
             Toggle(I18n.T("v4.archive.keep"), I18n.T("v4.archive.hint"), DownloadArchive.Keep, v => Settings.Data["keepArchives"] = v),
             limitRow,
             Ui.Text(I18n.T("v4.archive.size", ("n", count), ("size", GamePage.Size(bytes))), "muted"),
             Ui.Row(10,
                 Ui.Button(I18n.T("games.openFolder"), () => Actions.OpenFolder(DownloadArchive.Root), "", Icons.Folder),
-                Ui.Button(I18n.T("v4.archive.clear"), () => { DownloadArchive.Clear(); MainWindow.Current?.Toast(I18n.T("v4.archive.cleared")); Build(); }, "ghost", Icons.Trash)));
+                Ui.Button(I18n.T("v4.archive.clear"), () => { DownloadArchive.Clear(); MainWindow.Current?.Toast(I18n.T("v4.archive.cleared")); Build(); }, "ghost", Icons.Trash))), StorageSection());
     }
 
     // ---------------------------------------------------------------- DXVK
@@ -617,7 +836,7 @@ public sealed class SettingsPage : Page
         col.Children.Add(chips);
         if (!info.Supported) col.Children.Add(Ui.Text(I18n.T("dxvk.choose.hint"), "small muted", wrap: true));
 
-        var busy = Jobs.All.Any(j => j.Status == JobStatus.Running && j.Title == "DXVK");
+        var busy = Jobs.All.Any(j => j.Active && j.Title == "DXVK");
         var go = Ui.Button(busy ? I18n.T("dxvk.working") : I18n.T("dxvk.install"), () =>
         {
             var exe = info.Exe;
@@ -643,8 +862,10 @@ public sealed class SettingsPage : Page
         var col = new StackPanel { Spacing = 16 };
         col.Children.Add(Section(I18n.T("settings.tab.updates"), null,
             Toggle(I18n.T("upd.onStart"), I18n.T("upd.onStart.hint"), ModUpdates.OnStart, v => Settings.Data["checkModUpdates"] = v),
+            Toggle(I18n.T("upd.auto"), I18n.T("upd.auto.hint"), ModUpdates.Auto, v => Settings.Data["autoUpdateMods"] = v),
+            Toggle(I18n.T("upd.beforePlay"), I18n.T("upd.beforePlay.hint"), ModUpdates.BeforePlay, v => Settings.Data["updateBeforePlay"] = v),
             Ui.Row(10, Ui.Button(I18n.T("upd.checkAll"), CheckAll, "primary", Icons.Refresh)),
-            Ui.Text(I18n.T("upd.checkAll.hint"), "small muted", wrap: true)));
+            Ui.Text(I18n.T("upd.checkAll.hint2"), "small muted", wrap: true)));
 
         var list = new StackPanel { Spacing = 8 };
         var total = 0;
@@ -715,6 +936,22 @@ public sealed class SettingsPage : Page
         nxm.Children.Add(Ui.Col(3, Ui.Text(I18n.T("settings.nxm"), "h3"),
             Ui.Text(registered ? I18n.T("settings.nxm.yes") : I18n.T("settings.nxm.no"), "small", color: registered ? Ui.Res("Good") : Ui.Res("Muted"))));
         rows.Add(nxm);
+
+        // Кнопка Thunderstore «Install with Mod Manager» (ror2mm://) — по желанию: она заберёт её у r2modman.
+        var r2 = Nxm.IsRegistered("ror2mm");
+        var ror = new DockPanel();
+        if (OperatingSystem.IsWindows())
+        {
+            // Взяли кнопку — можно и отдать обратно (прежней программе, например r2modman).
+            var take = r2
+                ? Ui.Button(I18n.T("link.ror2mm.give"), () => { try { Nxm.Unregister("ror2mm"); } catch (Exception e) { MainWindow.Current?.Toast(e.Message, bad: true); } Build(); }, "ghost", Icons.Back)
+                : Ui.Button(I18n.T("link.ror2mm.take"), () => { try { Nxm.Register("ror2mm"); } catch (Exception e) { MainWindow.Current?.Toast(e.Message, bad: true); } Build(); }, "", Icons.Link);
+            DockPanel.SetDock(take, Dock.Right);
+            ror.Children.Add(take);
+        }
+        ror.Children.Add(Ui.Col(3, Ui.Text(I18n.T("link.ror2mm"), "h3"),
+            Ui.Text(r2 ? I18n.T("link.ror2mm.yes") : I18n.T("link.ror2mm.no"), "small", color: r2 ? Ui.Res("Good") : Ui.Res("Muted"), wrap: true)));
+        rows.Add(ror);
         return Ui.Col(16, AccountSection(), Section(I18n.T("settings.nexus"), I18n.T("settings.nexus.hint"), rows.ToArray()));
     }
 
@@ -828,7 +1065,7 @@ public sealed class SettingsPage : Page
         col.Children.Add(Ui.Row(10,
             Ui.Button(I18n.T("acc.signout"), () => { Social.Account.SignOut(); MainWindow.Current?.Toast(I18n.T("acc.signedOut")); Build(); }, "", Icons.Close),
             Ui.Button(I18n.T("acc.delete.title"), DeleteAccount, "ghost", Icons.Trash)));
-        col.Children.Add(Ui.Text(p.Since is DateTime since ? I18n.T("acc.delete.hint", ("since", since.ToString("d"))) : I18n.T("acc.delete.hintPlain"), "small muted"));
+        col.Children.Add(Ui.Text(p.Since is DateTime since ? I18n.T("acc.delete.hint", ("since", since.ToString("d", I18n.Culture))) : I18n.T("acc.delete.hintPlain"), "small muted"));
         return Ui.Card(col, 24);
     }
 

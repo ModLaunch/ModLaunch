@@ -57,3 +57,38 @@ node tools/friends-check.js  # друзья на правилах базы в э
 
 Ключ `apiKey` в `reviews.config.json` публичный по задумке Firebase: доступ
 к данным ограничивают правила базы, а не ключ.
+
+## Маркет Creator Hub: один раз включить на сервере
+
+Маркет (продажа моделей, частей кода, скриптов и ассетов), кошельки и заявки
+на пополнение/вывод живут в той же базе Firebase. Правила из
+[`firebase/market.rules`](../firebase/market.rules) нужно вставить в консоли
+Firebase так же, как правила друзей и Hub, и опубликовать. Именно правила
+сверяют суммы при покупке: цену, комиссию площадки и зачисление продавцу.
+
+- Комиссия площадки: `feePercent` в `desktop/ModLaunch/Assets/market.config.json`
+  и `mFee()` в `firebase/market.rules` — менять обе сразу.
+- `topUpUrl` в том же файле — ссылка на оплату для пополнения (можно с `{uid}`).
+- Деньги площадки копятся в `wallets/_platform`.
+- Пополнения и выплаты подтверждает админ (почта в коллекции `admins`) на
+  странице «Аккаунт → Админ-панель».
+
+## ModLaunch 8.4: сборка, сайт и службы
+
+- **Сборка и установка у себя**: двойной щелчок по `BUILD-8.4.bat` в корне. Он собирает
+  `out/ModLaunch.exe`, кладёт установщик и `update.json` (версия, заметки, sha256) в `site/`
+  и ставит программу в `%LOCALAPPDATA%\Programs\ModLaunch`.
+- **Сайт** (`site/`) загружается на хостинг modlaunchapp.com целиком: там `update.json`
+  (обновления), `ads.json` (реклама), `download/` (установщик) и `advertise.html`.
+- **Обновления**: программа сначала читает `https://modlaunchapp.com/update.json`
+  (адрес — `manifest` в `desktop/ModLaunch/Assets/update.config.json`), при ошибке — «Релизы»
+  GitHub. Принимаются только https и файл `ModLaunch-Setup-x.y.z.exe`, сумма sha256 сверяется.
+- **Реклама**: лента `ads.json` (адрес — `desktop/ModLaunch/Assets/ads.config.json`). Пустая
+  лента — крутятся объявления самого ModLaunch (Hub, Creator Hub, друзья, «разместить рекламу»).
+- **Состояние сервисов**: «Настройки → Система → Состояние сервисов» проверяет отзывы,
+  аккаунты, друзей, Hub, маркет, рекламу и обновления настоящими запросами. Кнопка
+  «Подключить» копирует правила (`Assets/server-rules.txt` = `firebase/friends.rules` +
+  `creations.rules` + `market.rules`) и открывает консоль Firebase. Поменяли правила в
+  `firebase/` — обновите и `server-rules.txt`.
+- **Готовые настройки модов**: `Features/CfgPresets.cs` (встроенные наборы и свои наборы в
+  `%APPDATA%\ModHub\cfg-presets\<игра>`), редактор — `Views/GamePage.Config.cs`.

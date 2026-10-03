@@ -1,0 +1,382 @@
+    // ===== ModLaunch 8.4: друзья, ModLaunch Hub и маркет =====================
+    // Вставить в Firebase → Firestore Database → Правила, ВНУТРЬ блока
+    // match /databases/{database}/documents { … } — рядом с правилами отзывов
+    // и аккаунтов. Если там уже есть старые правила друзей/Hub/маркета —
+    // заменить их этими целиком. Затем «Опубликовать».
+
+    // ── Друзья ModHub 2.1 ────────────────────────────────────────────────
+    // Вставить в консоли Firebase: Firestore Database → Правила, внутрь
+    // блока match /databases/{database}/documents { … }, рядом с правилами
+    // отзывов, и нажать «Опубликовать». Отзывы эти строки не трогают.
+
+    // Друзья — только у аккаунта с почтой (не у безымянной записи).
+    function friendsMember() {
+      return request.auth != null && request.auth.token.get('email', '') != '';
+    }
+    function friendsName(value) {
+      return value is string && value.size() > 0 && value.size() <= 32;
+    }
+
+    // Код друга → uid. Узнать можно только по точному коду: списка кодов нет.
+    match /codes/{code} {
+      allow get: if friendsMember();
+      allow create: if friendsMember()
+        && code.matches('^[A-HJ-NP-Z2-9]{8}$')
+        && request.resource.data.keys().hasOnly(['uid', 'name', 'created'])
+        && request.resource.data.uid == request.auth.uid
+        && friendsName(request.resource.data.name)
+        && request.resource.data.created == request.time;
+      allow delete: if friendsMember() && resource.data.uid == request.auth.uid;
+    }
+
+    // «В сети» и «в игре». Пишет только хозяин, читают по точному uid.
+    match /profiles/{uid} {
+      allow get: if friendsMember();
+      allow create, update: if friendsMember()
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['name', 'code', 'state', 'game', 'gameName', 'app', 'seen', 'since'])
+        && friendsName(request.resource.data.name)
+        && request.resource.data.code is string && request.resource.data.code.size() <= 8
+        && request.resource.data.state in ['online', 'playing', 'offline']
+        && request.resource.data.game is string && request.resource.data.game.size() <= 40
+        && request.resource.data.gameName is string && request.resource.data.gameName.size() <= 60
+        && request.resource.data.app is string && request.resource.data.app.size() <= 20
+        && request.resource.data.seen == request.time
+        && request.resource.data.since is timestamp
+        && request.resource.data.since <= request.time;
+      allow delete: if friendsMember() && request.auth.uid == uid;
+    }
+
+    // Дружба: один документ на пару, его имя — «меньший uid_больший uid».
+    // Запрос «ждёт» (pending), пока второй не примет (accepted).
+    match /friendships/{pair} {
+      allow get, list: if friendsMember() && request.auth.uid in resource.data.users;
+      allow create: if friendsMember()
+        && request.resource.data.keys().hasOnly(['users', 'from', 'to', 'fromName', 'toName', 'status', 'created', 'updated'])
+        && request.resource.data.from == request.auth.uid
+        && request.resource.data.to is string
+        && request.resource.data.to != request.auth.uid
+        && request.resource.data.users == (request.auth.uid < request.resource.data.to
+             ? [request.auth.uid, request.resource.data.to]
+             : [request.resource.data.to, request.auth.uid])
+        && pair == request.resource.data.users[0] + '_' + request.resource.data.users[1]
+        && request.resource.data.status == 'pending'
+        && friendsName(request.resource.data.fromName)
+        && friendsName(request.resource.data.toName)
+        && request.resource.data.created == request.time
+        && request.resource.data.updated == request.time;
+      allow update: if friendsMember()
+        && resource.data.to == request.auth.uid
+        && resource.data.status == 'pending'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'toName', 'updated'])
+        && request.resource.data.status == 'accepted'
+        && friendsName(request.resource.data.toName)
+        && request.resource.data.updated == request.time;
+      allow delete: if friendsMember() && request.auth.uid in resource.data.users;
+    }
+    // ── конец правил друзей ──────────────────────────────────────────────
+
+    // ── ModLaunch Hub (Creator Hub 5.5) ──────────────────────────────────
+    // Вставить в консоли Firebase: Firestore Database → Правила, внутрь
+    // блока match /databases/{database}/documents { … }, рядом с правилами
+    // отзывов и друзей, и нажать «Опубликовать». Если вставляли правила
+    // Creator Hub 5.0 — замените их этими целиком.
+    //
+    // creations — карточки модов (читают все, пишет только автор).
+    // creations/{id}/versions — история версий; /likes — один лайк на человека;
+    // /comments — комментарии. blobs — файлы модов кусками (до 1 МБ на кусок).
+    // reports — жалобы: создать может любой, читает только владелец проекта.
+
+    function hubMember() {
+      return request.auth != null && request.auth.token.get('email', '') != '';
+    }
+    function hubText(value, max) {
+      return value is string && value.size() <= max;
+    }
+    function hubDoc(id) {
+      return /databases/$(database)/documents/creations/$(id);
+    }
+    function hubValid(data) {
+      return data.keys().hasOnly(['uid', 'author', 'name', 'summary', 'description', 'game', 'version', 'kind', 'code',
+                                  'tags', 'images', 'size', 'sha256', 'chunks', 'fileName', 'changelog', 'app',
+                                  'likes', 'downloads', 'comments', 'created', 'updated'])
+        && data.uid == request.auth.uid
+        && hubText(data.author, 32) && data.author.size() > 0
+        && hubText(data.name, 60) && data.name.size() > 0
+        && hubText(data.summary, 200)
+        && hubText(data.description, 5000)
+        && hubText(data.game, 40) && data.game.size() > 0
+        && hubText(data.version, 20) && data.version.matches('^[0-9]+[.][0-9]+[.][0-9]+$')
+        && data.kind in ['script', 'package']
+        && hubText(data.code, 20000)
+        && data.tags is list && data.tags.size() <= 6
+        && data.images is list && data.images.size() <= 6
+        && data.size is int && data.size >= 0 && data.size <= 8388608
+        && hubText(data.sha256, 64)
+        && data.chunks is int && data.chunks >= 0 && data.chunks <= 16
+        && hubText(data.fileName, 120)
+        && hubText(data.changelog, 2000)
+        && hubText(data.app, 20)
+        && data.updated == request.time;
+    }
+    function hubCounters(field) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([field]);
+    }
+
+    match /creations/{id} {
+      allow get, list: if true;
+      allow create: if hubMember()
+        && id.matches('^' + request.auth.uid.lower() + '_[a-z0-9_]{1,60}$')
+        && hubValid(request.resource.data)
+        && request.resource.data.likes == 0
+        && request.resource.data.downloads == 0
+        && request.resource.data.comments == 0
+        && request.resource.data.created == request.time;
+      allow update: if
+        // Автор меняет карточку; счётчики и дата создания не трогаются.
+        (hubMember()
+          && resource.data.uid == request.auth.uid
+          && hubValid(request.resource.data)
+          && request.resource.data.created == resource.data.created
+          && request.resource.data.likes == resource.data.likes
+          && request.resource.data.downloads == resource.data.downloads
+          && request.resource.data.comments == resource.data.comments)
+        // Загрузки: +1 от любого (и анонимного) пользователя программы.
+        || (request.auth != null && hubCounters('downloads')
+          && request.resource.data.downloads == resource.data.downloads + 1)
+        // Лайк: +1 вместе с созданием своего лайка, −1 вместе с удалением.
+        || (hubMember() && hubCounters('likes')
+          && ((request.resource.data.likes == resource.data.likes + 1
+                && existsAfter(/databases/$(database)/documents/creations/$(id)/likes/$(request.auth.uid))
+                && !exists(/databases/$(database)/documents/creations/$(id)/likes/$(request.auth.uid)))
+            || (request.resource.data.likes == resource.data.likes - 1
+                && !existsAfter(/databases/$(database)/documents/creations/$(id)/likes/$(request.auth.uid))
+                && exists(/databases/$(database)/documents/creations/$(id)/likes/$(request.auth.uid)))))
+        // Комментарии: ±1 вместе с комментарием.
+        || (hubMember() && hubCounters('comments')
+          && (request.resource.data.comments == resource.data.comments + 1
+            || request.resource.data.comments == resource.data.comments - 1));
+      allow delete: if hubMember() && resource.data.uid == request.auth.uid;
+
+      match /versions/{version} {
+        allow get, list: if true;
+        allow create, update: if hubMember()
+          && getAfter(hubDoc(id)).data.uid == request.auth.uid
+          && request.resource.data.keys().hasOnly(['version', 'changelog', 'size', 'sha256', 'chunks', 'created'])
+          && request.resource.data.version == version
+          && hubText(request.resource.data.changelog, 2000);
+        allow delete: if hubMember() && get(hubDoc(id)).data.uid == request.auth.uid;
+      }
+
+      match /likes/{uid} {
+        allow get, list: if true;
+        allow create: if hubMember() && uid == request.auth.uid
+          && request.resource.data.keys().hasOnly(['created']) && request.resource.data.created == request.time;
+        allow delete: if hubMember() && uid == request.auth.uid;
+      }
+
+      match /comments/{comment} {
+        allow get, list: if true;
+        allow create: if hubMember()
+          && request.resource.data.keys().hasOnly(['uid', 'author', 'text', 'created'])
+          && request.resource.data.uid == request.auth.uid
+          && hubText(request.resource.data.author, 32)
+          && hubText(request.resource.data.text, 1000) && request.resource.data.text.size() > 0
+          && request.resource.data.created == request.time;
+        // Удалить может автор комментария или автор мода.
+        allow delete: if hubMember()
+          && (resource.data.uid == request.auth.uid || get(hubDoc(id)).data.uid == request.auth.uid);
+      }
+    }
+
+    match /blobs/{blob} {
+      allow get: if true;
+      allow create, update: if hubMember()
+        && blob.matches('^' + request.auth.uid.lower() + '_.*')
+        && request.resource.data.keys().hasOnly(['uid', 'n', 'data'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.data is string && request.resource.data.data.size() <= 1000000;
+      allow delete: if hubMember() && resource.data.uid == request.auth.uid;
+    }
+
+    match /reports/{report} {
+      allow create: if request.auth != null
+        && report.matches('^.+__' + request.auth.uid + '$')
+        && request.resource.data.keys().hasOnly(['creation', 'uid', 'reason', 'created'])
+        && request.resource.data.uid == request.auth.uid
+        && hubText(request.resource.data.reason, 500);
+    }
+    // ── конец правил ModLaunch Hub ───────────────────────────────────────
+
+    // ── Маркет Creator Hub (ModLaunch 7.2) ──────────────────────────────
+    // Вставить в консоли Firebase (Firestore Database → Правила) внутрь блока
+    // match /databases/{database}/documents { … }, рядом с правилами Hub.
+    //
+    // Суммы в копейках (int). Комиссия площадки mFee() % — та же, что feePercent
+    // в desktop/ModLaunch/Assets/market.config.json. Поменяли там — поменяйте здесь.
+    //
+    // market/{id}                — лоты (видят все; скрытые — только продавец)
+    // market/{id}/files/{n}      — файл товара кусками (продавец и купившие)
+    // market/{id}/sales/{buyer}  — продажа (покупатель и продавец)
+    // market/{id}/reviews/{uid}  — отзывы купивших
+    // wallets/{uid}              — баланс; wallets/_platform — комиссия площадки
+    // wallets/{uid}/purchases    — свои покупки
+    // payouts, topups            — заявки на вывод и пополнение (решает админ)
+
+    function mFee() { return 10; }
+    function mAdmin() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/admins/$(request.auth.token.get('email', '-')));
+    }
+    function mMember() { return request.auth != null && request.auth.token.get('email', '') != ''; }
+    function mText(v, max) { return v is string && v.size() <= max; }
+    function mOnly(keys) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys); }
+    function mListing(id) { return get(/databases/$(database)/documents/market/$(id)).data; }
+    function mSale(id, buyer) { return /databases/$(database)/documents/market/$(id)/sales/$(buyer); }
+    function mNewSale(id, buyer) { return existsAfter(mSale(id, buyer)) && !exists(mSale(id, buyer)); }
+    function mSaleAfter(id, buyer) { return getAfter(mSale(id, buyer)).data; }
+    function mWallet(uid) { return /databases/$(database)/documents/wallets/$(uid); }
+    function mPayout(pid) { return /databases/$(database)/documents/payouts/$(pid); }
+    function mValid(d) {
+      return d.keys().hasOnly(['uid', 'author', 'title', 'summary', 'description', 'kind', 'game', 'price', 'license',
+                               'version', 'preview', 'tags', 'images', 'size', 'sha256', 'chunks', 'fileName',
+                               'status', 'sales', 'created', 'updated'])
+        && d.uid == request.auth.uid
+        && mText(d.author, 32) && d.author.size() > 0
+        && mText(d.title, 60) && d.title.size() > 0
+        && mText(d.summary, 200) && mText(d.description, 5000) && mText(d.game, 40)
+        && d.kind in ['model', 'code', 'script', 'asset', 'pack']
+        && d.license in ['personal', 'commercial', 'open']
+        && d.price is int && d.price >= 0 && d.price <= 100000000
+        && mText(d.version, 20) && mText(d.preview, 4000)
+        && d.tags is list && d.tags.size() <= 6 && d.images is list && d.images.size() <= 6
+        && d.size is int && d.size <= 8388608 && d.chunks is int && d.chunks <= 16
+        && mText(d.sha256, 64) && mText(d.fileName, 120)
+        && d.status in ['active', 'hidden']
+        && d.updated == request.time;
+    }
+
+    match /market/{id} {
+      allow get, list: if resource.data.status == 'active'
+        || (request.auth != null && resource.data.uid == request.auth.uid) || mAdmin();
+      allow create: if mMember()
+        && id.matches('^' + request.auth.uid.lower() + '_[a-z0-9_]{1,60}$')
+        && mValid(request.resource.data)
+        && request.resource.data.sales == 0 && request.resource.data.created == request.time;
+      allow update: if
+        (mMember() && resource.data.uid == request.auth.uid && mValid(request.resource.data)
+          && request.resource.data.sales == resource.data.sales
+          && request.resource.data.created == resource.data.created)
+        // +1 продажа — только вместе с созданием своей продажи.
+        || (mMember() && mOnly(['sales'])
+          && request.resource.data.sales == resource.data.sales + 1
+          && mNewSale(id, request.auth.uid));
+      allow delete: if request.auth != null && resource.data.uid == request.auth.uid && resource.data.sales == 0;
+
+      match /files/{n} {
+        allow get: if request.auth != null
+          && (mListing(id).uid == request.auth.uid || exists(mSale(id, request.auth.uid)));
+        allow create, update: if mMember() && mListing(id).uid == request.auth.uid
+          && request.resource.data.uid == request.auth.uid && request.resource.data.data is string;
+        allow delete: if request.auth != null && mListing(id).uid == request.auth.uid;
+      }
+
+      match /sales/{buyer} {
+        allow get: if request.auth != null && (buyer == request.auth.uid || mListing(id).uid == request.auth.uid || mAdmin());
+        allow list: if request.auth != null && (mListing(id).uid == request.auth.uid || mAdmin());
+        // Продажа: цена из лота, комиссия по формуле, деньги разнесены в этой же пачке.
+        allow create: if mMember() && buyer == request.auth.uid
+          && mListing(id).status == 'active' && mListing(id).uid != buyer
+          && request.resource.data.keys().hasOnly(['buyerName', 'seller', 'title', 'price', 'fee', 'created'])
+          && request.resource.data.price == mListing(id).price
+          && request.resource.data.fee == math.floor(request.resource.data.price * mFee() / 100)
+          && request.resource.data.seller == mListing(id).uid
+          && mText(request.resource.data.buyerName, 32) && mText(request.resource.data.title, 60)
+          && request.resource.data.created == request.time
+          && getAfter(mWallet(buyer)).data.balance == get(mWallet(buyer)).data.balance - request.resource.data.price
+          && getAfter(mWallet(mListing(id).uid)).data.balance
+               == get(mWallet(mListing(id).uid)).data.balance + request.resource.data.price - request.resource.data.fee
+          && getAfter(mWallet('_platform')).data.balance == get(mWallet('_platform')).data.balance + request.resource.data.fee;
+      }
+
+      match /reviews/{uid} {
+        allow get, list: if true;
+        allow create, update: if mMember() && uid == request.auth.uid && exists(mSale(id, uid))
+          && request.resource.data.keys().hasOnly(['author', 'stars', 'text', 'created'])
+          && request.resource.data.stars is int && request.resource.data.stars >= 1 && request.resource.data.stars <= 5
+          && mText(request.resource.data.text, 1000) && mText(request.resource.data.author, 32)
+          && request.resource.data.created == request.time;
+        allow delete: if request.auth != null && (uid == request.auth.uid || mAdmin());
+      }
+    }
+
+    function mWalletNew() {
+      return request.resource.data.keys().hasOnly(['balance', 'earned', 'spent', 'paidOut'])
+        && request.resource.data.balance == 0 && request.resource.data.earned == 0
+        && request.resource.data.spent == 0 && request.resource.data.paidOut == 0;
+    }
+
+    match /wallets/{w} {
+      allow get: if request.auth != null && (w == request.auth.uid || w == '_platform' || mAdmin());
+      allow create: if mMember() && (w == request.auth.uid || w == '_platform') && mWalletNew();
+      allow update: if
+        // Покупатель: списание ровно на цену своей новой покупки.
+        (w == request.auth.uid && mOnly(['balance', 'spent', 'lastSale'])
+          && mNewSale(request.resource.data.lastSale, w)
+          && request.resource.data.balance == resource.data.balance - mSaleAfter(request.resource.data.lastSale, w).price
+          && request.resource.data.spent == resource.data.spent + mSaleAfter(request.resource.data.lastSale, w).price
+          && request.resource.data.balance >= 0)
+        // Продавец: цена за вычетом комиссии.
+        || (w != request.auth.uid && w != '_platform' && mOnly(['balance', 'earned', 'lastSale', 'lastBuyer'])
+          && request.resource.data.lastBuyer == request.auth.uid
+          && mNewSale(request.resource.data.lastSale, request.auth.uid)
+          && mSaleAfter(request.resource.data.lastSale, request.auth.uid).seller == w
+          && request.resource.data.balance == resource.data.balance
+               + mSaleAfter(request.resource.data.lastSale, request.auth.uid).price
+               - mSaleAfter(request.resource.data.lastSale, request.auth.uid).fee
+          && request.resource.data.earned == resource.data.earned
+               + mSaleAfter(request.resource.data.lastSale, request.auth.uid).price
+               - mSaleAfter(request.resource.data.lastSale, request.auth.uid).fee)
+        // Площадка: комиссия.
+        || (w == '_platform' && mOnly(['balance', 'earned', 'lastSale', 'lastBuyer'])
+          && request.resource.data.lastBuyer == request.auth.uid
+          && mNewSale(request.resource.data.lastSale, request.auth.uid)
+          && request.resource.data.balance == resource.data.balance + mSaleAfter(request.resource.data.lastSale, request.auth.uid).fee
+          && request.resource.data.earned == resource.data.earned + mSaleAfter(request.resource.data.lastSale, request.auth.uid).fee)
+        // Вывод: списание ровно на сумму своей новой заявки.
+        || (w == request.auth.uid && mOnly(['balance', 'paidOut', 'lastPayout'])
+          && existsAfter(mPayout(request.resource.data.lastPayout)) && !exists(mPayout(request.resource.data.lastPayout))
+          && getAfter(mPayout(request.resource.data.lastPayout)).data.uid == w
+          && request.resource.data.balance == resource.data.balance - getAfter(mPayout(request.resource.data.lastPayout)).data.amount
+          && request.resource.data.paidOut == resource.data.paidOut + getAfter(mPayout(request.resource.data.lastPayout)).data.amount
+          && request.resource.data.balance >= 0)
+        // Админ: пополнения, возвраты, бонусы.
+        || mAdmin();
+
+      match /purchases/{id} {
+        allow get, list: if request.auth != null && w == request.auth.uid;
+        allow create: if request.auth != null && w == request.auth.uid && mNewSale(id, w)
+          && request.resource.data.keys().hasOnly(['title', 'kind', 'seller', 'price', 'created']);
+      }
+    }
+
+    match /payouts/{pid} {
+      allow get, list: if request.auth != null && (resource.data.uid == request.auth.uid || mAdmin());
+      allow create: if mMember() && pid.matches('^' + request.auth.uid + '_[0-9]{14}$')
+        && request.resource.data.keys().hasOnly(['uid', 'author', 'amount', 'method', 'status', 'note', 'created'])
+        && request.resource.data.uid == request.auth.uid && request.resource.data.status == 'pending'
+        && request.resource.data.amount is int && request.resource.data.amount >= 100
+        && mText(request.resource.data.method, 300) && request.resource.data.created == request.time
+        && getAfter(mWallet(request.auth.uid)).data.lastPayout == pid;
+      allow update: if mAdmin() && mOnly(['status', 'note']);
+    }
+
+    match /topups/{tid} {
+      allow get, list: if request.auth != null && (resource.data.uid == request.auth.uid || mAdmin());
+      allow create: if mMember() && tid.matches('^' + request.auth.uid + '_[0-9]{14}$')
+        && request.resource.data.keys().hasOnly(['uid', 'author', 'amount', 'reference', 'status', 'created'])
+        && request.resource.data.uid == request.auth.uid && request.resource.data.status == 'pending'
+        && request.resource.data.amount is int && request.resource.data.amount > 0
+        && mText(request.resource.data.reference, 300) && request.resource.data.created == request.time;
+      allow update: if mAdmin() && mOnly(['status', 'note']);
+    }

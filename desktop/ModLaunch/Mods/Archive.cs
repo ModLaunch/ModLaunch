@@ -31,10 +31,11 @@ public static partial class Archive
             .Select(e => Norm(e.Key!)).Where(n => !Junk().IsMatch(n)).ToList();
     }
 
-    /// <summary>Корни модов. marker — "manifest" (SMAPI) или "dll" (BepInEx, HK).</summary>
-    public static List<ModRoot> FindRoots(string path, string marker, int maxDepth)
+    /// <summary>Корни модов. marker — "manifest" (SMAPI) или "dll" (BepInEx, HK). skip — файлы, которые ставятся отдельно.</summary>
+    public static List<ModRoot> FindRoots(string path, string marker, int maxDepth, Func<string, bool>? skip = null)
     {
-        var entries = Files(path);
+        var entries = Files(path).Where(e => skip is null || !skip(e)).ToList();
+        if (entries.Count == 0) return [new ModRoot("", null, Path.GetFileNameWithoutExtension(path))];
         var roots = new List<ModRoot>();
         foreach (var entry in entries)
         {
@@ -61,8 +62,11 @@ public static partial class Archive
         return [new ModRoot(wrapper, null, wrapper != "" ? wrapper : Path.GetFileNameWithoutExtension(path))];
     }
 
-    /// <summary>Распаковать всё под prefix (или весь архив) в dest. Пути наружу dest отбрасываются.</summary>
-    public static List<string> Extract(string path, string dest, string prefix = "", bool ignoreCase = false)
+    /// <summary>
+    /// Распаковать всё под prefix (или весь архив) в dest. Пути наружу dest отбрасываются.
+    /// skip — файлы, которые не трогать; keepExisting — не заменять уже лежащие файлы.
+    /// </summary>
+    public static List<string> Extract(string path, string dest, string prefix = "", bool ignoreCase = false, Func<string, bool>? skip = null, bool keepExisting = false)
     {
         var p = prefix == "" ? "" : Norm(prefix).TrimEnd('/') + "/";
         var cmp = ignoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
@@ -74,11 +78,12 @@ public static partial class Archive
         {
             if (entry.IsDirectory || entry.Key is null) continue;
             var name = Norm(entry.Key);
-            if (Junk().IsMatch(name) || !name.StartsWith(p, cmp)) continue;
+            if (Junk().IsMatch(name) || !name.StartsWith(p, cmp) || skip?.Invoke(name) == true) continue;
             var relative = name[p.Length..];
             if (relative == "") continue;
             var target = Path.GetFullPath(Path.Combine(root, relative));
             if (!target.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) continue;
+            if (keepExisting && File.Exists(target)) continue;
             Directory.CreateDirectory(Path.GetDirectoryName(target)!);
             entry.WriteToFile(target, new ExtractionOptions { Overwrite = true });
             written.Add(relative);

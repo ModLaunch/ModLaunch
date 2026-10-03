@@ -54,8 +54,9 @@ public static class Images
     public static Bitmap? GameAsset(Games.GameDef def, Art art, int width)
     {
         width = Bucket(width);
-        if (def.SteamAppId <= 0) return null;
-        var name = $"art/{def.SteamAppId}-{Kind(art)}.{(art == Art.Logo ? "png" : "jpg")}";
+        var key = def.ArtKey ?? (def.SteamAppId > 0 ? def.SteamAppId.ToString() : null);
+        if (key is null) return null;
+        var name = $"art/{key}-{Kind(art)}.{(art == Art.Logo ? "png" : "jpg")}";
         return AssetExists(name) ? Asset(name, width) : null;
     }
 

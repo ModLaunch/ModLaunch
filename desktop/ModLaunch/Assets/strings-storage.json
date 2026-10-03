@@ -1,0 +1,34 @@
+{
+  "ru": {
+    "storage.title": "Занимаемое место",
+    "storage.clear": "Очистить",
+    "storage.cleared": "Освободили {size}",
+    "storage.total": "Всего ModLaunch занимает {size} (без самих игр и модов).",
+    "storage.downloads": "Архив загрузок",
+    "storage.downloads.hint": "Скачанные архивы модов. Из них можно поставить мод без интернета. Чистится кнопкой выше.",
+    "storage.backups": "Резервные копии",
+    "storage.backups.hint": "Копии сохранений и снимки «как было». Их не стираем, они нужны для отката.",
+    "storage.cache": "Кэш картинок",
+    "storage.cache.hint": "Обложки и скриншоты модов. Безопасно очистить: подгрузятся заново.",
+    "storage.logs": "Журналы",
+    "storage.logs.hint": "Записи работы программы. Нужны, только когда ищем ошибку.",
+    "storage.reshade": "ReShade",
+    "storage.reshade.hint": "Файлы улучшения графики."
+  },
+  "en": {
+    "storage.title": "Disk usage",
+    "storage.clear": "Clear",
+    "storage.cleared": "Freed {size}",
+    "storage.total": "ModLaunch takes {size} in total (not counting games and mods).",
+    "storage.downloads": "Download archive",
+    "storage.downloads.hint": "Downloaded mod archives. They let you install a mod offline. Cleared with the button above.",
+    "storage.backups": "Backups",
+    "storage.backups.hint": "Save copies and \"how it was\" snapshots. We never delete these, you need them to roll back.",
+    "storage.cache": "Image cache",
+    "storage.cache.hint": "Mod covers and screenshots. Safe to clear, they load again.",
+    "storage.logs": "Logs",
+    "storage.logs.hint": "Program activity records. Only needed when hunting a bug.",
+    "storage.reshade": "ReShade",
+    "storage.reshade.hint": "Graphics enhancement files."
+  }
+}

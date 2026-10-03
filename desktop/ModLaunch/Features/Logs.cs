@@ -16,6 +16,7 @@ public static partial class Logs
     {
         LoaderKind.Smapi => Path.Combine(Roaming, "StardewValley", "ErrorLogs", "SMAPI-latest.txt"),
         LoaderKind.HkApi => Path.Combine(Home, "AppData", "LocalLow", "Team Cherry", "Hollow Knight", "ModLog.txt"),
+        LoaderKind.Minecraft => Path.Combine(Minecraft.Mc.Active?.Dir ?? gamePath, "logs", "latest.log"),
         _ => Path.Combine(gamePath, "BepInEx", "LogOutput.log"),
     };
 
@@ -24,6 +25,8 @@ public static partial class Logs
     [GeneratedRegex(@"^\s*-\s+(.+?)\s+because\s+(.+)$", RegexOptions.IgnoreCase)] private static partial Regex SmapiBecause();
     [GeneratedRegex(@"\[\s*ERROR\s+([^\]]+)\]\s*(.+)")] private static partial Regex SmapiError();
     [GeneratedRegex(@"\[ERROR\]:?\s*\[([^\]]+)\]\s*-?\s*(.+)")] private static partial Regex HkError();
+    /// <summary>Minecraft: «[12:00:01] [main/ERROR] (Fabric Loader) …» или «[Render thread/ERROR]: …».</summary>
+    [GeneratedRegex(@"\[([^\]/]+)/(?:ERROR|FATAL)\]:?\s*(?:\(([^)]+)\))?:?\s*(.+)")] private static partial Regex McError();
 
     public static List<LogIssue> Parse(GameDef game, string text)
     {
@@ -44,6 +47,9 @@ public static partial class Logs
                 break;
             case LoaderKind.HkApi:
                 foreach (Match m in HkError().Matches(text)) Add(m.Groups[1].Value, m.Groups[2].Value);
+                break;
+            case LoaderKind.Minecraft:
+                foreach (Match m in McError().Matches(text)) Add(m.Groups[2].Success ? m.Groups[2].Value : m.Groups[1].Value, m.Groups[3].Value);
                 break;
             default:
                 foreach (Match m in BepInExLine().Matches(text))

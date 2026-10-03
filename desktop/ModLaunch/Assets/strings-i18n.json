@@ -1,0 +1,16 @@
+{
+  "ru": {
+    "lang.auto": "Как в системе ({name})",
+    "lang.hint": "Не нашёл свой язык? Положи свой перевод в папку languages (например, de.json) и перезапусти ModLaunch. Что не переведено, показывается по-английски.",
+    "lang.folder": "Открыть папку переводов",
+    "num.k": "{n} тыс.",
+    "num.m": "{n} млн"
+  },
+  "en": {
+    "lang.auto": "Same as system ({name})",
+    "lang.hint": "Cannot find your language? Put your translation into the languages folder (for example de.json) and restart ModLaunch. Anything untranslated is shown in English.",
+    "lang.folder": "Open translations folder",
+    "num.k": "{n}K",
+    "num.m": "{n}M"
+  }
+}

@@ -46,7 +46,9 @@ public static class Demo
 
         // Игровое время — прямо в файл, до первого обращения к PlayTime.
         File.WriteAllText(Path.Combine(root, "data", "playtime.json"),
-            "{\"games\":{\"subnautica\":{\"totalMs\":45300000,\"sessions\":14,\"lastPlayed\":\"" + DateTime.UtcNow.AddDays(-1).ToString("o") + "\"}}}");
+            "{\"games\":{\"subnautica\":{\"totalMs\":45300000,\"sessions\":14,\"lastPlayed\":\"" + DateTime.UtcNow.AddDays(-1).ToString("o") + "\"}," +
+            "\"minecraft\":{\"totalMs\":312000000,\"sessions\":61,\"lastPlayed\":\"" + DateTime.UtcNow.AddHours(-3).ToString("o") + "\"}}}");
+        Minecraft.McDemo.Prepare(root);
 
         var sn = AppState.Game("subnautica");
         sn.Path = Settings.GamePath("subnautica");

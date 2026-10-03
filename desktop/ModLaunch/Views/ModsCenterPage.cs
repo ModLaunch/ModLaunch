@@ -41,19 +41,13 @@ public sealed class ModsCenterPage : Page
             b.Click += (_, _) => { _tab = id; Build(); };
             return b;
         }
-        var bar = new WrapPanel
-        {
-            Children =
-            {
-                Tab("updates", I18n.T("mc.updates"), Icons.Refresh, installedUpdates + Tracking.Updates.Count),
-                Tab("tracked", I18n.T("mc.tracked"), Icons.Bell, Tracking.All().Count),
-                Tab("favorites", I18n.T("mc.favorites"), Icons.Heart, Favorites.All().Count),
-                Tab("recent", I18n.T("mc.recent"), Icons.Eye, Recent.All().Count),
-                Tab("history", I18n.T("mc.history"), Icons.Download, History.All().Count),
-                Tab("hidden", I18n.T("mc.hidden"), Icons.EyeOff, Blocklist.All().Count),
-            },
-        };
-        content.Children.Add(new Border { Classes = { "card" }, Padding = new Thickness(6), CornerRadius = new CornerRadius(16), Child = bar, HorizontalAlignment = HorizontalAlignment.Left });
+        content.Children.Add(Ui.TabBar(
+            Tab("updates", I18n.T("mc.updates"), Icons.Refresh, installedUpdates + Tracking.Updates.Count),
+            Tab("tracked", I18n.T("mc.tracked"), Icons.Bell, Tracking.All().Count),
+            Tab("favorites", I18n.T("mc.favorites"), Icons.Heart, Favorites.All().Count),
+            Tab("recent", I18n.T("mc.recent"), Icons.Eye, Recent.All().Count),
+            Tab("history", I18n.T("mc.history"), Icons.Download, History.All().Count),
+            Tab("hidden", I18n.T("mc.hidden"), Icons.EyeOff, Blocklist.All().Count)));
         content.Children.Add(_tab switch
         {
             "tracked" => Tracked(),
@@ -100,12 +94,20 @@ public sealed class ModsCenterPage : Page
     Control Updates()
     {
         var rows = new List<Control>();
+        var all = new List<(GameState, ModUpdate)>();
         foreach (var (gameId, list) in ModUpdates.Found)
         {
             var g = AppState.Game(gameId);
             foreach (var u in list.Where(u => Match(u.Name, g.Def.Name)))
+            {
+                all.Add((g, u));
+                var busy = Actions.IsUpdating(g, u.RecordId);
+                var update = Ui.Button(busy ? I18n.T("upd.updating") : I18n.T("upd.one"), () => { _ = Actions.UpdateMods(g, [u]); Build(); },
+                    u.Manual ? "" : "primary", u.Manual ? Icons.External : Icons.ArrowUp, u.Manual ? I18n.T("upd.viaBrowser.tip") : null);
+                update.IsEnabled = !busy;
                 rows.Add(Row(u.Icon, u.Name, $"{g.Def.ShortName} · {u.Current} → {u.Latest}",
-                    Ui.Button(I18n.T("mc.toGame"), () => MainWindow.Current?.Navigate(() => new GamePage(gameId, "installed")), "primary", Icons.Refresh)));
+                    Ui.Button("", () => MainWindow.Current?.Navigate(() => new GamePage(gameId, "installed")), "icon ghost", Icons.Forward, I18n.T("mc.toGame")), update));
+            }
         }
         foreach (var u in Tracking.Updates.Where(u => Match(u.Item.Name)))
         {
@@ -120,8 +122,11 @@ public sealed class ModsCenterPage : Page
             foreach (var g in AppState.Games.Where(g => g.Status == Detect.Found)) { try { await ModUpdates.Check(g); } catch { } }
             Build();
         }, "", Icons.Refresh);
-        check.HorizontalAlignment = HorizontalAlignment.Left;
-        return Ui.Col(12, check, List(rows, I18n.T("mc.updates.none")));
+        var top = Ui.Row(8, check);
+        // «Обновить всё» по всем играм сразу — через окно со списком.
+        if (all.Count > 0) top.Children.Add(Ui.Button(I18n.T("upd.allN", ("n", all.Count)), () => UpdateReview.Show(all), "primary", Icons.ArrowUp));
+        top.HorizontalAlignment = HorizontalAlignment.Left;
+        return Ui.Col(12, top, List(rows, I18n.T("mc.updates.none")));
     }
 
     Control Tracked() => List(Tracking.All().Where(t => Match(t.Name)).OrderByDescending(t => t.Since).Select(t =>
@@ -153,7 +158,7 @@ public sealed class ModsCenterPage : Page
         {
             var state = Ui.Text(h.Ok ? I18n.T("mc.ok") : I18n.T("mc.failed"), "small", color: h.Ok ? Ui.Res("Good") : Ui.Res("Bad"));
             if (h.Error is not null) ToolTip.SetTip(state, h.Error);
-            return Row(null, h.Title, $"{h.Game} · {h.At.ToLocalTime():dd.MM.yyyy HH:mm}", state);
+            return Row(null, h.Title, $"{h.Game} · {h.At.ToLocalTime().ToString("g", I18n.Culture)}", state);
         });
         return Ui.Col(12, clear, List(rows, I18n.T("mc.history.none")));
     }

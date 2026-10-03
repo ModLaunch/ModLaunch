@@ -26,11 +26,15 @@ public sealed class GameState
         }
     }
 
-    public int ModCount => Registry?.List().Count ?? 0;
+    /// <summary>Сколько модов: у Minecraft — в выбранной сборке, у остальных — в списке установленных.</summary>
+    public int ModCount => Def.IsMinecraft
+        ? (Minecraft.Mc.Active is { } a ? Minecraft.McContent.Count(a, "mod") : 0)
+        : Registry?.List().Count ?? 0;
 
     public void Refresh()
     {
-        LoaderInstalled = Path is not null && Loader.IsInstalled(Def, Path);
+        // Отложенный «без модов» загрузчик считается установленным: его вернут сами.
+        LoaderInstalled = Path is not null && (Loader.IsInstalled(Def, Path) || Features.Vanilla.IsParked(Def.Id));
         Registry?.Reconcile();
     }
 }

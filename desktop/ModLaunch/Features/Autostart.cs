@@ -17,13 +17,15 @@ public static class Autostart
         }
     }
 
-    public static void Set(bool on)
+    /// <summary>exe — какую копию запускать (установщик указывает установленную, а не себя).</summary>
+    public static void Set(bool on, string? exe = null)
     {
         if (!OperatingSystem.IsWindows()) return;
         try
         {
             using var key = Registry.CurrentUser.CreateSubKey(Key);
-            if (on && Environment.ProcessPath is string exe) key.SetValue(Name, $"\"{exe}\" --autostart");
+            exe ??= Environment.ProcessPath;
+            if (on && exe is not null) key.SetValue(Name, $"\"{exe}\" --autostart");
             else key.DeleteValue(Name, false);
         }
         catch { }

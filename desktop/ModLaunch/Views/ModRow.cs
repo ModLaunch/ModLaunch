@@ -24,7 +24,7 @@ public static class ModRow
     {
         var name = new TextBlock
         {
-            FontSize = 17, FontWeight = FontWeight.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis,
+            FontSize = 16, FontWeight = FontWeight.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis,
             Inlines =
             {
                 new Avalonia.Controls.Documents.Run(mod.Name),
@@ -36,6 +36,7 @@ public static class ModRow
 
         var tags = Ui.Row(6);
         if (Badge(badge) is { } b) tags.Children.Add(b);
+        if (mod.Deprecated) tags.Children.Add(Tag(I18n.T("badge.deprecated"), Ui.Hex("#3A1216"), Ui.Hex("#FF6B6B")));
         if (mod.Adult) tags.Children.Add(Tag("18+", Ui.Hex("#3A1216"), Ui.Hex("#FF6B6B")));
         if (pick) tags.Children.Add(Tag(I18n.T("badge.pick"), Ui.Res("BrandSoft"), Ui.Res("Brand2")));
         if (game.IsLegacy(mod.UpdatedAt))
@@ -47,7 +48,7 @@ public static class ModRow
         if (mod.Source != game.PrimarySource) tags.Children.Add(Tag(Catalog.Title(mod.Source), Ui.Hex("#1B2A3A"), Ui.Hex("#7FB4E6")));
         foreach (var c in mod.Categories.Take(2)) tags.Children.Add(Tag(c, Ui.Res("Surface3"), Ui.Res("Muted")));
 
-        var middle = Ui.Col(6, name, desc, tags);
+        var middle = Ui.Col(4, name, desc, tags);
         middle.VerticalAlignment = VerticalAlignment.Center;
 
         Button action;
@@ -55,7 +56,8 @@ public static class ModRow
         else if (installing) action = Ui.Button(I18n.T("aside.installing"), () => { }, "primary");
         else action = Ui.Button(I18n.T("mod.install"), install, "primary", Icons.Download);
         action.IsEnabled = !installed && !installing;
-        action.HorizontalAlignment = HorizontalAlignment.Right;
+        action.HorizontalAlignment = HorizontalAlignment.Stretch;
+        action.HorizontalContentAlignment = HorizontalAlignment.Center;
 
         var stats = Ui.Col(4, action);
         if (Social.Reviews.Stats().GetValueOrDefault($"{game.Id}|{mod.Id}") is { } rating) stats.Children.Add(Stat(Icons.Star, $"{rating.Avg:0.0} ({rating.Count})"));
@@ -64,15 +66,16 @@ public static class ModRow
         stats.VerticalAlignment = VerticalAlignment.Center;
         stats.MinWidth = 150;
 
-        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"), ColumnSpacing = 18 };
-        var thumb = Ui.Thumb(mod.Icon, mod.Name, compact ? 52 : 88, compact ? 10 : 14, 200);
+        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"), ColumnSpacing = 16 };
+        var thumb = Ui.Thumb(mod.Icon, mod.Name, compact ? 52 : 68, compact ? 10 : 12, 200);
         grid.Children.Add(thumb);
         Grid.SetColumn(middle, 1);
         grid.Children.Add(middle);
         Grid.SetColumn(stats, 2);
         grid.Children.Add(stats);
 
-        var card = new Border { Classes = { "card" }, Padding = new Thickness(compact ? 9 : 14), Child = grid, Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand) };
+        var card = new Border { Classes = { "card" }, Padding = new Thickness(compact ? 9 : 12), Child = grid, Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand) };
+        Ctx.Attach(card, () => Menu(game, mod, installed, installing, install, open));
         card.PointerPressed += (s, e) =>
         {
             if (e.Source is Visual v && Avalonia.VisualTree.VisualExtensions.FindAncestorOfType<Button>(v, true) is not null) return;
@@ -83,9 +86,9 @@ public static class ModRow
     }
 
     /// <summary>Плитка мода для вида «сеткой» (как в Modrinth): большая картинка, имя, автор, загрузки.</summary>
-    public static Control Tile(GameDef game, ModInfo mod, bool installed, bool installing, Action install, Action open, string? badge = null)
+    public static Control Tile(GameDef game, ModInfo mod, bool installed, bool installing, Action install, Action open, string? badge = null, bool compact = false)
     {
-        var picture = new Border { Height = 132, CornerRadius = new CornerRadius(12, 12, 0, 0), ClipToBounds = true, Child = Ui.Thumb(mod.Icon, mod.Name, 236, 0, 480) };
+        var picture = new Border { Height = compact ? 84 : 132, CornerRadius = new CornerRadius(12, 12, 0, 0), ClipToBounds = true, Child = Ui.Thumb(mod.Icon, mod.Name, 236, 0, 480) };
         var layers = new Panel { Children = { picture } };
         if (Badge(badge) is { } b)
         {
@@ -105,11 +108,30 @@ public static class ModRow
         foot.Children.Add(Ui.Col(1,
             new TextBlock { Text = mod.Name, FontWeight = FontWeight.SemiBold, FontSize = 14.5, TextTrimming = TextTrimming.CharacterEllipsis },
             Ui.Text((mod.Author == "" ? "" : mod.Author + " · ") + (mod.Downloads > 0 ? "↓ " + I18n.Compact(mod.Downloads) : ""), "small muted")));
-        var body = Ui.Col(8, foot, new TextBlock { Text = mod.Description, FontSize = 12.5, Foreground = Ui.Res("Muted"), TextWrapping = TextWrapping.Wrap, MaxLines = 2, TextTrimming = TextTrimming.CharacterEllipsis, Height = 34 });
+        var body = compact ? Ui.Col(8, foot) : Ui.Col(8, foot, new TextBlock { Text = mod.Description, FontSize = 12.5, Foreground = Ui.Res("Muted"), TextWrapping = TextWrapping.Wrap, MaxLines = 2, TextTrimming = TextTrimming.CharacterEllipsis, Height = 34 });
         body.Margin = new Thickness(12, 10, 12, 12);
         var card = new Button { Classes = { "card-btn" }, Width = 238, Padding = new Thickness(0), Margin = new Thickness(0, 0, 14, 14), VerticalContentAlignment = VerticalAlignment.Top, Content = Ui.Col(0, layers, body) };
         card.Click += (_, _) => open();
+        Ctx.Attach(card, () => Menu(game, mod, installed, installing, install, open));
         return card;
+    }
+
+    /// <summary>Правый клик по моду каталога.</summary>
+    public static MenuFlyout Menu(GameDef game, ModInfo mod, bool installed, bool installing, Action install, Action? open)
+    {
+        var fav = Core.Favorites.Has(game.Id, mod.Id);
+        return Ctx.Menu(
+            open is not null ? Ctx.Item(I18n.T("ctx.open"), Icons.Eye, open) : null,
+            Ctx.Item(installed ? I18n.T("mod.installed") : I18n.T("mod.install"), installed ? Icons.Check : Icons.Download, install, !installed && !installing),
+            Ctx.Item(fav ? I18n.T("ctx.unfavorite") : I18n.T("ctx.favorite"), Icons.Star, () => { Core.Favorites.Toggle(game.Id, mod); AppState.Notify(); }),
+            "-",
+            mod.Url is { } url ? Ctx.Link(I18n.T("ctx.openSite"), url) : null,
+            mod.Url is { } u2 ? Ctx.Copy(I18n.T("ctx.copyLink"), u2) : null,
+            Ctx.Copy(I18n.T("ctx.copyName"), mod.Name),
+            Ctx.Copy(I18n.T("ctx.copyId"), mod.Id),
+            "-",
+            Ctx.Item(I18n.T("ctx.hideMod"), Icons.EyeOff, () => { Features.Blocklist.HideMod(game.Id, mod); AppState.Notify(); }),
+            mod.Author != "" ? Ctx.Item(I18n.T("ctx.hideAuthor", ("author", mod.Author)), Icons.EyeOff, () => { Features.Blocklist.HideAuthor(mod); AppState.Notify(); }) : null);
     }
 
     static Control Stat(string icon, string text)

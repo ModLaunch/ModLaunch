@@ -22,6 +22,7 @@ ModLaunch finds your game, installs the mod loader and downloads mods together w
 
 | Game | Mod loader (installed automatically) | Where mods come from |
 | --- | --- | --- |
+| **Minecraft: Java Edition** | Fabric, Quilt, Forge, NeoForge | Modrinth (mods, modpacks, resource packs, shaders, data packs) |
 | Stardew Valley | SMAPI | Nexus Mods |
 | Hollow Knight | Modding API | Hollow Knight community mod list |
 | Lethal Company | BepInEx | Thunderstore |
@@ -50,6 +51,17 @@ ModLaunch is a free project and isn't signed with a paid code-signing certificat
 
 You only need to do this once. Updates are installed by ModLaunch itself.
 
+## Minecraft
+
+New in 8.5: full Minecraft: Java Edition support.
+
+- **Builds** — separate game folders, each with its own Minecraft version, loader, mods, resource packs, shaders, worlds and settings. Switch builds in one click, duplicate or rename them.
+- **Every version** from the official manifest, snapshots included. Fabric, Quilt, Forge and NeoForge install themselves (Forge/NeoForge run their installer silently; the right Java 17/21/25 is taken from the launcher or downloaded).
+- **Play through the official launcher.** ModLaunch adds a “ModLaunch · <build>” installation with its own folder, version and memory, opens the launcher and tracks play time. Your Microsoft account and license stay with the launcher.
+- **Modrinth catalog that fits your build** — only versions for your Minecraft version and loader, required dependencies installed automatically, SHA-1 checked downloads. Modpacks install as a new build.
+- **Import** `.mrpack` files and link builds from Modrinth App, Prism Launcher and CurseForge in place — nothing is copied.
+- **Updates** for every mod, even ones you added by hand, with one “Update all” button. World backups, a screenshot gallery and crash reports with the cause.
+
 ## Features
 
 - **One-click installs.** Pick a mod and press *Install*. The loader and all required dependencies are installed with it.
@@ -63,7 +75,7 @@ You only need to do this once. Updates are installed by ModLaunch itself.
 - **In-game overlay** (Ctrl+Shift+M): session time, friends, save backup and notes for the game.
 - **Reviews and ratings** for mods, shared between all ModLaunch users.
 - **Auto-update:** new versions of ModLaunch download and install themselves.
-- **Interface in English and Russian.**
+- **Interface in English, Russian, Ukrainian, German, French, Spanish, Portuguese and Chinese.**
 
 ## Screenshots
 
@@ -85,7 +97,7 @@ You only need to do this once. Updates are installed by ModLaunch itself.
 Yes.
 
 **Does ModLaunch host mods?**
-No. Files are downloaded directly from where their authors published them: Thunderstore, the Hollow Knight community mod list, Nexus Mods and GitHub. All rights to each mod belong to its author.
+No. Files are downloaded directly from where their authors published them: Thunderstore, Modrinth, the Hollow Knight community mod list, Nexus Mods and GitHub. All rights to each mod belong to its author.
 
 **Why does Nexus Mods need an extra click?**
 Nexus Mods gives files to free accounts only from its own website. ModLaunch opens the mod's page, you press *Slow download* there, and ModLaunch picks the file up from your Downloads folder and installs it by itself. No API key needed.

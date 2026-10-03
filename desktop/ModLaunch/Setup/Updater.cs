@@ -25,7 +25,14 @@ public static partial class Updater
         return (json.Str("owner") ?? "", json.Str("repo") ?? "");
     }
 
-    public static bool Configured => Repo.Owner != "" && Repo.Repo != "";
+    /// <summary>8.4: свой сервер обновлений (сайт ModLaunch) — файл update.json. GitHub — запасной путь.</summary>
+    static readonly string? Manifest = Ads.HttpsUrl(Resources.Json("update.config.json").Str("manifest"));
+
+    /// <summary>Откуда пришла последняя проверка: адрес сайта или GitHub.</summary>
+    public static string Source { get; private set; } = "";
+    public static string? LastError { get; private set; }
+
+    public static bool Configured => Manifest is not null || (Repo.Owner != "" && Repo.Repo != "");
     public static string RepoName => $"{Repo.Owner}/{Repo.Repo}";
     public static bool Available => Latest is not null && Features.Versions.Compare(Latest.Version, Http.Version) > 0;
     public static bool CanInstall => Available && Installer.IsInstalledCopy && Latest?.SetupUrl is not null && OperatingSystem.IsWindows();
@@ -36,6 +43,24 @@ public static partial class Updater
     public static async Task<Release?> Check()
     {
         if (!Configured) return null;
+        if (Manifest is not null)
+        {
+            try
+            {
+                if (FromManifest(await Http.GetJson(Manifest, default, 12)) is { } own)
+                {
+                    Latest = own;
+                    Source = new Uri(Manifest).Host;
+                    LastError = null;
+                    Changed?.Invoke();
+                    if (CanInstall && AutoDownload) _ = Fetch(null).ContinueWith(_ => { });
+                    return Latest;
+                }
+            }
+            catch (Exception e) { LastError = e.Message; if (Repo.Owner == "") throw; }
+        }
+        if (Repo.Owner == "" || Repo.Repo == "") return null;
+        Source = "GitHub";
         var data = await Http.GetJson($"https://api.github.com/repos/{RepoName}/releases/latest", default, 15, "application/vnd.github+json");
         var asset = data.Arr("assets").FirstOrDefault(a => SetupName().IsMatch(a.Str("name") ?? ""));
         var sha = Regex.Match(asset.Str("digest") ?? "", "^sha256:([0-9a-f]{64})$", RegexOptions.IgnoreCase) is { Success: true } m ? m.Groups[1].Value : null;
@@ -46,6 +71,35 @@ public static partial class Updater
         Changed?.Invoke();
         if (CanInstall && AutoDownload) _ = Fetch(null).ContinueWith(_ => { });
         return Latest;
+    }
+
+    /// <summary>
+    /// update.json на своём сайте:
+    /// { "version": "8.4.0", "name": "ModLaunch 8.4.0", "notes": "…", "page": "https://…",
+    ///   "url": "https://…/ModLaunch-Setup-8.4.0.exe", "sha256": "…" }
+    /// Принимаются только https и файл с именем ModLaunch-Setup-x.y.z.exe.
+    /// </summary>
+    public static Release? FromManifest(System.Text.Json.Nodes.JsonNode? data)
+    {
+        var version = (data.Str("version") ?? "").TrimStart('v', 'V');
+        if (!Regex.IsMatch(version, @"^\d+\.\d+\.\d+$")) return null;
+        var url = Ads.HttpsUrl(data.Str("url"));
+        var name = url is null ? null : Path.GetFileName(new Uri(url).AbsolutePath);
+        if (name is not null && !SetupName().IsMatch(name)) { url = null; name = null; }
+        var sha = Regex.IsMatch(data.Str("sha256") ?? "", "^[0-9a-fA-F]{64}$") ? data.Str("sha256")!.ToLowerInvariant() : null;
+        var notes = data.Str("notes") ?? "";
+        return new Release(version, data.Str("name") ?? $"ModLaunch {version}", notes.Length > 6000 ? notes[..6000] : notes, Ads.HttpsUrl(data.Str("page")), url, name, sha);
+    }
+
+    [SelfTest]
+    static string ReadsManifest()
+    {
+        var ok = FromManifest(System.Text.Json.Nodes.JsonNode.Parse("""{ "version": "9.1.2", "url": "https://modlaunchapp.com/download/ModLaunch-Setup-9.1.2.exe", "sha256": "AB12AB12AB12AB12AB12AB12AB12AB12AB12AB12AB12AB12AB12AB12AB12AB12" }"""));
+        if (ok?.SetupName != "ModLaunch-Setup-9.1.2.exe" || ok.Sha256 is null) throw new Exception("good manifest rejected");
+        var bad = FromManifest(System.Text.Json.Nodes.JsonNode.Parse("""{ "version": "9.1.2", "url": "http://evil/x.exe" }"""));
+        if (bad is null || bad.SetupUrl is not null) throw new Exception("http or odd name accepted");
+        if (FromManifest(System.Text.Json.Nodes.JsonNode.Parse("""{ "version": "latest" }""")) is not null) throw new Exception("bad version accepted");
+        return "https + ModLaunch-Setup name + sha256 checked";
     }
 
     static Task<string>? _busy;

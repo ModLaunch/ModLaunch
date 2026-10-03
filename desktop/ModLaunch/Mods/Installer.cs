@@ -30,12 +30,18 @@ public static partial class Installer
             "modlinks" => await ModLinks.Resolve(mod.Id, ct),
             _ => (new List<ModInfo> { mod }, new List<string>()),
         };
+        // Мод просит другой загрузчик (MelonLoader, BepInEx IL2CPP, UE4SS) — в plugins он не заработает: говорим честно.
+        if (!IsLoaderPackage(game, mod.Id) && !Features.Compat.Confirmed.Contains(mod.Id) && Features.Compat.Foreign(game, plan.Order.Select(m => m.Id).Concat(plan.Missing).Concat(mod.Dependencies)) is { } loader)
+            throw new InvalidOperationException(I18n.T("compat.install", ("mod", mod.Name), ("loader", loader), ("ours", game.LoaderName)));
         plan.Order.RemoveAll(m => IsLoaderPackage(game, m.Id));
         return plan;
     }
 
-    /// <summary>Каталожный мод с прямой ссылкой (Thunderstore, ModLinks) — вместе с зависимостями.</summary>
-    public static async Task<int> InstallFromCatalog(ModRegistry registry, ModInfo mod, IProgress<InstallStep> progress, CancellationToken ct, bool reinstall = false, string? pinVersion = null, string? pinUrl = null)
+    /// <summary>
+    /// Каталожный мод с прямой ссылкой (Thunderstore, ModLinks) — вместе с зависимостями.
+    /// refreshDeps — при обновлении заодно обновить устаревшие зависимости (включённые и не закреплённые).
+    /// </summary>
+    public static async Task<int> InstallFromCatalog(ModRegistry registry, ModInfo mod, IProgress<InstallStep> progress, CancellationToken ct, bool reinstall = false, string? pinVersion = null, string? pinUrl = null, bool refreshDeps = false)
     {
         progress.Report(new InstallStep("install.deps", mod.Name));
         var (steps, _) = await Plan(registry.Game, mod, ct);
@@ -50,7 +56,9 @@ public static partial class Installer
         for (var i = 0; i < steps.Count; i++)
         {
             var entry = steps[i];
-            if (!(reinstall && entry.Id == mod.Id) && registry.Get(entry.Id) is { } existing && !existing.Bool("missing"))
+            var before = registry.Get(entry.Id);
+            var stale = refreshDeps && before is not null && before.Bool("enabled", true) && !before.Bool("hold") && Features.Versions.IsNewer(entry.Version, before.Str("version"));
+            if (!(reinstall && entry.Id == mod.Id) && !stale && before is { } existing && !existing.Bool("missing"))
             {
                 progress.Report(new InstallStep("install.exists", entry.Name, i + 1, steps.Count));
                 continue;
@@ -81,9 +89,13 @@ public static partial class Installer
                     ["source"] = entry.Source,
                     ["url"] = entry.Url,
                     ["icon"] = entry.Icon,
-                    ["requestedBy"] = entry.Id == mod.Id ? null : mod.Id,
+                    ["dependencies"] = new JsonArray(entry.Dependencies.Select(d => (JsonNode)d).ToArray()),
+                    ["requestedBy"] = entry.Id == mod.Id ? null : stale ? before!.Str("requestedBy") : mod.Id,
                 }, progress, ct);
-                if (entry.Source == "thunderstore" && registry.Game.Loader == LoaderKind.Bepinex) ApplyPackConfig(registry.GamePath, file);
+                // Обновлённая зависимость могла лечь в папку с другим именем — старую убираем, чтобы не было двух версий.
+                if (stale && registry.OwnFolder(before!) is string old && registry.Get(entry.Id) is { } fresh && registry.FolderFor(fresh) != old && Directory.Exists(old))
+                    Directory.Delete(old, true);
+                if (entry.Source == "thunderstore" && registry.Game.Loader == LoaderKind.Bepinex && IsModpack(entry)) ApplyPackConfig(registry.GamePath, file);
                 Features.DownloadArchive.Add(registry.Game.Id, entry.Id, entry.Version, file);
                 installed++;
             }
@@ -93,15 +105,18 @@ public static partial class Installer
         return installed;
     }
 
-    /// <summary>Настройки из сборок Thunderstore (config/ или BepInEx/config/) — в BepInEx/config.</summary>
+    /// <summary>Сборка Thunderstore (modpack) задаёт свои настройки — заменяем, сохранив старые в ModHub/config-backup.</summary>
     static void ApplyPackConfig(string gamePath, string archive)
     {
-        var target = Path.Combine(gamePath, "BepInEx", "config");
-        foreach (var folder in new[] { "config", "BepInEx/config" })
+        try
         {
-            try { if (Archive.HasFolder(archive, folder)) Archive.Extract(archive, target, folder, ignoreCase: true); } catch { }
+            foreach (var part in BepInExLayout.Find(Archive.Files(archive)).Where(p => p.Kind == "config"))
+                BepInExLayout.ApplyConfig(archive, part, gamePath, overwrite: true);
         }
+        catch { }
     }
+
+    static bool IsModpack(ModInfo mod) => mod.Categories.Any(c => c.Contains("modpack", StringComparison.OrdinalIgnoreCase));
 
     /// <summary>Любой архив: пресет ReShade ставится как пресет, остальное — как мод.</summary>
     public static async Task<JsonObject> InstallAny(ModRegistry registry, string archivePath, JsonObject meta, IProgress<InstallStep> progress, CancellationToken ct)
@@ -166,9 +181,17 @@ public static partial class Installer
     public static JsonObject InstallArchive(ModRegistry registry, string archivePath, JsonObject meta)
     {
         var game = registry.Game;
-        var roots = Archive.FindRoots(archivePath, game.ModMarker, game.ModMarker == "manifest" ? 5 : 4);
+        // BepInEx: patchers/, monomod/, config/ и core/ — не в plugins (см. BepInExLayout).
+        var parts = game.Loader == LoaderKind.Bepinex ? BepInExLayout.Find(Archive.Files(archivePath)).Where(p => p.Kind != "plugins").ToList() : [];
+        Func<string, bool>? skip = parts.Count > 0 ? entry => BepInExLayout.Inside(entry, parts) : null;
+        var roots = Archive.FindRoots(archivePath, game.ModMarker, game.ModMarker == "manifest" ? 5 : 4, skip);
         if (roots.Count == 0) throw new InvalidOperationException(I18n.T("err.archiveStructure"));
         Directory.CreateDirectory(registry.ModsDir);
+
+        // У BepInEx и HK корень мода — папка с .dll, а manifest.json Thunderstore лежит в корне архива:
+        // зависимости берём из каталога или оттуда, иначе не видно, каким модам нужна библиотека.
+        var packDeps = meta["dependencies"] is JsonArray given ? given.Select(d => d?.ToString()).OfType<string>().ToList()
+            : game.ModMarker == "manifest" ? [] : ReadManifest(game, Archive.ReadText(archivePath, "manifest.json"), "").Dependencies;
 
         JsonObject? primary = null;
         var folders = new List<string>();
@@ -186,7 +209,7 @@ public static partial class Installer
             if (folders.Contains(folder)) folder = Sanitize($"{folder} ({rawName})");
             var destination = Path.Combine(registry.ModsDir, folder);
             if (Directory.Exists(destination)) Directory.Delete(destination, true);
-            var files = Archive.Extract(archivePath, destination, root.Prefix);
+            var files = Archive.Extract(archivePath, destination, root.Prefix, skip: skip);
             folders.Add(folder);
 
             var record = new JsonObject
@@ -200,7 +223,7 @@ public static partial class Installer
                 ["icon"] = meta.Str("icon"),
                 ["folder"] = folder,
                 ["fileCount"] = files.Count,
-                ["dependencies"] = new JsonArray(fileMeta.Dependencies.Select(d => (JsonNode)d).ToArray()),
+                ["dependencies"] = new JsonArray((primary is null && fileMeta.Dependencies.Count == 0 ? packDeps : fileMeta.Dependencies).Select(d => (JsonNode)d).ToArray()),
                 ["uniqueId"] = fileMeta.Id is not null && game.ModMarker == "manifest" ? fileMeta.Id : null,
                 ["requires"] = new JsonArray(),
                 ["requestedBy"] = primary is not null && metaId is not null ? metaId : meta.Str("requestedBy"),
@@ -210,7 +233,43 @@ public static partial class Installer
             var saved = registry.Add(record);
             primary ??= saved;
         }
+        InstallParts(registry, archivePath, parts, primary!);
         return primary!;
+    }
+
+    /// <summary>
+    /// Патчеры — в BepInEx/patchers/&lt;мод&gt; отдельной записью «мод#patchers» (выключается и удаляется вместе с модом),
+    /// настройки — в BepInEx/config без замены уже настроенного, core — никогда.
+    /// </summary>
+    static void InstallParts(ModRegistry registry, string archivePath, List<BepInExLayout.Part> parts, JsonObject primary)
+    {
+        var id = primary.Str("id")!;
+        var name = primary.Str("name") ?? id;
+        foreach (var part in parts)
+        {
+            if (part.Kind == "config") { BepInExLayout.ApplyConfig(archivePath, part, registry.GamePath, overwrite: false); continue; }
+            if (!BepInExLayout.IsRouted(part.Kind)) continue;
+            var folder = Sanitize(primary.Str("folder") ?? name);
+            var destination = Path.Combine(registry.GamePath, "BepInEx", part.Kind, folder);
+            if (Directory.Exists(destination)) Directory.Delete(destination, true);
+            var files = Archive.Extract(archivePath, destination, part.Prefix, ignoreCase: true);
+            registry.Add(new JsonObject
+            {
+                ["id"] = $"{id}#{part.Kind}",
+                ["name"] = $"{name} ({part.Kind})",
+                ["version"] = primary.Str("version") ?? "",
+                ["author"] = primary.Str("author") ?? "",
+                ["source"] = primary.Str("source") ?? "file",
+                ["url"] = primary.Str("url"),
+                ["icon"] = primary.Str("icon"),
+                ["folder"] = folder,
+                ["target"] = part.Kind,
+                ["fileCount"] = files.Count,
+                ["requestedBy"] = id,
+                ["enabled"] = true,
+                ["missing"] = false,
+            });
+        }
     }
 
     sealed record Manifest(string? Id, string? Name, string? Version, string? Author, List<string> Dependencies);

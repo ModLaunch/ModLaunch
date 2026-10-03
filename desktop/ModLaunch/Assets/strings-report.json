@@ -1,0 +1,10 @@
+{
+  "ru": {
+    "report.copy": "Отчёт для помощи",
+    "report.copied": "Отчёт скопирован. Вставь его в сообщение, когда просишь помощи."
+  },
+  "en": {
+    "report.copy": "Support report",
+    "report.copied": "Report copied. Paste it into your message when you ask for help."
+  }
+}
