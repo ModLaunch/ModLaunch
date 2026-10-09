@@ -1,0 +1,58 @@
+# Быстрые снимки дизайна: сборка Debug, быстрые проверки без сети и только снимки
+# функций по фильтру (метки [DemoShots]) — несколько минут вместо полного прогона desktop.
+# Снимки — в ветку design-screens.
+name: design
+on:
+  workflow_dispatch:
+    inputs:
+      filter:
+        description: 'Какие снимки: часть имени метода с [DemoShots]'
+        required: false
+        default: 'Design91'
+  push:
+    branches: ['claude/design-**']
+    paths: ['desktop/**', '.github/workflows/design.yml']
+permissions:
+  contents: write
+jobs:
+  shots:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Build
+        working-directory: desktop/ModLaunch
+        run: dotnet build -c Debug -o ../../dbg
+      - name: Self-tests (offline)
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath dbg/ModLaunch.exe -ArgumentList '--selftest' -PassThru -Wait -NoNewWindow -RedirectStandardOutput selftest.txt
+          Get-Content selftest.txt
+          Get-Content selftest.txt | Where-Object { $_ -match '^\s*(FAIL|ERROR)' } | ForEach-Object { Write-Output "::error title=selftest::$_" }
+          if ($p.ExitCode -ne 0) { throw "selftest failed" }
+      - name: Shots
+        if: success() || failure()
+        timeout-minutes: 12
+        shell: pwsh
+        env:
+          MODLAUNCH_SHOTS: ${{ github.event.inputs.filter || 'Design91' }}
+        run: |
+          $p = Start-Process -FilePath dbg/ModLaunch.exe -ArgumentList '--screenshot', 'shots', '--only' -PassThru -Wait -NoNewWindow -RedirectStandardOutput shots.txt
+          Get-Content shots.txt
+          Get-ChildItem shots
+          if ($p.ExitCode -ne 0) { throw "exit $($p.ExitCode)" }
+      - name: Shots to branch design-screens
+        if: success() || failure()
+        shell: bash
+        run: |
+          [ -d shots ] || exit 0
+          cd shots
+          git init -q -b design-screens
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Снимки дизайна ${GITHUB_SHA::7}"
+          git push -q -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" design-screens

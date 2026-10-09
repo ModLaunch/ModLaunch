@@ -77,6 +77,17 @@ public sealed partial class MainWindow : Window
     readonly Border _bellPanel;
     readonly StackPanel _bellList = new() { Spacing = 8 };
 
+    // 9.1: слой анимаций «Скачать», выдвижная полоска Creator Hub у левого края, заставка при запуске.
+    readonly Panel _fxLayer = new() { IsVisible = false };
+    Control? _root;
+    CreatorDrawer? _drawer;
+    Splash? _splash;
+    /// <summary>Что снимает и прячет анимация загрузки: боковая панель и страница с шапкой.</summary>
+    internal Control FxRoot => _root!;
+    internal Control? FxRail => _railHost;
+    internal Panel FxLayer => _fxLayer;
+    internal Control? FxDownloads => _downloads;
+
     readonly List<Func<Page>> _history = [];
     int _index = -1;
     Page? _current;
@@ -216,15 +227,15 @@ public sealed partial class MainWindow : Window
         // Главная — по логотипу (одна кнопка вместо двух).
         _logo = logo;
         ToolTip.SetTip(logo, I18n.T("nav.menu"));
-        // 8.5: сверху — главное меню (логотип) и панель управления, за чертой — игры,
-        // в самом низу — Creator Hub, поддержка проекта и аккаунт. Остальное — в «⋯» и панели управления.
+        // 8.5: сверху — главное меню (логотип) и панель управления, за чертой — игры.
+        // 9.1 (эскиз): внизу — поддержка проекта, настройки и аккаунт; Creator Hub спрятан у левого края окна.
         var top = Ui.Col(8, logo, Slot(_panelButton), RailRule(new Thickness(16, 8, 16, 2)));
         top.Margin = new Thickness(0, 14, 0, 6);
         top.HorizontalAlignment = HorizontalAlignment.Center;
         DockPanel.SetDock(top, Dock.Top);
         // Аватар — по центру панели, как и значки над ним (они стоят в «слотах» шириной с панель).
         _accountButton.HorizontalAlignment = HorizontalAlignment.Center;
-        var bottom = Ui.Col(8, RailRule(new Thickness(16, 2, 16, 6)), Slot(_statsButton), Slot(_creatorButton), Slot(_donateButton), _accountButton);
+        var bottom = Ui.Col(8, RailRule(new Thickness(16, 2, 16, 6)), Slot(_statsButton), Slot(_donateButton), Slot(_settingsButton), _accountButton);
         bottom.Margin = new Thickness(0, 6, 0, 16);
         bottom.HorizontalAlignment = HorizontalAlignment.Center;
         DockPanel.SetDock(bottom, Dock.Bottom);
@@ -355,19 +366,28 @@ public sealed partial class MainWindow : Window
         root.Children.Add(railBorder);
         Grid.SetColumn(main, 1);
         root.Children.Add(main);
+        _root = root;
 
         var layers = new Panel();
         _layers = layers;
         layers.Classes.Set("anim", Look.Animations);
         layers.Children.Add(root);
+        layers.Children.Add(_fxLayer);
         layers.Children.Add(_downloadsPanel);
         layers.Children.Add(_bellPanel);
         layers.Children.Add(_accountPanel);
         _friendsDock = new FriendsDock();
         layers.Children.Add(_friendsDock);
+        _drawer = new CreatorDrawer(this);
+        layers.Children.Add(_drawer);
         layers.Children.Add(_launchLayer);
         layers.Children.Add(_toasts);
         layers.Children.Add(_overlay);
+        if (Splash.Enabled)
+        {
+            _splash = new Splash();
+            layers.Children.Add(_splash);
+        }
         return layers;
     }
 
@@ -438,6 +458,8 @@ public sealed partial class MainWindow : Window
     {
         _crumbs.Children.Clear();
         var items = _current?.Crumbs.ToList() ?? [];
+        // 9.1 (эскиз «Home – x – y»): путь всегда начинается с главной.
+        if (_current is not null and not HomePage) items.Insert(0, (I18n.T("nav.menu"), () => Navigate(() => new HomePage())));
         for (var i = 0; i < items.Count; i++)
         {
             var (text, open) = items[i];
@@ -772,6 +794,7 @@ public sealed partial class MainWindow : Window
     public void Navigate(Func<Page> make)
     {
         CloseAccountPanel();
+        _drawer?.Close();
         if (_index < _history.Count - 1) _history.RemoveRange(_index + 1, _history.Count - _index - 1);
         _history.Add(make);
         _index = _history.Count - 1;
@@ -886,7 +909,9 @@ public sealed partial class MainWindow : Window
         else if (e.Key == Key.F11) BigPictureWindow.Open();
         else if (e.Key == Key.Escape)
         {
-            if (_overlay.IsVisible) CloseDialog();
+            if (InstallFx.Active) InstallFx.Skip();
+            else if (_drawer?.IsOpen == true) _drawer.Close();
+            else if (_overlay.IsVisible) CloseDialog();
             else if (_launchLayer.IsVisible) (_launchLayer.Children.FirstOrDefault() as LaunchScreen)?.Close();
             else { _downloadsPanel.IsVisible = false; CloseAccountPanel(); }
         }
@@ -926,7 +951,9 @@ public sealed partial class MainWindow : Window
         };
         // Программа закрылась, пока шла игра «без модов», — возвращаем загрузчик на место.
         try { Features.Vanilla.RestoreLeftovers(); } catch { }
-        await AppState.DetectAll();
+        _splash?.Step(I18n.T("v91.splash.games"), 0.45);
+        try { await AppState.DetectAll(); }
+        finally { _splash?.Finish(() => _splash = null); }
         _ = Task.Run(async () =>
         {
             try { await Features.Tracking.Check(); } catch { }
@@ -1086,6 +1113,17 @@ public sealed partial class MainWindow : Window
         _overlay.IsVisible = false;
         _overlay.Children.Clear();
     }
+
+    /// <summary>Для снимков: показать что-то поверх всего окна (например, заставку). Убирается <see cref="CloseDialog"/>.</summary>
+    internal void Cover(Control c)
+    {
+        _overlay.Children.Clear();
+        _overlay.Children.Add(c);
+        _overlay.IsVisible = true;
+    }
+
+    /// <summary>Выдвижная полоска Creator Hub у левого края (открыть или убрать из кода — для снимков и горячих клавиш).</summary>
+    internal void ShowCreatorDrawer(bool open) { if (open) _drawer?.Open(); else _drawer?.Close(); }
 
     public Task<string?> PickFolder(string title) => Pickers.Folder(this, title);
     public Task<string?> PickFile(string title, bool json = false) => Pickers.File(this, title, json);

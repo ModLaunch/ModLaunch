@@ -35,7 +35,14 @@ public sealed partial class HomePage : Page
             .Select(g => (Game: g, Played: Features.PlayTime.Get(g.Def.Id)))
             .Where(x => x.Game.Status == Detect.Found && x.Played.LastPlayed is not null)
             .OrderByDescending(x => x.Played.LastPlayed).Take(3).ToList();
-        if (recent.Count > 0 && Settings.Data.Bool("homeContinue", true))
+        // Ваши игры — только те, что есть на компьютере.
+        var mine = MainWindow.OrderedGames().Where(g => g.Status == Detect.Found && !Features.GameCollections.IsHidden(g.Def.Id)).ToList();
+
+        // 9.1: в «Витрине» верх главной — плитки (раскладка меняется при каждом запуске).
+        var tiles = Look.Vitrina && Settings.Data.Bool("homeTiles", true);
+        if (tiles)
+            content.Children.Add(Tiles(Settings.Data.Bool("homeContinue", true) ? recent : [], mine));
+        else if (recent.Count > 0 && Settings.Data.Bool("homeContinue", true))
         {
             // 9.0 «Витрина»: последняя игра — большой картой во всю ширину, остальные — строками под ней.
             if (Look.Vitrina)
@@ -45,9 +52,6 @@ public sealed partial class HomePage : Page
             }
             else content.Children.Add(Continue(recent));
         }
-
-        // Ваши игры — только те, что есть на компьютере.
-        var mine = MainWindow.OrderedGames().Where(g => g.Status == Detect.Found && !Features.GameCollections.IsHidden(g.Def.Id)).ToList();
         var searching = AppState.Games.Any(g => g.Status == Detect.Searching);
         var games = new WrapPanel();
         var n = 0;
@@ -72,7 +76,7 @@ public sealed partial class HomePage : Page
 
         // «Выбор ModLaunch» — карусель лучших модов для ваших игр.
         if (_featured is null) { if (!_featuredLoading) { _featuredLoading = true; Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = LoadFeatured(mine)); } }
-        else if (_featured.Count > 0 && Settings.Data.Bool("homePopular", true))
+        else if (!tiles && _featured.Count > 0 && Settings.Data.Bool("homePopular", true))
         {
             _featuredView ??= new Featured(_featured);
             if (_featuredView.Parent is Panel old) old.Children.Remove(_featuredView);
@@ -120,12 +124,13 @@ public sealed partial class HomePage : Page
     /// «Витрина» (9.0): последняя игра во всю ширину — арт, логотип, сведения о модах, «Играть»
     /// и, если есть, готовые обновления модов с кнопкой «Обновить всё».
     /// </summary>
-    static Control ContinueHero(GameState g, Features.Played played)
+    static Control ContinueHero(GameState g, Features.Played played, List<GameState>? fan = null)
     {
         var id = g.Def.Id;
         var running = Features.Launcher.IsRunning(id);
         var white = Brushes.White;
         var soft = Ui.Hex("#D2D6DF");
+        var withFan = fan is { Count: > 0 };
 
         var art = Ui.GameImage(g.Def, 1600, art: Images.Art.Hero);
         var logo = Images.GameAsset(g.Def, Images.Art.Logo, 768);
@@ -135,8 +140,10 @@ public sealed partial class HomePage : Page
         if (logo is not null) ToolTip.SetTip(title, g.Def.Name);
 
         var when = running ? I18n.T("time.running") : I18n.T("time.last", ("when", Ui.Ago(played.LastPlayed)));
+        // Игра, в которую ещё не играли (9.1: герой бывает и без истории запусков), — без «последний раз…».
+        var line = running || played.LastPlayed is not null ? $"{I18n.T("v4.continue")} · {when}" : I18n.T("home.yourGames");
         var eyebrow = Ui.Row(8, Ui.Icon(Icons.Clock, 14, Ui.Hex("#B8E3F0")),
-            new TextBlock { Text = $"{I18n.T("v4.continue")} · {when}".ToUpper(I18n.Culture), FontSize = 12, FontWeight = FontWeight.SemiBold, LetterSpacing = 0.8, Foreground = Ui.Hex("#B8E3F0"), VerticalAlignment = VerticalAlignment.Center });
+            new TextBlock { Text = line.ToUpper(I18n.Culture), FontSize = 12, FontWeight = FontWeight.SemiBold, LetterSpacing = 0.8, Foreground = Ui.Hex("#B8E3F0"), VerticalAlignment = VerticalAlignment.Center });
 
         Control Chip(string text, IBrush? dot) => new Border
         {
@@ -165,6 +172,14 @@ public sealed partial class HomePage : Page
         var mods = Ui.Button(I18n.T("tab.mods"), () => MainWindow.Current?.Navigate(() => new GamePage(id, "installed")), "hero-ghost");
         mods.Padding = new Thickness(20, 13);
         buttons.Children.Add(mods);
+        // С веером обложек справа места под карточку обновлений нет — обновления становятся кнопкой.
+        var pending = Features.ModUpdates.Found.TryGetValue(id, out var found) ? found : null;
+        if (withFan && pending is { Count: > 0 })
+        {
+            var all = Ui.Button($"{I18n.T("v91.home.updates")} · {pending.Count}", () => UpdateReview.Show(pending.Select(u => (g, u)).ToList()), "hero-ghost", Icons.ArrowUp);
+            all.Padding = new Thickness(18, 13);
+            buttons.Children.Add(all);
+        }
 
         var left = Ui.Col(18, eyebrow, Ui.Col(16, title, chips), buttons);
         left.VerticalAlignment = VerticalAlignment.Bottom;
@@ -184,8 +199,10 @@ public sealed partial class HomePage : Page
             },
         };
 
+        // 9.1: справа — веер обложек других ваших игр (эскиз: SV, HK, LC).
+        if (withFan) layers.Children.Add(Fan(fan!));
         // Готовые обновления модов этой игры — карточка справа внизу.
-        if (Features.ModUpdates.Found.TryGetValue(id, out var updates) && updates.Count > 0)
+        else if (Features.ModUpdates.Found.TryGetValue(id, out var updates) && updates.Count > 0)
         {
             var list = Ui.Col(7);
             foreach (var u in updates.Take(3))

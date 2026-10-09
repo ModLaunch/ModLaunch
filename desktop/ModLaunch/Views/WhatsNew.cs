@@ -12,6 +12,10 @@ public static class WhatsNew
 {
     static readonly (string Icon, string Key, Func<Page>? Open)[] Items =
     [
+        (Icons.Grid, "new.v91.home", () => new HomePage()),
+        (Icons.Download, "new.v91.fx", null),
+        (Icons.Creator, "new.v91.creator", () => new CreatorPage()),
+        (Icons.Sparkles, "new.v91.splash", () => new SettingsPage("interface")),
         (Icons.Palette, "new.v9.design", () => new SettingsPage("look")),
         (Icons.Shield, "new.v9.safety", null),
         (Icons.Cube, "new.v85.minecraft", () => new MinecraftPage()),
@@ -36,7 +40,8 @@ public static class WhatsNew
         Settings.Data["seenVersion"] = Http.Version;
         Settings.Save();
         if (seen == Http.Version) return;
-        DispatcherTimer.RunOnce(Show, TimeSpan.FromSeconds(1.2));
+        // 9.1: сначала заставка при запуске, потом «Что нового».
+        DispatcherTimer.RunOnce(Show, TimeSpan.FromSeconds(Splash.Enabled ? 2.6 : 1.2));
     }
 
     public static void Show()

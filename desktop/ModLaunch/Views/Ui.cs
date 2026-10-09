@@ -76,6 +76,7 @@ public static class Icons
     public const string Wrench = "M14.7 6.3a4 4 0 0 0 5 5L21 13l-8 8-3-3 8-8-1.3-1.3a4 4 0 0 1-5-5z M3 21l6-6";
     public const string Music = "M9 18V5l12-2v13 M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M18 19a3 3 0 1 0 0-6 3 3 0 0 0 0 6z";
     public const string Grid = "M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z";
+    public const string Shuffle = "M16 3h5v5 M4 20 21 3 M21 16v5h-5 M15 15l6 6 M4 4l5 5";
     public const string Info = "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z M12 16v-4 M12 8h.01";
     public const string Lock = "M5 11h14v10H5z M8 11V7a4 4 0 0 1 8 0v4";
     public const string Power = "M12 2v10 M18.4 6.6a9 9 0 1 1-12.77.04";

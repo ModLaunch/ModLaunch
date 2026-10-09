@@ -412,6 +412,9 @@ public sealed partial class SettingsPage : Page
             Toggle(I18n.T("look.railFriends"), I18n.T("look.railFriends.hint"), Settings.Data.Bool("railFriends", true), v => { Settings.Data["railFriends"] = v; Chrome(); })));
 
         col.Children.Add(Section(I18n.T("look.home"), I18n.T("look.home.hint"),
+            Toggle(I18n.T("v91.set.shuffle"), I18n.T("v91.set.shuffle.hint"), Settings.Data.Bool("homeShuffle", true), v => Settings.Data["homeShuffle"] = v),
+            Toggle(I18n.T("v91.set.splash"), I18n.T("v91.set.splash.hint"), Settings.Data.Bool("splash", true), v => Settings.Data["splash"] = v),
+            Toggle(I18n.T("v91.set.fx"), I18n.T("v91.set.fx.hint"), Settings.Data.Bool("installFx", true), v => Settings.Data["installFx"] = v),
             Toggle(I18n.T("v4.continue"), I18n.T("v4.continue.text"), Settings.Data.Bool("homeContinue", true), v => Settings.Data["homeContinue"] = v),
             Toggle(I18n.T("home.favorites"), I18n.T("home.favorites.text"), Settings.Data.Bool("homeFavorites", true), v => Settings.Data["homeFavorites"] = v),
             Toggle(I18n.T("look.home.popular"), I18n.T("look.home.popular.hint"), Settings.Data.Bool("homePopular", true), v => Settings.Data["homePopular"] = v),

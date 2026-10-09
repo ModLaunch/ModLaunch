@@ -61,14 +61,14 @@ public static partial class Actions
                 {
                     W.CloseDialog();
                     Features.Compat.Confirmed.Add(mod.Id);
-                    Start(g, mod, pin, reinstall).ContinueWith(_ => asked.TrySetResult());
+                    Start(g, mod, pin, reinstall, fx: true).ContinueWith(_ => asked.TrySetResult());
                 }, "primary"));
             return asked.Task;
         }
-        return Start(g, mod, pin, reinstall);
+        return Start(g, mod, pin, reinstall, fx: !batch);
     }
 
-    static Task Start(GameState g, ModInfo mod, Pin? pin, bool reinstall)
+    static Task Start(GameState g, ModInfo mod, Pin? pin, bool reinstall, bool fx = false)
     {
         if (g.Path is null || g.Registry is null || NeedLoader(g)) return Task.CompletedTask;
         var registry = g.Registry;
@@ -102,6 +102,8 @@ public static partial class Actions
             done.TrySetResult();
         }
         Jobs.Finished += OnFinished;
+        // 9.1: нажали «Скачать» сами (не очередь сборки) — анимация с карточкой мода и прогрессом.
+        if (fx) InstallFx.Play(new FxCard(mod.Name, string.IsNullOrEmpty(mod.Author) ? g.Def.Name : $"{mod.Author} · {g.Def.Name}", mod.Icon, g.Def), job);
         return done.Task;
     }
 
