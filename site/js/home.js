@@ -6,7 +6,7 @@
 Object.assign(EN, {
   'nav.how': 'How it works',
   'hero.chip': 'Out now:',
-  'hero.chip2': 'Minecraft support',
+  'hero.chip2': 'the new “Showcase” design',
   'hero.t1': 'Mods in one click.',
   'hero.t2': 'No guides, no archives, no copying files by hand.',
   'hero.lead': 'ModLaunch finds the games on your PC, installs the mod loader and every mod with its dependencies, then keeps them up to date. 18 games — from Stardew Valley to Minecraft — and any other with the “+” button.',
@@ -115,6 +115,7 @@ Object.assign(EN, {
   'news.eyebrow': 'What’s new',
   'news.title': 'Latest versions',
   'news.all': 'All versions',
+  'news.90': '“Showcase” design', 'news.90a': 'Big game art and “Continue playing” on Home', 'news.90b': 'Game covers on the side rail', 'news.90c': 'Full-width game art on the game page', 'news.90d': 'Links from mods can’t launch programs',
   'news.85': 'Minecraft', 'news.85a': 'Fabric, Quilt, Forge and NeoForge install themselves', 'news.85b': 'Builds with their own mods and worlds', 'news.85c': 'A Modrinth catalog that fits your version and loader', 'news.85d': 'Modpacks, .mrpack and one-click updates',
   'news.70': 'ModLaunch 3 design', 'news.70a': 'Breadcrumbs, info panel and game-colored glow', 'news.70b': '“ModLaunch pick” carousel and top mods', 'news.70c': 'Grid catalog, “Hot” badges, hide installed', 'news.70d': 'Steam-style collections and sorting',
   'news.60': 'Big Picture', 'news.60a': 'Big Picture mode and PC control with a gamepad', 'news.60b': 'A Steam-style library with covers', 'news.60c': 'Mod tabs and a Mods center, like Nexus', 'news.60d': 'Logo is Home, Creator Hub moved down',
@@ -314,7 +315,7 @@ releaseHooks.push((rel) => {
   const latest = rel.all?.[0];
   if (!latest || lang === 'en' || !newer(String(latest.tag_name).replace(/^v/i, ''), shown)) return;
   const body = latest.body || '';
-  const parts = [...body.matchAll(/## (?:Что нового в|What's new in) ([\d.]+)\n([\s\S]*?)(?=\n## |$)/g)].slice(0, 3);
+  const parts = [...body.matchAll(/^#{1,2} (?:Что нового в|What's new in|ModLaunch) ([\d.]+)\n([\s\S]*?)(?=\n#{1,2} |(?![\s\S]))/gm)].slice(0, 3);
   if (!parts.length) return;
   const date = new Date(latest.published_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
   document.getElementById('newsList').innerHTML = parts.map(([, ver, text], i) => {
