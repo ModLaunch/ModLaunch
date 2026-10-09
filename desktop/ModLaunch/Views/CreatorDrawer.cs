@@ -138,7 +138,7 @@ public sealed class CreatorDrawer : Panel
         col.Children.Add(head);
 
         var create = Ui.Button(I18n.T("v91.cr.create"), () => { Close(); CreatorPage.CreateNew(); }, "primary", Icons.Plus);
-        var publish = Ui.Button(I18n.T("v91.cr.publish"), () => { Close(); CreatorPage.Publish(); }, "", Icons.Upload);
+        var publish = Ui.Button(I18n.T("v91.cr.publish"), () => { Close(); CreatorPage.PublishFromAnywhere(); }, "", Icons.Upload);
         create.HorizontalAlignment = publish.HorizontalAlignment = HorizontalAlignment.Stretch;
         create.HorizontalContentAlignment = publish.HorizontalContentAlignment = HorizontalAlignment.Center;
         var actions = new Grid { ColumnDefinitions = new ColumnDefinitions("*,*"), ColumnSpacing = 8, Margin = new Thickness(0, 0, 0, 14) };

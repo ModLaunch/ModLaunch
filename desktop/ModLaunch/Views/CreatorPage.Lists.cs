@@ -152,7 +152,7 @@ public sealed partial class CreatorPage
     }
 
     /// <summary>«Опубликовать» откуда угодно (выдвижная полоска): окно публикации, потом — «Мои → Опубликованные».</summary>
-    public static void Publish()
+    public static void PublishFromAnywhere()
     {
         var game = AppState.Games.FirstOrDefault(g => g.Status == Detect.Found)?.Def.Id ?? "";
         HubPublish.Show(new HubDraft { Game = game }, fromProject: false, pack: null,
