@@ -10,22 +10,29 @@ namespace ModLaunch.Core;
 /// </summary>
 public static class Look
 {
-    public static readonly string[] Themes = ["graphite", "paper", "dark", "black", "light", "midnight", "nord", "forest", "grape", "mocha", "sand", "contrast"];
-    public static readonly string[] Designs = ["studio", "aurora"];
+    public static readonly string[] Themes = ["ink", "graphite", "paper", "dark", "black", "light", "midnight", "nord", "forest", "grape", "mocha", "sand", "contrast"];
+    public static readonly string[] Designs = ["vitrina", "studio", "aurora"];
 
     /// <summary>
     /// Дизайн (8.3): studio — строгий, в духе студийной школы (типографика и воздух
     /// вместо украшений, тонкие контуры, монохром и один акцент); aurora — живой фон
     /// и стеклянные карточки 8.1–8.2.
     /// </summary>
-    public static string Design => Designs.Contains(Settings.Data.Str("design")) ? Settings.Data.Str("design")! : "studio";
-    public static bool Studio => Design == "studio";
+    public static string Design => Designs.Contains(Settings.Data.Str("design")) ? Settings.Data.Str("design")! : "vitrina";
+    /// <summary>Строгие дизайны без живого фона и стекла: «Витрина» (9.0) и «Студия» (8.3).</summary>
+    public static bool Studio => Design is "studio" or "vitrina";
+    /// <summary>
+    /// «Витрина» (9.0): игра на первом плане — большие арты, обложки 2:3 на боковой панели,
+    /// один фиолетовый акцент на главных действиях, шрифты Onest и Unbounded.
+    /// </summary>
+    public static bool Vitrina => Design == "vitrina";
     public static void SetDesign(string value)
     {
         Settings.Data["design"] = value;
         // К каждому дизайну — своя «родная» тема, если человек не выбрал другую.
-        if (value == "studio" && Theme is "dark") Settings.Data["theme"] = "graphite";
-        if (value == "aurora" && Theme is "graphite") Settings.Data["theme"] = "dark";
+        if (value == "studio" && Theme is "dark" or "ink") Settings.Data["theme"] = "graphite";
+        if (value == "aurora" && Theme is "graphite" or "ink") Settings.Data["theme"] = "dark";
+        if (value == "vitrina" && Theme is "graphite" or "dark") Settings.Data["theme"] = "ink";
         Settings.Save();
         Apply();
     }
@@ -33,15 +40,19 @@ public static class Look
     /// <summary>Первый запуск 8.3: включить «Студию» и её тему, если оформление не меняли.</summary>
     static void Migrate()
     {
-        if (Settings.Data["design"] is not null) return;
-        Settings.Data["design"] = "studio";
-        if (Settings.Data.Str("theme") is null or "dark") Settings.Data["theme"] = "graphite";
-        if (Settings.Data.Str("accent") is null or "#7C5CFF") Settings.Data["accent"] = "#F2483A";
+        // 9.0: всем — «Витрина». Тему и акцент меняем, только если они были стандартными для прежних версий.
+        if (Settings.Data.Bool("look9")) return;
+        Settings.Data["look9"] = true;
+        Settings.Data["design"] = "vitrina";
+        if (Settings.Data.Str("theme") is null or "dark" or "graphite") Settings.Data["theme"] = "ink";
+        if (Settings.Data.Str("accent") is null or "#7C5CFF" or "#F2483A") Settings.Data["accent"] = "#6E4BFF";
+        if (Settings.Data.Str("font") is null or "Inter") Settings.Data["font"] = "Onest";
+        Settings.Data["showBrand"] = false;
         Settings.Save();
     }
 
-    public static readonly string[] Accents = ["#F2483A", "#7C5CFF","#3B82F6", "#14B8A6", "#22C55E", "#EAB308", "#F97316", "#EF4444", "#EC4899", "#06B6D4", "#A3E635", "#F43F5E", "#8B5CF6", "#1BD96A", "#FFFFFF"];
-    public static readonly string[] Fonts = ["Inter", "Segoe UI", "Segoe UI Variable Display", "Arial", "Verdana", "Bahnschrift", "Consolas", "Cascadia Code"];
+    public static readonly string[] Accents = ["#6E4BFF", "#F2483A", "#7C5CFF","#3B82F6", "#14B8A6", "#22C55E", "#EAB308", "#F97316", "#EF4444", "#EC4899", "#06B6D4", "#A3E635", "#F43F5E", "#8B5CF6", "#1BD96A", "#FFFFFF"];
+    public static readonly string[] Fonts = ["Onest", "Inter", "Segoe UI", "Segoe UI Variable Display", "Arial", "Verdana", "Bahnschrift", "Consolas", "Cascadia Code"];
     public static readonly string[] Radii = ["sharp", "normal", "round"];
     public static readonly string[] Backdrops = ["aurora", "soft", "grid", "plain"];
     /// <summary>Фон окна: aurora — живые пятна и сетка, soft — пятна без движения, grid — сетка, plain — ровный.</summary>
@@ -49,7 +60,18 @@ public static class Look
     public static void SetBackdrop(string value) { Settings.Data["backdrop"] = value; Settings.Save(); Apply(); }
 
     /// <summary>Шрифт интерфейса (Inter встроен, остальные — из Windows).</summary>
-    public static string Font => Fonts.Contains(Settings.Data.Str("font")) ? Settings.Data.Str("font")! : "Inter";
+    public static string Font => Fonts.Contains(Settings.Data.Str("font")) ? Settings.Data.Str("font")! : "Onest";
+    /// <summary>Встроенные шрифты: Onest (текст) и Unbounded (крупные заголовки «Витрины»).</summary>
+    public static readonly FontFamily Onest = new("avares://ModLaunch/Assets/fonts#Onest");
+    public static readonly FontFamily Unbounded = new("avares://ModLaunch/Assets/fonts#Unbounded");
+    /// <summary>Шрифт крупных заголовков: в «Витрине» — Unbounded, иначе — шрифт интерфейса.</summary>
+    public static FontFamily Display => Vitrina ? Unbounded : UiFont;
+    public static FontFamily UiFont => Font switch
+    {
+        "Onest" => Onest,
+        "Inter" => new FontFamily("avares://Avalonia.Fonts.Inter/Assets#Inter"),
+        var f => new FontFamily(f),
+    };
     /// <summary>Скругление углов: sharp — почти квадратные, round — мягкие.</summary>
     public static string Radius => Radii.Contains(Settings.Data.Str("radius")) ? Settings.Data.Str("radius")! : "normal";
     /// <summary>Сила цветного свечения фона, 0…1.</summary>
@@ -101,7 +123,7 @@ public static class Look
     }
     public static readonly double[] Scales = [0.85, 0.9, 1.0, 1.1, 1.25];
 
-    public static string Theme => Themes.Contains(Settings.Data.Str("theme")) ? Settings.Data.Str("theme")! : "graphite";
+    public static string Theme => Themes.Contains(Settings.Data.Str("theme")) ? Settings.Data.Str("theme")! : "ink";
     public static string Accent => Settings.Data.Str("accent") is string a && a.StartsWith('#') && a.Length == 7 ? a : Accents[0];
     /// <summary>«Авто»: на широких мониторах интерфейс крупнее, чтобы не было пустых полей.</summary>
     public static bool AutoScale => Settings.Data["uiScale"] is null || Settings.Data.Str("uiScale") == "auto";
@@ -113,6 +135,12 @@ public static class Look
 
     static readonly Dictionary<string, Dictionary<string, string>> Palettes = new()
     {
+        // «Витрина» (9.0): почти чёрный с лёгкой синевой — на нём сочно смотрятся арты игр и фиолетовый акцент.
+        ["ink"] = new()
+        {
+            ["Bg"] = "#0B0C10", ["Rail"] = "#07080B", ["Surface"] = "#12141A", ["Surface2"] = "#191B23", ["Surface3"] = "#22252F",
+            ["Line"] = "#22252E", ["Text"] = "#ECEEF4", ["Muted"] = "#9AA2B4", ["Faint"] = "#6C7385",
+        },
         // «Студия»: нейтральный графит и бумага — без синевы, чтобы работали типографика и один акцент.
         ["graphite"] = new()
         {
@@ -187,7 +215,7 @@ public static class Look
     {
         if (_custom is not null) app.Styles.Remove(_custom);
         var k = Radius switch { "sharp" => 0.3, "round" => 1.6, _ => 1.0 };
-        var font = Font == "Inter" ? new FontFamily("avares://Avalonia.Fonts.Inter/Assets#Inter") : new FontFamily(Font);
+        var font = UiFont;
         _custom = new Styles
         {
             new Style(x => x.OfType<Avalonia.Controls.Window>()) { Setters = { new Setter(Avalonia.Controls.Primitives.TemplatedControl.FontFamilyProperty, font) } },
@@ -226,6 +254,7 @@ public static class Look
                 });
         }
         if (Studio) AddStudio(_custom);
+        if (Vitrina) AddVitrina(_custom);
         app.Styles.Add(_custom);
     }
 
@@ -281,6 +310,54 @@ public static class Look
             (Avalonia.Controls.Presenters.ContentPresenter.BackgroundProperty, R("Surface3")));
     }
 
+    /// <summary>
+    /// «Витрина» (9.0) поверх правил «Студии»: крупные заголовки — Unbounded, карточки мягче
+    /// (скругление 14), выбранное в акцентной подложке, главная кнопка — акцентом.
+    /// </summary>
+    static void AddVitrina(Styles s)
+    {
+        IBrush R(string key) => Application.Current!.Resources.TryGetResource(key, null, out var v) && v is IBrush b ? b : Brushes.Gray;
+        void Add(Func<Selector?, Selector> sel, params (AvaloniaProperty P, object V)[] setters)
+        {
+            var style = new Style(sel);
+            foreach (var (p, v) in setters) style.Setters.Add(new Setter(p, v));
+            s.Add(style);
+        }
+        var round = Radius switch { "round" => 1.4, "sharp" => 0.4, _ => 1.0 };
+        CornerRadius Cr(double r) => new(Math.Round(r * round));
+
+        Add(x => x.OfType<Avalonia.Controls.TextBlock>().Class("h1"),
+            (Avalonia.Controls.TextBlock.FontFamilyProperty, Unbounded), (Avalonia.Controls.TextBlock.FontSizeProperty, 32.0),
+            (Avalonia.Controls.TextBlock.FontWeightProperty, FontWeight.Bold), (Avalonia.Controls.TextBlock.LetterSpacingProperty, -1.2));
+        Add(x => x.OfType<Avalonia.Controls.TextBlock>().Class("h2"),
+            (Avalonia.Controls.TextBlock.FontFamilyProperty, Unbounded), (Avalonia.Controls.TextBlock.FontSizeProperty, 19.0),
+            (Avalonia.Controls.TextBlock.FontWeightProperty, FontWeight.Bold), (Avalonia.Controls.TextBlock.LetterSpacingProperty, -0.5));
+        Add(x => x.OfType<Avalonia.Controls.TextBlock>().Class("brand"), (Avalonia.Controls.TextBlock.ForegroundProperty, R("Brand2")));
+
+        Add(x => x.OfType<Avalonia.Controls.Border>().Class("card"),
+            (Avalonia.Controls.Border.BackgroundProperty, R("Surface")), (Avalonia.Controls.Border.BorderBrushProperty, R("Line")),
+            (Avalonia.Controls.Border.BorderThicknessProperty, new Thickness(1)), (Avalonia.Controls.Border.CornerRadiusProperty, Cr(14)));
+        foreach (var cls in new[] { "tile", "card-btn" })
+            Add(x => x.OfType<Avalonia.Controls.Button>().Class(cls),
+                (Avalonia.Controls.Primitives.TemplatedControl.CornerRadiusProperty, Cr(14)));
+        Add(x => x.OfType<Avalonia.Controls.Button>(), (Avalonia.Controls.Primitives.TemplatedControl.CornerRadiusProperty, Cr(10)));
+        Add(x => x.OfType<Avalonia.Controls.TextBox>(), (Avalonia.Controls.Primitives.TemplatedControl.CornerRadiusProperty, Cr(10)));
+        Add(x => x.OfType<Avalonia.Controls.ComboBox>(), (Avalonia.Controls.Primitives.TemplatedControl.CornerRadiusProperty, Cr(10)));
+        Add(x => x.OfType<Avalonia.Controls.Button>().Class("chip"), (Avalonia.Controls.Primitives.TemplatedControl.CornerRadiusProperty, Cr(9)));
+        // Пункты левой колонки каталога: выбранный — спокойная подложка, а не инверсия.
+        Add(x => x.OfType<Avalonia.Controls.Button>().Class("chip").Class("side"),
+            (Avalonia.Controls.Primitives.TemplatedControl.CornerRadiusProperty, Cr(10)), (Avalonia.Controls.Primitives.TemplatedControl.FontSizeProperty, 14.0));
+        Add(x => x.OfType<Avalonia.Controls.Button>().Class("chip").Class("side").Class("active"),
+            (Avalonia.Controls.Primitives.TemplatedControl.BackgroundProperty, R("Surface2")), (Avalonia.Controls.Primitives.TemplatedControl.ForegroundProperty, R("Text")));
+        Add(x => x.OfType<Avalonia.Controls.Button>().Class("chip").Class("side").Class("active").Template().OfType<Avalonia.Controls.Presenters.ContentPresenter>(),
+            (Avalonia.Controls.Presenters.ContentPresenter.BackgroundProperty, R("Surface2")), (Avalonia.Controls.Presenters.ContentPresenter.ForegroundProperty, R("Text")));
+        // Выбранная вкладка-кнопка — мягкая акцентная подложка, а не серая.
+        Add(x => x.OfType<Avalonia.Controls.Button>().Class("tab").Class("active").Not(y => y.Class("line")),
+            (Avalonia.Controls.Primitives.TemplatedControl.BackgroundProperty, R("BrandSoft")));
+        Add(x => x.OfType<Avalonia.Controls.Button>().Class("tab").Class("active").Not(y => y.Class("line")).Template().OfType<Avalonia.Controls.Presenters.ContentPresenter>(),
+            (Avalonia.Controls.Presenters.ContentPresenter.BackgroundProperty, R("BrandSoft")));
+    }
+
     /// <summary>Применить сохранённые настройки (при запуске и после любой смены).</summary>
     public static void Apply()
     {
@@ -300,7 +377,7 @@ public static class Look
         Set(app, "Brand", accent);
         Set(app, "Brand2", light ? Mix(accent, Colors.Black, 0.12) : Mix(accent, Colors.White, 0.22));
         Set(app, "BrandSoft", Mix(bg, accent, light ? 0.16 : 0.24));
-        if (Studio)
+        if (Studio && !Vitrina)
         {
             // Акцент только у главного действия: подсветки и значки — нейтральные.
             Set(app, "BrandSoft", Color.Parse(palette["Surface3"]));
@@ -312,6 +389,8 @@ public static class Look
         app.Resources["SystemAccentColorLight1"] = Mix(accent, Colors.White, 0.2);
         app.Resources["SystemAccentColorDark1"] = Mix(accent, Colors.Black, 0.2);
         app.RequestedThemeVariant = light ? ThemeVariant.Light : ThemeVariant.Dark;
+        // Шрифт и у кнопок, полей и списков (их шаблоны берут его из ресурса темы).
+        app.Resources["ContentControlThemeFontFamily"] = UiFont;
         ApplyStyles(app);
         Changed?.Invoke();
     }

@@ -1,0 +1,14 @@
+{
+  "ru": {
+    "look.theme.ink": "Чернила",
+    "look.design.vitrina": "Витрина",
+    "look.design.vitrina.text": "Игра на первом плане: большие арты, обложки на боковой панели, один акцент.",
+    "v9.sections": "Разделы"
+  },
+  "en": {
+    "look.theme.ink": "Ink",
+    "look.design.vitrina": "Showcase",
+    "look.design.vitrina.text": "Games first: big art, covers on the side rail, one accent.",
+    "v9.sections": "Sections"
+  }
+}

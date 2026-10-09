@@ -88,7 +88,14 @@ public sealed partial class GamePage : Page
     public override void Build()
     {
         var content = new StackPanel { Spacing = 24, Margin = new Thickness(40, 26, 40, 40), MaxWidth = 1640 };
-        content.Children.Add(Header());
+        // 9.0 «Витрина»: шапка игры во всю ширину окна, без рамки; остальное — под ней с полями.
+        Control page = content;
+        if (Look.Vitrina)
+        {
+            content.Margin = new Thickness(40, 4, 40, 40);
+            page = new StackPanel { Children = { Header(), content } };
+        }
+        else content.Children.Add(Header());
         if (_g.Status == Detect.Found)
         {
             if (PurgeBanner() is { } banner) content.Children.Add(banner);
@@ -115,7 +122,7 @@ public sealed partial class GamePage : Page
         // список остаётся на месте, а не прыгает наверх. Сброс — только при смене вкладки.
         _scroll ??= new ScrollViewer { HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
         if (_scrollTab != _tab) { _scroll.Offset = default; _scrollTab = _tab; }
-        _scroll.Content = content;
+        _scroll.Content = page;
         _root ??= new Panel { Children = { _scroll } };
         while (_root.Children.Count > 1) _root.Children.RemoveAt(1);
         if (BulkBar() is { } bar)
@@ -144,11 +151,18 @@ public sealed partial class GamePage : Page
         };
 
         // Логотип игры вместо названия, если он есть (как в Steam).
-        var logo = Images.GameAsset(_g.Def, Images.Art.Logo, 640);
+        var vitrina = Look.Vitrina;
+        var logo = Images.GameAsset(_g.Def, Images.Art.Logo, vitrina ? 768 : 640);
         Control title = logo is null
-            ? new TextBlock { Text = _g.Def.Name, FontSize = 30, FontWeight = FontWeight.Bold, Foreground = Brushes.White }
-            : new Image { Source = logo, MaxHeight = 70, MaxWidth = 260, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Left };
+            ? NameTitle()
+            : new Image { Source = logo, MaxHeight = vitrina ? 92 : 70, MaxWidth = vitrina ? 400 : 260, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Left };
         if (logo is not null) ToolTip.SetTip(title, _g.Def.Name);
+        TextBlock NameTitle()
+        {
+            var t = new TextBlock { Text = _g.Def.Name, FontSize = vitrina ? 34 : 30, FontWeight = FontWeight.Bold, Foreground = Brushes.White };
+            if (vitrina) t.FontFamily = Look.Display;
+            return t;
+        }
         var info = Ui.Col(10,
             title,
             Ui.Row(8, Ui.Dot(status.Item1), Ui.Text(status.Item2, "small", color: Ui.Hex("#D5DAE5"))));
@@ -166,7 +180,7 @@ public sealed partial class GamePage : Page
         buttons.VerticalAlignment = VerticalAlignment.Bottom;
         if (_g.Status == Detect.Found)
         {
-            buttons.Children.Add(Ui.Button(I18n.T("games.openFolder"), () => Actions.OpenFolder(_g.Path), "", Icons.Folder));
+            buttons.Children.Add(Ui.Button(I18n.T("games.openFolder"), () => Actions.OpenFolder(_g.Path), vitrina ? "hero-ghost" : "", Icons.Folder));
             if (_g.LoaderInstalled)
             {
                 if (Features.Launcher.IsRunning(_g.Def.Id))
@@ -189,7 +203,7 @@ public sealed partial class GamePage : Page
             }
         }
 
-        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), Margin = new Thickness(26, 22) };
+        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), Margin = vitrina ? new Thickness(40, 24, 40, 26) : new Thickness(26, 22) };
         grid.Children.Add(info);
         Grid.SetColumn(buttons, 1);
         grid.Children.Add(buttons);
@@ -201,6 +215,27 @@ public sealed partial class GamePage : Page
             Animate.From(hero, "scale(1.12)", 1400, 0, new Avalonia.Animation.Easings.QuadraticEaseOut(), 1);
             Animate.From(info, "translateX(-28px)", 520, 120);
             Animate.From(buttons, "translateX(28px)", 520, 180);
+        }
+        if (vitrina)
+        {
+            // Низ арта плавно уходит в цвет окна — вкладки стоят прямо под картинкой.
+            var bg = Ui.Res("Bg") is SolidColorBrush bb ? bb.Color : Color.Parse("#0B0C10");
+            Color A(byte a) => Color.FromArgb(a, bg.R, bg.G, bg.B);
+            return new Border
+            {
+                ClipToBounds = true,
+                Height = 300,
+                Child = new Panel
+                {
+                    Children =
+                    {
+                        hero,
+                        new Border { Background = new LinearGradientBrush { StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(0, 1, RelativeUnit.Relative), GradientStops = { new GradientStop(A(40), 0), new GradientStop(A(30), 0.35), new GradientStop(A(120), 0.62), new GradientStop(A(255), 1) } } },
+                        new Border { Background = new LinearGradientBrush { StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 0, RelativeUnit.Relative), GradientStops = { new GradientStop(Color.Parse("#C0080A0E"), 0), new GradientStop(Color.Parse("#00080A0E"), 0.6) } } },
+                        grid,
+                    },
+                },
+            };
         }
         return new Border
         {
@@ -389,11 +424,35 @@ public sealed partial class GamePage : Page
     Control CatalogView()
     {
         var col = new StackPanel { Spacing = 14 };
+        // 9.0 «Витрина»: источники и разделы — колонкой слева, как фильтры в Modrinth.
+        var side = Look.Vitrina ? new StackPanel { Spacing = 4 } : null;
+        Control SideCaption(string text) => new TextBlock { Text = text.ToUpper(I18n.Culture), FontSize = 11.5, FontWeight = FontWeight.SemiBold, LetterSpacing = 0.9, Foreground = Ui.Res("Faint"), Margin = new Thickness(12, 10, 0, 6) };
+        Button SideItem(Button b)
+        {
+            b.HorizontalAlignment = HorizontalAlignment.Stretch;
+            b.HorizontalContentAlignment = HorizontalAlignment.Left;
+            b.Margin = new Thickness(0);
+            b.Padding = new Thickness(12, 8);
+            b.Classes.Add("side");
+            return b;
+        }
 
         // Источники: основной каталог и дополнительные (как в Vortex — моды с разных сайтов).
         var source = _source ?? _g.Def.PrimarySource;
         DockPanel? sourceDock = null; // в одну строку с источниками уходят переключатели «скрыть установленные», «только рабочие» и вид списка
-        if (_g.Def.Sources.Length > 1)
+        if (_g.Def.Sources.Length > 1 && side is not null)
+        {
+            if (_sourceTotals.Count < _g.Def.Sources.Length && !Program.Demo) _ = LoadSourceTotals();
+            side.Children.Add(SideCaption(I18n.T("v4.source")));
+            foreach (var src in _g.Def.Sources)
+            {
+                var label = Catalog.Title(src) + (_sourceTotals.TryGetValue(src, out var n) ? $" · {I18n.Compact(n)}" : "");
+                var b = SideItem(Ui.Button(label, () => { _source = src; _section = "all"; _ = Load(reset: true); Build(); }, "chip"));
+                if (src == source) b.Classes.Add("active");
+                side.Children.Add(b);
+            }
+        }
+        else if (_g.Def.Sources.Length > 1)
         {
             if (_sourceTotals.Count < _g.Def.Sources.Length && !Program.Demo) _ = LoadSourceTotals();
             var sources = Ui.Row(8, Ui.Text(I18n.T("v4.source"), "small muted"));
@@ -412,6 +471,7 @@ public sealed partial class GamePage : Page
 
         var chips = new WrapPanel();
         var primarySource = source == _g.Def.PrimarySource;
+        side?.Children.Add(SideCaption(I18n.T("v9.sections")));
         foreach (var s in _g.Def.Sections)
         {
             if (!primarySource && s.Id is not ("all" or "best")) continue;
@@ -419,9 +479,10 @@ public sealed partial class GamePage : Page
             var b = Ui.Button(I18n.T("sec." + s.Id), () => SelectSection(s.Id), "chip", SectionIcon(s.Id));
             if (_section == s.Id) b.Classes.Add("active");
             b.Margin = new Thickness(0, 0, 8, 8);
-            chips.Children.Add(b);
+            if (side is not null) side.Children.Add(SideItem(b));
+            else chips.Children.Add(b);
         }
-        col.Children.Add(chips);
+        if (side is null) col.Children.Add(chips);
 
         if (_section is not ("picks" or "packs"))
         {
@@ -514,7 +575,12 @@ public sealed partial class GamePage : Page
         RenderList();
         // Если за это время страницу уже перестроили, этот список больше не нужен.
         if (ReferenceEquals(_listHost, host)) col.Children.Add(host);
-        return col;
+        if (side is null) return col;
+        var layout = new Grid { ColumnDefinitions = new ColumnDefinitions("228,*"), ColumnSpacing = 28 };
+        layout.Children.Add(side);
+        Grid.SetColumn(col, 1);
+        layout.Children.Add(col);
+        return layout;
     }
 
     /// <summary>Открыть раздел каталога (для снимков экрана).</summary>

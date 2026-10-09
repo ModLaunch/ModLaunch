@@ -486,8 +486,21 @@ public sealed partial class MainWindow : Window
         foreach (var g in RailGames())
         {
             var id = g.Def.Id;
-            var art = new Border { CornerRadius = new CornerRadius(11), ClipToBounds = true, Child = Ui.GameImage(g.Def, 120, art: Images.Art.Cover) };
+            var vitrina = Look.Vitrina;
+            // 9.0 «Витрина»: на панели — обложки 2:3, как полка в библиотеке Steam.
+            var art = vitrina
+                ? new Border { Width = 42, Height = 58, CornerRadius = new CornerRadius(8), ClipToBounds = true, Child = Ui.GameImage(g.Def, 120, art: Images.Art.Cover) }
+                : new Border { CornerRadius = new CornerRadius(11), ClipToBounds = true, Child = Ui.GameImage(g.Def, 120, art: Images.Art.Cover) };
             var running = Features.Launcher.IsRunning(id);
+            Control face = art;
+            if (vitrina && !running)
+                // Точка состояния: зелёная — можно играть с модами, жёлтая — сначала поставить загрузчик.
+                face = new Panel { Children = { art, new Border
+                {
+                    Width = 11, Height = 11, CornerRadius = new CornerRadius(6), Background = g.LoaderInstalled || g.Def.Loader is Games.LoaderKind.None or Games.LoaderKind.Minecraft ? Ui.Res("Good") : Ui.Res("Warn"),
+                    BorderBrush = Ui.Res("Rail"), BorderThickness = new Thickness(2), Margin = new Thickness(0, 0, 1, 1),
+                    HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom,
+                } } };
             var b = new Button
             {
                 Classes = { "rail" },
@@ -499,8 +512,9 @@ public sealed partial class MainWindow : Window
                             BorderBrush = Ui.Res("Rail"), BorderThickness = new Thickness(2), Margin = new Thickness(0, 0, 1, 1),
                             HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom,
                         } } }
-                    : art,
+                    : face,
             };
+            if (vitrina) { b.Width = 48; b.Height = 64; b.CornerRadius = new CornerRadius(10); }
             if (_current?.GameId == id) b.Classes.Add("active");
             b.Click += (_, _) => Navigate(() => new GamePage(id));
             b.ContextFlyout = GameCard.Menu(g);

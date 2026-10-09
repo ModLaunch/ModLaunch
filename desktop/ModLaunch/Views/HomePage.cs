@@ -35,15 +35,25 @@ public sealed partial class HomePage : Page
             .Select(g => (Game: g, Played: Features.PlayTime.Get(g.Def.Id)))
             .Where(x => x.Game.Status == Detect.Found && x.Played.LastPlayed is not null)
             .OrderByDescending(x => x.Played.LastPlayed).Take(3).ToList();
-        if (recent.Count > 0 && Settings.Data.Bool("homeContinue", true)) content.Children.Add(Continue(recent));
+        if (recent.Count > 0 && Settings.Data.Bool("homeContinue", true))
+        {
+            // 9.0 «Витрина»: последняя игра — большой картой во всю ширину, остальные — строками под ней.
+            if (Look.Vitrina)
+            {
+                content.Children.Add(Intro(ContinueHero(recent[0].Game, recent[0].Played), 0));
+                if (recent.Count > 1) content.Children.Add(Continue(recent.Skip(1).ToList(), false));
+            }
+            else content.Children.Add(Continue(recent));
+        }
 
         // Ваши игры — только те, что есть на компьютере.
         var mine = MainWindow.OrderedGames().Where(g => g.Status == Detect.Found && !Features.GameCollections.IsHidden(g.Def.Id)).ToList();
         var searching = AppState.Games.Any(g => g.Status == Detect.Searching);
         var games = new WrapPanel();
         var n = 0;
-        foreach (var g in mine) games.Children.Add(Intro(GameCard.Cover(g, 132), n++));
-        games.Children.Add(Intro(GameCard.AddCover(132), n++));
+        var coverWidth = Look.Vitrina ? 144 : 132;
+        foreach (var g in mine) games.Children.Add(Intro(GameCard.Cover(g, coverWidth), n++));
+        games.Children.Add(Intro(GameCard.AddCover(coverWidth), n++));
         var section = Ui.Col(12, Header(I18n.T("home.yourGames"), I18n.T("lib.open"), () => MainWindow.Current?.Navigate(() => new LibraryPage())));
         if (mine.Count == 0)
             section.Children.Add(Ui.Text(searching ? I18n.T("games.searching") : I18n.T("home.noGames"), "muted", wrap: true));
@@ -95,7 +105,7 @@ public sealed partial class HomePage : Page
         return row;
     }
 
-    static Control Continue(List<(GameState Game, Features.Played Played)> recent)
+    static Control Continue(List<(GameState Game, Features.Played Played)> recent, bool title = true)
     {
         var row = new WrapPanel();
         foreach (var (g, played) in recent)
@@ -103,7 +113,113 @@ public sealed partial class HomePage : Page
             var running = Features.Launcher.IsRunning(g.Def.Id);
             row.Children.Add(GameCard.Row(g, running ? I18n.T("time.running") : I18n.T("time.last", ("when", Ui.Ago(played.LastPlayed)))));
         }
-        return Ui.Col(12, Header(I18n.T("v4.continue"), null, null), row);
+        return title ? Ui.Col(12, Header(I18n.T("v4.continue"), null, null), row) : row;
+    }
+
+    /// <summary>
+    /// «Витрина» (9.0): последняя игра во всю ширину — арт, логотип, сведения о модах, «Играть»
+    /// и, если есть, готовые обновления модов с кнопкой «Обновить всё».
+    /// </summary>
+    static Control ContinueHero(GameState g, Features.Played played)
+    {
+        var id = g.Def.Id;
+        var running = Features.Launcher.IsRunning(id);
+        var white = Brushes.White;
+        var soft = Ui.Hex("#D2D6DF");
+
+        var art = Ui.GameImage(g.Def, 1600, art: Images.Art.Hero);
+        var logo = Images.GameAsset(g.Def, Images.Art.Logo, 768);
+        Control title = logo is null
+            ? new TextBlock { Text = g.Def.Name, FontFamily = Look.Display, FontSize = 34, FontWeight = FontWeight.Bold, Foreground = white, TextWrapping = TextWrapping.Wrap, MaxWidth = 520 }
+            : new Image { Source = logo, MaxHeight = 96, MaxWidth = 440, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Left };
+        if (logo is not null) ToolTip.SetTip(title, g.Def.Name);
+
+        var when = running ? I18n.T("time.running") : I18n.T("time.last", ("when", Ui.Ago(played.LastPlayed)));
+        var eyebrow = Ui.Row(8, Ui.Icon(Icons.Clock, 14, Ui.Hex("#B8E3F0")),
+            new TextBlock { Text = $"{I18n.T("v4.continue")} · {when}".ToUpper(I18n.Culture), FontSize = 12, FontWeight = FontWeight.SemiBold, LetterSpacing = 0.8, Foreground = Ui.Hex("#B8E3F0"), VerticalAlignment = VerticalAlignment.Center });
+
+        Control Chip(string text, IBrush? dot) => new Border
+        {
+            Background = new SolidColorBrush(Color.FromArgb(30, 255, 255, 255)), CornerRadius = new CornerRadius(8), Padding = new Thickness(11, 5), Margin = new Thickness(0, 0, 8, 0),
+            Child = dot is null
+                ? new TextBlock { Text = text, FontSize = 13, Foreground = white }
+                : Ui.Row(7, Ui.Dot(dot, 7), new TextBlock { Text = text, FontSize = 13, Foreground = white, VerticalAlignment = VerticalAlignment.Center }),
+        };
+        var chips = new WrapPanel();
+        chips.Children.Add(Chip(GameCard.Status(g), g.LoaderInstalled ? Ui.Res("Good") : Ui.Res("Warn")));
+        if (played.TotalMs > 0) chips.Children.Add(Chip(I18n.T("time.total", ("time", Features.PlayTime.Format(played.TotalMs))), null));
+
+        var buttons = Ui.Row(10);
+        if (running)
+        {
+            buttons.Children.Add(PlayControls.RunningPill(id));
+            buttons.Children.Add(Ui.Button(I18n.T("v4.stop"), () => Features.Launcher.Stop(id), "", Icons.Stop));
+        }
+        else if (g.LoaderInstalled) buttons.Children.Add(PlayControls.PlayButton(g));
+        else
+        {
+            var install = Ui.Button(I18n.T("games.installLoader", ("loader", g.Def.LoaderName)), () => Actions.InstallLoader(g), "primary", Icons.Download);
+            install.Padding = new Thickness(24, 13);
+            buttons.Children.Add(install);
+        }
+        var mods = Ui.Button(I18n.T("tab.mods"), () => MainWindow.Current?.Navigate(() => new GamePage(id, "installed")), "hero-ghost");
+        mods.Padding = new Thickness(20, 13);
+        buttons.Children.Add(mods);
+
+        var left = Ui.Col(18, eyebrow, Ui.Col(16, title, chips), buttons);
+        left.VerticalAlignment = VerticalAlignment.Bottom;
+        left.MaxWidth = 640;
+        left.HorizontalAlignment = HorizontalAlignment.Left;
+
+        var layers = new Panel
+        {
+            Children =
+            {
+                art,
+                new Border { Background = new LinearGradientBrush { StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 0, RelativeUnit.Relative),
+                    GradientStops = { new GradientStop(Color.Parse("#F0080A0E"), 0), new GradientStop(Color.Parse("#CC080A0E"), 0.34), new GradientStop(Color.Parse("#18080A0E"), 0.68), new GradientStop(Color.Parse("#00080A0E"), 1) } } },
+                new Border { Background = new LinearGradientBrush { StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(0, 1, RelativeUnit.Relative),
+                    GradientStops = { new GradientStop(Color.Parse("#00080A0E"), 0.55), new GradientStop(Color.Parse("#99080A0E"), 1) } } },
+                new Border { Padding = new Thickness(40, 32), Child = left },
+            },
+        };
+
+        // Готовые обновления модов этой игры — карточка справа внизу.
+        if (Features.ModUpdates.Found.TryGetValue(id, out var updates) && updates.Count > 0)
+        {
+            var list = Ui.Col(7);
+            foreach (var u in updates.Take(3))
+            {
+                var row = new DockPanel();
+                var ver = new TextBlock { Text = $"{u.Current} → {u.Latest}", FontSize = 13, Foreground = Ui.Hex("#9AA2B4"), VerticalAlignment = VerticalAlignment.Center };
+                DockPanel.SetDock(ver, Dock.Right);
+                row.Children.Add(ver);
+                row.Children.Add(new TextBlock { Text = u.Name, FontSize = 13, Foreground = soft, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 0, 10, 0) });
+                list.Children.Add(row);
+            }
+            var all = Ui.Button(I18n.T("upd.all"), () => UpdateReview.Show(updates.Select(u => (g, u)).ToList()), "hero-light", Icons.ArrowUp);
+            all.HorizontalAlignment = HorizontalAlignment.Stretch;
+            all.HorizontalContentAlignment = HorizontalAlignment.Center;
+            layers.Children.Add(new Border
+            {
+                Width = 300, Margin = new Thickness(28), Padding = new Thickness(16), CornerRadius = new CornerRadius(16),
+                Background = new SolidColorBrush(Color.FromArgb(205, 9, 11, 15)), BorderBrush = new SolidColorBrush(Color.FromArgb(28, 255, 255, 255)), BorderThickness = new Thickness(1),
+                HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom,
+                Child = Ui.Col(12,
+                    new TextBlock { Text = I18n.T("upd.review.title." + I18n.Plural(updates.Count, "one", "few", "many"), ("n", updates.Count)), FontWeight = FontWeight.SemiBold, Foreground = white },
+                    list, all),
+            });
+        }
+
+        var card = new Border { Height = 372, CornerRadius = new CornerRadius(20), ClipToBounds = true, Background = Ui.Res("Surface"), Child = layers, Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand) };
+        // Клик по арту (не по кнопкам) — страница игры.
+        card.PointerPressed += (_, e) =>
+        {
+            if (e.Source is Avalonia.Visual v && Avalonia.VisualTree.VisualExtensions.FindAncestorOfType<Button>(v, true) is null)
+                MainWindow.Current?.Navigate(() => new GamePage(id));
+        };
+        card.ContextFlyout = GameCard.Menu(g);
+        return card;
     }
 
     // Карусель и её данные живут весь сеанс: перерисовка главной не сбрасывает прокрутку.

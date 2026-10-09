@@ -110,6 +110,28 @@
       <Setter Property="Background" Value="{StaticResource Hover}"/>
     </Style>
 
+    <!-- 9.0 «Витрина»: кнопки поверх арта игры -->
+    <Style Selector="Button.hero-ghost">
+      <Setter Property="Background" Value="#730A0C10"/>
+      <Setter Property="BorderBrush" Value="#2EFFFFFF"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="Foreground" Value="White"/>
+    </Style>
+    <Style Selector="Button.hero-ghost:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="#A60A0C10"/>
+      <Setter Property="BorderBrush" Value="#59FFFFFF"/>
+      <Setter Property="Foreground" Value="White"/>
+    </Style>
+    <Style Selector="Button.hero-light">
+      <Setter Property="Background" Value="#ECEEF4"/>
+      <Setter Property="Foreground" Value="#0B0C10"/>
+      <Setter Property="FontWeight" Value="Bold"/>
+    </Style>
+    <Style Selector="Button.hero-light:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="White"/>
+      <Setter Property="Foreground" Value="#0B0C10"/>
+    </Style>
+
     <Style Selector="Button.ghost:disabled /template/ ContentPresenter">
       <Setter Property="Background" Value="Transparent"/>
     </Style>

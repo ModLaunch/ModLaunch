@@ -24,7 +24,13 @@ public static class SelfCheck
         async Task Check(string name, Func<Task<string>> body)
         {
             try { Console.WriteLine($"ok   {name}: {await body()}"); }
-            catch (Exception e) { failed++; Console.WriteLine($"FAIL {name}: {e.GetType().Name}: {e.Message}"); }
+            catch (Exception e)
+            {
+                failed++;
+                // Проверки с меткой [SelfTest] вызываются через отражение — показываем настоящую причину.
+                var inner = e is System.Reflection.TargetInvocationException { InnerException: { } ie } ? ie : e;
+                Console.WriteLine($"FAIL {name}: {inner.GetType().Name}: {inner.Message}");
+            }
         }
 
         await Check("thunderstore search", async () =>
