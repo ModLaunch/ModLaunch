@@ -143,10 +143,8 @@ public sealed class CreatorDrawer : Panel
         var publish = Ui.Button(I18n.T("v91.cr.publish"), () => { Close(); CreatorPage.PublishFromAnywhere(); }, "", Icons.Upload);
         create.HorizontalAlignment = publish.HorizontalAlignment = HorizontalAlignment.Stretch;
         create.HorizontalContentAlignment = publish.HorizontalContentAlignment = HorizontalAlignment.Center;
-        var actions = new Grid { ColumnDefinitions = new ColumnDefinitions("*,*"), ColumnSpacing = 8, Margin = new Thickness(0, 0, 0, 14) };
-        actions.Children.Add(create);
-        Grid.SetColumn(publish, 1);
-        actions.Children.Add(publish);
+        var actions = Ui.Col(8, create, publish);
+        actions.Margin = new Thickness(0, 0, 0, 14);
         col.Children.Add(actions);
 
         col.Children.Add(Caption(I18n.T("v91.drawer.sections")));
