@@ -553,7 +553,11 @@ public sealed class FxRun
         _layer.Children.Clear();
         _layer.Background = null;
         _root.Opacity = 1;
-        _shot?.Dispose();
+        // Снимок освобождаем не сразу: отрисовщик ещё кадр-другой может держать куски, вырезанные из него,
+        // и рисовать из уже освобождённой памяти — это роняло бы программу.
+        foreach (var p in _pieces) if (p.View is Image img) img.Source = null;
+        _pieces.Clear();
+        if (_shot is { } shot) DispatcherTimer.RunOnce(shot.Dispose, TimeSpan.FromSeconds(3));
         _shot = null;
         Ended?.Invoke();
     }
