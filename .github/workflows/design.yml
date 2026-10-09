@@ -1,14 +1,14 @@
-# Быстрые снимки дизайна: сборка Debug, быстрые проверки без сети и только снимки
-# функций по фильтру (метки [DemoShots]) — несколько минут вместо полного прогона desktop.
-# Снимки — в ветку design-screens.
+# Снимки дизайна: выпускная сборка (один exe), быстрые проверки без сети и снимки экранов.
+# При пуше в claude/design-* — все снимки; вручную — можно только снимки функций по фильтру.
+# Снимки, вывод программы и журнал ошибок — в ветку design-screens, готовый exe — в design-build.
 name: design
 on:
   workflow_dispatch:
     inputs:
       filter:
-        description: 'Какие снимки: часть имени метода с [DemoShots]'
+        description: 'Только снимки функций с [DemoShots], чьё имя содержит это (пусто — все снимки)'
         required: false
-        default: 'Design91'
+        default: ''
   push:
     branches: ['claude/design-**']
     paths: ['desktop/**', '.github/workflows/design.yml']
@@ -17,47 +17,48 @@ permissions:
 jobs:
   shots:
     runs-on: windows-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
-      - name: Build
+      - name: Publish (Release, one exe)
         working-directory: desktop/ModLaunch
-        run: dotnet build -c Debug -o ../../dbg
+        run: dotnet publish -c Release -r win-x64 -o ../../out
       - name: Self-tests (offline)
         shell: pwsh
         run: |
-          $p = Start-Process -FilePath dbg/ModLaunch.exe -ArgumentList '--selftest' -PassThru -Wait -NoNewWindow -RedirectStandardOutput selftest.txt
+          $p = Start-Process -FilePath out/ModLaunch.exe -ArgumentList '--selftest' -PassThru -Wait -NoNewWindow -RedirectStandardOutput selftest.txt
           Get-Content selftest.txt
           Get-Content selftest.txt | Where-Object { $_ -match '^\s*(FAIL|ERROR)' } | ForEach-Object { Write-Output "::error title=selftest::$_" }
           if ($p.ExitCode -ne 0) { throw "selftest failed" }
       - name: Shots
         if: success() || failure()
-        timeout-minutes: 12
+        timeout-minutes: 15
         shell: pwsh
         env:
-          MODLAUNCH_SHOTS: ${{ github.event.inputs.filter || 'Design91' }}
+          MODLAUNCH_SHOTS: ${{ github.event.inputs.filter }}
         run: |
-          $p = Start-Process -FilePath dbg/ModLaunch.exe -ArgumentList '--screenshot', 'shots', '--only' -PassThru -Wait -NoNewWindow -RedirectStandardOutput shots.txt
-          Get-Content shots.txt
-          Get-ChildItem shots
+          New-Item -ItemType Directory -Force shots | Out-Null
+          $only = if ($env:MODLAUNCH_SHOTS) { @('--only') } else { @() }
+          $p = Start-Process -FilePath out/ModLaunch.exe -ArgumentList (@('--screenshot', 'shots') + $only) -PassThru -Wait -NoNewWindow -RedirectStandardOutput shots-out.txt -RedirectStandardError shots-err.txt
+          "exit $($p.ExitCode)" | Out-File shots-exit.txt
+          Copy-Item shots-out.txt, shots-err.txt, shots-exit.txt shots/ -ErrorAction SilentlyContinue
+          Get-ChildItem $env:TEMP -Recurse -Filter errors.log -ErrorAction SilentlyContinue | Select-Object -First 3 | ForEach-Object { Copy-Item $_.FullName "shots/errors-$($_.Directory.Parent.Name).log" }
+          Get-Content shots-out.txt | Select-Object -Last 40
+          Get-Content shots-err.txt
           if ($p.ExitCode -ne 0) { throw "exit $($p.ExitCode)" }
-      # Готовая программа (как в выпуске: один exe) — в ветку design-build, чтобы её можно было забрать git'ом.
-      - name: Publish (Release, one exe)
-        if: success()
-        working-directory: desktop/ModLaunch
-        run: dotnet publish -c Release -r win-x64 -o ../../out
+      # Готовая программа — в ветку design-build, чтобы её можно было забрать git'ом.
       - name: Exe to branch design-build
-        if: success()
+        if: success() || failure()
         shell: bash
         run: |
+          [ -f out/ModLaunch.exe ] || exit 0
           v=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' desktop/ModLaunch/ModLaunch.csproj | head -1)
           mkdir -p pack
           cp out/ModLaunch.exe "pack/ModLaunch-Setup-$v.exe"
           pwsh -NoProfile -Command "Compress-Archive -Path 'pack/ModLaunch-Setup-$v.exe' -DestinationPath 'pack/ModLaunch-Setup-$v.zip' -Force"
-          ls -la pack
           cd pack
           git init -q -b design-build
           git config user.name "github-actions[bot]"
