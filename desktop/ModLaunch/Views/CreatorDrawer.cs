@@ -78,9 +78,12 @@ public sealed class CreatorDrawer : Panel
         w.AddHandler(PointerMovedEvent, (_, e) =>
         {
             var x = e.GetPosition(this).X;
+            // Развёрнутое окно Windows сдвигает за край экрана на несколько пикселей — край считаем от видимой части.
+            var hidden = Math.Max(0, _w.OffScreenMargin.Left);
             if (!IsOpen)
             {
-                var near = x >= 0 && x < EdgeZone;
+                if (Math.Abs(_handle.Margin.Left - (hidden + 2)) > 0.5) _handle.Margin = new Thickness(hidden + 2, 0, 0, 0);
+                var near = x >= 0 && x < hidden + EdgeZone;
                 Hot(near);
                 // Небольшая задержка: случайный проход мышью мимо края не открывает панель.
                 if (near) _openTimer ??= DispatcherTimer.RunOnce(() => { _openTimer = null; Open(); }, TimeSpan.FromMilliseconds(140));
