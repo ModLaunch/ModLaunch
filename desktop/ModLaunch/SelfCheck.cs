@@ -317,21 +317,31 @@ public static class SelfCheck
             var dir = Path.Combine(root, "ConflictGame");
             Directory.CreateDirectory(Path.Combine(dir, "valheim_Data"));
             var registry = new ModRegistry(game, dir);
-            foreach (var n in new[] { "ModA", "ModB" })
+            // Список модов игры общий для всех проверок (games/valheim.json) — свои записи убираем за собой,
+            // иначе следующие проверки увидят чужие моды (DepGraph.SharedHelperIsNotOffered).
+            try
             {
-                Directory.CreateDirectory(Path.Combine(registry.ModsDir, n));
-                File.WriteAllText(Path.Combine(registry.ModsDir, n, "Shared.dll"), n);
-                registry.Add(new JsonObject { ["id"] = "x-" + n, ["name"] = n, ["folder"] = n, ["source"] = "thunderstore" });
+                foreach (var n in new[] { "ModA", "ModB" })
+                {
+                    Directory.CreateDirectory(Path.Combine(registry.ModsDir, n));
+                    File.WriteAllText(Path.Combine(registry.ModsDir, n, "Shared.dll"), n);
+                    registry.Add(new JsonObject { ["id"] = "x-" + n, ["name"] = n, ["folder"] = n, ["source"] = "thunderstore" });
+                }
+                var conflicts = Features.Conflicts.Find(registry);
+                if (conflicts.Count != 1) throw new Exception($"{conflicts.Count} conflicts");
+                var zip = Path.Combine(root, "t.zip");
+                Features.DownloadArchive.Add("valheim", "x-ModA", "1.0", zip);
+                var archived = Features.DownloadArchive.For("valheim", "x-ModA");
+                if (archived.Count != 1) throw new Exception("archive miss");
+                Features.Notes.Set("valheim", "x-ModA", "note");
+                if (Features.Notes.Get("valheim", "x-ModA") != "note") throw new Exception("notes");
+                return Task.FromResult($"{conflicts[0].A} vs {conflicts[0].B}; archive ok; notes ok");
             }
-            var conflicts = Features.Conflicts.Find(registry);
-            if (conflicts.Count != 1) throw new Exception($"{conflicts.Count} conflicts");
-            var zip = Path.Combine(root, "t.zip");
-            Features.DownloadArchive.Add("valheim", "x-ModA", "1.0", zip);
-            var archived = Features.DownloadArchive.For("valheim", "x-ModA");
-            if (archived.Count != 1) throw new Exception("archive miss");
-            Features.Notes.Set("valheim", "x-ModA", "note");
-            if (Features.Notes.Get("valheim", "x-ModA") != "note") throw new Exception("notes");
-            return Task.FromResult($"{conflicts[0].A} vs {conflicts[0].B}; archive ok; notes ok");
+            finally
+            {
+                foreach (var id in new[] { "x-ModA", "x-ModB" })
+                    if (registry.Has(id)) registry.Remove(id);
+            }
         });
 
         await Check("modscript: all examples compile", () =>

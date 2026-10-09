@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 >nul
 cd /d "%~dp0"
-set VER=8.5.0
+set VER=9.0.0
 title ModLaunch %VER% - установщик
 echo.
 echo  ==== ModLaunch %VER%: собираю установщик ====

@@ -111,23 +111,36 @@ public static class Program
         // Снимки новых функций: у каждой свой метод с меткой [DemoShots], окно — в начальном виде.
         var kit = new Shots(window, Save, ms => Pump(ms), outDir);
         var filter = Environment.GetEnvironmentVariable("MODLAUNCH_SHOTS");
+        // Сбой одного набора снимков не обрывает остальные; причина — строкой ::error, её видно в отчёте CI.
+        var failed = new List<string>();
         foreach (var m in Hooks.Marked<DemoShotsAttribute>())
         {
             if (!string.IsNullOrEmpty(filter) && !m.Name.Contains(filter, StringComparison.OrdinalIgnoreCase)) continue;
-            window.Width = 1366;
-            window.Height = 800;
-            window.CloseDialog();
-            I18n.Set("ru");
-            window.Navigate(() => new HomePage());
-            Pump(200);
-            m.Invoke(null, [kit]);
+            try
+            {
+                window.Width = 1366;
+                window.Height = 800;
+                window.CloseDialog();
+                I18n.Set("ru");
+                window.Navigate(() => new HomePage());
+                Pump(200);
+                m.Invoke(null, [kit]);
+            }
+            catch (Exception e)
+            {
+                var error = e is System.Reflection.TargetInvocationException { InnerException: { } inner } ? inner : e;
+                var where = string.Join(" | ", (error.StackTrace ?? "").Split('\n').Select(l => l.Trim()).Where(l => l != "").Take(6));
+                Console.WriteLine($"::error title=screenshots::{m.DeclaringType?.Name}.{m.Name}: {error.GetType().Name}: {error.Message.ReplaceLineEndings(" ")} @ {where}");
+                failed.Add(m.Name);
+            }
         }
-        if (featuresOnly) return 0;
-
-        I18n.Set("en");
-        window.Navigate(() => new HomePage());
-        Save("8-home-en");
-        return 0;
+        if (!featuresOnly)
+        {
+            I18n.Set("en");
+            window.Navigate(() => new HomePage());
+            Save("8-home-en");
+        }
+        return failed.Count == 0 ? 0 : 1;
     }
 
     static void BuiltInShots(MainWindow window, string outDir, Action<int> pump, Action<string> Save)

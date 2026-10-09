@@ -12,6 +12,8 @@ public static class WhatsNew
 {
     static readonly (string Icon, string Key, Func<Page>? Open)[] Items =
     [
+        (Icons.Palette, "new.v9.design", () => new SettingsPage("look")),
+        (Icons.Shield, "new.v9.safety", null),
         (Icons.Cube, "new.v85.minecraft", () => new MinecraftPage()),
         (Icons.Layers, "new.v85.builds", () => new MinecraftPage("builds")),
         (Icons.Bag, "new.v85.catalog", () => new MinecraftPage("catalog")),
