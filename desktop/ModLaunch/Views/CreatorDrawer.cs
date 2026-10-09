@@ -35,7 +35,6 @@ public sealed class CreatorDrawer : Panel
     readonly Border _shade = new() { IsHitTestVisible = false, Opacity = 0 };
     readonly Border _panel = new() { Width = PanelWidth, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Stretch };
     IDisposable? _openTimer, _closeTimer;
-    bool _wasNear;
 
     public bool IsOpen { get; private set; }
 
@@ -73,7 +72,7 @@ public sealed class CreatorDrawer : Panel
         Children.Add(_handle);
         Children.Add(_panel);
 
-        _zone.PointerPressed += (_, e) => { e.Handled = true; Trace("zone pressed"); Open(); };
+        _zone.PointerPressed += (_, e) => { e.Handled = true; Open(); };
         // Где мышь — смотрим по всему окну (а не только над узкой полосой): у края — через мгновение
         // выезжает панель; открыта и мышь ушла правее неё — уезжает обратно, вернулась — остаётся.
         w.AddHandler(PointerMovedEvent, (_, e) =>
@@ -85,7 +84,6 @@ public sealed class CreatorDrawer : Panel
             {
                 if (Math.Abs(_handle.Margin.Left - (hidden + 2)) > 0.5) _handle.Margin = new Thickness(hidden + 2, 0, 0, 0);
                 var near = x >= 0 && x < hidden + EdgeZone;
-                if (near != _wasNear) { _wasNear = near; Trace($"near={near} x={x:0.0} hidden={hidden:0.0} timer={_openTimer is not null}"); }
                 Hot(near);
                 // Небольшая задержка: случайный проход мышью мимо края не открывает панель.
                 if (near) _openTimer ??= DispatcherTimer.RunOnce(() => { _openTimer = null; Open(); }, TimeSpan.FromMilliseconds(140));
@@ -112,28 +110,13 @@ public sealed class CreatorDrawer : Panel
         _handle.Width = on ? 6 : 4;
     }
 
-    /// <summary>Временный журнал полоски (logs\drawer.log): что видит окно и что делает панель.</summary>
-    internal static void Trace(string what)
-    {
-        try
-        {
-            var path = Path.Combine(Paths.DataDir, "logs", "drawer.log");
-            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            if (File.Exists(path) && new FileInfo(path).Length > 200_000) File.Delete(path);
-            File.AppendAllText(path, $"{DateTime.Now:HH:mm:ss.fff} {what}\n");
-        }
-        catch { }
-    }
-
     public void Open()
     {
-        Trace($"Open called, IsOpen={IsOpen}, bounds={Bounds}, panel={_panel.Bounds}, visible={IsVisible}, effective={IsEffectivelyVisible}, parentIdx={(Parent as Panel)?.Children.IndexOf(this)}/{(Parent as Panel)?.Children.Count}");
         CancelOpen();
         if (IsOpen) return;
         IsOpen = true;
         Hot(false);
-        try { Render(); }
-        catch (Exception e) { Trace("Render failed: " + e); }
+        Render();
         _panel.Opacity = 1;
         _panel.IsHitTestVisible = true;
         _panel.RenderTransform = TransformOperations.Parse("translateX(0px)");
@@ -143,7 +126,6 @@ public sealed class CreatorDrawer : Panel
     public void Close()
     {
         _closeTimer?.Dispose();
-        if (IsOpen) Trace("Close");
         if (!IsOpen) return;
         IsOpen = false;
         _panel.IsHitTestVisible = false;
