@@ -3,6 +3,7 @@ using Avalonia.Animation;
 using Avalonia.Animation.Easings;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Transformation;
@@ -28,14 +29,12 @@ public sealed class CreatorDrawer : Panel
     readonly Border _shade = new() { IsHitTestVisible = false, Opacity = 0 };
     readonly Border _panel = new() { Width = PanelWidth, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Stretch };
     IDisposable? _openTimer, _closeTimer;
-    bool _inside;
 
     public bool IsOpen { get; private set; }
 
     public CreatorDrawer(MainWindow w)
     {
         _w = w;
-        ZIndex = 50;
         _handle.Background = Ui.Res("Brand");
         _handle.Opacity = 0.35;
         _handle.Transitions =
@@ -82,8 +81,13 @@ public sealed class CreatorDrawer : Panel
             if (!IsOpen) _openTimer?.Dispose();
         };
         _zone.PointerPressed += (_, e) => { e.Handled = true; Open(); };
-        _panel.PointerEntered += (_, _) => { _inside = true; _closeTimer?.Dispose(); };
-        _panel.PointerExited += (_, _) => { _inside = false; CloseSoon(260); };
+        // Где мышь — смотрим по всему окну: ушла правее панели — панель уезжает, вернулась — остаётся.
+        w.AddHandler(PointerMovedEvent, (_, e) =>
+        {
+            if (!IsOpen) return;
+            if (e.GetPosition(this).X > PanelWidth + 12) CloseSoon(220);
+            else _closeTimer?.Dispose();
+        }, RoutingStrategies.Tunnel, handledEventsToo: true);
     }
 
     public void Open()
@@ -96,8 +100,6 @@ public sealed class CreatorDrawer : Panel
         _panel.IsHitTestVisible = true;
         _panel.RenderTransform = TransformOperations.Parse("translateX(0px)");
         _shade.Opacity = 1;
-        // Мышь так и не зашла на панель (ушла за край окна) — закрыть.
-        CloseSoon(1400);
     }
 
     public void Close()
@@ -114,7 +116,7 @@ public sealed class CreatorDrawer : Panel
     void CloseSoon(int ms)
     {
         _closeTimer?.Dispose();
-        _closeTimer = DispatcherTimer.RunOnce(() => { if (!_inside) Close(); }, TimeSpan.FromMilliseconds(ms));
+        _closeTimer = DispatcherTimer.RunOnce(Close, TimeSpan.FromMilliseconds(ms));
     }
 
     void Go(Func<Page> page)

@@ -44,6 +44,27 @@ jobs:
           Get-Content shots.txt
           Get-ChildItem shots
           if ($p.ExitCode -ne 0) { throw "exit $($p.ExitCode)" }
+      # Готовая программа (как в выпуске: один exe) — в ветку design-build, чтобы её можно было забрать git'ом.
+      - name: Publish (Release, one exe)
+        if: success()
+        working-directory: desktop/ModLaunch
+        run: dotnet publish -c Release -r win-x64 -o ../../out
+      - name: Exe to branch design-build
+        if: success()
+        shell: bash
+        run: |
+          v=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' desktop/ModLaunch/ModLaunch.csproj | head -1)
+          mkdir -p pack
+          cp out/ModLaunch.exe "pack/ModLaunch-Setup-$v.exe"
+          pwsh -NoProfile -Command "Compress-Archive -Path 'pack/ModLaunch-Setup-$v.exe' -DestinationPath 'pack/ModLaunch-Setup-$v.zip' -Force"
+          ls -la pack
+          cd pack
+          git init -q -b design-build
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "ModLaunch $v (${GITHUB_SHA::7})"
+          git push -q -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" design-build
       - name: Shots to branch design-screens
         if: success() || failure()
         shell: bash

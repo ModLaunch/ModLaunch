@@ -372,7 +372,6 @@ public sealed partial class MainWindow : Window
         _layers = layers;
         layers.Classes.Set("anim", Look.Animations);
         layers.Children.Add(root);
-        layers.Children.Add(_fxLayer);
         layers.Children.Add(_downloadsPanel);
         layers.Children.Add(_bellPanel);
         layers.Children.Add(_accountPanel);
@@ -380,6 +379,8 @@ public sealed partial class MainWindow : Window
         layers.Children.Add(_friendsDock);
         _drawer = new CreatorDrawer(this);
         layers.Children.Add(_drawer);
+        // Анимация «Скачать» — поверх страницы, панелей и полоски Creator Hub, но под экраном запуска и окнами.
+        layers.Children.Add(_fxLayer);
         layers.Children.Add(_launchLayer);
         layers.Children.Add(_toasts);
         layers.Children.Add(_overlay);

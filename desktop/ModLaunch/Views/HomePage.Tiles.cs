@@ -47,7 +47,7 @@ public sealed partial class HomePage
     }
 
     /// <summary>Моды для плиток: «Выбор ModLaunch» и популярные — в случайном, но постоянном за сеанс порядке.</summary>
-    static List<(GameState Game, ModInfo Mod)> TileMods(List<GameState> mine)
+    static List<(GameState Game, ModInfo Mod)> TileMods(List<GameState> mine, string? heroGame = null)
     {
         var list = new List<(GameState, ModInfo)>();
         if (_featured is not null) list.AddRange(_featured);
@@ -55,16 +55,20 @@ public sealed partial class HomePage
             foreach (var m in (Views.Aside.Popular(g) ?? []).Take(6))
                 if (!list.Any(x => x.Item1.Def.Id == g.Def.Id && x.Item2.Id == m.Id)) list.Add((g, m));
         var rng = new Random(Seed);
-        return list.Where(x => !x.Item2.Adult).OrderBy(_ => rng.Next()).Take(12).ToList();
+        var mods = list.Where(x => !x.Item2.Adult).OrderBy(_ => rng.Next()).Take(12).ToList();
+        // Первая (широкая) плитка — мод другой игры, чем в герое: иначе рядом два одинаковых арта.
+        var other = mods.FindIndex(x => x.Item1.Def.Id != heroGame);
+        if (heroGame is not null && other > 0) { var pick = mods[other]; mods.RemoveAt(other); mods.Insert(0, pick); }
+        return mods;
     }
 
     /// <summary>Верх главной: плитки в выбранной раскладке и кнопка «Перемешать».</summary>
     Control Tiles(List<(GameState Game, Features.Played Played)> recent, List<GameState> mine)
     {
-        var mods = TileMods(mine);
         (GameState Game, Features.Played Played)? hero = null;
         if (recent.Count > 0) hero = recent[0];
         else if (mine.Count > 0) hero = (mine[0], Features.PlayTime.Get(mine[0].Def.Id));
+        var mods = TileMods(mine, hero?.Game.Def.Id);
         // Веер обложек: ваши игры, кроме той, что в герое; если своих мало — популярные из каталога.
         var fan = mine.Where(g => g.Def.Id != hero?.Game.Def.Id)
             .Concat(AppState.Games.Where(g => g.Status != Detect.Found && !g.Def.Custom && g.Def.Id != hero?.Game.Def.Id))
