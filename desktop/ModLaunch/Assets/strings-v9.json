@@ -7,7 +7,8 @@
     "new.v9.design": "Новый дизайн «Витрина»",
     "new.v9.design.text": "Большие арты игр, «Продолжить игру» на главной, обложки игр на боковой панели и новые шрифты. Прежний вид — в «Настройки → Внешний вид».",
     "new.v9.safety": "Больше защиты",
-    "new.v9.safety.text": "Ссылки из модов и Hub больше не могут запустить программу или ярлык — открываются только сайты, папки и обычные файлы. Картинки в Hub — только по https."
+    "new.v9.safety.text": "Ссылки из модов и Hub больше не могут запустить программу или ярлык — открываются только сайты, папки и обычные файлы. Картинки в Hub — только по https.",
+    "new.subtitle": "Новый дизайн «Витрина», больше защиты — и всё из 8.5: полная поддержка Minecraft."
   },
   "en": {
     "look.theme.ink": "Ink",
@@ -17,6 +18,7 @@
     "new.v9.design": "New “Showcase” design",
     "new.v9.design.text": "Big game art, “Continue playing” on the home page, game covers on the side rail and new fonts. The previous look is in Settings → Appearance.",
     "new.v9.safety": "Safer by default",
-    "new.v9.safety.text": "Links from mods and the Hub can no longer launch a program or shortcut — only websites, folders and ordinary files open. Hub images load over https only."
+    "new.v9.safety.text": "Links from mods and the Hub can no longer launch a program or shortcut — only websites, folders and ordinary files open. Hub images load over https only.",
+    "new.subtitle": "The new “Showcase” design, more protection — plus everything from 8.5: full Minecraft support."
   }
 }
