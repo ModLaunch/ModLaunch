@@ -23,8 +23,14 @@ namespace ModLaunch.Views;
 public sealed class CreatorDrawer : Panel
 {
     const double PanelWidth = 300;
+    /// <summary>
+    /// Насколько близко к левому краю ловить мышь. Первые несколько пикселей окна Windows отдаёт
+    /// под «потянуть, чтобы изменить размер» (там окно мышь не видит), поэтому полоса шире этого;
+    /// значки боковой панели начинаются дальше (с 14), так что полоса им почти не мешает.
+    /// </summary>
+    const double EdgeZone = 16;
     readonly MainWindow _w;
-    readonly Border _zone = new() { Width = 10, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Stretch, Background = Brushes.Transparent };
+    readonly Border _zone = new() { Width = 14, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Stretch, Background = Brushes.Transparent };
     readonly Border _handle = new() { Width = 4, Height = 64, CornerRadius = new CornerRadius(2), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(2, 0, 0, 0), IsHitTestVisible = false };
     readonly Border _shade = new() { IsHitTestVisible = false, Opacity = 0 };
     readonly Border _panel = new() { Width = PanelWidth, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Stretch };
@@ -66,35 +72,47 @@ public sealed class CreatorDrawer : Panel
         Children.Add(_handle);
         Children.Add(_panel);
 
-        _zone.PointerEntered += (_, _) =>
-        {
-            _handle.Opacity = 1;
-            _handle.Width = 6;
-            _openTimer?.Dispose();
-            // Небольшая задержка: случайный проход мышью мимо края не открывает панель.
-            _openTimer = DispatcherTimer.RunOnce(Open, TimeSpan.FromMilliseconds(110));
-        };
-        _zone.PointerExited += (_, _) =>
-        {
-            _handle.Opacity = 0.35;
-            _handle.Width = 4;
-            if (!IsOpen) _openTimer?.Dispose();
-        };
         _zone.PointerPressed += (_, e) => { e.Handled = true; Open(); };
-        // Где мышь — смотрим по всему окну: ушла правее панели — панель уезжает, вернулась — остаётся.
+        // Где мышь — смотрим по всему окну (а не только над узкой полосой): у края — через мгновение
+        // выезжает панель; открыта и мышь ушла правее неё — уезжает обратно, вернулась — остаётся.
         w.AddHandler(PointerMovedEvent, (_, e) =>
         {
-            if (!IsOpen) return;
-            if (e.GetPosition(this).X > PanelWidth + 12) CloseSoon(220);
-            else _closeTimer?.Dispose();
+            var x = e.GetPosition(this).X;
+            if (!IsOpen)
+            {
+                var near = x >= 0 && x < EdgeZone;
+                Hot(near);
+                // Небольшая задержка: случайный проход мышью мимо края не открывает панель.
+                if (near) _openTimer ??= DispatcherTimer.RunOnce(() => { _openTimer = null; Open(); }, TimeSpan.FromMilliseconds(140));
+                else CancelOpen();
+                return;
+            }
+            if (x > PanelWidth + 12) CloseSoon(220);
+            else { _closeTimer?.Dispose(); _closeTimer = null; }
         }, RoutingStrategies.Tunnel, handledEventsToo: true);
+        // Мышь ушла из окна, не дождавшись панели, — не открываем.
+        w.PointerExited += (_, _) => { if (!IsOpen) { CancelOpen(); Hot(false); } };
+    }
+
+    void CancelOpen()
+    {
+        _openTimer?.Dispose();
+        _openTimer = null;
+    }
+
+    /// <summary>«Ручка» у края ярче и шире, пока мышь рядом.</summary>
+    void Hot(bool on)
+    {
+        _handle.Opacity = on ? 1 : 0.35;
+        _handle.Width = on ? 6 : 4;
     }
 
     public void Open()
     {
-        _openTimer?.Dispose();
+        CancelOpen();
         if (IsOpen) return;
         IsOpen = true;
+        Hot(false);
         Render();
         _panel.Opacity = 1;
         _panel.IsHitTestVisible = true;
