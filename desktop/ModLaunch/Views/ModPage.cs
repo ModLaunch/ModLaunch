@@ -33,7 +33,8 @@ public sealed partial class ModPage : Page
     }
 
     public override string Title => _brief.Name;
-    public override Control? Aside() => Views.Aside.Mod(_g, Mod, _details, _versions?.Count ?? 0);
+    // В «Витрине» сведения о моде стоят справа на самой странице — отдельная панель не нужна.
+    public override Control? Aside() => Look.Vitrina ? null : Views.Aside.Mod(_g, Mod, _details, _versions?.Count ?? 0);
     public override IEnumerable<(string Text, Action? Open)> Crumbs =>
     [
         (_g.Def.Name, () => MainWindow.Current?.Navigate(() => new GamePage(_g.Def.Id, "catalog"))),
@@ -65,7 +66,18 @@ public sealed partial class ModPage : Page
         var col = new StackPanel { Spacing = 24, Margin = new Thickness(40, 26, 40, 40), MaxWidth = 1500 };
         col.Children.Add(Header());
         col.Children.Add(Tabs());
-        col.Children.Add(TabContent());
+        if (Look.Vitrina)
+        {
+            // 9.0 «Витрина»: справа — карточка со сведениями о моде, как на Modrinth.
+            var body = new Grid { ColumnDefinitions = new ColumnDefinitions("*,320"), ColumnSpacing = 28 };
+            body.Children.Add(TabContent());
+            var side = Ui.Card(Views.Aside.Mod(_g, Mod, _details, _versions?.Count ?? 0), 20);
+            side.VerticalAlignment = VerticalAlignment.Top;
+            Grid.SetColumn(side, 1);
+            body.Children.Add(side);
+            col.Children.Add(body);
+        }
+        else col.Children.Add(TabContent());
         Content = new ScrollViewer { Content = col, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
     }
 
@@ -139,11 +151,22 @@ public sealed partial class ModPage : Page
         info.VerticalAlignment = VerticalAlignment.Center;
 
         var cover = _details?.Images.FirstOrDefault() ?? mod.Icon;
+        var vitrina = Look.Vitrina;
         var picture = new Border
         {
-            Width = 250, Height = 230, CornerRadius = new CornerRadius(18), ClipToBounds = true, VerticalAlignment = VerticalAlignment.Top,
-            BorderBrush = Ui.Hex("#26FFFFFF"), BorderThickness = new Thickness(1), Child = Ui.Thumb(cover, mod.Name, 250, 0, 520),
+            Width = vitrina ? 120 : 250, Height = vitrina ? 120 : 230, CornerRadius = new CornerRadius(vitrina ? 26 : 18), ClipToBounds = true, VerticalAlignment = VerticalAlignment.Top,
+            BorderBrush = Ui.Hex("#26FFFFFF"), BorderThickness = new Thickness(1), Child = Ui.Thumb(vitrina ? mod.Icon ?? cover : cover, mod.Name, vitrina ? 120 : 250, 0, 520),
         };
+        if (vitrina)
+        {
+            // Заголовок без цветной подложки: значок, название крупным шрифтом, цифры и кнопки.
+            if (info.Children.Count > 1 && info.Children[1] is TextBlock name) { name.FontFamily = Look.Display; name.FontSize = 30; name.LetterSpacing = -0.8; }
+            var plain = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*"), ColumnSpacing = 24 };
+            plain.Children.Add(picture);
+            Grid.SetColumn(info, 1);
+            plain.Children.Add(info);
+            return plain;
+        }
         var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*"), ColumnSpacing = 26, Margin = new Thickness(26) };
         grid.Children.Add(picture);
         Grid.SetColumn(info, 1);
