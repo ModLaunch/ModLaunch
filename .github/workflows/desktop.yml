@@ -1,6 +1,8 @@
 name: desktop
 
 # ModLaunch 4 на Avalonia: сборка одним exe под Windows и снимки экранов.
+permissions:
+  contents: write
 on:
   push:
     paths:
@@ -44,6 +46,7 @@ jobs:
 
       - name: Screenshots
         if: success() || failure()
+        timeout-minutes: 15
         shell: pwsh
         run: |
           $p = Start-Process -FilePath out/ModLaunch.exe -ArgumentList '--screenshot', 'shots' -PassThru -Wait -NoNewWindow
@@ -60,3 +63,17 @@ jobs:
         with:
           name: screenshots
           path: shots/
+
+      # Снимки — ещё и в ветку desktop-screens: их можно посмотреть прямо в репозитории.
+      - name: Screenshots to branch desktop-screens
+        if: success() || failure()
+        shell: bash
+        run: |
+          [ -d shots ] || exit 0
+          cd shots
+          git init -q -b desktop-screens
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Снимки ModLaunch ${GITHUB_SHA::7} (${GITHUB_REF_NAME})"
+          git push -q -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" desktop-screens
