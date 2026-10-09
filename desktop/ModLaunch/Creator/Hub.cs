@@ -107,7 +107,7 @@ public static partial class Hub
         var name = doc.Str("name") ?? "";
         return new HubMod(
             name[(name.LastIndexOf('/') + 1)..], f.S("uid"), f.S("author"), f.S("name"), f.S("summary") is { Length: > 0 } s ? s : f.S("about"),
-            f.S("description"), f.S("game"), f.S("version"), f.S("kind") is { Length: > 0 } k ? k : "script", f.S("code"), f.A("tags"), f.A("images"),
+            f.S("description"), f.S("game"), f.S("version"), f.S("kind") is { Length: > 0 } k ? k : "script", f.S("code"), f.A("tags"), f.A("images").Where(u => Ads.HttpsUrl(u) is not null).Take(6).ToList(),
             f.L("size"), f.S("sha256"), (int)f.L("chunks"), f.S("fileName"), f.S("changelog"),
             f.L("likes"), f.L("downloads"), f.L("comments"), Firebase.Time(f.S("created")), Firebase.Time(f.S("updated")));
     }

@@ -15,7 +15,10 @@
 
     function mFee() { return 10; }
     function mAdmin() {
+      // Почта админа должна быть подтверждена: иначе любой, кто первым зарегистрирует
+      // адрес из admins/, получил бы права админа (пополнения, выплаты, возвраты).
       return request.auth != null
+        && request.auth.token.get('email_verified', false) == true
         && exists(/databases/$(database)/documents/admins/$(request.auth.token.get('email', '-')));
     }
     function mMember() { return request.auth != null && request.auth.token.get('email', '') != ''; }

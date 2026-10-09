@@ -31,6 +31,8 @@ jobs:
         run: |
           $p = Start-Process -FilePath out/ModLaunch.exe -ArgumentList '--selfcheck' -PassThru -Wait -NoNewWindow -RedirectStandardOutput selfcheck.txt
           Get-Content selfcheck.txt
+          # Упавшие проверки — отдельными пометками: их видно в сводке запуска без скачивания логов.
+          Get-Content selfcheck.txt | Where-Object { $_ -match '^\s*(FAIL|ERROR)' } | ForEach-Object { Write-Output "::error title=self-check::$_" }
           if ($p.ExitCode -ne 0) { throw "self-check failed" }
 
       - name: Catalog report (counts and top mods per game)
@@ -41,6 +43,7 @@ jobs:
           Get-Content report.txt
 
       - name: Screenshots
+        if: success() || failure()
         shell: pwsh
         run: |
           $p = Start-Process -FilePath out/ModLaunch.exe -ArgumentList '--screenshot', 'shots' -PassThru -Wait -NoNewWindow
@@ -53,6 +56,7 @@ jobs:
           path: out/ModLaunch.exe
 
       - uses: actions/upload-artifact@v4
+        if: success() || failure()
         with:
           name: screenshots
           path: shots/

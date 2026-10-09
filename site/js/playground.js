@@ -4,7 +4,7 @@
    и готовый zip — всё в браузере, без сервера. */
 
 Object.assign(EN, {
-  's.chip': 'Creator Hub · ModLaunch 5.5',
+  's.chip': 'Creator Hub · try it in the browser',
   's.sub': 'ModLaunch’s modding language. One command per line, plain words, errors shown instantly — and a real mod comes out. Try it right here.',
   's.share': 'Share', 's.mls': 'Download .mls', 's.zip': 'Download mod (zip)',
   's.zipHint': 'A ready package — drop it into the game or install it via ModLaunch.',

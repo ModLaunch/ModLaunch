@@ -3,21 +3,21 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>ModLaunch — моды в один клик и свой хаб модов</title>
-    <meta name="description" content="ModLaunch — бесплатный лаунчер модов: 17 игр и 100 000+ модов с Thunderstore, Nexus и ModLinks в один клик, свой хаб модов ModLaunch Hub без рекламы, язык модов ModScript, друзья, оверлей и шейдеры." />
-    <meta name="theme-color" content="#0b0c12" />
-    <link rel="canonical" href="https://modlaunch.github.io/ModLaunch/" />
-    <meta property="og:title" content="ModLaunch — моды в один клик и свой хаб модов" />
-    <meta property="og:description" content="17 игр, 100 000+ модов в один клик, ModLaunch Hub и свой язык модов ModScript. Бесплатно." />
+    <title>ModLaunch — моды одной кнопкой, теперь и для Minecraft</title>
+    <meta name="description" content="ModLaunch — бесплатный лаунчер модов для Windows: сам находит игры, ставит загрузчик и моды со всеми зависимостями. 18 игр, включая Minecraft, 100 000+ модов с Thunderstore, Nexus, Modrinth и ModLinks." />
+    <meta name="theme-color" content="#0b0c10" />
+    <link rel="canonical" href="https://modlaunchapp.com/" />
+    <meta property="og:title" content="ModLaunch — моды одной кнопкой" />
+    <meta property="og:description" content="18 игр, включая Minecraft, и 100 000+ модов в один клик. Бесплатно, для Windows 10 и 11." />
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://modlaunch.github.io/ModLaunch/" />
-    <meta property="og:image" content="https://modlaunch.github.io/ModLaunch/img/og.jpg" />
+    <meta property="og:url" content="https://modlaunchapp.com/" />
+    <meta property="og:image" content="https://modlaunchapp.com/img/og.jpg" />
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="icon" href="img/logo.svg" type="image/svg+xml" />
     <link rel="manifest" href="site.webmanifest" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=Unbounded:wght@500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="style.css" />
     <script type="application/ld+json">
       {
@@ -27,25 +27,26 @@
         "operatingSystem": "Windows 10, Windows 11",
         "applicationCategory": "GameApplication",
         "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "url": "https://modlaunchapp.com/",
         "downloadUrl": "https://github.com/ModLaunch/ModLaunch/releases/latest",
-        "softwareVersion": "7.0.0",
-        "description": "Бесплатный лаунчер модов: 17 игр, 100 000+ модов в один клик, ModLaunch Hub и язык модов ModScript."
+        "softwareVersion": "8.5",
+        "description": "Бесплатный лаунчер модов: 18 игр, включая Minecraft, 100 000+ модов в один клик."
       }
     </script>
   </head>
   <body>
-    <div class="bg" aria-hidden="true"><i></i><i></i><i></i></div>
-
     <header class="nav" id="nav">
       <div class="wrap nav__in">
-        <a class="brand" href="./" aria-label="ModLaunch">
-          <svg class="logo" viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><g class="logo__orbit"><path d="M4.3 4.3 19.7 19.7M19.7 4.3 4.3 19.7" stroke="#7a62d6" stroke-width="1.5"/><circle cx="4.3" cy="4.3" r="3" fill="#cbbcff"/><circle cx="19.7" cy="4.3" r="3" fill="#f2c25c"/><circle cx="4.3" cy="19.7" r="3" fill="#8f73ff"/><circle cx="19.7" cy="19.7" r="3" fill="#cbbcff"/></g><circle cx="12" cy="12" r="5.6" fill="#fff" stroke="#b9a6ff" stroke-width=".6"/><circle cx="12" cy="12" r="2.6" fill="#7c5cff"/></svg>
+        <a class="brand" href="./" aria-label="ModLaunch — на главную">
+          <span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><circle cx="5" cy="5" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><path d="M6.5 6.5 9.7 9.7M17.5 6.5l-3.2 3.2M6.5 17.5l3.2-3.2M17.5 17.5l-3.2-3.2"/></svg></span>
           <span>Mod<b>Launch</b></span>
         </a>
-        <nav class="nav__links">
-          <a href="#features" data-t="nav.features">Возможности</a>
+        <nav class="nav__links" aria-label="Разделы">
+          <a href="#how" data-t="nav.how">Как это работает</a>
           <a href="#games" data-t="nav.games">Игры</a>
-          <a href="hub.html"><span data-t="nav.hub">Hub</span><span class="new" data-t="nav.new">новое</span></a>
+          <a href="#minecraft">Minecraft</a>
+          <a href="#features" data-t="nav.features">Возможности</a>
+          <a href="hub.html"><span data-t="nav.hub">Hub</span></a>
           <a href="modscript.html" data-t="nav.creator">ModScript</a>
           <a href="#faq" data-t="nav.faq">Вопросы</a>
         </nav>
@@ -59,24 +60,22 @@
     </header>
 
     <main id="top">
-      <!-- Первый экран -->
-      <section class="hero wrap">
-        <div class="hero__text">
-          <a class="chip reveal" href="#news"><span class="chip__dot"></span><span data-t="hero.chip">Вышла версия</span> <b class="js-version">8.5</b> <span class="hide-sm">· <span data-t="hero.chip2">полная поддержка Minecraft: Fabric, Forge, NeoForge и модпаки</span></span></a>
+      <!-- Первый экран: текст слева, стена обложек справа -->
+      <section class="hero">
+        <div class="wall" id="wall" aria-hidden="true"></div>
+        <div class="wrap hero__in">
+          <a class="chip reveal" href="#news" style="align-self:flex-start"><span class="chip__dot"></span><span data-t="hero.chip">Вышла версия</span> <b class="js-version">8.5</b><span class="hide-sm">&nbsp;· <span data-t="hero.chip2">теперь и Minecraft</span></span></a>
           <h1 class="reveal">
-            <span data-t="hero.title1">Моды в один клик.</span>
-            <span class="grad" data-t="hero.title2">И свой хаб модов.</span>
+            <span data-t="hero.t1">Моды — одной кнопкой.</span>
+            <span class="h1b" data-t="hero.t2">Без гайдов, архивов и ручного копирования.</span>
           </h1>
-          <p class="lead reveal" data-t="hero.lead">ModLaunch сам находит игры, ставит загрузчик, подтягивает зависимости и следит за обновлениями. Теперь и Minecraft — сборки, Fabric, Forge, NeoForge и каталог Modrinth. Библиотека с настоящими обложками, режим Big Picture для геймпада, ModLaunch Hub без рекламы и свой язык модов ModScript.</p>
+          <p class="lead reveal" data-t="hero.lead">ModLaunch сам находит игры на компьютере, ставит загрузчик и моды со всеми зависимостями, а потом следит за обновлениями. 18 игр — от Stardew Valley до Minecraft — и любая другая по кнопке «+».</p>
           <div class="hero__cta reveal" id="download">
             <a class="btn btn--primary btn--lg js-setup" href="https://github.com/ModLaunch/ModLaunch/releases/latest">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19h14" /></svg>
               <span><span data-t="hero.download">Скачать для Windows</span><small class="js-meta">Windows 10 / 11 · бесплатно</small></span>
             </a>
-            <a class="btn btn--ghost btn--lg" href="hub.html">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
-              <span data-t="hero.hub">Открыть Hub</span>
-            </a>
+            <a class="btn btn--ghost btn--lg" href="#how"><span data-t="hero.how">Как это работает</span></a>
           </div>
           <ul class="hero__facts reveal">
             <li><b>18</b><span data-t="hero.games">игр</span></li>
@@ -84,8 +83,11 @@
             <li><b>0 ₽</b><span data-t="hero.free">навсегда</span></li>
           </ul>
         </div>
+      </section>
 
-        <div class="hero__shot reveal" id="tilt">
+      <!-- Окно программы -->
+      <section class="showcase wrap">
+        <div class="showcase__stage reveal" id="tilt">
           <div class="window">
             <div class="window__bar"><i></i><i></i><i></i></div>
             <img src="img/home.webp" alt="Главный экран ModLaunch" width="1366" height="800" />
@@ -96,7 +98,7 @@
           </div>
           <div class="float float--b">
             <span class="float__ico float__ico--up">↑</span>
-            <span><b data-t="float.b1">Обновление готово</b><small data-t="float.b2">3 мода · 1 клик</small></span>
+            <span><b data-t="float.b1">Обновления готовы</b><small data-t="float.b2">3 мода · одна кнопка</small></span>
           </div>
           <div class="float float--c">
             <span class="float__ico float__ico--hub">★</span>
@@ -105,139 +107,148 @@
         </div>
       </section>
 
-      <!-- Цифры -->
-      <div class="band">
-        <div class="wrap band__in">
-          <div class="reveal"><b data-count="18">18</b><span data-t="band.games">игр</span></div>
-          <div class="reveal"><b class="js-total" data-count="0">100 000+</b><span data-t="band.mods">модов в каталогах</span></div>
-          <div class="reveal"><b data-count="29">29</b><span data-t="band.examples">готовых примочек ModScript</span></div>
-          <div class="reveal"><b class="js-hubcount">0</b><span data-t="band.hub">модов в ModLaunch Hub</span></div>
+      <!-- Как это работает -->
+      <section class="wrap" id="how">
+        <div class="head">
+          <div>
+            <span class="eyebrow" data-t="how.eyebrow">Как это работает</span>
+            <h2 class="reveal" data-t="how.title">Три шага — и вы играете с модами</h2>
+          </div>
+          <p class="sub reveal" style="max-width:420px" data-t="how.sub">Никаких «скачайте архив, распакуйте в папку, переименуйте dll». ModLaunch делает это за вас.</p>
         </div>
-      </div>
+        <div class="how__grid">
+          <article class="how__card reveal">
+            <h3 data-t="how.1t">Найдёт игры</h3>
+            <p data-t="how.1p">Steam, Epic, GOG и любые папки — ModLaunch обходит диски сам и показывает, что нашёл.</p>
+            <div class="mini" aria-hidden="true">
+              <div class="mini__row"><span class="mini__ok">✓</span><span>Subnautica</span><small>D:\Games</small></div>
+              <div class="mini__row"><span class="mini__ok">✓</span><span>Stardew Valley</span><small>Steam</small></div>
+              <div class="mini__row"><span class="mini__ok">✓</span><span>Hollow Knight</span><small>C:\Program Files</small></div>
+              <div class="mini__row"><span class="mini__wait"></span><span style="color:var(--muted)" data-t="how.1m">Ищу ещё…</span></div>
+            </div>
+          </article>
+          <article class="how__card reveal">
+            <h3 data-t="how.2t">Поставит загрузчик</h3>
+            <p data-t="how.2p">BepInEx, SMAPI, Modding API, Fabric или Forge — нужный ставится сам и нужной версии.</p>
+            <div class="mini" aria-hidden="true">
+              <div class="mini__row"><span>BepInEx 5.4</span><small>Subnautica</small><span class="mini__ok">✓</span></div>
+              <div class="mini__bar"><i style="--w:100%"></i></div>
+              <div class="mini__row"><span>SMAPI 4</span><small>Stardew Valley</small><span class="mini__wait"></span></div>
+              <div class="mini__bar"><i style="--w:68%"></i></div>
+            </div>
+          </article>
+          <article class="how__card reveal">
+            <h3 data-t="how.3t">Моды одной кнопкой</h3>
+            <p data-t="how.3p">Нажали «Установить» — мод скачан с сайта автора вместе со всем, что ему нужно, и уже работает в игре.</p>
+            <div class="mini" aria-hidden="true">
+              <div class="mini__row"><span class="mini__ico" style="background:#3b1726;color:#ff8fb0">N</span><span><b>Nautilus</b><br /><small data-t="how.3m">+ BepInEx pack сам</small></span><span class="mini__btn" data-t="how.3b">Установить</span></div>
+              <div class="mini__row"><span class="mini__ico" style="background:#13293d;color:#7cc4ff">M</span><span><b>Map</b><br /><small data-t="how.3u">обновится сам</small></span><span class="mini__ok">✓</span></div>
+            </div>
+          </article>
+        </div>
+      </section>
 
       <!-- Игры -->
-      <section class="games wrap" id="games">
-        <span class="eyebrow" data-t="games.eyebrow">Поддерживаемые игры</span>
-        <h2 class="reveal" data-t="games.title">18 игр, включая Minecraft, — и любая другая</h2>
-        <p class="sub reveal" data-t="games.sub">Загрузчик ставится сам, моды — из всех каталогов сразу. Нет вашей игры? Кнопка «+» найдёт её на диске и подберёт моды.</p>
+      <section class="wrap" id="games">
+        <div class="head">
+          <div>
+            <span class="eyebrow" data-t="games.eyebrow">Игры</span>
+            <h2 class="reveal" data-t="games.title">18 игр — и любая другая</h2>
+            <p class="sub reveal" data-t="games.sub">Загрузчик ставится сам, моды — из всех каталогов сразу. Нет вашей игры? Кнопка «+» найдёт её на диске.</p>
+          </div>
+          <a class="head__link" href="#faq"><span data-t="games.missing">Нет вашей игры? Кнопка «+»</span> →</a>
+        </div>
         <div class="games__grid" id="gamesGrid"></div>
       </section>
 
+      <!-- Minecraft -->
+      <section class="wrap" id="minecraft">
+        <div class="mc reveal">
+          <img class="mc__art" src="img/minecraft-hero.webp" alt="" loading="lazy" />
+          <div class="mc__text">
+            <span class="eyebrow" data-t="mc.eyebrow">Новое в 8.5</span>
+            <h2 data-t="mc.title">Minecraft — со сборками и Modrinth</h2>
+            <p data-t="mc.p">Все версии от 1.12 до свежих снапшотов. Нужный загрузчик ставится сам, а играете вы через официальный лаунчер.</p>
+            <div class="mc__loaders"><span>Fabric</span><span>Quilt</span><span>Forge</span><span>NeoForge</span></div>
+            <ul class="mc__list">
+              <li data-t="mc.1">Сборки со своими модами, ресурспаками, шейдерами и мирами</li>
+              <li data-t="mc.2">Каталог Modrinth — только то, что подходит к версии и загрузчику</li>
+              <li data-t="mc.3">Модпаки и .mrpack, импорт из Modrinth App, Prism Launcher и CurseForge</li>
+              <li data-t="mc.4">Обновления модов одной кнопкой, копии миров и разбор вылетов</li>
+            </ul>
+            <div class="hero__cta">
+              <a class="btn btn--light js-setup" href="https://github.com/ModLaunch/ModLaunch/releases/latest">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19h14" /></svg>
+                <span data-t="mc.cta">Скачать ModLaunch</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- Возможности -->
-      <section class="features wrap" id="features">
-        <span class="eyebrow" data-t="feat.eyebrow">Возможности</span>
-        <h2 class="reveal" data-t="feat.title">Всё для модов. В одной программе.</h2>
-        <p class="sub reveal" data-t="feat.sub">Без ручного копирования файлов, распаковки архивов и поиска, почему игра не запускается.</p>
-        <div class="fgrid">
-          <article class="fcard fcard--wide reveal">
-            <div class="fcard__ico"><svg viewBox="0 0 24 24"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19h14"/></svg></div>
-            <h3 data-t="f.install">Установка в один клик</h3>
-            <p data-t="f.install.p">Нажали «Установить» — ModLaunch сам поставит BepInEx, SMAPI или Modding API, скачает мод со всеми зависимостями и положит его куда нужно. Моды с Thunderstore, Nexus, ModLinks и ModLaunch Hub — в одном каталоге.</p>
+      <section class="wrap" id="features">
+        <div class="head">
+          <div>
+            <span class="eyebrow" data-t="feat.eyebrow">Возможности</span>
+            <h2 class="reveal" data-t="feat.title">Всё для модов — в одной программе</h2>
+          </div>
+          <p class="sub reveal" style="max-width:420px" data-t="feat.sub">Установка — только начало. ModLaunch следит за версиями, сохранениями и тем, чтобы игра запускалась.</p>
+        </div>
+        <div class="bento">
+          <article class="tile tile--wide reveal">
+            <div class="tile__text"><h3 data-t="f.versions">Обновления и откат</h3><p data-t="f.versions.p">Все версии мода со списком изменений. Обновите всё одной кнопкой — или откатитесь, если новая версия сломала игру.</p></div>
+            <div class="tile__shot"><img src="img/versions.webp" alt="" loading="lazy" width="1366" height="800" /></div>
           </article>
-          <article class="fcard fcard--wide reveal">
-            <span class="tag">7.0</span>
-            <div class="fcard__ico"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/></svg></div>
-            <h3 data-t="f.v7">Дизайн ModLaunch 3 — только лучше</h3>
-            <p data-t="f.v7.p">«Хлебные крошки» в шапке, правая панель со сведениями об игре и моде, свечение в цвет игры, большая карусель «Выбор ModLaunch», «Топ модов» и каталог списком или сеткой, как в Modrinth.</p>
+          <article class="tile reveal">
+            <div class="tile__text"><h3 data-t="f.bp">Big Picture и геймпад</h3><p data-t="f.bp.p">F11 — и ModLaunch на весь экран, как Steam на телевизоре. Моды и запуск — с дивана.</p></div>
+            <div class="tile__shot"><img src="img/bigpicture.webp" alt="" loading="lazy" width="1366" height="800" /></div>
           </article>
-          <article class="fcard reveal">
-            <span class="tag">7.0</span>
-            <div class="fcard__ico"><svg viewBox="0 0 24 24"><path d="M12 2l3 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.9 21l1.2-6.8-5-4.9 6.9-1z"/></svg></div>
-            <h3 data-t="f.coll">Коллекции как в Steam</h3>
-            <p data-t="f.coll.p">Избранное и свои коллекции, сортировка по времени в игре, скрытие игр и меню по правой кнопке на обложке.</p>
+          <article class="tile reveal">
+            <div class="tile__text"><h3 data-t="f.center">Центр модов</h3><p data-t="f.center.p">Обновления, отслеживаемые, избранное и история загрузок — на одной странице.</p></div>
+            <div class="tile__shot"><img src="img/mods-center.webp" alt="" loading="lazy" width="1366" height="800" /></div>
           </article>
-          <article class="fcard fcard--wide reveal">
-            <span class="tag">6.0</span>
-            <div class="fcard__ico"><svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="12" rx="6"/><path d="M7 11v4M5 13h4M15.5 12h.01M18 14h.01"/></svg></div>
-            <h3 data-t="f.bp">Big Picture и геймпад</h3>
-            <p data-t="f.bp.p">F11 — и ModLaunch на весь экран, как Steam на телевизоре: крупные обложки, арт игры на фоне, запуск, моды и выключение компьютера с геймпада. Кнопка View превращает геймпад в мышь и клавиатуру: стик — курсор, A — клик, X — экранная клавиатура.</p>
+          <article class="tile tile--wide reveal">
+            <div class="tile__text"><h3 data-t="f.lib">Библиотека как в Steam</h3><p data-t="f.lib.p">Настоящие обложки, коллекции, сортировка по времени в игре и меню по правой кнопке.</p></div>
+            <div class="tile__shot"><img src="img/library.webp" alt="" loading="lazy" width="1366" height="800" /></div>
           </article>
-          <article class="fcard fcard--wide reveal">
-            <span class="tag">6.0</span>
-            <div class="fcard__ico"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="10" rx="1.5"/><rect x="14" y="3" width="7" height="10" rx="1.5"/><rect x="3" y="15" width="18" height="6" rx="1.5"/></svg></div>
-            <h3 data-t="f.lib">Библиотека как в Steam</h3>
-            <p data-t="f.lib.p">Настоящие обложки всех 17 игр — даже без интернета. Ваши игры сверху, остальные ниже. У каждой игры шапка с артом и логотипом.</p>
+          <article class="tile reveal">
+            <div class="tile__text"><h3 data-t="f.overlay">Оверлей в игре</h3><p data-t="f.overlay.p">Ctrl+Shift+M прямо в игре: время сеанса, друзья, заметки и копия сохранений.</p></div>
+            <div class="tile__shot"><img src="img/overlay.webp" alt="" loading="lazy" width="1024" height="560" /></div>
           </article>
-          <article class="fcard reveal">
-            <span class="tag">6.0</span>
-            <div class="fcard__ico"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg></div>
-            <h3 data-t="f.tabs">Всё как на Nexus</h3>
-            <p data-t="f.tabs.p">Вкладки мода: файлы, изменения, требования, картинки, видео, отзывы и статистика. Сортировки «случайные» и «по названию», период и 18+.</p>
+          <article class="tile tile--wide reveal">
+            <div class="tile__text"><h3 data-t="f.gfx">ReShade и DXVK</h3><p data-t="f.gfx.p">Шейдеры и пресеты одной кнопкой. DXVK убирает фризы в старых играх.</p></div>
+            <div class="tile__shot"><img src="img/shaders.webp" alt="" loading="lazy" width="1366" height="800" /></div>
           </article>
-          <article class="fcard reveal">
-            <span class="tag">6.0</span>
-            <div class="fcard__ico"><svg viewBox="0 0 24 24"><path d="M21 16V8l-9-5-9 5v8l9 5 9-5zM3.3 7 12 12l8.7-5M12 22V12"/></svg></div>
-            <h3 data-t="f.center">Центр модов</h3>
-            <p data-t="f.center.p">Обновления, отслеживаемые, избранное, недавно просмотренные, история загрузок и скрытое — на одной странице.</p>
-          </article>
-          <article class="fcard fcard--wide reveal">
-            <span class="tag">5.5</span>
-            <div class="fcard__ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg></div>
-            <h3 data-t="f.hub">ModLaunch Hub</h3>
-            <p data-t="f.hub.p">Своя площадка модов без рекламы и платного «быстрого скачивания»: версии со списком изменений, лайки, комментарии, отслеживание, проверка файлов по SHA-256 и VirusTotal.</p>
-          </article>
-          <article class="fcard reveal">
-            <span class="tag">5.5</span>
-            <div class="fcard__ico"><svg viewBox="0 0 24 24"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg></div>
-            <h3 data-t="f.ms">Свой язык модов</h3>
-            <p data-t="f.ms.p">ModScript: переменные, циклы, условия. Скрипт собирается в пакет Content Patcher или Thunderstore.</p>
-          </article>
-          <article class="fcard reveal">
-            <div class="fcard__ico"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></div>
-            <h3 data-t="f.plus">Любая игра</h3>
-            <p data-t="f.plus.p">Кнопка «+» находит игры Steam, Epic и GOG, узнаёт движок и сама ставит BepInEx в игры на Unity.</p>
-          </article>
-          <article class="fcard reveal">
-            <span class="tag">5.5</span>
-            <div class="fcard__ico"><svg viewBox="0 0 24 24"><path d="M12 2 2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>
-            <h3 data-t="f.versions">Версии и откат</h3>
-            <p data-t="f.versions.p">Все версии мода со списком изменений. Поставьте любую — или откатитесь, если новая сломала игру.</p>
-          </article>
-          <article class="fcard reveal">
-            <span class="tag">5.5</span>
-            <div class="fcard__ico"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg></div>
-            <h3 data-t="f.track">Отслеживание</h3>
-            <p data-t="f.track.p">«Отслеживать» у любого мода — колокольчик сообщит о новой версии. Плюс «Ещё от автора» и скрытие модов.</p>
-          </article>
-          <article class="fcard reveal">
-            <div class="fcard__ico"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3 19c.6-3.3 3-5 6-5s5.4 1.7 6 5"/><circle cx="17.5" cy="9" r="2.4"/><path d="M16 14.2c2.6-.3 4.5 1.3 5 4.3"/></svg></div>
-            <h3 data-t="f.friends">Друзья и оверлей</h3>
-            <p data-t="f.friends.p">Кто из друзей во что играет. В игре — Ctrl+Shift+M: таймер, заметки, копия сохранений.</p>
-          </article>
-          <article class="fcard reveal">
-            <div class="fcard__ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg></div>
-            <h3 data-t="f.gfx">ReShade и DXVK</h3>
-            <p data-t="f.gfx.p">Шейдеры и пресеты — одной кнопкой. DXVK убирает фризы в старых играх.</p>
-          </article>
-          <article class="fcard reveal">
-            <div class="fcard__ico"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h8M8 17h5"/></svg></div>
-            <h3 data-t="f.profiles">Профили и сохранения</h3>
-            <p data-t="f.profiles.p">Наборы модов для разных прохождений, копии сохранений, конфликты файлов и архив загрузок.</p>
-          </article>
-          <article class="fcard reveal">
-            <div class="fcard__ico"><svg viewBox="0 0 24 24"><path d="M12 22a10 10 0 1 1 10-10c0 2.5-2 3-3.5 3H16a2 2 0 0 0-1.5 3.3A1.9 1.9 0 0 1 12 22z"/></svg></div>
-            <h3 data-t="f.look">Ваш вид</h3>
-            <p data-t="f.look.p">Тёмная, чёрная OLED и светлая темы, цвет акцента, масштаб, что показывать — и быстрый переход по Ctrl+P.</p>
-          </article>
-          <article class="fcard reveal">
-            <div class="fcard__ico"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v4.5h-4.5"/></svg></div>
-            <h3 data-t="f.update">Сам обновляется</h3>
-            <p data-t="f.update.p">ModLaunch скачивает свои обновления, сверяет контрольную сумму и ставит их по одной кнопке.</p>
-          </article>
+        </div>
+        <div class="extras reveal">
+          <span data-t="x.1">Профили и копии сохранений</span>
+          <span data-t="x.2">Конфликты файлов</span>
+          <span data-t="x.3">Nexus без Premium</span>
+          <span data-t="x.4">Кнопка «+» для любой игры</span>
+          <span data-t="x.5">Друзья — кто во что играет</span>
+          <span data-t="x.6">Тёмная, OLED и светлая темы</span>
+          <span data-t="x.7">Быстрый переход Ctrl+P</span>
+          <span data-t="x.8">Отслеживание модов</span>
+          <span data-t="x.9">Сам обновляется</span>
         </div>
       </section>
 
       <!-- ModLaunch Hub -->
-      <section class="hubsec wrap" id="hub">
-        <span class="eyebrow" data-t="hub.eyebrow">ModLaunch Hub</span>
-        <h2 class="reveal" data-t="hub.title">Моды сообщества — без посредников</h2>
-        <p class="sub reveal" data-t="hub.sub">Свежие моды из ModLaunch Hub. Каждый ставится в программе одной кнопкой, а здесь его можно посмотреть и скачать.</p>
+      <section class="wrap" id="hub">
+        <div class="head">
+          <div>
+            <span class="eyebrow" data-t="hub.eyebrow">ModLaunch Hub</span>
+            <h2 class="reveal" data-t="hub.title">Моды сообщества — без посредников</h2>
+            <p class="sub reveal" data-t="hub.sub">Без рекламы и платного «быстрого скачивания». Каждый мод ставится в программе одной кнопкой, а здесь его можно посмотреть и скачать.</p>
+          </div>
+          <a class="head__link" href="hub.html"><span data-t="hub.all">Все моды Hub</span> →</a>
+        </div>
         <div id="hubTeaser"></div>
-        <p style="text-align:center;margin-top:26px"><a class="btn" href="hub.html"><span data-t="hub.all">Все моды Hub</span> →</a></p>
       </section>
 
       <!-- ModScript -->
-      <section class="creator wrap" id="creator">
+      <section class="wrap" id="creator">
         <div class="split">
           <div>
             <span class="eyebrow" style="text-align:left" data-t="cr.eyebrow">Creator Hub · ModScript</span>
@@ -264,16 +275,50 @@
         </div>
       </section>
 
+      <!-- Безопасность -->
+      <section class="wrap" id="safety">
+        <div class="head">
+          <div>
+            <span class="eyebrow" data-t="safe.eyebrow">Безопасность</span>
+            <h2 class="reveal" data-t="safe.title">Ставит только то, что вы выбрали</h2>
+          </div>
+          <p class="sub reveal" style="max-width:420px" data-t="safe.sub">Моды приходят с сайтов их авторов, а каждый файл проверяется перед установкой.</p>
+        </div>
+        <div class="safe">
+          <article class="reveal">
+            <span class="safe__ico"><svg viewBox="0 0 24 24"><path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V6z"/><path d="m8.5 12 2.5 2.5 4.5-5"/></svg></span>
+            <h3 data-t="safe.1t">Оригиналы от авторов</h3>
+            <p data-t="safe.1p">Thunderstore, Nexus Mods, Modrinth и ModLinks — файл скачивается оттуда, где его выложил автор.</p>
+          </article>
+          <article class="reveal">
+            <span class="safe__ico"><svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></span>
+            <h3 data-t="safe.2t">Проверка каждого файла</h3>
+            <p data-t="safe.2p">Контрольная сумма сверяется при скачивании. Не совпала — установка отменяется.</p>
+          </article>
+          <article class="reveal">
+            <span class="safe__ico"><svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"/><path d="M4 3.5V8h4.5"/><path d="M4 13a8 8 0 0 0 14.3 4.9L20 16"/><path d="M20 20.5V16h-4.5"/></svg></span>
+            <h3 data-t="safe.3t">Честные обновления</h3>
+            <p data-t="safe.3p">ModLaunch обновляется только по https и ставит обновление после проверки контрольной суммы.</p>
+          </article>
+          <article class="reveal">
+            <span class="safe__ico"><svg viewBox="0 0 24 24"><path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/></svg></span>
+            <h3 data-t="safe.4t">Код на виду</h3>
+            <p data-t="safe.4p">Исходники лежат на GitHub, а установщик собирается там автоматически и проходит самопроверку.</p>
+          </article>
+        </div>
+      </section>
+
       <!-- Сравнение -->
-      <section class="versus wrap" id="compare">
+      <section class="wrap" id="compare">
         <span class="eyebrow" data-t="vs.eyebrow">Сравнение</span>
         <h2 class="reveal" data-t="vs.title">Почему ModLaunch</h2>
-        <div class="compare reveal">
+        <div class="compare reveal" style="margin-top:40px">
           <table>
             <thead><tr><th></th><th>ModLaunch</th><th>Vortex</th><th>r2modman</th></tr></thead>
             <tbody>
               <tr><td data-t="vs.r1">Моды Thunderstore в один клик</td><td class="yes">✓</td><td class="no">—</td><td class="yes">✓</td></tr>
               <tr><td data-t="vs.r2">Моды Nexus Mods</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">—</td></tr>
+              <tr><td data-t="vs.r11">Minecraft: сборки, Fabric, Forge и Modrinth</td><td class="yes">✓</td><td class="no">—</td><td class="no">—</td></tr>
               <tr><td data-t="vs.r3">Несколько каталогов у одной игры</td><td class="yes">✓</td><td class="no">—</td><td class="no">—</td></tr>
               <tr><td data-t="vs.r4">Своя площадка модов без рекламы</td><td class="yes">✓</td><td class="no">—</td><td class="no">—</td></tr>
               <tr><td data-t="vs.r5">Свой язык модов и публикация из программы</td><td class="yes">✓</td><td class="no">—</td><td class="no">—</td></tr>
@@ -288,9 +333,9 @@
       </section>
 
       <!-- Скриншоты -->
-      <section class="screens wrap" id="screens">
+      <section class="wrap" id="screens">
         <span class="eyebrow" data-t="sc.eyebrow">Скриншоты</span>
-        <h2 class="reveal" data-t="sc.title">Как это выглядит</h2>
+        <h2 class="reveal" data-t="sc.title" style="margin-bottom:32px">Как это выглядит</h2>
         <div class="tabs reveal" role="tablist">
           <button class="tab is-on" role="tab" data-shot="home" data-t="sc.home">Главная</button>
           <button class="tab" role="tab" data-shot="library" data-t="sc.library">Библиотека</button>
@@ -317,52 +362,54 @@
       </section>
 
       <!-- Что нового -->
-      <section class="news-sec wrap" id="news">
-        <span class="eyebrow" data-t="news.eyebrow">Что нового</span>
-        <h2 class="reveal" data-t="news.title">Последние версии</h2>
+      <section class="wrap" id="news">
+        <div class="head">
+          <div>
+            <span class="eyebrow" data-t="news.eyebrow">Что нового</span>
+            <h2 class="reveal" data-t="news.title">Последние версии</h2>
+          </div>
+          <a class="head__link" href="https://github.com/ModLaunch/ModLaunch/releases" target="_blank" rel="noopener"><span data-t="news.all">Все версии</span> →</a>
+        </div>
         <div class="news" id="newsList">
           <article class="reveal"><span class="ver">8.5</span><h3 data-t="news.85">Minecraft</h3><ul><li data-t="news.85a">Fabric, Quilt, Forge и NeoForge — ставятся сами</li><li data-t="news.85b">Сборки со своими модами и мирами</li><li data-t="news.85c">Каталог Modrinth под версию и загрузчик</li><li data-t="news.85d">Модпаки, .mrpack и обновления в один клик</li></ul></article>
           <article class="reveal"><span class="ver">7.0</span><h3 data-t="news.70">Дизайн ModLaunch 3</h3><ul><li data-t="news.70a">Крошки, правая панель и свечение цвета игры</li><li data-t="news.70b">Карусель «Выбор ModLaunch» и топ модов</li><li data-t="news.70c">Каталог сеткой, «Хит» и «Скрыть установленные»</li><li data-t="news.70d">Коллекции и сортировка, как в Steam</li></ul></article>
           <article class="reveal"><span class="ver">6.0</span><h3 data-t="news.60">Big Picture</h3><ul><li data-t="news.60a">Режим Big Picture и управление ПК геймпадом</li><li data-t="news.60b">Библиотека с обложками, как в Steam</li><li data-t="news.60c">Вкладки мода и «Центр модов», как на Nexus</li><li data-t="news.60d">Логотип — главная, Creator Hub внизу</li></ul></article>
-          <article class="reveal"><span class="ver">5.5</span><h3 data-t="news.55">ModLaunch Hub</h3><ul><li data-t="news.55a">Свой сайт модов в программе</li><li data-t="news.55b">Редактор ModScript с подсветкой</li><li data-t="news.55c">Версии, отслеживание, моды автора</li><li data-t="news.55d">Silksong, GTFO и Outward</li></ul></article>
-          <article class="reveal"><span class="ver">5.0</span><h3 data-t="news.50">Creator Hub</h3><ul><li data-t="news.50a">Язык модов ModScript</li><li data-t="news.50b">Кнопка «+» для любых игр</li><li data-t="news.50c">Шесть новых игр</li><li data-t="news.50d">Темы и гибкие настройки</li></ul></article>
         </div>
-        <p style="text-align:center;margin-top:22px"><a class="final__zip" href="https://github.com/ModLaunch/ModLaunch/releases" target="_blank" rel="noopener" data-t="news.all">Все версии и полный список изменений</a></p>
-      </section>
-
-      <!-- Три шага -->
-      <section class="steps wrap">
-        <h2 class="reveal" data-t="steps.title">Начать — минута</h2>
-        <ol class="steps__row">
-          <li class="reveal"><b>1</b><h3 data-t="steps.1t">Скачайте</h3><p data-t="steps.1p">Один файл, около 25 МБ.</p></li>
-          <li class="reveal"><b>2</b><h3 data-t="steps.2t">Установите</h3><p data-t="steps.2p">«Установить» — и ModLaunch на рабочем столе.</p></li>
-          <li class="reveal"><b>3</b><h3 data-t="steps.3t">Играйте с модами</h3><p data-t="steps.3p">Игры найдутся сами. Выберите мод и нажмите «Играть».</p></li>
-        </ol>
       </section>
 
       <!-- Вопросы -->
-      <section class="faq wrap" id="faq">
-        <h2 class="reveal" data-t="faq.title">Частые вопросы</h2>
-        <div class="faq__list">
-          <details class="reveal"><summary data-t="faq.1q">Это бесплатно?</summary><p data-t="faq.1a">Да, полностью. Без подписок, рекламы и платных функций.</p></details>
-          <details class="reveal"><summary data-t="faq.2q">Windows пишет «неизвестный издатель». Это безопасно?</summary><p data-t="faq.2a">Так Windows пишет про любые программы без платной цифровой подписи. Нажмите «Подробнее» → «Выполнить в любом случае». Исходный код открыт на GitHub, а установщик собирается там же автоматически и перед выпуском проходит самопроверку.</p></details>
-          <details class="reveal"><summary data-t="faq.3q">Откуда берутся моды?</summary><p data-t="faq.3a">С сайтов, где их выкладывают авторы: Thunderstore, Nexus Mods и ModLinks — ModLaunch скачивает оригинал. И из ModLaunch Hub, куда авторы публикуют моды прямо из программы.</p></details>
-          <details class="reveal"><summary data-t="faq.4q">Моды из Hub безопасны?</summary><p data-t="faq.4a">Каждый файл сверяется по SHA-256 при скачивании, на странице мода есть отчёт VirusTotal по хэшу, а на плохой мод можно пожаловаться. Моды-скрипты на ModScript вообще не содержат программного кода — только данные и настройки.</p></details>
-          <details class="reveal"><summary data-t="faq.5q">Нужен ли аккаунт?</summary><p data-t="faq.5a">Нет. Аккаунт ModLaunch нужен только для публикации в Hub, комментариев, друзей и отзывов — всё остальное работает без него.</p></details>
-          <details class="reveal"><summary data-t="faq.6q">Моей игры нет в списке</summary><p data-t="faq.6a">Нажмите «+» в программе: ModLaunch найдёт игру на диске, узнает движок и подберёт каталог модов. Или напишите в Issues на GitHub, какую игру встроить следующей.</p></details>
-          <details class="reveal"><summary data-t="faq.7q">Что такое ModScript?</summary><p data-t="faq.7a">Простой язык модов ModLaunch: одна команда на строку. Из скрипта получается настоящий мод — пакет Content Patcher для Stardew Valley или пакет Thunderstore для игр на BepInEx. Попробовать можно прямо на сайте.</p></details>
+      <section class="wrap faq" id="faq">
+        <div class="faq__layout">
+          <div>
+            <h2 class="reveal" data-t="faq.title">Частые вопросы</h2>
+            <p class="sub reveal" data-t="faq.sub">Не нашли ответ? Напишите нам в Issues на GitHub — отвечаем там же.</p>
+            <p style="margin-top:20px"><a class="btn btn--sm" href="https://github.com/ModLaunch/ModLaunch/issues" target="_blank" rel="noopener" data-t="faq.ask">Задать вопрос</a></p>
+          </div>
+          <div class="faq__list">
+            <details class="reveal"><summary data-t="faq.1q">Это бесплатно?</summary><p data-t="faq.1a">Да, полностью. Без подписок, рекламы и платных функций.</p></details>
+            <details class="reveal"><summary data-t="faq.2q">Windows пишет «неизвестный издатель». Это безопасно?</summary><p data-t="faq.2a">Так Windows пишет про любые программы без платной цифровой подписи. Нажмите «Подробнее» → «Выполнить в любом случае». Исходный код открыт на GitHub, а установщик собирается там же автоматически и перед выпуском проходит самопроверку.</p></details>
+            <details class="reveal"><summary data-t="faq.3q">Откуда берутся моды?</summary><p data-t="faq.3a">С сайтов, где их выкладывают авторы: Thunderstore, Nexus Mods, Modrinth и ModLinks — ModLaunch скачивает оригинал. И из ModLaunch Hub, куда авторы публикуют моды прямо из программы.</p></details>
+            <details class="reveal"><summary data-t="faq.8q">Как играть в Minecraft с модами?</summary><p data-t="faq.8a">Откройте Minecraft в ModLaunch и создайте сборку: выберите версию и загрузчик — Fabric, Quilt, Forge или NeoForge. Моды из каталога Modrinth ставятся в сборку одной кнопкой, а запуск идёт через официальный лаунчер Minecraft.</p></details>
+            <details class="reveal"><summary data-t="faq.4q">Моды из Hub безопасны?</summary><p data-t="faq.4a">Каждый файл сверяется по SHA-256 при скачивании, на странице мода есть отчёт VirusTotal по хэшу, а на плохой мод можно пожаловаться. Моды-скрипты на ModScript вообще не содержат программного кода — только данные и настройки.</p></details>
+            <details class="reveal"><summary data-t="faq.5q">Нужен ли аккаунт?</summary><p data-t="faq.5a">Нет. Аккаунт ModLaunch нужен только для публикации в Hub, комментариев, друзей и отзывов — всё остальное работает без него.</p></details>
+            <details class="reveal"><summary data-t="faq.6q">Моей игры нет в списке</summary><p data-t="faq.6a">Нажмите «+» в программе: ModLaunch найдёт игру на диске, узнает движок и подберёт каталог модов. Или напишите в Issues на GitHub, какую игру встроить следующей.</p></details>
+            <details class="reveal"><summary data-t="faq.7q">Что такое ModScript?</summary><p data-t="faq.7a">Простой язык модов ModLaunch: одна команда на строку. Из скрипта получается настоящий мод — пакет Content Patcher для Stardew Valley или пакет Thunderstore для игр на BepInEx. Попробовать можно прямо на сайте.</p></details>
+          </div>
         </div>
       </section>
 
       <!-- Финал -->
-      <section class="final wrap reveal">
-        <svg class="logo" viewBox="0 0 24 24" width="68" height="68" aria-hidden="true"><g class="logo__orbit"><path d="M4.3 4.3 19.7 19.7M19.7 4.3 4.3 19.7" stroke="#7a62d6" stroke-width="1.5"/><circle cx="4.3" cy="4.3" r="3" fill="#cbbcff"/><circle cx="19.7" cy="4.3" r="3" fill="#f2c25c"/><circle cx="4.3" cy="19.7" r="3" fill="#8f73ff"/><circle cx="19.7" cy="19.7" r="3" fill="#cbbcff"/></g><circle cx="12" cy="12" r="5.6" fill="#fff" stroke="#b9a6ff" stroke-width=".6"/><circle cx="12" cy="12" r="2.6" fill="#7c5cff"/></svg>
-        <h2 data-t="final.title">Готовы попробовать?</h2>
-        <a class="btn btn--primary btn--lg js-setup" href="https://github.com/ModLaunch/ModLaunch/releases/latest">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19h14" /></svg>
-          <span><span data-t="hero.download">Скачать для Windows</span><small class="js-meta">Windows 10 / 11 · бесплатно</small></span>
-        </a>
-        <a class="final__zip js-zip" href="https://github.com/ModLaunch/ModLaunch/releases/latest" data-t="final.zip">Портативная версия (zip)</a>
+      <section class="wrap">
+        <div class="final__panel reveal">
+          <span class="mark" style="width:64px;height:64px;border-radius:18px" aria-hidden="true"><svg viewBox="0 0 24 24" style="width:38px;height:38px"><circle cx="12" cy="12" r="3.2"/><circle cx="5" cy="5" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><path d="M6.5 6.5 9.7 9.7M17.5 6.5l-3.2 3.2M6.5 17.5l3.2-3.2M17.5 17.5l-3.2-3.2"/></svg></span>
+          <h2 data-t="final.title">Готовы попробовать?</h2>
+          <p data-t="final.p">Один файл, около 30 МБ. Игры найдутся сами — останется выбрать моды.</p>
+          <a class="btn btn--primary btn--lg js-setup" href="https://github.com/ModLaunch/ModLaunch/releases/latest">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19h14" /></svg>
+            <span><span data-t="hero.download">Скачать для Windows</span><small class="js-meta">Windows 10 / 11 · бесплатно</small></span>
+          </a>
+          <a class="final__zip js-zip" href="https://github.com/ModLaunch/ModLaunch/releases/latest" data-t="final.zip">Портативная версия (zip)</a>
+        </div>
       </section>
     </main>
 

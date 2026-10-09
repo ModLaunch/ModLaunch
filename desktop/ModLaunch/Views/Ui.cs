@@ -294,8 +294,61 @@ public static class Ui
         return parts.Length <= 2 ? path : "…" + sep + string.Join(sep, parts[^2..]);
     }
 
+    /// <summary>
+    /// Открыть ссылку в браузере или свой файл и папку в Проводнике.
+    /// 8.5.1: только http(s) и локальные пути, которые нельзя «запустить», — ссылка из чужого
+    /// мода (картинка из Hub, страница мода) не откроет .exe, сетевую папку или ms-msdt:.
+    /// </summary>
     public static void OpenUrl(string url)
     {
-        try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true }); } catch { }
+        if (SafeTarget(url) is not { } target) return;
+        try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(target) { UseShellExecute = true }); } catch { }
+    }
+
+    static readonly HashSet<string> Runnable = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".exe", ".com", ".bat", ".cmd", ".ps1", ".psm1", ".psd1", ".vbs", ".vbe", ".js", ".jse", ".wsf", ".wsh", ".msi", ".msp", ".msix",
+        ".appx", ".appinstaller", ".scr", ".pif", ".lnk", ".url", ".hta", ".cpl", ".jar", ".reg", ".inf", ".application", ".appref-ms",
+        ".settingcontent-ms", ".msc", ".gadget", ".library-ms", ".search-ms", ".searchconnector-ms", ".diagcab", ".dll", ".sys", ".chm",
+        ".iso", ".img", ".vhd", ".vhdx", ".xll", ".scf", ".theme", ".themepack", ".website",
+    };
+
+    /// <summary>Во что безопасно «ткнуть» оболочкой: http(s)-адрес или существующий локальный файл/папка не для запуска.</summary>
+    public static string? SafeTarget(string? value)
+    {
+        var s = (value ?? "").Trim();
+        if (s == "") return null;
+        if (s.StartsWith(@"\\", StringComparison.Ordinal) || s.StartsWith("//", StringComparison.Ordinal)) return null; // сетевые пути
+        if (Uri.TryCreate(s, UriKind.Absolute, out var u))
+        {
+            if (u.Scheme == Uri.UriSchemeHttps || u.Scheme == Uri.UriSchemeHttp) return u.AbsoluteUri;
+            if (!u.IsFile || !u.IsLoopback && u.Host != "") return null; // ms-msdt:, search-ms:, file://сервер/… — нет
+            s = u.LocalPath;
+        }
+        if (s.StartsWith(@"\\", StringComparison.Ordinal) || !System.IO.Path.IsPathFullyQualified(s)) return null;
+        string full;
+        try { full = System.IO.Path.GetFullPath(s); } catch { return null; }
+        if (Directory.Exists(full)) return full;
+        return File.Exists(full) && !Runnable.Contains(System.IO.Path.GetExtension(full)) ? full : null;
+    }
+
+    [SelfTest]
+    static string OpensOnlySafeTargets()
+    {
+        if (SafeTarget("https://modlaunchapp.com/") is null) throw new Exception("https rejected");
+        foreach (var bad in new[] { @"\\evil\share\x.exe", "file://evil/share/x.exe", "ms-msdt:/id PCWDiagnostic", "search-ms:query=x", "javascript:alert(1)", "C:\\Windows\\System32\\cmd.exe", "file:///C:/Windows/System32/calc.exe" })
+            if (OperatingSystem.IsWindows() && SafeTarget(bad) is not null) throw new Exception("allowed: " + bad);
+        var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "modlaunch-open-test");
+        Directory.CreateDirectory(dir);
+        var png = System.IO.Path.Combine(dir, "shot.png");
+        var exe = System.IO.Path.Combine(dir, "run.exe");
+        File.WriteAllText(png, "x"); File.WriteAllText(exe, "x");
+        try
+        {
+            if (SafeTarget(png) is null || SafeTarget(dir) is null) throw new Exception("own file or folder rejected");
+            if (SafeTarget(exe) is not null) throw new Exception("exe allowed");
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+        return "http(s), own files and folders only";
     }
 }

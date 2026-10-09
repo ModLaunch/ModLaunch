@@ -3,7 +3,7 @@
   "short_name": "ModLaunch",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#0b0c12",
-  "theme_color": "#7c5cff",
+  "background_color": "#0b0c10",
+  "theme_color": "#6e4bff",
   "icons": [{ "src": "img/logo.svg", "sizes": "any", "type": "image/svg+xml" }]
 }

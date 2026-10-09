@@ -34,6 +34,8 @@ jobs:
         run: |
           $p = Start-Process -FilePath out/ModLaunch.exe -ArgumentList '--selfcheck' -PassThru -Wait -NoNewWindow -RedirectStandardOutput selfcheck.txt
           Get-Content selfcheck.txt
+          # Упавшие проверки — отдельными пометками: их видно в сводке запуска без скачивания логов.
+          Get-Content selfcheck.txt | Where-Object { $_ -match '^\s*(FAIL|ERROR)' } | ForEach-Object { Write-Output "::error title=self-check::$_" }
           if ($p.ExitCode -ne 0) { throw "self-check failed" }
       - name: Package
         shell: pwsh

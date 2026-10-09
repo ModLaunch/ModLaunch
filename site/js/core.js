@@ -4,7 +4,7 @@
    список игр, появление при прокрутке и доступ к ModLaunch Hub (Firestore). */
 
 const REPO = 'ModLaunch/ModLaunch';
-const SITE = 'https://modlaunch.github.io/ModLaunch/';
+const SITE = 'https://modlaunchapp.com/';
 document.documentElement.classList.add('js');
 
 /* ---------------------------------------------------------------- игры */
@@ -127,18 +127,38 @@ function renderRelease() {
       : t('meta');
   });
   if (!release) return;
-  document.querySelectorAll('.js-version').forEach((n) => (n.textContent = release.version));
+  // На странице уже написана версия новее, чем нашлась (выпуск на GitHub отстаёт) — номер не откатываем.
+  document.querySelectorAll('.js-version').forEach((n) => { if (!verNewer(n.dataset.v || n.textContent, release.version)) n.textContent = release.version; else n.dataset.v ||= n.textContent; });
   if (release.setup) document.querySelectorAll('.js-setup').forEach((n) => (n.href = release.setup.browser_download_url));
   if (release.zip) document.querySelectorAll('.js-zip').forEach((n) => (n.href = release.zip.browser_download_url));
 }
 const releaseHooks = [];
+// Версии «1.2.3»: a новее b?
+function verNewer(a, b) {
+  const pa = String(a).split('.').map(Number);
+  const pb = String(b).split('.').map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) > (pb[i] || 0);
+  return false;
+}
+/** Свой сервер обновлений: update.json рядом с сайтом (его же читает программа). Нет файла — null. */
+async function ownManifest() {
+  try {
+    const r = await fetch('update.json', { cache: 'no-cache' });
+    if (!r.ok) return null;
+    const m = await r.json();
+    if (!/^\d+\.\d+\.\d+$/.test(m.version || '') || !/^https:\/\/[^\s"'<>]+\/ModLaunch-Setup-[\d.]+\.exe$/i.test(m.url || '')) return null;
+    return { version: m.version, setup: { browser_download_url: m.url, size: Number(m.size) || 0 } };
+  } catch { return null; }
+}
 async function loadRelease() {
+  const own = ownManifest();
+  let list = [];
   try {
     const r = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=100`, { headers: { Accept: 'application/vnd.github+json' } });
-    if (!r.ok) return;
-    const list = (await r.json()).filter((x) => !x.draft && !x.prerelease);
-    if (!list.length) return;
-    const latest = list[0];
+    if (r.ok) list = (await r.json()).filter((x) => !x.draft && !x.prerelease);
+  } catch { /* без сети — остаются ссылки на страницу выпусков */ }
+  const latest = list[0];
+  if (latest) {
     release = {
       version: String(latest.tag_name).replace(/^v/i, ''),
       setup: latest.assets.find((a) => /-Setup-.*\.exe$/i.test(a.name)),
@@ -146,9 +166,16 @@ async function loadRelease() {
       all: list,
       downloads: list.reduce((s, x) => s + x.assets.reduce((q, a) => q + (a.download_count || 0), 0), 0),
     };
-    renderRelease();
-    releaseHooks.forEach((f) => f(release));
-  } catch { /* без сети — остаются ссылки на страницу выпусков */ }
+  }
+  // Установщик на своём сайте новее (или GitHub недоступен) — кнопка «Скачать» ведёт на него.
+  const mine = await own;
+  if (mine && (!release || verNewer(mine.version, release.version) || mine.version === release.version)) {
+    const zip = release && mine.version === release.version ? release.zip : null; // старый zip к новой версии не подсовываем
+    release = { ...(release || { all: [], downloads: 0 }), version: mine.version, setup: mine.setup, zip };
+  }
+  if (!release) return;
+  renderRelease();
+  releaseHooks.forEach((f) => f(release));
 }
 
 /* ---------------------------------------------------------------- анимации */
@@ -224,12 +251,16 @@ async function fbFetch(url, body) {
   if (!r.ok) throw new HubError('SERVER', String(r.status));
   return r.json();
 }
+// Картинки модов Hub — только https-адреса без кавычек и скобок: они попадают в url('…') в стилях.
+function safeImages(list) {
+  return (Array.isArray(list) ? list : []).filter((u) => typeof u === 'string' && /^https:\/\/[^\s'"()\\<>]+$/i.test(u)).slice(0, 6);
+}
 function toMod(doc) {
   const f = fromFields(doc.fields);
   const id = doc.name.slice(doc.name.lastIndexOf('/') + 1);
   return {
     id, uid: f.uid || '', author: f.author || '', name: f.name || '', summary: f.summary || f.about || '', description: f.description || '',
-    game: f.game || '', version: f.version || '', kind: f.kind || 'script', code: f.code || '', tags: f.tags || [], images: f.images || [],
+    game: f.game || '', version: f.version || '', kind: f.kind || 'script', code: f.code || '', tags: f.tags || [], images: safeImages(f.images),
     size: f.size || 0, sha256: f.sha256 || '', chunks: f.chunks || 0, fileName: f.fileName || '', changelog: f.changelog || '',
     likes: f.likes || 0, downloads: f.downloads || 0, comments: f.comments || 0,
     created: f.created ? new Date(f.created) : null, updated: f.updated ? new Date(f.updated) : null,

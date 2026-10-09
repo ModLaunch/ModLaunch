@@ -103,7 +103,7 @@ public static class Market
         var name = doc.Str("name") ?? "";
         return new Listing(
             name[(name.LastIndexOf('/') + 1)..], f.S("uid"), f.S("author"), f.S("title"), f.S("summary"), f.S("description"),
-            f.S("kind"), f.S("game"), f.L("price"), f.S("license"), f.S("version"), f.S("preview"), f.A("tags"), f.A("images"),
+            f.S("kind"), f.S("game"), f.L("price"), f.S("license"), f.S("version"), f.S("preview"), f.A("tags"), f.A("images").Where(u => Ads.HttpsUrl(u) is not null).Take(6).ToList(),
             f.L("size"), f.S("sha256"), (int)f.L("chunks"), f.S("fileName"), f.S("status"), f.L("sales"),
             Firebase.Time(f.S("created")), Firebase.Time(f.S("updated")));
     }
