@@ -11,6 +11,8 @@ static partial class SelfTests
     {
         var ru = I18n.Keys("ru");
         var en = I18n.Keys("en");
+        // --selfcheck идёт без интерфейса: ресурсы программы (а с ними и словари) там недоступны.
+        if (ru.Count == 0 && Avalonia.Application.Current is null) return "skipped: no UI in --selfcheck (checked in --selftest)";
         var onlyRu = ru.Except(en).Take(5).ToList();
         if (ru.Count < 100) throw new Exception($"only {ru.Count} strings loaded");
         return $"{ru.Count} ru / {en.Count} en" + (onlyRu.Count > 0 ? $"; no English yet: {string.Join(", ", onlyRu)}" : "");

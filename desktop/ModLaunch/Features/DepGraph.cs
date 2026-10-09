@@ -220,7 +220,15 @@ public sealed class DepGraph
         registry.Edit("Owner-OtherMod", m => m["dependencies"] = new JsonArray());
         if (Build(registry).Orphans(["Owner-BigMod"]).Count != 0 || Build(registry).Unused().Count != 0) throw new Exception("helper offered though OtherMod's needs are unknown");
         registry.Remove("Owner-OtherMod");
-        if (Build(registry).Orphans(["Owner-BigMod"]).SingleOrDefault()?.Str("id") != "Owner-SharedLib") throw new Exception("real orphan not found");
+        var orphans = Build(registry).Orphans(["Owner-BigMod"]);
+        if (orphans.SingleOrDefault()?.Str("id") != "Owner-SharedLib")
+        {
+            // Подробности для журнала самопроверки: какие записи и связи увидел граф.
+            var graph = Build(registry);
+            var state = string.Join("; ", registry.List().Select(m =>
+                $"{m.Str("id")}[deps={string.Join(",", m.Arr("dependencies").Select(d => d?.ToString()))} by={m.Str("requestedBy")} kind={m.Str("kind")} missing={m.Bool("missing")} target={m.Str("target")} unknown={graph._unknown.Contains(m.Str("id") ?? "")} neededBy={string.Join(",", graph._neededBy.GetValueOrDefault(m.Str("id") ?? "") ?? [])}]"));
+            throw new Exception($"real orphan not found; orphans=[{string.Join(",", orphans.Select(o => o.Str("id")))}]; {state}");
+        }
         foreach (var id in new[] { "Owner-BigMod", "Owner-SharedLib" }) registry.Remove(id);
         return "SharedLib kept while OtherMod needs it (or might); offered once it is really unused";
     }

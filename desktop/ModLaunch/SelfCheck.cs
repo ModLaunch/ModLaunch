@@ -264,7 +264,8 @@ public static class SelfCheck
         {
             var lines = new List<string>();
             var small = new List<string>();
-            foreach (var g in GameCatalog.All)
+            // Minecraft — свой каталог Modrinth под сборку (версия и загрузчик), его проверяют проверки Minecraft.
+            foreach (var g in GameCatalog.All.Where(g => !g.IsMinecraft))
             {
                 long total = 0;
                 var parts = new List<string>();

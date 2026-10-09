@@ -16,7 +16,25 @@ public sealed record LangInfo(string Code, string Native, int Coverage);
 /// </summary>
 public static partial class I18n
 {
-    static readonly Dictionary<string, Dictionary<string, string>> Tables = Load();
+    static Dictionary<string, Dictionary<string, string>> _tables = Load();
+    static bool _reloaded;
+
+    /// <summary>
+    /// Словари читаются из ресурсов Avalonia. Если к ним обратились раньше, чем она запустилась
+    /// (самопроверка, ранние сообщения), — перечитываем один раз, когда приложение уже есть.
+    /// </summary>
+    static Dictionary<string, Dictionary<string, string>> Tables
+    {
+        get
+        {
+            if (!_reloaded && _tables["ru"].Count == 0 && Avalonia.Application.Current is not null)
+            {
+                _reloaded = true;
+                _tables = Load();
+            }
+            return _tables;
+        }
+    }
 
     /// <summary>Родные названия языков для списка выбора.</summary>
     static readonly Dictionary<string, string> Names = new(StringComparer.OrdinalIgnoreCase)
