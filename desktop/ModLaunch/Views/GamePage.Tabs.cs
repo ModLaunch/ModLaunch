@@ -158,7 +158,7 @@ public sealed partial class GamePage
             var state = have ? I18n.T("pack.have") : catalogId is null ? I18n.T("pack.manual") : I18n.T("pack.will");
             if (!have && catalogId is not null) toInstall.Add(m);
             var row = new DockPanel();
-            var tag = ModRow.Tag(state, have ? Ui.Res("Surface3") : catalogId is null ? Ui.Hex("#3A2A12") : Ui.Res("BrandSoft"), have ? Ui.Res("Muted") : catalogId is null ? Ui.Res("Warn") : Ui.Res("Brand2"));
+            var tag = ModRow.Tag(state, have ? Ui.Res("Surface3") : catalogId is null ? Ui.Soft("#3A2A12", "#F2B84B") : Ui.Res("BrandSoft"), have ? Ui.Res("Muted") : catalogId is null ? Ui.Res("Warn") : Ui.Res("Brand2"));
             DockPanel.SetDock(tag, Dock.Right);
             row.Children.Add(tag);
             row.Children.Add(Ui.Text(m.Name + (m.Version != "" ? $" · {m.Version}" : "")));

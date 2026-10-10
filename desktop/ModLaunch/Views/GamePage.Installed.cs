@@ -353,13 +353,13 @@ public sealed partial class GamePage
         if (DateTime.TryParse(mod.Str("installedAt"), out var at)) sub.Add(Ui.Ago(at.ToUniversalTime()));
 
         var title = Ui.Row(8, Ui.Text(name, "h3"));
-        if (missing) title.Children.Add(ModRow.Tag(I18n.T("inst.missing"), Ui.Hex("#3A1A1A"), Ui.Res("Bad")));
+        if (missing) title.Children.Add(ModRow.Tag(I18n.T("inst.missing"), Ui.Soft("#3A1A1A", "#FF6B6B"), Ui.Ink("#FF6B6B")));
         else if (!enabled) title.Children.Add(ModRow.Tag(I18n.T("inst.off"), Ui.Res("Surface3"), Ui.Res("Muted")));
         if (mod.Str("requestedBy") is not null) title.Children.Add(ModRow.Tag(I18n.T("mod.stat.deps.one").ToLowerInvariant(), Ui.Res("Surface3"), Ui.Res("Muted")));
         if (mod.Bool("hold")) title.Children.Add(ModRow.Tag(I18n.T("upd.held"), Ui.Res("Surface3"), Ui.Res("Muted")));
         if (_g.Def.Loader == Games.LoaderKind.Smapi && Features.SmapiIndex.Cached(mod.Str("uniqueId")) is var (smapi, fix) && Features.Compat.SmapiBadge(smapi) is var (smapiKey, smapiBad))
         {
-            var tag = ModRow.Tag(I18n.T(smapiKey), smapiBad ? Ui.Hex("#3A1A1A") : Ui.Hex("#3A2A12"), smapiBad ? Ui.Res("Bad") : Ui.Res("Warn"));
+            var tag = ModRow.Tag(I18n.T(smapiKey), smapiBad ? Ui.Soft("#3A1A1A", "#FF6B6B") : Ui.Soft("#3A2A12", "#F2B84B"), smapiBad ? Ui.Ink("#FF6B6B") : Ui.Ink("#F2B84B"));
             ToolTip.SetTip(tag, I18n.T("smapi.hint"));
             title.Children.Add(tag);
             if (fix is not null) title.Children.Add(Ui.Button(I18n.T("smapi.fix"), () => Ui.OpenUrl(fix), "ghost"));

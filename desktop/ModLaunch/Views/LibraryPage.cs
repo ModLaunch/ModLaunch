@@ -12,7 +12,7 @@ namespace ModLaunch.Views;
 /// сортировка (недавние, по названию, по времени в игре). Сначала игры с
 /// компьютера, ниже — остальные поддерживаемые.
 /// </summary>
-public sealed class LibraryPage : Page
+public sealed partial class LibraryPage : Page
 {
     string _query = "";
     string _collection = "all"; // all | ★ | hidden | имя коллекции
@@ -42,6 +42,8 @@ public sealed class LibraryPage : Page
 
     public override void Build()
     {
+        // 9.2: в дизайне Store — библиотека как в Microsoft Store (LibraryPage.Store.cs).
+        if (Look.Store) { BuildStore(); return; }
         var content = new StackPanel { Spacing = 20, Margin = new Thickness(32, 26, 32, 32), MaxWidth = 1760 };
         bool Match(GameState g) => (_query == "" || g.Def.Name.Contains(_query, StringComparison.OrdinalIgnoreCase)) && InCollection(g);
         var all = MainWindow.OrderedGames().ToList();

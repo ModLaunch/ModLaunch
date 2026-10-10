@@ -1,4 +1,4 @@
-﻿using Avalonia;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Shapes;
@@ -67,6 +67,8 @@ public static class Icons
     /// <summary>Кубик мода с искрой — логотип Creator Hub.</summary>
     public const string Creator = "M11 3.5l-7 4v8l7 4 7-4v-8z M4 7.5l7 4 7-4 M11 11.5v8 M19.5 1.5v4 M17.5 3.5h4";
     public const string ChevronDown = "M6 9l6 6 6-6";
+    public const string ChevronLeft = "M15 18l-6-6 6-6";
+    public const string ChevronRight = "M9 18l6-6-6-6";
     public const string Gamepad = "M6 11h4 M8 9v4 M15 12h.01 M18 10h.01 M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z";
     public const string Tv = "M2 7a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z M8 22h8 M12 19v3";
     public const string Sidebar = "M3 4h18v16H3z M15 4v16";
@@ -119,6 +121,17 @@ public static class Ui
         Application.Current!.TryGetResource(key, Application.Current.ActualThemeVariant, out var v) && v is IBrush b ? b : Brushes.Magenta;
 
     public static IBrush Hex(string hex) => new SolidColorBrush(Color.Parse(hex));
+
+    /// <summary>
+    /// Фон цветной метки: в тёмных темах — заданный тёмный оттенок, в светлых (Красно-белая и др.) —
+    /// светлая подложка цвета текста, чтобы метки не выглядели серыми пятнами на белом.
+    /// </summary>
+    public static IBrush Soft(string darkBg, string ink) =>
+        Look.IsLight ? new SolidColorBrush(Look.Mix(Colors.White, Color.Parse(ink), 0.16)) : Hex(darkBg);
+
+    /// <summary>Цвет текста метки: в светлых темах темнее, чтобы читался на светлом.</summary>
+    public static IBrush Ink(string hex) =>
+        Look.IsLight ? new SolidColorBrush(Look.Mix(Color.Parse(hex), Colors.Black, 0.38)) : Hex(hex);
 
     /// <summary>Иконка: контур в квадрате 24×24, масштабируется целиком (и прямые линии тоже).</summary>
     public static Control Icon(string data, double size = 18, IBrush? stroke = null, bool fill = false)

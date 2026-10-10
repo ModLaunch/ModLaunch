@@ -16,6 +16,8 @@ public static class GameCard
     {
         Detect.Searching => I18n.T("games.searching"),
         Detect.Found when g.Def.IsMinecraft => Minecraft.Mc.CardLine(),
+        // Игры без загрузчика (свои, моды — просто файлы в папке): не «— установлен», а число модов или «готова».
+        Detect.Found when g.Def.Loader == Games.LoaderKind.None => g.ModCount > 0 ? I18n.T("aside.mods." + I18n.Plural(g.ModCount, "one", "few", "many"), ("n", g.ModCount)) : I18n.T("v92.game.ready"),
         Detect.Found when !g.LoaderInstalled => I18n.T("home.loaderNeeded", ("loader", g.Def.LoaderName)),
         Detect.Found when g.ModCount > 0 => I18n.T("aside.mods." + I18n.Plural(g.ModCount, "one", "few", "many"), ("n", g.ModCount)),
         Detect.Found => I18n.T("games.loaderReady", ("loader", g.Def.LoaderName)),

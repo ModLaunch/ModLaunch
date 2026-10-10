@@ -243,6 +243,8 @@ public sealed partial class SettingsPage : Page
         var langHint = Ui.Text(I18n.T("lang.hint"), "small muted", wrap: true);
         var langFolder = Ui.Button(I18n.T("lang.folder"), () => Actions.OpenFolder(Directory.CreateDirectory(Path.Combine(Paths.DataDir, "languages")).FullName), "ghost", Icons.Folder);
         var col = new StackPanel { Spacing = 16 };
+        // 9.2: три готовых оформления Store — первым делом, крупными карточками.
+        col.Children.Add(Section(I18n.T("v92.style.section"), I18n.T("v92.style.section.hint"), StylePicker.Row(Build)));
         col.Children.Add(Section(I18n.T("settings.language"), null, lang, langHint, langFolder));
 
         // Тема: карточки-образцы.
@@ -277,7 +279,7 @@ public sealed partial class SettingsPage : Page
             card.Click += (_, _) => { Look.SetDesign(d); Build(); };
             designs.Children.Add(card);
         }
-        col.Children.Insert(1, Section(I18n.T("look.design"), I18n.T("look.design.hint"), designs));
+        col.Children.Insert(2, Section(I18n.T("look.design"), I18n.T("look.design.hint"), designs));
 
         // Шрифт, скругление и свечение фона.
         var font = new ComboBox { Width = 260, ItemsSource = Look.Fonts, SelectedItem = Look.Font };
@@ -415,6 +417,7 @@ public sealed partial class SettingsPage : Page
             Toggle(I18n.T("v91.set.shuffle"), I18n.T("v91.set.shuffle.hint"), Settings.Data.Bool("homeShuffle", true), v => Settings.Data["homeShuffle"] = v),
             Toggle(I18n.T("v91.set.splash"), I18n.T("v91.set.splash.hint"), Settings.Data.Bool("splash", true), v => Settings.Data["splash"] = v),
             Toggle(I18n.T("v91.set.fx"), I18n.T("v91.set.fx.hint"), Settings.Data.Bool("installFx", true), v => Settings.Data["installFx"] = v),
+            Toggle(I18n.T("v92.set.openfx"), I18n.T("v92.set.openfx.hint"), Settings.Data.Bool("modOpenFx", true), v => Settings.Data["modOpenFx"] = v),
             Toggle(I18n.T("v4.continue"), I18n.T("v4.continue.text"), Settings.Data.Bool("homeContinue", true), v => Settings.Data["homeContinue"] = v),
             Toggle(I18n.T("home.favorites"), I18n.T("home.favorites.text"), Settings.Data.Bool("homeFavorites", true), v => Settings.Data["homeFavorites"] = v),
             Toggle(I18n.T("look.home.popular"), I18n.T("look.home.popular.hint"), Settings.Data.Bool("homePopular", true), v => Settings.Data["homePopular"] = v),
@@ -592,7 +595,7 @@ public sealed partial class SettingsPage : Page
             Ui.Text(I18n.T("guide.steam"), "small muted", wrap: true), Ui.Text(I18n.T("guide.gog"), "small muted", wrap: true),
             Ui.Text(I18n.T("guide.repack"), "small muted", wrap: true), Ui.Text(I18n.T("guide.check"), "small muted", wrap: true));
         return Section(I18n.T("settings.games"), I18n.T("settings.games.hint"), list,
-            Ui.Button(I18n.T("games.deep"), () => { foreach (var g in AppState.Games.Where(x => x.Status != Detect.Found)) _ = AppState.DetectOne(g, deep: true); }, "", Icons.Search),
+            Ui.Button(I18n.T("games.deep"), () => _ = AppState.DetectMany(AppState.Games.Where(x => x.Status != Detect.Found).ToList(), deep: true), "", Icons.Search),
             guide);
     }
 

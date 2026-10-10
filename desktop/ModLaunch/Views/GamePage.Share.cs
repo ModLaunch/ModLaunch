@@ -107,7 +107,7 @@ public sealed partial class GamePage
             var have = registry.Get(m.Id);
             var same = have is not null && !have.Bool("missing") && Versions.Same(have.Str("version"), m.Version);
             var (text, bg, fg) = same ? (I18n.T("pack.have"), Ui.Res("Surface3"), Ui.Res("Muted"))
-                : have is not null ? (I18n.T("code.other", ("version", have.Str("version") ?? "?")), Ui.Hex("#3A2A12"), Ui.Res("Warn"))
+                : have is not null ? (I18n.T("code.other", ("version", have.Str("version") ?? "?")), Ui.Soft("#3A2A12", "#F2B84B"), Ui.Res("Warn"))
                 : (I18n.T("pack.will"), Ui.Res("Surface3"), Ui.Res("Text"));
             if (!same) work++;
             var tag = ModRow.Tag(text, bg, fg);

@@ -14,7 +14,7 @@ public static class PlayControls
     public static string Clock(TimeSpan t) => t.TotalHours >= 1 ? $"{(int)t.TotalHours}:{t.Minutes:00}:{t.Seconds:00}" : $"{t.Minutes:00}:{t.Seconds:00}";
 
     /// <summary>«● Запущено 12:34» — пока игра идёт; время тикает раз в секунду, пока плашка на экране.</summary>
-    public static Control RunningPill(string gameId, bool big = true)
+    public static Control RunningPill(string gameId, bool big = true, bool onArt = true)
     {
         var size = big ? 16 : 13;
         var dot = new Border
@@ -23,7 +23,8 @@ public static class PlayControls
             VerticalAlignment = VerticalAlignment.Center,
         };
         var label = new TextBlock { Text = I18n.T("run.running"), FontSize = size, FontWeight = FontWeight.SemiBold, Foreground = Ui.Res("Good"), VerticalAlignment = VerticalAlignment.Center };
-        var time = new TextBlock { FontSize = size, FontWeight = FontWeight.Bold, Foreground = Brushes.White, VerticalAlignment = VerticalAlignment.Center };
+        // Время — белым поверх арта игры, цветом текста темы — на обычном фоне (в светлой теме белое не видно).
+        var time = new TextBlock { FontSize = size, FontWeight = FontWeight.Bold, Foreground = onArt ? Brushes.White : Ui.Res("Text"), VerticalAlignment = VerticalAlignment.Center };
         void Tick() => time.Text = Launcher.StartedAt(gameId) is DateTime s ? Clock(DateTime.UtcNow - s) : "";
         Tick();
         var pill = new Border

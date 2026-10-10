@@ -10,22 +10,53 @@ namespace ModLaunch.Core;
 /// </summary>
 public static class Look
 {
-    public static readonly string[] Themes = ["ink", "graphite", "paper", "dark", "black", "light", "midnight", "nord", "forest", "grape", "mocha", "sand", "contrast"];
-    public static readonly string[] Designs = ["vitrina", "studio", "aurora"];
+    public static readonly string[] Themes = ["store", "snow", "jet", "ink", "graphite", "paper", "dark", "black", "light", "midnight", "nord", "forest", "grape", "mocha", "sand", "contrast"];
+    public static readonly string[] Designs = ["store", "vitrina", "studio", "aurora"];
+
+    /// <summary>
+    /// 9.2: три готовых оформления в духе Microsoft Store — тема и цвет акцента одним нажатием.
+    /// «Тёмная» (графит и фиолетовый), «Красно-белая» и «Чёрно-зелёная».
+    /// </summary>
+    public sealed record LookStyle(string Id, string Theme, string Accent);
+    public static readonly LookStyle[] Styles =
+    [
+        new("dark", "store", "#7B5CFF"),
+        new("redwhite", "snow", "#D7262E"),
+        new("blackgreen", "jet", "#2BD46F"),
+    ];
+
+    /// <summary>Какое из трёх оформлений сейчас включено (null — своя тема или акцент).</summary>
+    public static LookStyle? CurrentStyle => Styles.FirstOrDefault(s => s.Theme == Theme && s.Accent.Equals(Accent, StringComparison.OrdinalIgnoreCase));
+
+    public static void SetStyle(string id)
+    {
+        if (Styles.FirstOrDefault(s => s.Id == id) is not { } style) return;
+        Settings.Data["design"] = "store";
+        Settings.Data["theme"] = style.Theme;
+        Settings.Data["accent"] = style.Accent;
+        Settings.Save();
+        Apply();
+    }
 
     /// <summary>
     /// Дизайн (8.3): studio — строгий, в духе студийной школы (типографика и воздух
     /// вместо украшений, тонкие контуры, монохром и один акцент); aurora — живой фон
     /// и стеклянные карточки 8.1–8.2.
     /// </summary>
-    public static string Design => Designs.Contains(Settings.Data.Str("design")) ? Settings.Data.Str("design")! : "vitrina";
-    /// <summary>Строгие дизайны без живого фона и стекла: «Витрина» (9.0) и «Студия» (8.3).</summary>
-    public static bool Studio => Design is "studio" or "vitrina";
+    public static string Design => Designs.Contains(Settings.Data.Str("design")) ? Settings.Data.Str("design")! : "store";
+    /// <summary>Строгие дизайны без живого фона и стекла: Store (9.2), «Витрина» (9.0) и «Студия» (8.3).</summary>
+    public static bool Studio => Design is "studio" or "vitrina" or "store";
+    /// <summary>
+    /// Store (9.2): как Microsoft Store — подписанная боковая панель, поиск по центру шапки,
+    /// содержимое на отдельном «листе» со скруглённым углом, большие арты, ровная сетка.
+    /// Строится поверх правил «Витрины».
+    /// </summary>
+    public static bool Store => Design == "store";
     /// <summary>
     /// «Витрина» (9.0): игра на первом плане — большие арты, обложки 2:3 на боковой панели,
     /// один фиолетовый акцент на главных действиях, шрифты Onest и Unbounded.
     /// </summary>
-    public static bool Vitrina => Design == "vitrina";
+    public static bool Vitrina => Design is "vitrina" or "store";
     public static void SetDesign(string value)
     {
         Settings.Data["design"] = value;
@@ -33,6 +64,8 @@ public static class Look
         if (value == "studio" && Theme is "dark" or "ink") Settings.Data["theme"] = "graphite";
         if (value == "aurora" && Theme is "graphite" or "ink") Settings.Data["theme"] = "dark";
         if (value == "vitrina" && Theme is "graphite" or "dark") Settings.Data["theme"] = "ink";
+        if (value != "store" && Theme is "store" or "snow" or "jet") Settings.Data["theme"] = value == "studio" ? "graphite" : value == "aurora" ? "dark" : "ink";
+        if (value == "store" && Theme is "ink" or "graphite" or "dark") { Settings.Data["theme"] = "store"; if (Accent is "#6E4BFF" or "#7C5CFF") Settings.Data["accent"] = "#7B5CFF"; }
         Settings.Save();
         Apply();
     }
@@ -40,6 +73,19 @@ public static class Look
     /// <summary>Первый запуск 8.3: включить «Студию» и её тему, если оформление не меняли.</summary>
     static void Migrate()
     {
+        // 9.2: всем — дизайн Store. Тёмные темы прошлых версий и их акцент меняем на «Тёмное» оформление Store.
+        if (!Settings.Data.Bool("look92"))
+        {
+            Settings.Data["look92"] = true;
+            Settings.Data["look9"] = true;
+            Settings.Data["design"] = "store";
+            if (Settings.Data.Str("theme") is null or "ink" or "dark" or "graphite") Settings.Data["theme"] = "store";
+            if (Settings.Data.Str("accent") is null or "#6E4BFF" or "#7C5CFF" or "#F2483A") Settings.Data["accent"] = "#7B5CFF";
+            if (Settings.Data.Str("font") is null or "Inter") Settings.Data["font"] = "Onest";
+            Settings.Data["showBrand"] = false;
+            Settings.Save();
+            return;
+        }
         // 9.0: всем — «Витрина». Тему и акцент меняем, только если они были стандартными для прежних версий.
         if (Settings.Data.Bool("look9")) return;
         Settings.Data["look9"] = true;
@@ -51,7 +97,7 @@ public static class Look
         Settings.Save();
     }
 
-    public static readonly string[] Accents = ["#6E4BFF", "#F2483A", "#7C5CFF","#3B82F6", "#14B8A6", "#22C55E", "#EAB308", "#F97316", "#EF4444", "#EC4899", "#06B6D4", "#A3E635", "#F43F5E", "#8B5CF6", "#1BD96A", "#FFFFFF"];
+    public static readonly string[] Accents = ["#7B5CFF", "#D7262E", "#2BD46F", "#6E4BFF", "#F2483A", "#7C5CFF","#3B82F6", "#14B8A6", "#22C55E", "#EAB308", "#F97316", "#EF4444", "#EC4899", "#06B6D4", "#A3E635", "#F43F5E", "#8B5CF6", "#1BD96A", "#0078D4", "#FFFFFF"];
     public static readonly string[] Fonts = ["Onest", "Inter", "Segoe UI", "Segoe UI Variable Display", "Arial", "Verdana", "Bahnschrift", "Consolas", "Cascadia Code"];
     public static readonly string[] Radii = ["sharp", "normal", "round"];
     public static readonly string[] Backdrops = ["aurora", "soft", "grid", "plain"];
@@ -65,7 +111,7 @@ public static class Look
     public static readonly FontFamily Onest = new("avares://ModLaunch/Assets/fonts#Onest");
     public static readonly FontFamily Unbounded = new("avares://ModLaunch/Assets/fonts#Unbounded");
     /// <summary>Шрифт крупных заголовков: в «Витрине» — Unbounded, иначе — шрифт интерфейса.</summary>
-    public static FontFamily Display => Vitrina ? Unbounded : UiFont;
+    public static FontFamily Display => Store ? UiFont : Vitrina ? Unbounded : UiFont;
     public static FontFamily UiFont => Font switch
     {
         "Onest" => Onest,
@@ -77,7 +123,7 @@ public static class Look
     /// <summary>Сила цветного свечения фона, 0…1.</summary>
     public static double Glow => Settings.Data["glow"] is { } g && double.TryParse(g.ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v) ? Math.Clamp(v, 0, 1) : 1;
     /// <summary>Светлые темы (для подсветки кода и иконок).</summary>
-    public static bool IsLight => Theme is "light" or "sand" or "paper";
+    public static bool IsLight => Theme is "light" or "sand" or "paper" or "snow";
 
     public static void SetFont(string font) { Settings.Data["font"] = font; Settings.Save(); Apply(); }
     public static void SetRadius(string radius) { Settings.Data["radius"] = radius; Settings.Save(); Apply(); }
@@ -123,7 +169,7 @@ public static class Look
     }
     public static readonly double[] Scales = [0.85, 0.9, 1.0, 1.1, 1.25];
 
-    public static string Theme => Themes.Contains(Settings.Data.Str("theme")) ? Settings.Data.Str("theme")! : "ink";
+    public static string Theme => Themes.Contains(Settings.Data.Str("theme")) ? Settings.Data.Str("theme")! : "store";
     public static string Accent => Settings.Data.Str("accent") is string a && a.StartsWith('#') && a.Length == 7 ? a : Accents[0];
     /// <summary>«Авто»: на широких мониторах интерфейс крупнее, чтобы не было пустых полей.</summary>
     public static bool AutoScale => Settings.Data["uiScale"] is null || Settings.Data.Str("uiScale") == "auto";
@@ -135,6 +181,22 @@ public static class Look
 
     static readonly Dictionary<string, Dictionary<string, string>> Palettes = new()
     {
+        // 9.2 Store. Bg — шапка и боковая панель, Layer — «лист» с содержимым, Surface — карточки.
+        ["store"] = new()
+        {
+            ["Bg"] = "#17171A", ["Rail"] = "#17171A", ["Layer"] = "#1E1E22", ["Surface"] = "#26262B", ["Surface2"] = "#2E2E34", ["Surface3"] = "#38383F",
+            ["Line"] = "#303036", ["Text"] = "#F4F4F6", ["Muted"] = "#B1B1BA", ["Faint"] = "#7A7A85",
+        },
+        ["snow"] = new()
+        {
+            ["Bg"] = "#ECECEF", ["Rail"] = "#ECECEF", ["Layer"] = "#F7F7F8", ["Surface"] = "#FFFFFF", ["Surface2"] = "#F2F2F4", ["Surface3"] = "#E6E6EA",
+            ["Line"] = "#E0E0E5", ["Text"] = "#17171A", ["Muted"] = "#5B5B65", ["Faint"] = "#93939D",
+        },
+        ["jet"] = new()
+        {
+            ["Bg"] = "#000000", ["Rail"] = "#000000", ["Layer"] = "#070908", ["Surface"] = "#0F1211", ["Surface2"] = "#161A18", ["Surface3"] = "#1F2421",
+            ["Line"] = "#1B201D", ["Text"] = "#F0F5F1", ["Muted"] = "#9BA79F", ["Faint"] = "#646F68",
+        },
         // «Витрина» (9.0): почти чёрный с лёгкой синевой — на нём сочно смотрятся арты игр и фиолетовый акцент.
         ["ink"] = new()
         {
@@ -204,6 +266,15 @@ public static class Look
         },
     };
 
+    /// <summary>Все цвета темы (для образцов оформления): Bg, Layer, Surface…, Text, Muted.</summary>
+    public static IReadOnlyDictionary<string, string> Palette(string theme)
+    {
+        var p = Palettes.TryGetValue(theme, out var found) ? found : Palettes["store"];
+        var copy = new Dictionary<string, string>(p);
+        copy.TryAdd("Layer", p["Bg"]);
+        return copy;
+    }
+
     /// <summary>Цвета образца темы для карточек выбора: фон, поверхность, текст.</summary>
     public static (string Bg, string Surface, string Text) Sample(string theme) =>
         Palettes.TryGetValue(theme, out var p) ? (p["Bg"], p["Surface2"], p["Text"]) : ("#0F1116", "#1E222B", "#E8EBF2");
@@ -255,6 +326,7 @@ public static class Look
         }
         if (Studio) AddStudio(_custom);
         if (Vitrina) AddVitrina(_custom);
+        if (Store) AddStore(_custom);
         app.Styles.Add(_custom);
     }
 
@@ -358,6 +430,56 @@ public static class Look
             (Avalonia.Controls.Presenters.ContentPresenter.BackgroundProperty, R("BrandSoft")));
     }
 
+    /// <summary>
+    /// Store (9.2) поверх «Витрины»: заголовки — шрифтом интерфейса (как Segoe в Microsoft Store),
+    /// карточки с тонкой линией и скруглением 10, кнопки 6, фильтры — «пилюли».
+    /// </summary>
+    static void AddStore(Styles s)
+    {
+        IBrush R(string key) => Application.Current!.Resources.TryGetResource(key, null, out var v) && v is IBrush b ? b : Brushes.Gray;
+        void Add(Func<Selector?, Selector> sel, params (AvaloniaProperty P, object V)[] setters)
+        {
+            var style = new Style(sel);
+            foreach (var (p, v) in setters) style.Setters.Add(new Setter(p, v));
+            s.Add(style);
+        }
+        var round = Radius switch { "round" => 1.5, "sharp" => 0.4, _ => 1.0 };
+        CornerRadius Cr(double r) => new(Math.Round(r * round));
+        var font = UiFont;
+
+        Add(x => x.OfType<Avalonia.Controls.TextBlock>().Class("h1"),
+            (Avalonia.Controls.TextBlock.FontFamilyProperty, font), (Avalonia.Controls.TextBlock.FontSizeProperty, 30.0),
+            (Avalonia.Controls.TextBlock.FontWeightProperty, FontWeight.Bold), (Avalonia.Controls.TextBlock.LetterSpacingProperty, -0.6));
+        Add(x => x.OfType<Avalonia.Controls.TextBlock>().Class("h2"),
+            (Avalonia.Controls.TextBlock.FontFamilyProperty, font), (Avalonia.Controls.TextBlock.FontSizeProperty, 20.0),
+            (Avalonia.Controls.TextBlock.FontWeightProperty, FontWeight.SemiBold), (Avalonia.Controls.TextBlock.LetterSpacingProperty, -0.3));
+        Add(x => x.OfType<Avalonia.Controls.TextBlock>().Class("h3"),
+            (Avalonia.Controls.TextBlock.FontSizeProperty, 14.5), (Avalonia.Controls.TextBlock.FontWeightProperty, FontWeight.SemiBold), (Avalonia.Controls.TextBlock.LetterSpacingProperty, -0.1));
+
+        Add(x => x.OfType<Avalonia.Controls.Border>().Class("card"),
+            (Avalonia.Controls.Border.BackgroundProperty, R("Surface")), (Avalonia.Controls.Border.BorderBrushProperty, R("Line")),
+            (Avalonia.Controls.Border.BorderThicknessProperty, new Thickness(1)), (Avalonia.Controls.Border.CornerRadiusProperty, Cr(10)));
+        foreach (var cls in new[] { "tile", "card-btn" })
+            Add(x => x.OfType<Avalonia.Controls.Button>().Class(cls),
+                (Avalonia.Controls.Primitives.TemplatedControl.CornerRadiusProperty, Cr(10)),
+                (Avalonia.Controls.Primitives.TemplatedControl.BorderBrushProperty, R("Line")),
+                (Avalonia.Controls.Primitives.TemplatedControl.BorderThicknessProperty, new Thickness(1)));
+        Add(x => x.OfType<Avalonia.Controls.Button>(), (Avalonia.Controls.Primitives.TemplatedControl.CornerRadiusProperty, Cr(6)));
+        Add(x => x.OfType<Avalonia.Controls.TextBox>(), (Avalonia.Controls.Primitives.TemplatedControl.CornerRadiusProperty, Cr(6)));
+        Add(x => x.OfType<Avalonia.Controls.ComboBox>(), (Avalonia.Controls.Primitives.TemplatedControl.CornerRadiusProperty, Cr(6)));
+        Add(x => x.OfType<Avalonia.Controls.Button>().Class("chip"), (Avalonia.Controls.Primitives.TemplatedControl.CornerRadiusProperty, new CornerRadius(999)));
+        Add(x => x.OfType<Avalonia.Controls.Button>().Class("chip").Class("side"), (Avalonia.Controls.Primitives.TemplatedControl.CornerRadiusProperty, Cr(6)));
+        // Выбранный фильтр — как в Microsoft Store: акцентная обводка и мягкая заливка, а не инверсия.
+        Add(x => x.OfType<Avalonia.Controls.Button>().Class("chip").Class("active").Not(y => y.Class("side")),
+            (Avalonia.Controls.Primitives.TemplatedControl.BackgroundProperty, R("BrandSoft")), (Avalonia.Controls.Primitives.TemplatedControl.ForegroundProperty, R("Brand2")),
+            (Avalonia.Controls.Primitives.TemplatedControl.BorderBrushProperty, R("Brand")), (Avalonia.Controls.Primitives.TemplatedControl.BorderThicknessProperty, new Thickness(1)));
+        Add(x => x.OfType<Avalonia.Controls.Button>().Class("chip").Class("active").Not(y => y.Class("side")).Template().OfType<Avalonia.Controls.Presenters.ContentPresenter>(),
+            (Avalonia.Controls.Presenters.ContentPresenter.BackgroundProperty, R("BrandSoft")), (Avalonia.Controls.Presenters.ContentPresenter.ForegroundProperty, R("Brand2")),
+            (Avalonia.Controls.Presenters.ContentPresenter.BorderBrushProperty, R("Brand")));
+        Add(x => x.OfType<Avalonia.Controls.Button>().Class("chip").Not(y => y.Class("active")).Not(y => y.Class("side")),
+            (Avalonia.Controls.Primitives.TemplatedControl.BorderBrushProperty, R("Line")), (Avalonia.Controls.Primitives.TemplatedControl.BorderThicknessProperty, new Thickness(1)));
+    }
+
     /// <summary>Применить сохранённые настройки (при запуске и после любой смены).</summary>
     public static void Apply()
     {
@@ -371,7 +493,11 @@ public static class Look
         if (app is null) return;
         var palette = Palettes[Theme];
         foreach (var (key, hex) in palette) Set(app, key, Color.Parse(hex));
+        // «Лист» с содержимым есть только у тем Store; у остальных — цвет окна.
+        if (!palette.ContainsKey("Layer")) Set(app, "Layer", Color.Parse(palette["Bg"]));
         var accent = Color.Parse(Accent);
+        // Текст на акценте: на светлом (зелёный, белый) — тёмный, иначе белый.
+        Set(app, "OnBrand", Luma(accent) > 0.55 ? Color.Parse("#08110B") : Colors.White);
         var bg = Color.Parse(palette["Bg"]);
         var light = IsLight;
         Set(app, "Brand", accent);
@@ -399,6 +525,9 @@ public static class Look
     {
         if (app.Resources.TryGetResource(key, null, out var v) && v is SolidColorBrush brush) brush.Color = color;
     }
+
+    /// <summary>Яркость цвета 0…1 (как её видит глаз).</summary>
+    public static double Luma(Color c) => (0.2126 * c.R + 0.7152 * c.G + 0.0722 * c.B) / 255.0;
 
     public static Color Mix(Color a, Color b, double t) => Color.FromRgb(
         (byte)(a.R + (b.R - a.R) * t), (byte)(a.G + (b.G - a.G) * t), (byte)(a.B + (b.B - a.B) * t));

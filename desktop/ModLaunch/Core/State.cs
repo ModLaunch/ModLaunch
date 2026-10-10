@@ -63,22 +63,61 @@ public static class AppState
         }, TimeSpan.FromMilliseconds(150)));
     }
 
-    /// <summary>Сохранённые пути проверяем сразу, остальные игры ищем в фоне.</summary>
+    /// <summary>
+    /// Сохранённые пути проверяем сразу (игра должна быть на месте, а не только папка),
+    /// остальные игры ищем в фоне — 9.2: одним общим обходом дисков на все игры.
+    /// </summary>
     public static async Task DetectAll(bool force = false)
     {
         foreach (var g in Games)
         {
             var saved = Settings.GamePath(g.Def.Id);
-            if (!force && saved is not null && Directory.Exists(saved))
+            if (!force && saved is not null && Locator.StillThere(g.Def, saved))
             {
                 g.Path = saved;
                 g.Status = Detect.Found;
                 g.Refresh();
             }
+            else if (g.Status == Detect.Found && force) g.Status = Detect.Unknown;
         }
         Notify();
-        foreach (var g in Games.Where(g => g.Status != Detect.Found))
-            await DetectOne(g);
+        await DetectMany(Games.Where(g => g.Status != Detect.Found).ToList());
+    }
+
+    /// <summary>Найти несколько игр за один обход дисков; каждая показывается, как только нашлась.</summary>
+    public static async Task DetectMany(List<GameState> games, bool deep = false)
+    {
+        games = games.Where(g => g.Status != Detect.Searching).ToList();
+        if (games.Count == 0) return;
+        foreach (var g in games) { g.Status = Detect.Searching; g.SearchingWhere = null; }
+        Notify();
+        void Found(GameDef def, Located where) => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            var g = games.FirstOrDefault(x => x.Def == def);
+            if (g is null || g.Status == Detect.Found) return;
+            g.Path = where.Path;
+            g.Status = Detect.Found;
+            g.SearchingWhere = null;
+            Settings.SetGamePath(def.Id, where.Path);
+            g.Refresh();
+            Notify();
+        });
+        try
+        {
+            await Locator.LocateAll(games.Select(g => g.Def).ToList(), deep, new Progress<string>(where =>
+            {
+                foreach (var g in games.Where(x => x.Status == Detect.Searching)) g.SearchingWhere = where;
+                Notify();
+            }), Found);
+        }
+        catch { }
+        // Дать дойти последним «нашлась» из фона, потом остальных пометить «не найдена».
+        await Task.Delay(50);
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            foreach (var g in games.Where(x => x.Status == Detect.Searching)) { g.Status = Detect.NotFound; g.SearchingWhere = null; }
+            Notify();
+        });
     }
 
     public static async Task DetectOne(GameState g, bool deep = false)

@@ -12,6 +12,10 @@ public static class WhatsNew
 {
     static readonly (string Icon, string Key, Func<Page>? Open)[] Items =
     [
+        (Icons.Home, "new.v92.store", () => new HomePage()),
+        (Icons.Palette, "new.v92.styles", () => new SettingsPage("look")),
+        (Icons.Gamepad, "new.v92.game", () => new LibraryPage()),
+        (Icons.Sparkles, "new.v92.openfx", null),
         (Icons.Grid, "new.v91.home", () => new HomePage()),
         (Icons.Download, "new.v91.fx", null),
         (Icons.Creator, "new.v91.creator", () => new CreatorPage()),
@@ -39,9 +43,15 @@ public static class WhatsNew
         var seen = Settings.Data.Str("seenVersion");
         Settings.Data["seenVersion"] = Http.Version;
         Settings.Save();
-        if (seen == Http.Version) return;
+        // 9.2: после обновления — сначала выбор оформления, потом «Что нового».
+        var picker = StylePicker.ShouldShow;
+        if (seen == Http.Version && !picker) return;
         // 9.1: сначала заставка при запуске, потом «Что нового».
-        DispatcherTimer.RunOnce(Show, TimeSpan.FromSeconds(Splash.Enabled ? 2.6 : 1.2));
+        DispatcherTimer.RunOnce(() =>
+        {
+            if (picker) StylePicker.Show(seen == Http.Version ? null : Show);
+            else Show();
+        }, TimeSpan.FromSeconds(Splash.Enabled ? 2.6 : 1.2));
     }
 
     public static void Show()

@@ -215,22 +215,140 @@ public static class Locator
         return null;
     }
 
+    /// <summary>Быстрые способы: Minecraft, манифест Steam, папка в библиотеке Steam, Epic, GOG — без обхода дисков.</summary>
+    static Located? Quick(GameDef game, List<string> libraries)
+    {
+        if (game.IsMinecraft) return Minecraft.Mc.Locate() is string mc ? new Located(mc, "minecraft") : null;
+        if (game.SteamAppId > 0 && FindSteamApp(game.SteamAppId, libraries) is string steam) return new Located(steam, "steam");
+        foreach (var library in libraries)
+        foreach (var folder in game.FolderNames)
+        {
+            var candidate = Path.Combine(library, "steamapps", "common", folder);
+            if (Directory.Exists(candidate)) return new Located(candidate, "steam-folder");
+        }
+        if (FindInEpic(game) is string epic) return new Located(epic, "epic");
+        if (FindInGog(game) is string gog) return new Located(gog, "gog");
+        return null;
+    }
+
     public static Task<Located?> Locate(GameDef game, bool deep = false, IProgress<string>? progress = null, CancellationToken ct = default) =>
         Task.Run(() =>
         {
-            if (game.IsMinecraft) return Minecraft.Mc.Locate() is string mc ? new Located(mc, "minecraft") : null;
             var libraries = SteamLibraries();
-            if (FindSteamApp(game.SteamAppId, libraries) is string steam) return new Located(steam, "steam");
-            foreach (var library in libraries)
-            foreach (var folder in game.FolderNames)
-            {
-                var candidate = Path.Combine(library, "steamapps", "common", folder);
-                if (Directory.Exists(candidate)) return new Located(candidate, "steam-folder");
-            }
-            if (FindInEpic(game) is string epic) return new Located(epic, "epic");
-            if (FindInGog(game) is string gog) return new Located(gog, "gog");
+            if (Quick(game, libraries) is { } quick) return quick;
+            if (game.IsMinecraft) return null;
             return Scan(game, libraries, deep, progress, ct) is string found ? new Located(found, "scan") : null;
         }, ct);
+
+    /// <summary>
+    /// 9.2: поиск сразу всех игр. Сначала быстрые способы для каждой, потом — ОДИН обход дисков
+    /// на всех ненайденных: в каждой папке проверяются признаки всех игр сразу. Раньше каждая игра
+    /// обходила диски отдельно (до 6000 папок на игру), и поиск при запуске шёл долго.
+    /// onFound вызывается сразу, как только игра нашлась (из фонового потока).
+    /// </summary>
+    public static Task<Dictionary<GameDef, Located>> LocateAll(IReadOnlyList<GameDef> games, bool deep = false, IProgress<string>? progress = null,
+        Action<GameDef, Located>? onFound = null, CancellationToken ct = default) =>
+        Task.Run(() =>
+        {
+            var result = new Dictionary<GameDef, Located>();
+            var libraries = SteamLibraries();
+            var pending = new List<GameDef>();
+            foreach (var game in games)
+            {
+                if (ct.IsCancellationRequested) break;
+                Located? quick = null;
+                try { quick = Quick(game, libraries); } catch { }
+                if (quick is not null) { result[game] = quick; onFound?.Invoke(game, quick); }
+                else if (!game.IsMinecraft) pending.Add(game);
+            }
+            if (pending.Count > 0)
+                ScanMany(pending, ScanRoots(libraries, deep), deep, progress, (game, dir) =>
+                {
+                    var found = new Located(dir, "scan");
+                    result[game] = found;
+                    onFound?.Invoke(game, found);
+                }, ct);
+            return result;
+        }, ct);
+
+    /// <summary>Один обход папок на несколько игр: найденная игра выбывает, обход кончается, когда искать некого.</summary>
+    static void ScanMany(List<GameDef> pending, List<(string Dir, int Depth)> roots, bool deep, IProgress<string>? progress, Action<GameDef, string> found, CancellationToken ct)
+    {
+        var maxTotal = deep ? DeepMaxTotalDirs : MaxTotalDirs;
+        var maxPerRoot = deep ? DeepMaxDirsPerRoot : MaxDirsPerRoot;
+        var left = new List<GameDef>(pending);
+        var checkedCount = 0;
+        foreach (var (rootDir, maxDepth) in roots)
+        {
+            if (left.Count == 0 || checkedCount >= maxTotal || ct.IsCancellationRequested) break;
+            if (!Directory.Exists(rootDir)) continue;
+            progress?.Report(rootDir);
+            var queue = new Queue<(string Dir, int Depth)>();
+            queue.Enqueue((rootDir, 0));
+            while (queue.Count > 0 && checkedCount < maxTotal && left.Count > 0)
+            {
+                var (dir, depth) = queue.Dequeue();
+                if (depth > 0)
+                {
+                    checkedCount++;
+                    foreach (var game in left.ToList())
+                        if (game.MatchesSignature(dir)) { left.Remove(game); found(game, dir); }
+                }
+                if (depth >= maxDepth) continue;
+                IEnumerable<string> children;
+                try { children = Directory.EnumerateDirectories(dir).Take(maxPerRoot).ToList(); } catch { continue; }
+                foreach (var child in children)
+                {
+                    var name = Path.GetFileName(child);
+                    if (name.StartsWith('$') || name.StartsWith('.') || SkipDirs.Contains(name)) continue;
+                    queue.Enqueue((child, depth + 1));
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Сохранённая папка ещё похожа на игру: есть её признаки, её exe или хоть какой-то exe.
+    /// Если игру удалили, а пустая папка (или папка модов) осталась — игра больше не считается найденной.
+    /// </summary>
+    public static bool StillThere(GameDef game, string dir)
+    {
+        try
+        {
+            if (!Directory.Exists(dir)) return false;
+            if (game.IsMinecraft || game.Custom) return true;
+            if (game.MatchesSignature(dir)) return true;
+            if (game.Executables.Any(e => File.Exists(Path.Combine(dir, e)))) return true;
+            return Directory.EnumerateFiles(dir, "*.exe").Any() || Directory.EnumerateFiles(dir, "*.x86_64").Any();
+        }
+        catch { return true; }
+    }
+
+    /// <summary>Один обход находит сразу несколько игр, а лишняя папка не мешает.</summary>
+    [SelfTest]
+    static string ScanFindsSeveralGamesInOnePass()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "modlaunch-scan-test-" + Environment.ProcessId);
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(root, "Games", "Sub nautica repack", "Subnautica_Data"));
+            Directory.CreateDirectory(Path.Combine(root, "Games", "vh", "valheim_Data"));
+            Directory.CreateDirectory(Path.Combine(root, "Games", "Other", "Something_Data"));
+            var sub = GameCatalog.ById("subnautica")!;
+            var val = GameCatalog.ById("valheim")!;
+            var hk = GameCatalog.ById("hollow-knight")!;
+            var found = new Dictionary<string, string>();
+            ScanMany([sub, val, hk], [(root, 3)], false, null, (g, d) => found[g.Id] = d, default);
+            if (!found.ContainsKey("subnautica") || !found.ContainsKey("valheim")) throw new Exception("found: " + string.Join(", ", found.Keys));
+            if (found.ContainsKey("hollow-knight")) throw new Exception("hollow knight found by mistake");
+            File.WriteAllText(Path.Combine(root, "Games", "vh", "valheim.exe"), "");
+            if (!StillThere(val, Path.Combine(root, "Games", "vh"))) throw new Exception("installed game not recognised");
+            Directory.CreateDirectory(Path.Combine(root, "Gone", "BepInEx"));
+            if (StillThere(sub, Path.Combine(root, "Gone"))) throw new Exception("deleted game still counted");
+            return "2 games found in one pass, deleted game folder not counted";
+        }
+        finally { try { Directory.Delete(root, true); } catch { } }
+    }
 
     /// <summary>Проверка папки, выбранной вручную. null — всё хорошо, иначе ключ текста ошибки.</summary>
     public static string? Validate(GameDef game, string dir)

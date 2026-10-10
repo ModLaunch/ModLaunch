@@ -30,9 +30,9 @@ public static class Animate
     static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Control, Original> Kept = new();
 
     /// <summary>Поставить элемент в начальное положение и через delay плавно вернуть на место.</summary>
-    public static void From(Control c, string from, int ms = 320, int delay = 0, Easing? easing = null, double opacity = 0)
+    public static void From(Control c, string from, int ms = 320, int delay = 0, Easing? easing = null, double opacity = 0, bool force = false)
     {
-        if (!On) return;
+        if (!On && !force) return;
         var run = new object();
         Runs.AddOrUpdate(c, run);
         // Исходное состояние запоминаем один раз: при перезапуске середина прошлой анимации — не «исходное».

@@ -14,9 +14,9 @@ public static class ModRow
     /// <summary>Значок «Хит» / «Лучшее» / «Новое», как в ModLaunch 3.</summary>
     public static Control? Badge(string? kind) => kind switch
     {
-        "hit" => Tag("🔥 " + I18n.T("badge.hit"), Ui.Hex("#3A1C12"), Ui.Hex("#FF8A5B")),
-        "best" => Tag("🏆 " + I18n.T("badge.best"), Ui.Hex("#3A3212"), Ui.Hex("#F2C25C")),
-        "new" => Tag("✦ " + I18n.T("badge.new"), Ui.Hex("#123A26"), Ui.Hex("#5BD68F")),
+        "hit" => Tag("🔥 " + I18n.T("badge.hit"), Ui.Soft("#3A1C12", "#FF8A5B"), Ui.Ink("#FF8A5B")),
+        "best" => Tag("🏆 " + I18n.T("badge.best"), Ui.Soft("#3A3212", "#F2C25C"), Ui.Ink("#F2C25C")),
+        "new" => Tag("✦ " + I18n.T("badge.new"), Ui.Soft("#123A26", "#5BD68F"), Ui.Ink("#5BD68F")),
         _ => null,
     };
 
@@ -36,16 +36,16 @@ public static class ModRow
 
         var tags = Ui.Row(6);
         if (Badge(badge) is { } b) tags.Children.Add(b);
-        if (mod.Deprecated) tags.Children.Add(Tag(I18n.T("badge.deprecated"), Ui.Hex("#3A1216"), Ui.Hex("#FF6B6B")));
-        if (mod.Adult) tags.Children.Add(Tag("18+", Ui.Hex("#3A1216"), Ui.Hex("#FF6B6B")));
+        if (mod.Deprecated) tags.Children.Add(Tag(I18n.T("badge.deprecated"), Ui.Soft("#3A1216", "#FF6B6B"), Ui.Ink("#FF6B6B")));
+        if (mod.Adult) tags.Children.Add(Tag("18+", Ui.Soft("#3A1216", "#FF6B6B"), Ui.Ink("#FF6B6B")));
         if (pick) tags.Children.Add(Tag(I18n.T("badge.pick"), Ui.Res("BrandSoft"), Ui.Res("Brand2")));
         if (game.IsLegacy(mod.UpdatedAt))
         {
-            var old = Tag(I18n.T("badge.old"), Ui.Hex("#3A2A12"), Ui.Res("Warn"));
+            var old = Tag(I18n.T("badge.old"), Ui.Soft("#3A2A12", "#F2B84B"), Ui.Ink("#F2B84B"));
             ToolTip.SetTip(old, I18n.T("badge.old.hint"));
             tags.Children.Add(old);
         }
-        if (mod.Source != game.PrimarySource) tags.Children.Add(Tag(Catalog.Title(mod.Source), Ui.Hex("#1B2A3A"), Ui.Hex("#7FB4E6")));
+        if (mod.Source != game.PrimarySource) tags.Children.Add(Tag(Catalog.Title(mod.Source), Ui.Soft("#1B2A3A", "#7FB4E6"), Ui.Ink("#7FB4E6")));
         foreach (var c in mod.Categories.Take(2)) tags.Children.Add(Tag(c, Ui.Res("Surface3"), Ui.Res("Muted")));
 
         var middle = Ui.Col(4, name, desc, tags);

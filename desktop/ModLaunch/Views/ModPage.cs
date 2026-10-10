@@ -1,4 +1,4 @@
-﻿using Avalonia;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
@@ -61,8 +61,20 @@ public sealed partial class ModPage : Page
 
     ModInfo Mod => _details?.Mod ?? _brief;
 
+    bool _deferred;
+
+    /// <summary>Анимация открытия закончилась: показать то, что догрузилось за это время.</summary>
+    internal void FlushDeferred()
+    {
+        if (!_deferred) return;
+        _deferred = false;
+        Build();
+    }
+
     public override void Build()
     {
+        // 9.2: пока играет анимация открытия, не меняем страницу под ней — перестроим сразу после.
+        if (ReferenceEquals(ModOpenFx.Running, this)) { _deferred = true; return; }
         var col = new StackPanel { Spacing = 24, Margin = new Thickness(40, 26, 40, 40), MaxWidth = 1500 };
         col.Children.Add(Header());
         col.Children.Add(Tabs());
@@ -92,7 +104,7 @@ public sealed partial class ModPage : Page
         // Плитки с цифрами, как в ModLaunch 3.
         Control Tile(Control top, string label) => new Border
         {
-            Background = Ui.Hex("#661A1D26"), BorderBrush = Ui.Hex("#1FFFFFFF"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(12),
+            Background = Ui.Res("Surface"), BorderBrush = Ui.Res("Line"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(12),
             Padding = new Thickness(14, 10), MinWidth = 104, Margin = new Thickness(0, 0, 8, 8),
             Child = Ui.Col(3, top, new TextBlock { Text = label, FontSize = 12, Foreground = Ui.Res("Muted") }),
         };
@@ -134,18 +146,18 @@ public sealed partial class ModPage : Page
             tiles,
             buttons);
         if (mod.Source == "nexus" && !installed) info.Children.Add(Ui.Row(8, Ui.Icon(Icons.Info, 14, Ui.Res("Muted")), Ui.Text(I18n.T("mod.nexusHint"), "small muted", wrap: true)));
-        if (_g.Def.IsLegacy(mod.UpdatedAt)) info.Children.Add(ModRow.Tag(I18n.T("badge.old.hint"), Ui.Hex("#3A2A12"), Ui.Res("Warn")));
+        if (_g.Def.IsLegacy(mod.UpdatedAt)) info.Children.Add(ModRow.Tag(I18n.T("badge.old.hint"), Ui.Soft("#3A2A12", "#F2B84B"), Ui.Ink("#F2B84B")));
         if (mod.Deprecated)
             info.Children.Add(new Border
             {
-                Background = Ui.Hex("#3A1A1A"), CornerRadius = new CornerRadius(12), Padding = new Thickness(12, 8), HorizontalAlignment = HorizontalAlignment.Left,
+                Background = Ui.Soft("#3A1A1A", "#FF6B6B"), CornerRadius = new CornerRadius(12), Padding = new Thickness(12, 8), HorizontalAlignment = HorizontalAlignment.Left,
                 Child = Ui.Row(8, Ui.Icon(Icons.Alert, 15, Ui.Res("Bad")), Ui.Text(I18n.T("compat.deprecated"), "small", wrap: true)),
             });
         // «Заработает ли?»: мод просит другой загрузчик.
         if (Features.Compat.Foreign(_g.Def, mod.Dependencies) is { } loader)
             info.Children.Add(new Border
             {
-                Background = Ui.Hex("#3A2A12"), CornerRadius = new CornerRadius(12), Padding = new Thickness(12, 8), HorizontalAlignment = HorizontalAlignment.Left,
+                Background = Ui.Soft("#3A2A12", "#F2B84B"), CornerRadius = new CornerRadius(12), Padding = new Thickness(12, 8), HorizontalAlignment = HorizontalAlignment.Left,
                 Child = Ui.Row(8, Ui.Icon(Icons.Alert, 15, Ui.Res("Warn")), Ui.Text(I18n.T("compat.page", ("loader", loader), ("ours", _g.Def.LoaderName)), "small", wrap: true)),
             });
         info.VerticalAlignment = VerticalAlignment.Center;
@@ -154,6 +166,7 @@ public sealed partial class ModPage : Page
         var vitrina = Look.Vitrina;
         var picture = new Border
         {
+            Classes = { "mod-picture" },
             Width = vitrina ? 120 : 250, Height = vitrina ? 120 : 230, CornerRadius = new CornerRadius(vitrina ? 26 : 18), ClipToBounds = true, VerticalAlignment = VerticalAlignment.Top,
             BorderBrush = Ui.Hex("#26FFFFFF"), BorderThickness = new Thickness(1), Child = Ui.Thumb(vitrina ? mod.Icon ?? cover : cover, mod.Name, vitrina ? 120 : 250, 0, 520),
         };
@@ -281,7 +294,7 @@ public sealed partial class ModPage : Page
         foreach (var r in list)
         {
             var title = Ui.Row(8, Ui.Text(r.Name, "h3"), Stars(r.Stars, 13));
-            if (r.Admin) title.Children.Add(ModRow.Tag("👑 " + I18n.T("rev.admin"), Ui.Hex("#3A2E10"), Ui.Hex("#F2B84B")));
+            if (r.Admin) title.Children.Add(ModRow.Tag("👑 " + I18n.T("rev.admin"), Ui.Soft("#3A2E10", "#F2B84B"), Ui.Ink("#F2B84B")));
             if (r.Played) { var p = ModRow.Tag(I18n.T("rev.played"), Ui.Res("Surface3"), Ui.Res("Good")); ToolTip.SetTip(p, I18n.T("rev.played.title")); title.Children.Add(p); }
             if (r.Mine) title.Children.Add(ModRow.Tag(I18n.T("rev.mine"), Ui.Res("BrandSoft"), Ui.Res("Brand2")));
             var when = Ui.Ago(r.Updated ?? r.Created) + (r.Updated is not null && r.Created is not null && r.Updated - r.Created > TimeSpan.FromMinutes(1) ? " · " + I18n.T("rev.edited") : "");

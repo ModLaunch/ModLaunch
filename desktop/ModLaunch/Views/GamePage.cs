@@ -1,4 +1,4 @@
-﻿using System.Text.Json.Nodes;
+using System.Text.Json.Nodes;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
@@ -44,10 +44,13 @@ public sealed partial class GamePage : Page
         _query = query;
         // Minecraft показывает своя страница (MainWindow.Show подменяет): здесь ничего не грузим.
         if (_g.Def.IsMinecraft) { _tab = tab; return; }
-        _tab = tab != "" ? tab : _g.ModCount > 0 || !_g.Def.HasCatalog ? "installed" : "catalog";
-        if (_tab == "catalog" && !_g.Def.HasCatalog) _tab = "installed";
+        // 9.2 Store: страница игры открывается на «Обзоре».
+        _tab = tab != "" ? tab : Look.Store ? "overview" : _g.ModCount > 0 || !_g.Def.HasCatalog ? "installed" : "catalog";
+        if (_tab == "catalog" && !_g.Def.HasCatalog) _tab = Look.Store ? "overview" : "installed";
+        if (_tab == "overview" && !Look.Store) _tab = "installed";
         if (_g.Def.Picks.Length > 0 && _query == "") _section = "picks";
-        if (_tab == "catalog") _ = Load(reset: true);
+        // На «Обзоре» каталог грузится тоже — ради цифры «модов в каталоге» в шапке.
+        if (_tab == "catalog" || _tab == "overview" && _g.Def.HasExternalCatalog && _g.Status == Detect.Found) _ = Load(reset: true);
     }
 
     /// <summary>Вкладка и запрос — для подмены страницей Minecraft.</summary>
@@ -69,6 +72,7 @@ public sealed partial class GamePage : Page
             "health" => I18n.T("health.tab"),
             "config" => I18n.T("cfg.tab"),
             "shots" => I18n.T("shots.tab"),
+            "overview" => I18n.T("v92.tab.overview"),
             _ => I18n.T("games.downloads"),
         }, null),
     ];
@@ -87,6 +91,8 @@ public sealed partial class GamePage : Page
 
     public override void Build()
     {
+        // 9.2: в дизайне Store — страница как у приложения в Microsoft Store (GamePage.Store.cs).
+        if (Look.Store) { BuildStore(); return; }
         var content = new StackPanel { Spacing = 24, Margin = new Thickness(40, 26, 40, 40), MaxWidth = 1640 };
         // 9.0 «Витрина»: шапка игры во всю ширину окна, без рамки; остальное — под ней с полями.
         Control page = content;

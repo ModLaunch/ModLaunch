@@ -26,6 +26,8 @@ public sealed partial class HomePage : Page
 
     public override void Build()
     {
+        // 9.2: в дизайне Store — главная как в Microsoft Store (HomePage.Store.cs).
+        if (Look.Store) { BuildStore(); return; }
         var content = new StackPanel { Spacing = 30, Margin = new Thickness(32, 26, 32, 32), MaxWidth = 1680 };
 
         // Новичку: три шага «найти игру, поставить мод, играть».

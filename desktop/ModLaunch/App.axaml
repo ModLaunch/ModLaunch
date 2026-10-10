@@ -8,6 +8,9 @@
       <Color x:Key="BgColor">#0F1116</Color>
       <SolidColorBrush x:Key="Bg" Color="#0F1116"/>
       <SolidColorBrush x:Key="Rail" Color="#12141A"/>
+      <!-- 9.2 Store: «лист» с содержимым (у остальных тем — цвет окна) и текст на акценте. -->
+      <SolidColorBrush x:Key="Layer" Color="#1E1E22"/>
+      <SolidColorBrush x:Key="OnBrand" Color="#FFFFFF"/>
       <SolidColorBrush x:Key="Surface" Color="#171A21"/>
       <SolidColorBrush x:Key="Surface2" Color="#1E222B"/>
       <SolidColorBrush x:Key="Surface3" Color="#262B36"/>
@@ -91,11 +94,11 @@
     <Style Selector="Button.primary">
       <Setter Property="Background" Value="{StaticResource Brand}"/>
       <Setter Property="BorderThickness" Value="0"/>
-      <Setter Property="Foreground" Value="White"/>
+      <Setter Property="Foreground" Value="{StaticResource OnBrand}"/>
     </Style>
     <Style Selector="Button.primary:pointerover /template/ ContentPresenter">
       <Setter Property="Background" Value="{StaticResource Brand2}"/>
-      <Setter Property="Foreground" Value="White"/>
+      <Setter Property="Foreground" Value="{StaticResource OnBrand}"/>
     </Style>
     <Style Selector="Button.primary:disabled /template/ ContentPresenter">
       <Setter Property="Background" Value="{StaticResource Surface3}"/>
@@ -621,5 +624,154 @@
         </Animation>
       </Style.Animations>
     </Style>
+
+    <!-- ============================== 9.2 Store ============================== -->
+    <!-- Разделы на боковой панели: значок над подписью, выбранный — на светлой подложке -->
+    <Style Selector="Button.nav">
+      <Setter Property="Width" Value="66"/>
+      <Setter Property="Height" Value="58"/>
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+      <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+      <Setter Property="FontWeight" Value="Normal"/>
+    </Style>
+    <Style Selector="Button.nav:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{StaticResource Hover}"/></Style>
+    <Style Selector="Button.nav.active"><Setter Property="Background" Value="{StaticResource Surface}"/></Style>
+    <Style Selector="Button.nav.active:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{StaticResource Surface}"/></Style>
+    <Style Selector="Window.juicy Button.nav:pressed"><Setter Property="RenderTransform" Value="scale(0.94)"/></Style>
+
+    <!-- Поиск в шапке: ровное поле с тонкой линией, при фокусе — линия акцента снизу -->
+    <Style Selector="TextBox.store-search">
+      <Setter Property="Background" Value="{StaticResource Surface}"/>
+      <Setter Property="BorderBrush" Value="{StaticResource Line}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="FontSize" Value="13"/>
+    </Style>
+    <Style Selector="TextBox.store-search:pointerover /template/ Border#PART_BorderElement">
+      <Setter Property="Background" Value="{StaticResource Surface2}"/>
+      <Setter Property="BorderBrush" Value="{StaticResource Line}"/>
+    </Style>
+    <Style Selector="TextBox.store-search:focus /template/ Border#PART_BorderElement">
+      <Setter Property="Background" Value="{StaticResource Surface}"/>
+      <Setter Property="BorderBrush" Value="{StaticResource Brand}"/>
+    </Style>
+
+    <!-- Полка Store: заголовок раздела со стрелкой «›» -->
+    <Style Selector="Button.shelf-link">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Padding" Value="4,2"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="FontSize" Value="20"/>
+    </Style>
+    <Style Selector="Button.shelf-link:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Foreground" Value="{StaticResource Brand2}"/>
+    </Style>
+
+    <!-- Плитка Store: картинка с подписью, при наведении приподнимается и светлеет -->
+    <Style Selector="Border.store-tile">
+      <Setter Property="CornerRadius" Value="10"/>
+      <Setter Property="ClipToBounds" Value="True"/>
+      <Setter Property="Background" Value="{StaticResource Surface}"/>
+      <Setter Property="BorderBrush" Value="{StaticResource Line}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Transitions">
+        <Transitions>
+          <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.26" Easing="CubicEaseOut"/>
+          <BoxShadowsTransition Property="BoxShadow" Duration="0:0:0.22"/>
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Window.juicy Border.store-tile:pointerover">
+      <Setter Property="RenderTransform" Value="translateY(-3px)"/>
+      <Setter Property="BoxShadow" Value="0 14 28 -12 #90000000"/>
+    </Style>
+    <Style Selector="Border.store-tile Image.zoom">
+      <Setter Property="Transitions">
+        <Transitions>
+          <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.5" Easing="CubicEaseOut"/>
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Window.juicy Border.store-tile:pointerover Image.zoom"><Setter Property="RenderTransform" Value="scale(1.05)"/></Style>
+
+    <!-- Кнопка «Играть» на обложке: появляется при наведении -->
+    <Style Selector="Border.store-tile Button.tile-play">
+      <Setter Property="Opacity" Value="0"/>
+      <Setter Property="Transitions">
+        <Transitions>
+          <DoubleTransition Property="Opacity" Duration="0:0:0.16"/>
+          <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.3" Easing="BackEaseOut"/>
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Window.juicy Border.store-tile Button.tile-play"><Setter Property="RenderTransform" Value="scale(0.6)"/></Style>
+    <Style Selector="Border.store-tile:pointerover Button.tile-play"><Setter Property="Opacity" Value="1"/></Style>
+    <Style Selector="Window.juicy Border.store-tile:pointerover Button.tile-play"><Setter Property="RenderTransform" Value="scale(1)"/></Style>
+
+    <!-- Стрелки полки «‹ ›» -->
+    <Style Selector="Button.shelf-arrow">
+      <Setter Property="Background" Value="{StaticResource Surface}"/>
+      <Setter Property="BorderBrush" Value="{StaticResource Line}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+    </Style>
+    <Style Selector="Button.shelf-arrow:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource Surface2}"/>
+      <Setter Property="BorderBrush" Value="{StaticResource Line}"/>
+    </Style>
+
+    <!-- Строка списка Store (как «Популярные игры»): подсветка при наведении -->
+    <Style Selector="Border.store-row">
+      <Setter Property="CornerRadius" Value="8"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Transitions">
+        <Transitions>
+          <BrushTransition Property="Background" Duration="0:0:0.14"/>
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Border.store-row:pointerover"><Setter Property="Background" Value="{StaticResource Hover}"/></Style>
+
+    <!-- Вкладки страницы игры в духе Windows 11: подпись и полоска акцента под выбранной -->
+    <Style Selector="Button.pivot">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Foreground" Value="{StaticResource Muted}"/>
+      <Setter Property="Padding" Value="14,12"/>
+      <Setter Property="CornerRadius" Value="6"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="FontSize" Value="14"/>
+    </Style>
+    <Style Selector="Button.pivot:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource Hover}"/>
+      <Setter Property="Foreground" Value="{StaticResource Text}"/>
+    </Style>
+    <Style Selector="Button.pivot.active"><Setter Property="Foreground" Value="{StaticResource Text}"/></Style>
+    <Style Selector="Window.juicy Button.pivot:pressed"><Setter Property="RenderTransform" Value="scale(0.96)"/></Style>
+
+    <!-- Карточка-образец оформления (Тёмная, Красно-белая, Чёрно-зелёная) -->
+    <Style Selector="Button.style-card">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="BorderThickness" Value="2"/>
+      <Setter Property="BorderBrush" Value="{StaticResource Line}"/>
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+      <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+      <Setter Property="FontWeight" Value="Normal"/>
+      <Setter Property="Transitions">
+        <Transitions>
+          <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.28" Easing="BackEaseOut"/>
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Button.style-card:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="{StaticResource Brand}"/>
+    </Style>
+    <Style Selector="Button.style-card.on"><Setter Property="BorderBrush" Value="{StaticResource Brand}"/></Style>
+    <Style Selector="Window.juicy Button.style-card:pointerover"><Setter Property="RenderTransform" Value="translateY(-4px)"/></Style>
   </Application.Styles>
 </Application>
