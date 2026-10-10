@@ -198,14 +198,22 @@ public sealed class OpenRun
     public void Start()
     {
         if (_tracks.Count == 0) { Finish(); return; }
-        _clock.Start();
         _timer = new DispatcherTimer(TimeSpan.FromMilliseconds(15), DispatcherPriority.Render, (_, _) =>
         {
             var ms = _clock.Elapsed.TotalMilliseconds;
             Seek(ms);
             if (ms >= Length) Finish();
         });
-        _timer.Start();
+        // Часы пускаем, когда новая страница уже разложена и нарисована в начальном кадре:
+        // иначе на тяжёлой странице первые сотни миллисекунд анимации «съедала» бы раскладка.
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (_done) return;
+            _clock.Start();
+            _timer.Start();
+        }, DispatcherPriority.Background);
+        // Страховка: что бы ни случилось с таймером, через 3 с страница стоит на месте.
+        DispatcherTimer.RunOnce(Finish, TimeSpan.FromSeconds(3));
     }
 
     /// <summary>Поставить кадр на момент ms (для снимков экрана).</summary>
