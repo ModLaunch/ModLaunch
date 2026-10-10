@@ -21,6 +21,8 @@ public enum Slot
     List,
     /// <summary>Строка мода (значок, название, кнопка).</summary>
     R,
+    /// <summary>Маленькая кнопка-«чип» для небольшого мода: значок, название и «Установить».</summary>
+    Chip,
 }
 
 /// <summary>Клетка раскладки: где стоит и сколько занимает.</summary>
@@ -29,12 +31,13 @@ public sealed record FeedCell(int Col, int Row, int ColSpan, int RowSpan, Slot S
 /// <summary>
 /// Раскладка блока ленты: столбцы и строки сетки (как в Grid), высота блока и клетки.
 /// Hero — в раскладке есть большое место, ей можно начинать ленту.
-/// Shelf — особая раскладка: полка обложек с прокруткой вбок.
+/// Shelf — особая раскладка: полка обложек с прокруткой вбок. Fold — «топ», который по нажатию
+/// раскрывается в список.
 /// </summary>
-public sealed record FeedLayout(string Id, string Cols, string Rows, double Height, bool Hero, FeedCell[] Cells, bool Shelf = false);
+public sealed record FeedLayout(string Id, string Cols, string Rows, double Height, bool Hero, FeedCell[] Cells, bool Shelf = false, bool Fold = false);
 
 /// <summary>
-/// 9.3: раскладки плиток ленты — 25 штук. Каждый блок ленты берёт раскладку наугад; одна и та же
+/// 9.3: раскладки плиток ленты — 28 штук. Каждый блок ленты берёт раскладку наугад; одна и та же
 /// не встаёт больше трёх раз подряд. Все раскладки — ровные сетки с одинаковыми промежутками
 /// (края плиток совпадают), поэтому лента разная, но не «потыканная как попало».
 /// </summary>
@@ -69,6 +72,10 @@ public static class FeedLayouts
         new("ladder", "*,*,*,*", "*,*", 440, false, [C(0, 0, Slot.T, rowSpan: 2), C(1, 0, Slot.W, colSpan: 2), C(1, 1, Slot.S), C(2, 1, Slot.S), C(3, 0, Slot.T, rowSpan: 2)]),
         new("listMid", "*,*,*", "*", 400, false, [C(0, 0, Slot.M), C(1, 0, Slot.List), C(2, 0, Slot.M)]),
         new("shelf", "*", "*", 270, false, [C(0, 0, Slot.T)], Shelf: true),
+        // 9.3: маленькие моды — кнопками-«чипами»; крупный баннер и чипы рядом; топ, который раскрывается.
+        new("chips", "*,*,*,*", "*,*", 148, false, [C(0, 0, Slot.Chip), C(1, 0, Slot.Chip), C(2, 0, Slot.Chip), C(3, 0, Slot.Chip), C(0, 1, Slot.Chip), C(1, 1, Slot.Chip), C(2, 1, Slot.Chip), C(3, 1, Slot.Chip)]),
+        new("bannerChips", "2*,*,*", "*,*,*,*", 400, true, [C(0, 0, Slot.XL, rowSpan: 4), C(1, 0, Slot.Chip), C(2, 0, Slot.Chip), C(1, 1, Slot.Chip), C(2, 1, Slot.Chip), C(1, 2, Slot.Chip), C(2, 2, Slot.Chip), C(1, 3, Slot.Chip), C(2, 3, Slot.Chip)]),
+        new("topFold", "*", "*", 0, false, [C(0, 0, Slot.List)], Fold: true),
     ];
 
     static readonly Random Rng = new();
@@ -79,8 +86,14 @@ public static class FeedLayouts
     public const int MaxInARow = 3;
 
     /// <summary>Раскладка для следующего блока: наугад; та же — не больше трёх раз подряд.</summary>
+    static readonly Queue<string> Forced = new();
+
+    /// <summary>Для снимков экрана: следующие блоки возьмут эти раскладки по порядку.</summary>
+    public static void Force(params string[] ids) { Forced.Clear(); foreach (var id in ids) Forced.Enqueue(id); }
+
     public static FeedLayout Next(bool heroOnly = false)
     {
+        if (Forced.TryDequeue(out var forced) && All.FirstOrDefault(l => l.Id == forced) is { } f) { _last = f.Id; _streak = 1; return f; }
         var pool = All.Where(l => !heroOnly || l.Hero).ToList();
         if (_last is string last && _streak >= MaxInARow) pool.RemoveAll(l => l.Id == last);
         var pick = pool[Rng.Next(pool.Count)];
@@ -90,6 +103,9 @@ public static class FeedLayouts
     }
 
     public static void Reset() { _last = null; _streak = 0; }
+
+    /// <summary>Сколько раскладок в ленте.</summary>
+    public static int Count => All.Length;
 
     /// <summary>Правило ленты: не меньше 19 раскладок, одна и та же — не больше трёх раз подряд.</summary>
     [SelfTest]

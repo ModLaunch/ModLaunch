@@ -412,7 +412,8 @@ public sealed partial class SettingsPage : Page
         col.Children.Add(Section(I18n.T("look.chrome"), I18n.T("look.chrome.hint"),
             Toggle(I18n.T("look.brand"), I18n.T("look.brand.hint"), Settings.Data.Bool("showBrand", true), v => { Settings.Data["showBrand"] = v; Chrome(); }),
             Toggle(I18n.T("look.rail"), I18n.T("look.rail.hint"), !Settings.Data.Bool("railHidden"), v => { Settings.Data["railHidden"] = !v; Chrome(); }),
-            Toggle(I18n.T("look.railFriends"), I18n.T("look.railFriends.hint"), Settings.Data.Bool("railFriends", true), v => { Settings.Data["railFriends"] = v; Chrome(); })));
+            Toggle(I18n.T("look.railFriends"), I18n.T("look.railFriends.hint"), Settings.Data.Bool("railFriends", true), v => { Settings.Data["railFriends"] = v; Chrome(); }),
+            Toggle(I18n.T("v93.set.railSections"), I18n.T("v93.set.railSections.hint"), Settings.Data.Bool("railGamesMods"), v => { Settings.Data["railGamesMods"] = v; Chrome(); })));
 
         // «Перемешать плитки» — только у главной «Витрины» (у Store плитки стоят ровной сеткой).
         Control? shuffle = Look.Store ? null : Toggle(I18n.T("v91.set.shuffle"), I18n.T("v91.set.shuffle.hint"), Settings.Data.Bool("homeShuffle", true), v => Settings.Data["homeShuffle"] = v);

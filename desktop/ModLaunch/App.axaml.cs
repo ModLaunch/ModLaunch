@@ -1,4 +1,5 @@
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using ModLaunch.Core;
@@ -17,6 +18,9 @@ public partial class App : Application
         Look.Apply();
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            // Программа выходит, когда закрыто главное окно, — даже если где-то осталось
+            // спрятанное окошко (оверлей в игре, подсказка): раньше оно держало процесс.
+            desktop.ShutdownMode = ShutdownMode.OnMainWindowClose;
             desktop.MainWindow = Program.SetupMode == ModLaunch.Setup.SetupMode.None
                 ? new MainWindow()
                 : new SetupWindow(Program.SetupMode);

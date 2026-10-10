@@ -742,12 +742,18 @@ public sealed partial class MainWindow : Window
             });
             return true;
         }, TimeSpan.FromMinutes(5));
+        // 9.3: окно закрывается сразу. Раньше закрытие ждало «не в сети» для друзей прямо в
+        // окне (до полутора секунд, а иногда и дольше — ожидание мешало самому себе). Теперь окно
+        // прячется мгновенно, уборка идёт в фоне (не дольше секунды), потом программа выходит.
         Closing += (_, e) =>
         {
-            if (e.Cancel) return;
-            _tray?.Dispose();
-            Features.Hotkey.Disarm();
-            try { Social.Friends.GoOffline().Wait(1500); } catch { }
+            if (e.Cancel || _closing) return;
+            _closing = true;
+            e.Cancel = true;
+            Hide();
+            try { _tray?.Dispose(); _tray = null; } catch { }
+            try { Features.Hotkey.Disarm(); } catch { }
+            _ = FinishAndExit();
         };
         // Программа закрылась, пока шла игра «без модов», — возвращаем загрузчик на место.
         try { Features.Vanilla.RestoreLeftovers(); } catch { }
@@ -770,6 +776,16 @@ public sealed partial class MainWindow : Window
             AppState.Notify();
             Actions.AutoUpdate();
         }
+    }
+
+    bool _closing;
+
+    async Task FinishAndExit()
+    {
+        try { await Task.WhenAny(Task.Run(Social.Friends.GoOffline), Task.Delay(1000)); } catch { }
+        try { Settings.Save(); } catch { }
+        if (Application.Current?.ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop) desktop.Shutdown();
+        else Environment.Exit(0);
     }
 
     void OnGameExit(string gameId, bool counted, long ms)

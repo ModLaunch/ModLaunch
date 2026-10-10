@@ -67,13 +67,27 @@ public sealed class ControlPanelPage : Page
         new("downloads", Icons.Download, "cp.t.downloads", () => W.Navigate(() => new SettingsPage("downloads"))),
     ];
 
-    static readonly string[] DefaultTiles = ["play", "updates", "creator", "market", "modrinth", "account", "look", "clean"];
+    // 9.3: «Панель» заменяет пункты «Игры» и «Моды» боковой панели — плитки библиотеки и модов идут первыми.
+    static readonly string[] DefaultTiles = ["play", "library", "updates", "creator", "market", "modrinth", "account", "look", "clean"];
 
     static JsonObject Store => Settings.Data.Obj("controlPanel");
 
     static List<string> Pinned
     {
-        get => Store["tiles"] is JsonArray a ? a.Select(x => x?.ToString() ?? "").Where(x => x != "").ToList() : [.. DefaultTiles];
+        get
+        {
+            if (Store["tiles"] is not JsonArray a) return [.. DefaultTiles];
+            var list = a.Select(x => x?.ToString() ?? "").Where(x => x != "").ToList();
+            // Один раз после 9.3: свои плитки сохраняем, но «Библиотека» и «Моды» должны быть на месте.
+            if (!Store.Bool("v93"))
+            {
+                Store["v93"] = true;
+                if (!list.Contains("updates")) list.Insert(Math.Min(1, list.Count), "updates");
+                if (!list.Contains("library")) list.Insert(Math.Min(1, list.Count), "library");
+                Pinned = list;
+            }
+            return list;
+        }
         set { Store["tiles"] = new JsonArray(value.Select(x => (JsonNode)x).ToArray()); Settings.Save(); }
     }
 

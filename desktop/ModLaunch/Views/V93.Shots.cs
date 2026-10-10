@@ -29,6 +29,18 @@ public static class V93Shots
             s.Pump(700);
             s.Save($"v93-1-feed-{y}");
         }
+        // Обложки модов, «чипы» для маленьких модов и раскрытый топ.
+        HomePage.DemoLayouts(true, "bannerChips", "topFold", "chips", "bigL4", "towersL");
+        w.Navigate(() => new HomePage());
+        s.Pump(1200);
+        s.Save("v93-1-feed-new");
+        foreach (var y in new[] { 450, 1100, 1700 })
+        {
+            if (Scroller(w.CurrentPage) is { } sv) sv.Offset = new Vector(0, y);
+            s.Pump(700);
+            s.Save($"v93-1-feed-new-{y}");
+        }
+        HomePage.DemoLayouts(false);
         foreach (var style in Look.Styles)
         {
             Look.SetStyle(style.Id);

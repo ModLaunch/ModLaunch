@@ -342,10 +342,14 @@ public sealed partial class MainWindow
 
         // Разделы: выбранный — значком цвета акцента и полоской слева.
         SetNav(_homeButton, _current is HomePage or SearchPage);
+        // 9.3: «Игры» и «Моды» на панели — по желанию (Настройки → Внешний вид → Рамка окна);
+        // без них их место занимает «Панель», и она подсвечена на страницах библиотеки и модов.
+        var sections = Settings.Data.Bool("railGamesMods");
+        _libraryButton.IsVisible = _modsButton.IsVisible = sections;
         SetNav(_libraryButton, _current is LibraryPage or AddGamePage or GamePage or MinecraftPage || _current is ModPage);
         SetNav(_creatorButton, _current is MarketPage or CreatorPage or ListingPage or AuthorPage);
         SetNav(_modsButton, _current is ModsCenterPage);
-        SetNav(_panelButton, _current is ControlPanelPage);
+        SetNav(_panelButton, _current is ControlPanelPage || !sections && _current is LibraryPage or ModsCenterPage);
         var view = Social.Friends.View();
         _friendsBadge.IsVisible = view.Incoming.Count > 0 || view.Friends.Any(f => f.State != "offline");
         _friendsBadge.Background = view.Incoming.Count > 0 ? Ui.Res("Warn") : Ui.Res("Good");

@@ -95,7 +95,7 @@ public static class Aside
         return null;
     }
 
-    public static async Task<List<ModInfo>> PopularAsync(GameState g, int take = 12)
+    public static async Task<List<ModInfo>> PopularAsync(GameState g, int take = 30)
     {
         if (PopularCache.TryGetValue(g.Def.Id, out var hit)) return hit;
         if (!g.Def.HasCatalog) return PopularCache[g.Def.Id] = [];

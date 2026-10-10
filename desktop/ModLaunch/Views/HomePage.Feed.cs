@@ -54,6 +54,15 @@ public sealed partial class HomePage
     Control? _feedEnd;
     int _feedShown;
 
+    /// <summary>Для снимков: собрать ленту заново с заданными раскладками и раскрытыми топами.</summary>
+    public static void DemoLayouts(bool openTops, params string[] ids)
+    {
+        _plan.Clear(); _used.Clear(); _gameUses.Clear(); _promoAt.Clear(); _recentThemes.Clear();
+        _openTops.Clear();
+        if (openTops) foreach (var g in AppState.Games) _openTops.Add(g.Def.Id);
+        FeedLayouts.Force(ids);
+    }
+
     /// <summary>Данные для снимков экрана: лоты рынка и моды Мастерской без сети.</summary>
     public static void DemoFeed(List<Listing> market, List<HubMod> hub) { _feedMarket = market; _feedHub = hub; }
 
@@ -204,7 +213,7 @@ public sealed partial class HomePage
         return block;
     }
 
-    static int SlotRank(Slot s) => s switch { Slot.XL => 0, Slot.W => 1, Slot.L => 2, Slot.List => 3, Slot.T => 4, Slot.M => 5, _ => 6 };
+    static int SlotRank(Slot s) => s switch { Slot.XL => 0, Slot.W => 1, Slot.L => 2, Slot.List => 3, Slot.T => 4, Slot.M => 5, Slot.Chip => 7, _ => 6 };
 
     /// <summary>Тема блока: одна игра (её моды и топ), рынок, Мастерская или «вперемешку».</summary>
     static string Theme(List<GameState> mine)
@@ -260,16 +269,25 @@ public sealed partial class HomePage
             Use(g);
             return new FeedItem(FeedKind.Game, g, Tag: poster ? "poster" : "");
         }
+        // 9.3: крупным модам — крупные места (баннеры), мелким — «чипы» и строки, остальным — плитки.
         FeedItem? ModItem()
         {
             if (!Allowed(FeedKind.Mod)) return null;
             IEnumerable<GameState> games = themeGame is not null ? [themeGame, .. mine.Where(g => g != themeGame).OrderBy(_ => FeedRng.Next())] : mine.OrderBy(_ => FeedRng.Next());
             foreach (var g in games)
-                foreach (var (m, tag) in ModsOf(g))
+            {
+                var pool = ModsOf(g).Where(x => !_used.Contains("m:" + g.Def.Id + "/" + x.Mod.Id)).GroupBy(x => x.Mod.Id).Select(x => x.First()).ToList();
+                if (pool.Count == 0) continue;
+                var byDownloads = pool.OrderByDescending(x => x.Mod.Downloads).ToList();
+                var (m, tag) = slot switch
                 {
-                    if (!_used.Add("m:" + g.Def.Id + "/" + m.Id)) continue;
-                    return new FeedItem(FeedKind.Mod, g, m, Tag: tag);
-                }
+                    Slot.XL or Slot.W or Slot.L => byDownloads[0],
+                    Slot.Chip or Slot.R => byDownloads[^1],
+                    _ => byDownloads[Math.Min(byDownloads.Count - 1, FeedRng.Next(Math.Max(1, byDownloads.Count / 2 + 1)))],
+                };
+                _used.Add("m:" + g.Def.Id + "/" + m.Id);
+                return new FeedItem(FeedKind.Mod, g, m, Tag: tag);
+            }
             return null;
         }
         FeedItem? TopItem()
@@ -279,6 +297,8 @@ public sealed partial class HomePage
             foreach (var g in games)
             {
                 if ((Views.Aside.Popular(g) ?? []).Count < 3 || !_used.Add("top:" + g.Def.Id)) continue;
+                // Моды из топа ниже в ленте не повторяются.
+                foreach (var m in (Views.Aside.Popular(g) ?? []).OrderByDescending(m => m.Downloads).Take(block.Layout.Fold ? 10 : 5)) _used.Add("m:" + g.Def.Id + "/" + m.Id);
                 return new FeedItem(FeedKind.Top, g);
             }
             return null;
@@ -318,7 +338,12 @@ public sealed partial class HomePage
         var order = new List<Func<FeedItem?>>();
         switch (slot)
         {
-            case Slot.XL: order.AddRange([() => GameItem(), ModItem, ListingItem, HubItem, PromoItem]); break;
+            case Slot.XL:
+                // Большое место — то баннер игры, то самый популярный мод (крупным модам — крупные баннеры).
+                if (FeedRng.NextDouble() < 0.5) order.AddRange([ModItem, () => GameItem(), ListingItem, HubItem, PromoItem]);
+                else order.AddRange([() => GameItem(), ModItem, ListingItem, HubItem, PromoItem]);
+                break;
+            case Slot.Chip: order.AddRange([ModItem, ModItem, ListingItem, HubItem, PromoItem]); break;
             case Slot.L: order.AddRange([ModItem, () => GameItem(), ListingItem, HubItem, PromoItem]); break;
             case Slot.W: order.AddRange([() => GameItem(), ModItem, PromoItem, ListingItem, HubItem]); break;
             case Slot.T: order.AddRange([() => GameItem(poster: true), TopItem, ModItem, ListingItem]); break;
@@ -337,6 +362,8 @@ public sealed partial class HomePage
         // Тема блока важнее размера места: в блоке рынка — лоты, в блоке Мастерской — её моды.
         if (block.Theme == "market") order.Insert(0, ListingItem);
         if (block.Theme == "workshop") order.Insert(0, HubItem);
+        // Раскрывающийся топ — всегда топ (если есть игра с популярными модами).
+        if (block.Layout.Fold) order.Insert(0, TopItem);
         foreach (var f in order) if (f() is { } item) return item;
         // Совсем пусто (новичок без игр и без сети) — подсказки по кругу.
         _promoAt.Clear();
@@ -392,7 +419,7 @@ public sealed partial class HomePage
     /// <summary>Подпись блока: тема (игра, рынок, Мастерская) и ссылка «Все ›».</summary>
     static Control? Caption(FeedBlock b, int index)
     {
-        if (index == 0) return null;
+        if (index == 0 || b.Layout.Fold) return null;
         string text;
         Action? open = null;
         if (b.Layout.Shelf) { text = I18n.T("home.yourGames"); open = () => MainWindow.Current?.Navigate(() => new LibraryPage()); }
@@ -426,7 +453,14 @@ public sealed partial class HomePage
     {
         Control body;
         var tiles = new List<(Control Tile, double X)>();
-        if (b.Layout.Shelf)
+        if (b.Layout.Fold)
+        {
+            // Топ, который раскрывается в список по нажатию.
+            var item = b.Items[0];
+            body = item is { Kind: FeedKind.Top, Game: { } tg } ? TopFold(tg) : new Border { Height = 230, Child = item is null ? StoreKit.Placeholder(double.NaN, double.NaN) : FeedTile(item, Slot.L) };
+            tiles.Add((body, 0.5));
+        }
+        else if (b.Layout.Shelf)
         {
             // Полка обложек: ваши игры (или игры темы) — в ряд с прокруткой.
             var posters = new List<Control>();
@@ -484,6 +518,9 @@ public sealed partial class HomePage
                 FeedKind.Game when slot is Slot.T || item.Tag == "poster" => GamePoster(item.Game!),
                 FeedKind.Game when slot is Slot.XL or Slot.W or Slot.L => GameBanner(item.Game!, slot),
                 FeedKind.Game => GameSmall(item.Game!),
+                FeedKind.Mod when slot is Slot.Chip => ModChip(item.Game!, item.Mod!),
+                FeedKind.Listing when slot is Slot.Chip => ListingChip(item.Listing!),
+                FeedKind.Hub when slot is Slot.Chip => HubChip(item.Hub!),
                 FeedKind.Mod when slot is Slot.R => StoreKit.ModItem(item.Game!, item.Mod!),
                 FeedKind.Mod when slot is Slot.XL or Slot.W or Slot.L => ModBanner(item.Game!, item.Mod!, item.Tag, slot),
                 FeedKind.Mod when slot is Slot.T => ModTall(item.Game!, item.Mod!, item.Tag),
@@ -492,6 +529,7 @@ public sealed partial class HomePage
                 FeedKind.Listing => MarketTiles.Listing(item.Listing!, slot is Slot.XL or Slot.W or Slot.L ? 2 : slot is Slot.R ? 0 : 1),
                 FeedKind.Hub => MarketTiles.Workshop(item.Hub!, slot is Slot.XL or Slot.W or Slot.L ? 2 : slot is Slot.R ? 0 : 1),
                 FeedKind.Stats => StatsTile(),
+                _ when slot is Slot.Chip => PromoChip(item.Promo),
                 _ => PromoTile(item.Promo, slot is Slot.XL or Slot.W or Slot.L),
             };
         }
@@ -633,19 +671,19 @@ public sealed partial class HomePage
         if (m.Author != "") meta.Children.Add(StoreKit.Pill(m.Author));
         var words = Ui.Col(big ? 14 : 10, Gx.Eyebrow(ModEyebrow(tag), Ui.Hex("#E6E7EE")), Gx.Title(m.Name, big ? 30 : 22, white), desc, meta, Ui.Row(10, InstallButton(g, m, true)));
         words.VerticalAlignment = VerticalAlignment.Bottom;
+        words.HorizontalAlignment = HorizontalAlignment.Left;
+        words.MaxWidth = 620;
         words.Margin = new Thickness(big ? 32 : 24, 0, 24, big ? 28 : 22);
-        var icon = ModIcon(m, big ? 132 : 96, big ? 28 : 22);
-        icon.HorizontalAlignment = HorizontalAlignment.Right;
-        icon.Margin = new Thickness(0, 0, big ? 42 : 28, 0);
+        // Обложка мода во всю плитку; квадратный значок — справа, чтобы не спорить с текстом.
+        var cover = ModCover.Create(g, m, 1280, big: true, iconH: HorizontalAlignment.Right, iconShare: 0.66);
         var layers = new Panel
         {
             Children =
             {
-                Ui.GameImage(g.Def, 1600, art: Images.Art.Hero),
-                new Border { Background = Gx.ShadeLeft(0.85, 240) },
-                new Border { Background = Gx.ShadeUp(0.5, 160) },
+                cover,
+                new Border { Background = Gx.ShadeLeft(0.75, 240) },
+                new Border { Background = Gx.ShadeUp(0.55, 170) },
                 Gx.Haze(right: true),
-                icon,
                 words,
             },
         };
@@ -657,12 +695,7 @@ public sealed partial class HomePage
 
     static Control ModSmall(GameState g, ModInfo m, string tag)
     {
-        var top = new Panel
-        {
-            ClipToBounds = true,
-            Children = { Ui.GameImage(g.Def, 768, art: Images.Art.Hero), new Border { Background = new SolidColorBrush(Color.FromArgb(130, 8, 8, 10)) }, ModIcon(m, 76, 18) },
-        };
-        if (top.Children[2] is Border ib) ib.HorizontalAlignment = HorizontalAlignment.Center;
+        var top = new Panel { ClipToBounds = true, Children = { ModCover.Create(g, m, 768) } };
         var label = Gx.Tag(ModEyebrow(tag), null, null, 10.5);
         label.Margin = new Thickness(10);
         top.Children.Add(label);
@@ -687,16 +720,185 @@ public sealed partial class HomePage
     static Control ModTall(GameState g, ModInfo m, string tag)
     {
         var words = Ui.Col(10,
-            ModIcon(m, 84, 20),
             Gx.Eyebrow(ModEyebrow(tag), Ui.Hex("#E6E7EE"), 10.5),
             Gx.Title(m.Name, 18, Brushes.White, 3),
             new TextBlock { Text = m.Description, FontSize = 12.5, Foreground = Ui.Hex("#C9CCD6"), TextWrapping = TextWrapping.Wrap, MaxLines = 3, TextTrimming = TextTrimming.CharacterEllipsis },
             InstallButton(g, m, true));
         words.VerticalAlignment = VerticalAlignment.Bottom;
         words.Margin = new Thickness(16, 0, 16, 16);
-        var layers = new Panel { Children = { Ui.GameImage(g.Def, 512, art: Images.Art.Cover), new Border { Background = Gx.ShadeUp(0.05, 245) }, Gx.Haze(), words } };
+        var cover = ModCover.Create(g, m, 768, iconV: VerticalAlignment.Top, iconShare: 0.7);
+        var layers = new Panel { Children = { cover, new Border { Background = Gx.ShadeUp(0.35, 245) }, Gx.Haze(), words } };
         var id = g.Def.Id;
         return Tile(layers, () => MainWindow.Current?.Navigate(() => new ModPage(id, m)), "poster");
+    }
+
+    // ---------------------------------------------------------------- маленькие кнопки-«чипы»
+
+    static Border Chip(Control icon, string title, string sub, Control? right, Action open)
+    {
+        var words = Ui.Col(2,
+            new TextBlock { Text = title, FontWeight = FontWeight.SemiBold, FontSize = 13.5, TextTrimming = TextTrimming.CharacterEllipsis },
+            new TextBlock { Text = sub, FontSize = 11.5, Foreground = Ui.Res("Muted"), TextTrimming = TextTrimming.CharacterEllipsis });
+        words.VerticalAlignment = VerticalAlignment.Center;
+        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"), ColumnSpacing = 10, VerticalAlignment = VerticalAlignment.Center };
+        icon.VerticalAlignment = VerticalAlignment.Center;
+        grid.Children.Add(icon);
+        Grid.SetColumn(words, 1);
+        grid.Children.Add(words);
+        if (right is not null)
+        {
+            right.VerticalAlignment = VerticalAlignment.Center;
+            Grid.SetColumn(right, 2);
+            grid.Children.Add(right);
+        }
+        var t = new Border { Classes = { "store-tile", "feed-chip" }, Padding = new Thickness(10, 8), Child = grid };
+        StoreKit.OnClick(t, open);
+        return t;
+    }
+
+    /// <summary>Небольшой мод — компактная кнопка: значок, название, загрузки и круглая «Установить».</summary>
+    static Control ModChip(GameState g, ModInfo m)
+    {
+        var action = InstallButton(g, m, false);
+        if (action is Button b) { b.Width = b.Height = 30; b.CornerRadius = new CornerRadius(15); }
+        var id = g.Def.Id;
+        var t = Chip(Ui.Thumb(m.Icon, m.Name, 40, 10, 120), m.Name, m.Downloads > 0 ? $"{g.Def.ShortName} · ↓ {I18n.Compact(m.Downloads)}" : g.Def.ShortName, action,
+            () => MainWindow.Current?.Navigate(() => new ModPage(id, m)));
+        Ctx.Attach(t, () => ModRow.Menu(g.Def, m, Actions.IsInstalled(g, m.Id), Actions.IsBusy(g, m.Id), () => _ = Actions.Install(g, m), () => MainWindow.Current?.Navigate(() => new ModPage(id, m))));
+        return t;
+    }
+
+    static Control ListingChip(Listing l)
+    {
+        var game = Games.GameCatalog.ById(l.Game);
+        Control icon = new Border { Width = 40, Height = 40, CornerRadius = new CornerRadius(10), ClipToBounds = true, Child = game is null ? Gx.Gradient(null) : Ui.GameImage(game, 128, art: Images.Art.Cover) };
+        var price = Gx.Price(MarketViews.PriceText(l), l.Free);
+        return Chip(icon, l.Title, $"{I18n.T("mk.kind." + l.Kind)} · {l.Author}", price, () => MarketTiles.Open(l));
+    }
+
+    static Control HubChip(HubMod h)
+    {
+        var game = Games.GameCatalog.ById(h.Game);
+        Control icon = new Border { Width = 40, Height = 40, CornerRadius = new CornerRadius(10), ClipToBounds = true, Child = h.Images.Count > 0 ? Ui.Thumb(h.Images[0], h.Name, 40, 10, 120) : game is null ? Gx.Gradient("#2BB673") : Ui.GameImage(game, 128, art: Images.Art.Cover) };
+        return Chip(icon, h.Name, $"{I18n.T("v93.mk.workshop")} · ↓ {I18n.Compact(h.Downloads)}", Gx.Price(I18n.T("mk.free"), true), () => CreatorPage.OpenMod(h));
+    }
+
+    static Control PromoChip(string id)
+    {
+        var (icon, title, open) = id switch
+        {
+            "creator" => (Icons.Creator, "Creator Hub", (Action)(() => MainWindow.Current?.Navigate(() => new MarketPage()))),
+            "center" => (Icons.Package, I18n.T("mc.title"), () => MainWindow.Current?.Navigate(() => new ModsCenterPage())),
+            "workshop" => (Icons.Globe, I18n.T("v93.mk.workshop"), () => MainWindow.Current?.Navigate(() => new MarketPage("workshop"))),
+            "sell" => (Icons.Bag, I18n.T("v93.promo.sell"), () => MainWindow.Current?.Navigate(() => new MarketPage("studio"))),
+            "style" => (Icons.Palette, I18n.T("v92.style.title"), () => StylePicker.Show()),
+            "bigpicture" => (Icons.Tv, "Big Picture", BigPictureWindow.Open),
+            "friends" => (Icons.Users, I18n.T("v92.nav.friends"), () => MainWindow.Current?.Navigate(() => new FriendsPage())),
+            _ => (Icons.Plus, I18n.T("add.title"), () => MainWindow.Current?.Navigate(() => new AddGamePage())),
+        };
+        var badge = new Border { Width = 40, Height = 40, CornerRadius = new CornerRadius(10), Background = Ui.Res("BrandSoft"), Child = Ui.Icon(icon, 18, Ui.Res("Brand2")) };
+        return Chip(badge, title, I18n.T("v93.feed.open"), Ui.Icon(Icons.ChevronRight, 16, Ui.Res("Muted")), open);
+    }
+
+    // ---------------------------------------------------------------- топ, который раскрывается
+
+    /// <summary>Какие «топы» раскрыты (переживает перерисовку ленты).</summary>
+    static readonly HashSet<string> _openTops = [];
+
+    /// <summary>
+    /// «Топ-10» игры: сверху пьедестал из трёх лучших модов с обложками, по нажатию «Весь топ»
+    /// места 4–10 ложатся одной строкой за другой — сверху вниз, с лёгким отскоком.
+    /// </summary>
+    static Control TopFold(GameState g)
+    {
+        var mods = (Views.Aside.Popular(g) ?? []).OrderByDescending(m => m.Downloads).Take(10).ToList();
+        var id = g.Def.Id;
+        var podium = new Grid { ColumnDefinitions = new ColumnDefinitions("*,*,*"), ColumnSpacing = StoreKit.Gap, Height = 236 };
+        string[] medals = ["#F2C25C", "#C9D1DC", "#D9894E"];
+        for (var i = 0; i < Math.Min(3, mods.Count); i++)
+        {
+            var m = mods[i];
+            var rank = new Border
+            {
+                Width = 46, Height = 46, CornerRadius = new CornerRadius(23), Margin = new Thickness(12), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top,
+                Background = new SolidColorBrush(Color.FromArgb(220, 10, 10, 14)), BorderBrush = Ui.Hex(medals[i]), BorderThickness = new Thickness(2),
+                BoxShadow = new BoxShadows(new BoxShadow { Blur = 18, Color = Gx.Alpha(Color.Parse(medals[i]), 150) }),
+                Child = new TextBlock { Text = (i + 1).ToString(), FontFamily = Gx.Display, FontSize = 20, FontWeight = FontWeight.Bold, Foreground = Ui.Hex(medals[i]), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
+            };
+            var words = Ui.Col(2, Gx.Title(m.Name, 16, Brushes.White, 1), new TextBlock { Text = "↓ " + I18n.Compact(m.Downloads) + (m.Author != "" ? " · " + m.Author : ""), FontSize = 12, Foreground = Ui.Hex("#D0D3DC"), TextTrimming = TextTrimming.CharacterEllipsis });
+            words.VerticalAlignment = VerticalAlignment.Bottom;
+            words.Margin = new Thickness(14, 0, 56, 12);
+            var install = InstallButton(g, m, false);
+            install.HorizontalAlignment = HorizontalAlignment.Right;
+            install.VerticalAlignment = VerticalAlignment.Bottom;
+            install.Margin = new Thickness(12);
+            var mm = m;
+            var card = Tile(new Panel { Children = { ModCover.Create(g, m, 768, iconV: VerticalAlignment.Top, iconShare: 0.5), new Border { Background = Gx.ShadeUp(0.35, 235) }, rank, words, install } },
+                () => MainWindow.Current?.Navigate(() => new ModPage(id, mm)));
+            Grid.SetColumn(card, i);
+            podium.Children.Add(card);
+        }
+
+        var list = new StackPanel { Spacing = 4 };
+        var open = _openTops.Contains(id);
+        void Fill(bool animate)
+        {
+            list.Children.Clear();
+            for (var i = 3; i < mods.Count; i++)
+            {
+                var m = mods[i];
+                var rank = new TextBlock { Text = (i + 1).ToString(), FontFamily = Gx.Display, FontSize = 18, FontWeight = FontWeight.Bold, Width = 34, Foreground = Ui.Res("Faint"), VerticalAlignment = VerticalAlignment.Center };
+                var words = Ui.Col(1,
+                    new TextBlock { Text = m.Name, FontWeight = FontWeight.SemiBold, FontSize = 14, TextTrimming = TextTrimming.CharacterEllipsis },
+                    new TextBlock { Text = (m.Categories.FirstOrDefault() is { } cat ? cat + " · " : "") + "↓ " + I18n.Compact(m.Downloads), FontSize = 12, Foreground = Ui.Res("Muted"), TextTrimming = TextTrimming.CharacterEllipsis });
+                words.VerticalAlignment = VerticalAlignment.Center;
+                var action = InstallButton(g, m, false);
+                if (action is Button b) { b.Width = b.Height = 32; b.CornerRadius = new CornerRadius(16); }
+                action.VerticalAlignment = VerticalAlignment.Center;
+                var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,Auto,*,Auto"), ColumnSpacing = 12 };
+                grid.Children.Add(rank);
+                var thumb = Ui.Thumb(m.Icon, m.Name, 44, 10, 120);
+                Grid.SetColumn(thumb, 1);
+                grid.Children.Add(thumb);
+                Grid.SetColumn(words, 2);
+                grid.Children.Add(words);
+                Grid.SetColumn(action, 3);
+                grid.Children.Add(action);
+                var row = new Border { Classes = { "store-row" }, Padding = new Thickness(10, 7), Child = grid, Background = Ui.Res("Surface"), BorderBrush = Ui.Res("Line"), BorderThickness = new Thickness(1) };
+                var mm = m;
+                StoreKit.OnClick(row, () => MainWindow.Current?.Navigate(() => new ModPage(id, mm)));
+                list.Children.Add(row);
+                // Строки «ложатся» сверху одна за другой.
+                if (animate) Animate.From(row, "translateY(-26px) scale(0.97)", 420, (i - 3) * 60, new BackEaseOut());
+            }
+        }
+        if (open) Fill(false);
+
+        var toggle = new Button { Padding = new Thickness(14, 8) };
+        void Label()
+        {
+            var chevron = Ui.Icon(Icons.ChevronDown, 16);
+            if (open) chevron.RenderTransform = new RotateTransform(180);
+            toggle.Content = Ui.Row(8, new TextBlock { Text = open ? I18n.T("v93.feed.top.less") : I18n.T("v93.feed.top.more", ("n", Math.Max(0, mods.Count - 3))), VerticalAlignment = VerticalAlignment.Center, FontWeight = FontWeight.SemiBold }, chevron);
+        }
+        Label();
+        toggle.Click += (_, _) =>
+        {
+            open = !open;
+            if (open) { _openTops.Add(id); Fill(true); }
+            else { _openTops.Remove(id); list.Children.Clear(); }
+            Label();
+        };
+        toggle.IsVisible = mods.Count > 3;
+        var head = new DockPanel();
+        DockPanel.SetDock(toggle, Dock.Right);
+        toggle.VerticalAlignment = VerticalAlignment.Center;
+        head.Children.Add(toggle);
+        var title = Ui.Row(12,
+            new Border { Width = 40, Height = 40, CornerRadius = new CornerRadius(9), ClipToBounds = true, Child = Ui.GameImage(g.Def, 128, art: Images.Art.Cover) },
+            Ui.Col(1, Gx.Eyebrow(I18n.T("v93.feed.top10"), Ui.Res("Brand2"), 10.5), new TextBlock { Text = g.Def.Name, FontFamily = Gx.Display, FontWeight = FontWeight.Bold, FontSize = 17 }));
+        head.Children.Add(title);
+        return new Border { Classes = { "card" }, Padding = new Thickness(16), Child = Ui.Col(14, head, podium, list) };
     }
 
     /// <summary>«Топ-5» модов игры: места крупными цифрами, как таблица рекордов.</summary>

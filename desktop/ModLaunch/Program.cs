@@ -56,6 +56,8 @@ public static class Program
         // Свои ссылки modlaunch:// (кнопка «Открыть в ModLaunch» на сайте Hub) — всегда наши.
         try { if (!Features.Nxm.IsRegistered("modlaunch")) Features.Nxm.Register("modlaunch"); } catch { }
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+        // Окно закрыто — выходим сразу, не дожидаясь фоновых загрузок и проверок.
+        Environment.Exit(0);
         return 0;
     }
 
