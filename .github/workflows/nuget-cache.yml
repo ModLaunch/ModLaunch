@@ -1,0 +1,38 @@
+# Пакеты NuGet для сборки в облачной сессии без доступа к nuget.org:
+# восстанавливает зависимости desktop/ModLaunch и кладёт ~/.nuget/packages
+# архивом (частями по 90 МБ) в ветку nuget-cache. Только при пуше в claude/nuget-cache.
+name: nuget-cache
+on:
+  push:
+    branches: ['claude/nuget-cache']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  pack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Restore
+        working-directory: desktop/ModLaunch
+        run: |
+          dotnet restore
+          dotnet build -c Debug --no-restore -v q || true
+      - name: Pack
+        shell: bash
+        run: |
+          mkdir -p pack
+          du -sh ~/.nuget/packages
+          tar -C ~/.nuget -cf - packages | zstd -10 -T0 | split -b 90m - pack/nuget.tar.zst.
+          ls -la pack
+          cd pack
+          git init -q -b nuget-cache
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "NuGet packages for ${GITHUB_SHA::7}"
+          git push -q -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" nuget-cache
