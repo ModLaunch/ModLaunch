@@ -75,10 +75,9 @@ public sealed partial class MainWindow : Window
     readonly Border _bellPanel;
     readonly StackPanel _bellList = new() { Spacing = 8 };
 
-    // 9.1: слой анимаций «Скачать», выдвижная полоска Creator Hub у левого края, заставка при запуске.
+    // 9.1: слой анимаций «Скачать» и заставка при запуске (выдвижная полоска Creator Hub убрана в 9.3).
     readonly Panel _fxLayer = new() { IsVisible = false };
     Control? _root;
-    CreatorDrawer? _drawer;
     Splash? _splash;
     /// <summary>Что снимает и прячет анимация загрузки: боковая панель и страница с шапкой.</summary>
     internal Control FxRoot => _root!;
@@ -119,7 +118,8 @@ public sealed partial class MainWindow : Window
         _back = Ui.Button("", GoBack, "icon ghost", Icons.Back, I18n.T("nav.back"));
         _forward = Ui.Button("", GoForward, "icon ghost", Icons.Forward, I18n.T("nav.forward"));
         // 9.2 Store: разделы — подписанными пунктами на боковой панели, как в Microsoft Store.
-        _homeButton = NavButton(Icons.Home, "v92.nav.home", () => Navigate(() => new HomePage()));
+        // 9.3: первый пункт — логотип ModLaunch и «Лента» (рекомендации вместо «Главной»).
+        _homeButton = NavButton(LogoIcon, "v93.nav.feed", () => Navigate(() => new HomePage()));
         _libraryButton = NavButton(Icons.Gamepad, "v92.nav.games", () => Navigate(() => new LibraryPage()));
         _modsButton = NavButton(Icons.Package, "v92.nav.mods", () => Navigate(() => new ModsCenterPage()));
         _panelButton = NavButton(Icons.Grid, "v92.nav.panel", () => Navigate(() => new ControlPanelPage()));
@@ -127,8 +127,8 @@ public sealed partial class MainWindow : Window
         _friendsButton = NavButton(Icons.Users, "v92.nav.friends", () => Navigate(() => new FriendsPage()));
         _statsButton = NavButton(Icons.Chart, "v92.nav.stats", () => Navigate(() => new StatsPage()));
         _donateButton = NavButton(Icons.Coffee, "v92.nav.donate", () => Navigate(() => new DonatePage()));
-        // Creator Hub — в выдвижной полоске у левого края (эскиз 9.1), отдельного пункта нет.
-        _creatorButton = NavButton(Icons.Creator, "Creator Hub", () => Navigate(() => new CreatorPage()));
+        // 9.3: Creator Hub снова на боковой панели — это рынок креаторов (MarketPage).
+        _creatorButton = NavButton(Icons.Creator, "Creator Hub", () => Navigate(() => new MarketPage()));
         _friendsBadge.Width = 9; _friendsBadge.Height = 9; _friendsBadge.CornerRadius = new CornerRadius(5);
         _friendsBadge.Background = Ui.Res("Good"); _friendsBadge.HorizontalAlignment = HorizontalAlignment.Right; _friendsBadge.VerticalAlignment = VerticalAlignment.Top;
         _updatePill.Click += (_, _) => ShowUpdate();
@@ -480,13 +480,13 @@ public sealed partial class MainWindow : Window
         var commands = new List<(string Title, string Icon, Action Run)>
         {
             (I18n.T("nav.menu"), Icons.Home, () => Navigate(() => new HomePage())),
-            ("Creator Hub", Icons.Creator, () => Navigate(() => new CreatorPage())),
+            ("Creator Hub", Icons.Creator, () => Navigate(() => new MarketPage())),
             (I18n.T("add.title"), Icons.Plus, () => Navigate(() => new AddGamePage())),
             (I18n.T("nav.settings"), Icons.Settings, () => Navigate(() => new SettingsPage())),
             (I18n.T("look.title"), Icons.Palette, () => Navigate(() => new SettingsPage("look"))),
             (I18n.T("friends.title"), Icons.Users, () => Navigate(() => new FriendsPage())),
             (I18n.T("acc.page"), Icons.User, () => Navigate(() => new AccountPage())),
-            (I18n.T("mk.tab"), Icons.Bag, () => Navigate(() => new CreatorPage("market"))),
+            (I18n.T("mk.tab"), Icons.Bag, () => Navigate(() => new MarketPage())),
             ("Minecraft", Icons.Cube, () => Navigate(() => new MinecraftPage())),
             ("Minecraft · " + I18n.T("mine.tab.catalog"), Icons.Bag, () => Navigate(() => new MinecraftPage("catalog"))),
             ("Minecraft · " + I18n.T("mine.build.new"), Icons.Plus, () => { Navigate(() => new MinecraftPage("builds")); MinecraftPage.CreateDialog(); }),
@@ -556,7 +556,6 @@ public sealed partial class MainWindow : Window
     public void Navigate(Func<Page> make)
     {
         CloseAccountPanel();
-        _drawer?.Close();
         if (_index < _history.Count - 1) _history.RemoveRange(_index + 1, _history.Count - _index - 1);
         _history.Add(make);
         _index = _history.Count - 1;
@@ -566,12 +565,24 @@ public sealed partial class MainWindow : Window
     void GoBack() { if (_index > 0) Show(_history[--_index]()); }
     void GoForward() { if (_index < _history.Count - 1) Show(_history[++_index]()); }
 
-    void Show(Page page)
+    void Show(Page page) => Show(page, null);
+
+    /// <summary>
+    /// Показать страницу. 9.3: страница игры появляется одной из восьми анимаций (по снимку
+    /// прежнего экрана), страница мода — одной из трёх. force — для снимков: нужная анимация без таймера.
+    /// </summary>
+    internal GameOpenRun? Show(Page page, GameFx? force)
     {
         // У Minecraft своя страница (сборки, версии, загрузчики) — любые ссылки на «игру» ведут туда.
         if (page is GamePage gp && gp.GameId == Minecraft.Mc.Id) page = new MinecraftPage(gp.Tab, gp.Query);
-        var same = page.SameScreenAs(_current);
+        var previous = _current;
+        var same = page.SameScreenAs(previous);
         if (same) page.Classes.Add("quiet");
+        // Открываем игру с другого экрана — снимок прежнего экрана и нажатая обложка (до замены страницы).
+        var gameFx = !same && previous is not null && page is GamePage or MinecraftPage && (force is not null || GameOpenFx.Enabled);
+        var shot = gameFx ? GameOpenFx.Snapshot(_page, this) : null;
+        var tile = gameFx ? TileUnderPress() : null;
+        var origin = ClickInPage();
         _current = page;
         if (page.GameId is string gid) { Settings.Data["lastGame"] = gid; Settings.Save(); }
         page.Build();
@@ -580,8 +591,10 @@ public sealed partial class MainWindow : Window
         RenderCrumbs();
         RenderAside();
         RenderGlow();
+        GameOpenRun? run = null;
+        if (gameFx) run = GameOpenFx.Play(this, page, shot, origin, tile, page.GameId is string id ? Games.GameCatalog.ById(id) : null, force);
         // 9.2: страница мода появляется одной из трёх анимаций (из места нажатия, шторкой или каскадом).
-        if (!same && page is ModPage && _current is not null) ModOpenFx.Play(page, _page, ClickInPage());
+        else if (!same && page is ModPage && previous is not null) ModOpenFx.Play(page, _page, origin);
         else if (!same) Animate.PageIn(page);
         _title.Text = page.Title;
         _search.Text = "";
@@ -591,6 +604,30 @@ public sealed partial class MainWindow : Window
         _downloadsPanel.IsVisible = false;
         _bellPanel.IsVisible = false;
         RenderRail();
+        return run;
+    }
+
+    /// <summary>Для снимков: открыть страницу с нужной анимацией (кадр выбирается через Seek).</summary>
+    internal GameOpenRun? NavigateWithFx(Func<Page> make, GameFx kind, Point? press = null)
+    {
+        if (press is Point p && _page.TranslatePoint(p, this) is Point q) _lastPress = q;
+        if (_index < _history.Count - 1) _history.RemoveRange(_index + 1, _history.Count - _index - 1);
+        _history.Add(make);
+        _index = _history.Count - 1;
+        return Show(make(), kind);
+    }
+
+    /// <summary>Плитка или обложка, по которой нажали, — в координатах области страницы.</summary>
+    Rect? TileUnderPress()
+    {
+        if (_lastPress is not Point p) return null;
+        for (var v = this.InputHitTest(p) as Visual; v is not null; v = v.GetVisualParent())
+        {
+            if (v == _page) break;
+            var tile = v is Border b && (b.Classes.Contains("store-tile") || b.Classes.Contains("poster")) || v is Button btn && btn.Classes.Contains("rail");
+            if (tile && v.TranslatePoint(new Point(0, 0), _page) is Point at) return new Rect(at, v.Bounds.Size);
+        }
+        return null;
     }
 
     /// <summary>Уведомления: новые версии отслеживаемых модов (всех каталогов и ModLaunch Hub).</summary>
@@ -665,7 +702,7 @@ public sealed partial class MainWindow : Window
         else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.OemComma) Navigate(() => new SettingsPage());
         else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.L) Navigate(() => new LibraryPage());
         else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.U) Navigate(() => new ModsCenterPage());
-        else if (e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift) && e.Key == Key.C) Navigate(() => new CreatorPage());
+        else if (e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift) && e.Key == Key.C) Navigate(() => new MarketPage());
         else if (e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift) && e.Key == Key.P) Navigate(() => new ControlPanelPage());
         else if (e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift) && e.Key == Key.M) Navigate(() => new MinecraftPage());
         else if (e.Key == Key.F5 && e.KeyModifiers == KeyModifiers.None) _current?.Build();
@@ -674,7 +711,6 @@ public sealed partial class MainWindow : Window
         else if (e.Key == Key.Escape)
         {
             if (InstallFx.Active) InstallFx.Skip();
-            else if (_drawer?.IsOpen == true) _drawer.Close();
             else if (_overlay.IsVisible) CloseDialog();
             else if (_launchLayer.IsVisible) (_launchLayer.Children.FirstOrDefault() as LaunchScreen)?.Close();
             else { _downloadsPanel.IsVisible = false; CloseAccountPanel(); }
@@ -885,9 +921,6 @@ public sealed partial class MainWindow : Window
         _overlay.Children.Add(c);
         _overlay.IsVisible = true;
     }
-
-    /// <summary>Выдвижная полоска Creator Hub у левого края (открыть или убрать из кода — для снимков и горячих клавиш).</summary>
-    internal void ShowCreatorDrawer(bool open) { if (open) _drawer?.Open(); else _drawer?.Close(); }
 
     public Task<string?> PickFolder(string title) => Pickers.Folder(this, title);
     public Task<string?> PickFile(string title, bool json = false) => Pickers.File(this, title, json);

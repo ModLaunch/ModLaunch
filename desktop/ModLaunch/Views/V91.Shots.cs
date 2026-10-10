@@ -88,12 +88,5 @@ public static class V91Shots
         w.Navigate(() => new CreatorPage("models"));
         s.Pump(900);
         s.Save("v91-6-creator-models");
-        w.Navigate(() => new HomePage());
-        s.Pump(600);
-        w.ShowCreatorDrawer(true);
-        s.Pump(900);
-        s.Save("v91-7-drawer");
-        w.ShowCreatorDrawer(false);
-        s.Pump(500);
     }
 }

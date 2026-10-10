@@ -13,7 +13,7 @@ namespace ModLaunch.Views;
 /// </summary>
 public sealed partial class HomePage : Page
 {
-    public override string Title => I18n.T("nav.menu");
+    public override string Title => Look.Store ? I18n.T("v93.feed.title") : I18n.T("nav.menu");
     public override Control? Aside() => Views.Aside.Home();
 
     public override void Search(string text)
@@ -26,8 +26,8 @@ public sealed partial class HomePage : Page
 
     public override void Build()
     {
-        // 9.2: в дизайне Store — главная как в Microsoft Store (HomePage.Store.cs).
-        if (Look.Store) { BuildStore(); return; }
+        // 9.3: в дизайне Store главная — «Лента» рекомендаций (HomePage.Feed.cs).
+        if (Look.Store) { BuildFeed(); return; }
         var content = new StackPanel { Spacing = 30, Margin = new Thickness(32, 26, 32, 32), MaxWidth = 1680 };
 
         // Новичку: три шага «найти игру, поставить мод, играть».
@@ -271,6 +271,8 @@ public sealed partial class HomePage : Page
         RebuildCurrent();
         // Популярные моды для полки — тоже все сразу; главная перерисуется, когда придут.
         try { await Task.WhenAll(mine.Select(g => Views.Aside.PopularAsync(g))); } catch { }
+        // 9.3: всё для ленты загружено — можно раскладывать блоки.
+        _feedReady = true;
         RebuildCurrent();
     }
 

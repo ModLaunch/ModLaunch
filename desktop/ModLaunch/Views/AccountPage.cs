@@ -206,8 +206,8 @@ public sealed class AccountPage : Page
         col.Children.Add(Card(I18n.T("acc.quick"), null, Ui.Row(10,
             Ui.Button(I18n.T("acc.menu.friends"), () => MainWindow.Current?.Navigate(() => new FriendsPage()), "", Icons.Users),
             Ui.Button("Creator Hub", () => MainWindow.Current?.Navigate(() => new CreatorPage()), "", Icons.Creator),
-            Ui.Button(I18n.T("mk.tab"), () => MainWindow.Current?.Navigate(() => new CreatorPage("market")), "", Icons.Bag),
-            Ui.Button(I18n.T("st.tab"), () => MainWindow.Current?.Navigate(() => new CreatorPage("studio")), "", Icons.Chart))));
+            Ui.Button(I18n.T("mk.tab"), () => MainWindow.Current?.Navigate(() => new MarketPage()), "", Icons.Bag),
+            Ui.Button(I18n.T("st.tab"), () => MainWindow.Current?.Navigate(() => new MarketPage("studio")), "", Icons.Chart))));
         return col;
     }
 
@@ -328,7 +328,7 @@ public sealed class AccountPage : Page
         if (_purchases is null) { col.Children.Add(Loading()); return Card(I18n.T("acc.s.purchases"), null, col); }
         if (_purchases.Count == 0)
             col.Children.Add(Ui.Col(10, Ui.Text(I18n.T("acc.purchases.empty"), "muted", wrap: true),
-                Ui.Button(I18n.T("mk.tab"), () => MainWindow.Current?.Navigate(() => new CreatorPage("market")), "primary", Icons.Bag)));
+                Ui.Button(I18n.T("mk.tab"), () => MainWindow.Current?.Navigate(() => new MarketPage()), "primary", Icons.Bag)));
         foreach (var p in _purchases)
         {
             var item = p;
@@ -361,7 +361,7 @@ public sealed class AccountPage : Page
         col.Children.Add(stats);
         col.Children.Add(Card(I18n.T("acc.selling.title"), I18n.T("acc.selling.text", ("fee", Market.FeePercent)),
             Ui.Row(10,
-                Ui.Button(I18n.T("st.tab"), () => MainWindow.Current?.Navigate(() => new CreatorPage("studio")), "primary", Icons.Chart),
+                Ui.Button(I18n.T("st.tab"), () => MainWindow.Current?.Navigate(() => new MarketPage("studio")), "primary", Icons.Chart),
                 Ui.Button(I18n.T("mk.new"), () => MarketViews.Editor(null, () => { Reset(); Build(); }), "", Icons.Plus),
                 Ui.Button(I18n.T("acc.payout"), () => { _tab = "wallet"; Build(); }, "", Icons.Upload))));
         return col;

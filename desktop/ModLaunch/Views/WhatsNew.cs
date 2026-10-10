@@ -12,13 +12,17 @@ public static class WhatsNew
 {
     static readonly (string Icon, string Key, Func<Page>? Open)[] Items =
     [
+        (Icons.Sparkles, "new.v93.feed", () => new HomePage()),
+        (Icons.Bag, "new.v93.market", () => new MarketPage()),
+        (Icons.Play, "new.v93.gamefx", () => new LibraryPage()),
+        (Icons.Sidebar, "new.v93.rail", null),
         (Icons.Home, "new.v92.store", () => new HomePage()),
         (Icons.Palette, "new.v92.styles", () => new SettingsPage("look")),
         (Icons.Gamepad, "new.v92.game", () => new LibraryPage()),
         (Icons.Sparkles, "new.v92.openfx", null),
         (Icons.Grid, "new.v91.home", () => new HomePage()),
         (Icons.Download, "new.v91.fx", null),
-        (Icons.Creator, "new.v91.creator", () => new CreatorPage()),
+        (Icons.Creator, "new.v91.creator", () => new MarketPage()),
         (Icons.Sparkles, "new.v91.splash", () => new SettingsPage("interface")),
         (Icons.Palette, "new.v9.design", () => new SettingsPage("look")),
         (Icons.Shield, "new.v9.safety", null),

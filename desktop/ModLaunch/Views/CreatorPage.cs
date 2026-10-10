@@ -69,6 +69,13 @@ public sealed partial class CreatorPage : Page
     void Go(string tab)
     {
         if (_dirty) Save(quiet: true);
+        // 9.3: Мастерская, рынок и студия продавца — разделы рынка креаторов (MarketPage).
+        if (tab is "hub" or "market" or "studio")
+        {
+            var to = tab switch { "hub" => "workshop", "studio" => "studio", _ => "store" };
+            MainWindow.Current?.Navigate(() => new MarketPage(to));
+            return;
+        }
         _tab = tab;
         if (tab != "mine") _open = null;
         Build();
@@ -97,8 +104,10 @@ public sealed partial class CreatorPage : Page
     {
         get
         {
-            if (_tab == "home") return [("Creator Hub", (Action?)null)];
-            return [("Creator Hub", () => MainWindow.Current?.Navigate(() => new CreatorPage())), (TabTitle(_tab), null)];
+            // 9.3: Creator Hub — это рынок; здесь — «Создать» (свои моды, код, модели, шаблоны).
+            Action market = () => MainWindow.Current?.Navigate(() => new MarketPage());
+            if (_tab == "home") return [("Creator Hub", market), (I18n.T("v93.mk.create"), null)];
+            return [("Creator Hub", market), (I18n.T("v93.mk.create"), () => MainWindow.Current?.Navigate(() => new CreatorPage())), (TabTitle(_tab), null)];
         }
     }
 

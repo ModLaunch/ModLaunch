@@ -130,6 +130,35 @@ public static class Demo
 
     public static List<ModInfo> Many(GameDef game, IEnumerable<string> ids) => ids.Distinct().Select((id, i) => Mod(game, id, i)).ToList();
 
+    /// <summary>Лоты рынка креаторов для скриншотов (без сети).</summary>
+    public static List<Creator.Listing> Listings()
+    {
+        Creator.Listing L(string id, string author, string title, string summary, string kind, string game, long price, long sales, int days, string license, string[] tags, string preview = "") =>
+            new(id, "demo" + author, author, title, summary,
+                summary + ".\n\nЧто внутри:\n• файлы в понятных папках\n• инструкция по подключению на русском и английском\n• бесплатные обновления\n\nВопросы — в отзывах, отвечаю быстро.",
+                kind, game, price, license, "1." + (sales % 5) + "." + (days % 4), preview, [.. tags], [], 180_000 + sales * 911, "", 1, "item.zip", "active", sales,
+                DateTime.UtcNow.AddDays(-days - 40), DateTime.UtcNow.AddDays(-days));
+        return
+        [
+            L("seamoth", "Mira", "Low-poly Seamoth", "Готовая модель подлодки: 3 LOD, текстуры 2K", "model", "subnautica", 34900, 128, 2, "commercial", ["visuals", "content"]),
+            L("sort", "Kira", "Сортировка инвентаря", "Часть кода на C#: сортировка по типу, весу и имени", "code", "subnautica", 9900, 341, 5, "personal", ["qol", "library"],
+                "public static void Sort(Inventory inv)\n{\n    inv.Items.Sort((a, b) => a.Kind != b.Kind\n        ? a.Kind.CompareTo(b.Kind)\n        : a.Name.CompareTo(b.Name));\n}"),
+            L("daynight", "Nox", "Day/Night tweaks", "Скрипт ModScript: длинные ночи и яркие рассветы", "script", "valheim", 0, 1230, 1, "open", ["gameplay", "visuals"]),
+            L("icons", "Vega", "Alien UI icons", "180 иконок интерфейса в едином стиле, SVG и PNG", "asset", "subnautica-below-zero", 14900, 77, 8, "commercial", ["ui", "cosmetics"]),
+            L("survival", "Alpin", "Survival pack", "Сборка: 24 мода на выживание, проверены вместе", "pack", "valheim", 49900, 63, 3, "personal", ["modpack", "gameplay"]),
+            L("crew", "Nox", "Crew Radio FX", "Звуки рации и шумы для экипажа", "asset", "lethal-company", 7900, 212, 4, "personal", ["audio", "multiplayer"]),
+            L("monster", "Mira", "Monster Kit", "Три модели монстров с анимациями и звуками", "model", "lethal-company", 59900, 41, 6, "commercial", ["content", "visuals"]),
+            L("lootbox", "Echo", "Генератор лута", "Часть кода: таблицы редкости и выпадения, как в RPG", "code", "repo", 12900, 96, 9, "commercial", ["gameplay", "library"],
+                "var roll = rng.NextDouble();\nvar tier = roll < 0.01 ? Tier.Legendary\n         : roll < 0.08 ? Tier.Epic\n         : roll < 0.25 ? Tier.Rare : Tier.Common;"),
+            L("vikinghud", "Kira", "Viking HUD", "Интерфейс в стиле рун: полоски, компас, карта", "asset", "valheim", 19900, 154, 11, "personal", ["ui", "visuals"]),
+            L("starter", "Alpin", "Стартовый набор", "Скрипт: полезные вещи в начале игры", "script", "subnautica", 0, 2210, 2, "open", ["qol", "tweaks"]),
+            L("blocks", "Vega", "Пак блоков «Неон»", "64 светящихся блока для построек", "pack", "minecraft", 24900, 187, 7, "personal", ["content", "visuals"]),
+            L("netcode", "Echo", "Лобби на 8 игроков", "Часть кода: лобби, приглашения и голос", "code", "lethal-company", 29900, 58, 12, "commercial", ["multiplayer", "library"]),
+            L("shaders", "Mira", "Подводные шейдеры", "Свет под водой и каустика, настройка яркости", "asset", "subnautica", 0, 940, 13, "open", ["visuals"]),
+            L("truck", "Nox", "Грузовик экспедиции", "Модель с интерьером и физикой колёс", "model", "repo", 39900, 22, 1, "commercial", ["content"]),
+        ];
+    }
+
     /// <summary>Моды ModLaunch Hub для скриншотов (без сети).</summary>
     public static List<Creator.HubMod> Hub()
     {

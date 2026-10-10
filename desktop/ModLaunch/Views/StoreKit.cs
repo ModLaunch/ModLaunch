@@ -358,6 +358,31 @@ public static class StoreKit
         return new Panel { Children = { new Border { Background = Ui.Res("Surface2") }, image } };
     }
 
+    /// <summary>
+    /// 9.3: сетка карточек 16:9 на всю ширину — столбцов столько, сколько влезает (не уже minWidth),
+    /// высота карточек подстраивается, справа не остаётся пустой полосы.
+    /// </summary>
+    public static Control Tiles(IEnumerable<Control> items, double minWidth = 250, double extra = 62)
+    {
+        var list = items.ToList();
+        var grid = new UniformGrid { Columns = 3, Margin = new Thickness(0, 0, -Gap, 0) };
+        foreach (var c in list)
+        {
+            c.Width = double.NaN;
+            c.Height = Math.Round(minWidth * 9 / 16) + extra;
+            c.Margin = new Thickness(0, 0, Gap, Gap);
+            grid.Children.Add(c);
+        }
+        grid.SizeChanged += (_, e) =>
+        {
+            var cols = Math.Max(1, (int)(e.NewSize.Width / (minWidth + Gap)));
+            if (grid.Columns != cols) grid.Columns = cols;
+            var w = e.NewSize.Width / cols - Gap;
+            foreach (var c in list) c.Height = Math.Round(w * 9 / 16) + extra;
+        };
+        return grid;
+    }
+
     /// <summary>Заготовка карточки, пока данные грузятся.</summary>
     public static Control Placeholder(double width, double height) => new Border
     {

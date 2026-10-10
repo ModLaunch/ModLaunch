@@ -65,12 +65,22 @@ public sealed partial class MainWindow
                 BorderBrush = Ui.Res("Rail"), BorderThickness = new Thickness(2),
                 HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom,
             };
-            _accountButton.Content = new Panel { Width = 36, Height = 36, Children = { Ui.Thumb(null, name, 36, 18, person: true), online } };
+            // 9.3: аватар в кольце цвета акцента — как профиль игрока.
+            var ring = new Border
+            {
+                Width = 40, Height = 40, CornerRadius = new CornerRadius(20), BorderThickness = new Thickness(2), BorderBrush = Ui.Res("Brand"), Padding = new Thickness(2),
+                Child = Ui.Thumb(null, name, 32, 16, person: true),
+            };
+            _accountButton.Content = new Panel { Width = 40, Height = 40, Children = { ring, online } };
             ToolTip.SetTip(_accountButton, name);
         }
         else
         {
-            _accountButton.Content = Ui.Icon(Icons.User, 20);
+            _accountButton.Content = new Border
+            {
+                Width = 38, Height = 38, CornerRadius = new CornerRadius(19), Background = Ui.Res("Surface2"), BorderBrush = Ui.Res("Line"), BorderThickness = new Thickness(1),
+                Child = Ui.Icon(Icons.User, 18, Ui.Res("Muted")),
+            };
             ToolTip.SetTip(_accountButton, I18n.T("acc.menu.signin"));
         }
         _accountButton.Foreground = Ui.Res("Muted");
@@ -90,7 +100,7 @@ public sealed partial class MainWindow
             col.Children.Add(MenuRow(I18n.T("acc.menu.account"), Icons.User, () => Navigate(() => new AccountPage())));
             col.Children.Add(MenuRow(I18n.T("acc.s.wallet"), Icons.Bag, () => Navigate(() => new AccountPage("wallet"))));
             col.Children.Add(MenuRow(I18n.T("acc.s.purchases"), Icons.Download, () => Navigate(() => new AccountPage("purchases"))));
-            col.Children.Add(MenuRow(I18n.T("st.tab"), Icons.Chart, () => Navigate(() => new CreatorPage("studio"))));
+            col.Children.Add(MenuRow(I18n.T("st.tab"), Icons.Chart, () => Navigate(() => new MarketPage("studio"))));
             col.Children.Add(MenuRow(I18n.T("acc.menu.friends"), Icons.Users, () => Navigate(() => new FriendsPage())));
             var signOut = MenuRow(I18n.T("acc.menu.signout"), Icons.Power, () =>
             {

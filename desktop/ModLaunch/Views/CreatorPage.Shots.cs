@@ -18,7 +18,7 @@ public sealed partial class CreatorPage
             L("d", "Alien UI icons", "asset", 14900, 7),
             L("e", "Survival pack", "pack", 49900, 3),
         ];
-        s.Window.Navigate(() => new CreatorPage("market"));
+        s.Window.Navigate(() => new MarketPage());
         s.Pump(900);
         s.Save("market-1-store");
         MarketViews.Open(_market[1]);
@@ -29,7 +29,7 @@ public sealed partial class CreatorPage
         s.Pump(700);
         s.Save("market-3-editor");
         s.Window.CloseDialog();
-        s.Window.Navigate(() => new CreatorPage("studio"));
+        s.Window.Navigate(() => new MarketPage("studio"));
         s.Pump(600);
         s.Save("market-4-studio");
         s.Window.Navigate(() => new AccountPage());

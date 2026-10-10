@@ -478,6 +478,24 @@ public static class Look
             (Avalonia.Controls.Presenters.ContentPresenter.BorderBrushProperty, R("Brand")));
         Add(x => x.OfType<Avalonia.Controls.Button>().Class("chip").Not(y => y.Class("active")).Not(y => y.Class("side")),
             (Avalonia.Controls.Primitives.TemplatedControl.BorderBrushProperty, R("Line")), (Avalonia.Controls.Primitives.TemplatedControl.BorderThicknessProperty, new Thickness(1)));
+
+        // 9.3 «игровой» слой: неоновая кромка и свечение цветом акцента при наведении на плитки,
+        // светящиеся главные кнопки, выбранный раздел — в акцентной подложке.
+        var accent = Color.Parse(Accent);
+        string Hex(byte a) => $"#{a:X2}{accent.R:X2}{accent.G:X2}{accent.B:X2}";
+        var glow = BoxShadows.Parse($"0 0 0 1 {Hex(220)}, 0 18 42 -14 {Hex(150)}");
+        Add(x => x.OfType<Avalonia.Controls.Border>().Class("store-tile").Class(":pointerover"),
+            (Avalonia.Controls.Border.BoxShadowProperty, glow), (Avalonia.Controls.Border.BorderBrushProperty, new SolidColorBrush(Color.FromArgb(200, accent.R, accent.G, accent.B))));
+        Add(x => x.OfType<Avalonia.Controls.Button>().Class("primary").Class(":pointerover").Template().OfType<Avalonia.Controls.Presenters.ContentPresenter>(),
+            (Avalonia.Controls.Presenters.ContentPresenter.BoxShadowProperty, BoxShadows.Parse($"0 0 18 0 {Hex(150)}")));
+        Add(x => x.OfType<Avalonia.Controls.Button>().Class("nav").Class("active"), (Avalonia.Controls.Primitives.TemplatedControl.BackgroundProperty, R("BrandSoft")));
+        Add(x => x.OfType<Avalonia.Controls.Button>().Class("nav").Class("active").Class(":pointerover").Template().OfType<Avalonia.Controls.Presenters.ContentPresenter>(),
+            (Avalonia.Controls.Presenters.ContentPresenter.BackgroundProperty, R("BrandSoft")));
+        // Вкладки рынка: выбранная — подложка акцента и светлый текст.
+        Add(x => x.OfType<Avalonia.Controls.Border>().Class("market-nav").Descendant().OfType<Avalonia.Controls.Button>().Class("pivot").Class("active"),
+            (Avalonia.Controls.Primitives.TemplatedControl.BackgroundProperty, R("BrandSoft")), (Avalonia.Controls.Primitives.TemplatedControl.ForegroundProperty, R("Text")));
+        Add(x => x.OfType<Avalonia.Controls.Border>().Class("market-nav").Descendant().OfType<Avalonia.Controls.Button>().Class("pivot").Class("active").Template().OfType<Avalonia.Controls.Presenters.ContentPresenter>(),
+            (Avalonia.Controls.Presenters.ContentPresenter.BackgroundProperty, R("BrandSoft")));
     }
 
     /// <summary>Применить сохранённые настройки (при запуске и после любой смены).</summary>

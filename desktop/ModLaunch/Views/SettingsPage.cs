@@ -421,6 +421,7 @@ public sealed partial class SettingsPage : Page
             Toggle(I18n.T("v91.set.splash"), I18n.T("v91.set.splash.hint"), Settings.Data.Bool("splash", true), v => Settings.Data["splash"] = v),
             Toggle(I18n.T("v91.set.fx"), I18n.T("v91.set.fx.hint"), Settings.Data.Bool("installFx", true), v => Settings.Data["installFx"] = v),
             Toggle(I18n.T("v92.set.openfx"), I18n.T("v92.set.openfx.hint"), Settings.Data.Bool("modOpenFx", true), v => Settings.Data["modOpenFx"] = v),
+            Toggle(I18n.T("v93.set.gamefx"), I18n.T("v93.set.gamefx.hint"), Settings.Data.Bool("gameOpenFx", true), v => Settings.Data["gameOpenFx"] = v),
             Toggle(I18n.T("v4.continue"), I18n.T("v4.continue.text"), Settings.Data.Bool("homeContinue", true), v => Settings.Data["homeContinue"] = v),
             Toggle(I18n.T("home.favorites"), I18n.T("home.favorites.text"), Settings.Data.Bool("homeFavorites", true), v => Settings.Data["homeFavorites"] = v),
             Toggle(I18n.T("look.home.popular"), I18n.T("look.home.popular.hint"), Settings.Data.Bool("homePopular", true), v => Settings.Data["homePopular"] = v),

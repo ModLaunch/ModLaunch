@@ -30,7 +30,7 @@ public static class AdSlot
         {
             switch (ad.Go)
             {
-                case "hub": w.Navigate(() => new CreatorPage("hub")); return;
+                case "hub": w.Navigate(() => new MarketPage("workshop")); return;
                 case "creator": w.Navigate(() => new CreatorPage()); return;
                 case "friends": w.Navigate(() => new FriendsPage()); return;
             }
