@@ -157,7 +157,7 @@ public sealed partial class MainWindow : Window
         ToolTip.SetTip(_bell, I18n.T("nx.notify"));
         _bellPanel = new Border
         {
-            Classes = { "card" }, Width = 400, MaxHeight = 540, Padding = new Thickness(16), Margin = new Thickness(0, 50, 120, 0),
+            Classes = { "card" }, Width = 400, MaxHeight = 540, Padding = new Thickness(16), Margin = new Thickness(0, 50, 170, 0),
             HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top, IsVisible = false,
             BoxShadow = BoxShadows.Parse("0 18 50 0 #80000000"),
             Child = Ui.Col(12, Ui.Text(I18n.T("nx.notify"), "h3"), new ScrollViewer { Content = _bellList, MaxHeight = 460 }),
@@ -170,7 +170,7 @@ public sealed partial class MainWindow : Window
             Width = 380,
             MaxHeight = 520,
             Padding = new Thickness(16),
-            Margin = new Thickness(0, 50, 80, 0),
+            Margin = new Thickness(0, 50, 130, 0),
             HorizontalAlignment = HorizontalAlignment.Right,
             VerticalAlignment = VerticalAlignment.Top,
             IsVisible = false,

@@ -24,7 +24,10 @@ public sealed partial class HomePage
         var col = StoreKit.Column();
         var mine = MainWindow.OrderedGames().Where(g => g.Status == Detect.Found && !Features.GameCollections.IsHidden(g.Def.Id)).ToList();
         // Недавние — первыми: карусель начинается с игры, в которую играли последней.
-        var byRecent = mine.OrderByDescending(g => Features.PlayTime.Get(g.Def.Id).LastPlayed ?? DateTime.MinValue).ToList();
+        // «Продолжить игру» выключено в настройках — карусель просто по порядку игр.
+        var byRecent = Settings.Data.Bool("homeContinue", true)
+            ? mine.OrderByDescending(g => Features.PlayTime.Get(g.Def.Id).LastPlayed ?? DateTime.MinValue).ToList()
+            : mine;
 
         if (Starter(mine) is { } starter) col.Children.Add(Intro(starter, 0));
         col.Children.Add(Intro(HeroRow(byRecent), 0));
