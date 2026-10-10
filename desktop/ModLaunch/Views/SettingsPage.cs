@@ -269,11 +269,12 @@ public sealed partial class SettingsPage : Page
         col.Children.Add(Section(I18n.T("look.theme"), I18n.T("look.theme.hint"), themes));
 
         // Дизайн: «Студия» (строгий) или «Аврора» (живой фон и стекло).
-        var designs = Ui.Row(10);
+        // Карточки дизайнов переносятся на новую строку, если колонке не хватает ширины.
+        var designs = new WrapPanel();
         foreach (var dz in Look.Designs)
         {
             var d = dz;
-            var card = new Button { Classes = { "card-btn" }, Width = 250, Padding = new Thickness(16), HorizontalContentAlignment = HorizontalAlignment.Left,
+            var card = new Button { Classes = { "card-btn" }, Width = 230, Margin = new Thickness(0, 0, 10, 10), Padding = new Thickness(16), HorizontalContentAlignment = HorizontalAlignment.Left,
                 Content = Ui.Col(4, Ui.Text(I18n.T("look.design." + dz), "h3"), Ui.Text(I18n.T("look.design." + dz + ".text"), "small muted", wrap: true)) };
             if (Look.Design == dz) { card.BorderBrush = Ui.Res("Text"); card.BorderThickness = new Thickness(2); }
             card.Click += (_, _) => { Look.SetDesign(d); Build(); };

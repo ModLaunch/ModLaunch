@@ -70,7 +70,10 @@
     "new.v92.openfx.text": "Из карточки, шторкой или каскадом — на выбор случайно, одна и та же не больше двух раз подряд.",
     "look.design.store": "Store",
     "look.design.store.text": "Как Microsoft Store: подписанные разделы, поиск по центру, ровные полки (9.2)",
-    "new.subtitle": "Дизайн как в Microsoft Store, три оформления, новая страница игры и три анимации открытия мода."
+    "new.subtitle": "Дизайн как в Microsoft Store, три оформления, новая страница игры и три анимации открытия мода.",
+    "look.theme.store": "Store",
+    "look.theme.snow": "Снег",
+    "look.theme.jet": "Смоль"
   },
   "en": {
     "v92.nav.home": "Home",
@@ -143,6 +146,9 @@
     "new.v92.openfx.text": "From the card, sliding or cascading — picked at random, never the same one three times in a row.",
     "look.design.store": "Store",
     "look.design.store.text": "Like Microsoft Store: labeled sections, centered search, tidy shelves (9.2)",
-    "new.subtitle": "A Microsoft Store–style design, three styles, a new game page and three mod opening animations."
+    "new.subtitle": "A Microsoft Store–style design, three styles, a new game page and three mod opening animations.",
+    "look.theme.store": "Store",
+    "look.theme.snow": "Snow",
+    "look.theme.jet": "Jet"
   }
 }
