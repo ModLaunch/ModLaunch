@@ -668,7 +668,8 @@ public sealed partial class HomePage
         var desc = new TextBlock { Text = m.Description, FontSize = 13.5, Foreground = Ui.Hex("#D0D3DC"), TextWrapping = TextWrapping.Wrap, MaxLines = big ? 3 : 2, TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = 520, HorizontalAlignment = HorizontalAlignment.Left };
         var meta = Ui.Row(8, StoreKit.Pill(g.Def.ShortName));
         if (m.Downloads > 0) meta.Children.Add(StoreKit.Pill("↓ " + I18n.Compact(m.Downloads)));
-        if (m.Author != "") meta.Children.Add(StoreKit.Pill(m.Author));
+        // Длинный список авторов (у модов Hollow Knight их бывает десяток) — первые имена и «…».
+        if (m.Author != "") meta.Children.Add(StoreKit.Pill(m.Author.Length > 32 ? m.Author[..32].TrimEnd(' ', ',') + "…" : m.Author));
         var words = Ui.Col(big ? 14 : 10, Gx.Eyebrow(ModEyebrow(tag), Ui.Hex("#E6E7EE")), Gx.Title(m.Name, big ? 30 : 22, white), desc, meta, Ui.Row(10, InstallButton(g, m, true)));
         words.VerticalAlignment = VerticalAlignment.Bottom;
         words.HorizontalAlignment = HorizontalAlignment.Left;
