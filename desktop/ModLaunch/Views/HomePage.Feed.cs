@@ -508,8 +508,45 @@ public sealed partial class HomePage
 
     static Control GameBanner(GameState g, Slot slot)
     {
-        var slide = Slide(g);
-        var t = new Border { Classes = { "store-tile", "feed-tile", "hero" }, Child = new Panel { Children = { slide, Gx.Haze(right: true) } } };
+        // Большое место — полный слайд (как в карусели); полоса и половина ряда ниже — компактный баннер.
+        if (slot == Slot.XL) return new Border { Classes = { "store-tile", "feed-tile", "hero" }, Child = new Panel { Children = { Slide(g), Gx.Haze(right: true) } } };
+        var id = g.Def.Id;
+        var (dot, state) = StoreKit.GameState(g);
+        var logo = Images.GameAsset(g.Def, Images.Art.Logo, 512);
+        Control title = logo is null
+            ? Gx.Title(g.Def.Name, 24, Brushes.White, 1)
+            : new Image { Source = logo, MaxHeight = 58, MaxWidth = 260, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Left };
+        Control action;
+        if (Features.Launcher.IsRunning(id)) action = PlayControls.RunningPill(id, big: false);
+        else if (g.LoaderInstalled || g.Def.Loader is Games.LoaderKind.None or Games.LoaderKind.Minecraft)
+        {
+            var gs = g;
+            action = Ui.Button(I18n.T("games.play"), () => Actions.Play(gs), "primary", Icons.Play);
+        }
+        else
+        {
+            var gs = g;
+            action = Ui.Button(I18n.T("games.installLoader", ("loader", g.Def.LoaderName)), () => Actions.InstallLoader(gs), "primary", Icons.Download);
+        }
+        if (action is Button ab) ab.Padding = new Thickness(18, 9);
+        var open = Ui.Button(I18n.T("v92.home.toGame"), () => MainWindow.Current?.Navigate(() => new GamePage(id)), "hero-ghost");
+        open.Padding = new Thickness(16, 9);
+        var words = Ui.Col(10, title, StoreKit.Pill(state, dot), Ui.Row(8, action, open));
+        words.VerticalAlignment = VerticalAlignment.Center;
+        words.HorizontalAlignment = HorizontalAlignment.Left;
+        words.Margin = new Thickness(24, 12, 24, 12);
+        var layers = new Panel
+        {
+            Children =
+            {
+                Ui.GameImage(g.Def, 1600, art: Images.Art.Hero),
+                new Border { Background = Gx.ShadeLeft(0.8, 235) },
+                Gx.Haze(right: true),
+                words,
+            },
+        };
+        var t = Tile(layers, () => MainWindow.Current?.Navigate(() => new GamePage(id)), "hero");
+        t.ContextFlyout = GameCard.Menu(g);
         return t;
     }
 

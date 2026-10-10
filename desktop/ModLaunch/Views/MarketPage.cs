@@ -175,12 +175,11 @@ public sealed partial class MarketPage : Page
     {
         var col = Ui.Col(30);
         var all = Active.ToList();
-        if (MarketData.Error is { } error && all.Count == 0)
-            col.Children.Add(Ui.Card(Ui.Col(10, Ui.Row(10, Ui.Icon(Icons.Alert, 20, Ui.Res("Warn")), Ui.Text(I18n.T("v93.mk.error"), "h3")), Ui.Text(error, "muted", wrap: true),
-                Ui.Button(I18n.T("cr.refresh"), MarketData.Reload, "", Icons.Refresh)), 22));
         if (all.Count == 0)
         {
-            col.Children.Add(Empty());
+            // Сервер рынка ещё не подключён (нет правил в базе) — объясняем и ведём в «Состояние сервисов».
+            if (MarketData.Error is { } error) col.Children.Add(Offline(error));
+            else col.Children.Add(Empty());
             col.Children.Add(Become());
             if (MarketData.Mods.Any()) col.Children.Add(WorkshopShelf());
             return col;
@@ -206,6 +205,33 @@ public sealed partial class MarketPage : Page
         }
         col.Children.Add(Become());
         return col;
+    }
+
+    static Control Offline(string error)
+    {
+        var steps = Ui.Col(6,
+            Ui.Text(I18n.T("v93.mk.offline.1"), "small", wrap: true),
+            Ui.Text(I18n.T("v93.mk.offline.2"), "small", wrap: true),
+            Ui.Text(I18n.T("v93.mk.offline.3"), "small", wrap: true));
+        var detail = Ui.Text(error, "small muted", wrap: true);
+        var buttons = Ui.Row(10,
+            Ui.Button(I18n.T("v93.mk.offline.connect"), () => MainWindow.Current?.Navigate(() => new SettingsPage("services")), "primary", Icons.Zap),
+            Ui.Button(I18n.T("cr.refresh"), MarketData.Reload, "", Icons.Refresh));
+        var words = Ui.Col(12,
+            Gx.Eyebrow(I18n.T("v93.mk.offline.eyebrow"), Ui.Res("Warn")),
+            Gx.Title(I18n.T("v93.mk.offline"), 22, Ui.Res("Text")),
+            Ui.Text(I18n.T("v93.mk.offline.text"), "muted", wrap: true),
+            steps, detail, buttons);
+        var icon = new Border
+        {
+            Width = 72, Height = 72, CornerRadius = new CornerRadius(18), Background = Ui.Res("Surface2"), BorderBrush = Ui.Res("Line"), BorderThickness = new Thickness(1),
+            VerticalAlignment = VerticalAlignment.Top, Child = Ui.Icon(Icons.Server, 32, Ui.Res("Warn")),
+        };
+        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*"), ColumnSpacing = 22 };
+        grid.Children.Add(icon);
+        Grid.SetColumn(words, 1);
+        grid.Children.Add(words);
+        return new Border { Classes = { "card" }, Padding = new Thickness(26, 22), Child = grid };
     }
 
     static Control Empty() => Ui.Card(Ui.Col(10,

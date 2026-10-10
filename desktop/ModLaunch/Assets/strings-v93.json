@@ -161,7 +161,14 @@
     "new.v93.feed": "Главная стала «Лентой»: 25 раскладок плиток наугад (одна и та же — не больше трёх раз подряд), новые блоки подгружаются, пока листаете",
     "new.v93.gamefx": "Восемь новых анимаций открытия игры: портал, жалюзи, осколки, глитч, гиперпрыжок, обложка, срез и створки",
     "new.v93.market": "Creator Hub — самостоятельный рынок креаторов как в Steam: витрина, обзор с фильтрами, очередь открытий, желаемое, авторы, библиотека и студия",
-    "new.v93.rail": "На боковой панели — логотип «Лента», Creator Hub и аккаунт внизу; выдвижная полоска у края убрана"
+    "new.v93.rail": "На боковой панели — логотип «Лента», Creator Hub и аккаунт внизу; выдвижная полоска у края убрана",
+    "v93.mk.offline.eyebrow": "Сервер рынка не подключён",
+    "v93.mk.offline": "Рынок заработает, как только в базу добавят его правила",
+    "v93.mk.offline.text": "Витрина, покупки, кошельки и выплаты хранятся в базе Firebase проекта ModLaunch. Сейчас база отклоняет запросы рынка — в ней ещё нет его правил. Это делается один раз владельцем проекта:",
+    "v93.mk.offline.1": "1. «Подключить сервер» → откроется «Состояние сервисов», у строки «Маркет» нажмите «Подключить» — правила скопируются, откроется консоль Firebase.",
+    "v93.mk.offline.2": "2. Firestore Database → «Правила»: вставьте скопированное и нажмите «Опубликовать».",
+    "v93.mk.offline.3": "3. Вернитесь сюда и нажмите «Обновить» — рынок откроется.",
+    "v93.mk.offline.connect": "Подключить сервер"
   },
   "en": {
     "v93.nav.feed": "Feed",
@@ -325,6 +332,13 @@
     "new.v93.feed": "Home is now a Feed: 25 random tile layouts (the same one at most three times in a row), new blocks load as you scroll",
     "new.v93.gamefx": "Eight new game opening animations: portal, blinds, shatter, glitch, warp, cover, slice and doors",
     "new.v93.market": "Creator Hub is a standalone creators' market like Steam: store front, browse with filters, discovery queue, wishlist, creators, library and studio",
-    "new.v93.rail": "The sidebar has the logo Feed item, Creator Hub and your account at the bottom; the slide-out edge strip is gone"
+    "new.v93.rail": "The sidebar has the logo Feed item, Creator Hub and your account at the bottom; the slide-out edge strip is gone",
+    "v93.mk.offline.eyebrow": "Market server not connected",
+    "v93.mk.offline": "The market starts working once its rules are added to the database",
+    "v93.mk.offline.text": "The store front, purchases, wallets and payouts live in the ModLaunch Firebase database. Right now the database rejects market requests — its rules are not there yet. The project owner does this once:",
+    "v93.mk.offline.1": "1. “Connect server” → Service status opens; next to “Market” click “Connect” — the rules are copied and the Firebase console opens.",
+    "v93.mk.offline.2": "2. Firestore Database → Rules: paste and click Publish.",
+    "v93.mk.offline.3": "3. Come back and click Refresh — the market opens.",
+    "v93.mk.offline.connect": "Connect server"
   }
 }
