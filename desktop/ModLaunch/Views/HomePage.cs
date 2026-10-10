@@ -13,7 +13,12 @@ namespace ModLaunch.Views;
 /// </summary>
 public sealed partial class HomePage : Page
 {
-    public override string Title => Look.Store ? I18n.T("v93.feed.title") : I18n.T("nav.menu");
+    /// <summary>9.3: одна страница — два экрана: «Главная» (самое нужное, компактно) и «Лента» рекомендаций.</summary>
+    public bool IsFeed { get; }
+
+    public HomePage(bool feed = false) => IsFeed = feed && Look.Store;
+
+    public override string Title => !Look.Store ? I18n.T("nav.menu") : IsFeed ? I18n.T("v93.feed.title") : I18n.T("v93.home.title");
     public override Control? Aside() => Views.Aside.Home();
 
     public override void Search(string text)
@@ -26,8 +31,8 @@ public sealed partial class HomePage : Page
 
     public override void Build()
     {
-        // 9.3: в дизайне Store главная — «Лента» рекомендаций (HomePage.Feed.cs).
-        if (Look.Store) { BuildFeed(); return; }
+        // 9.3: в дизайне Store — «Главная» (HomePage.Main.cs) или «Лента» рекомендаций (HomePage.Feed.cs).
+        if (Look.Store) { if (IsFeed) BuildFeed(); else BuildMain(); return; }
         var content = new StackPanel { Spacing = 30, Margin = new Thickness(32, 26, 32, 32), MaxWidth = 1680 };
 
         // Новичку: три шага «найти игру, поставить мод, играть».

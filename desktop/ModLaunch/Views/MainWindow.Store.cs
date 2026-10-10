@@ -26,6 +26,25 @@ public sealed partial class MainWindow
     Border? _crumbSep;
     /// <summary>Невысокое окно: подписи под значками прячутся, пункты становятся ниже — всё помещается.</summary>
     bool _railCompact;
+    Border? _railGamesHost;
+
+    /// <summary>
+    /// Сколько недавних игр показать на панели: столько, сколько влезает по высоте целиком,
+    /// и всегда кнопка «+». Остальные игры — в библиотеке; панель не превращается в обрезанную ленту.
+    /// </summary>
+    void FitRailGames(double height)
+    {
+        if (height <= 0) return;
+        const double item = 52, gap = 7, caption = 14, plus = 42;
+        var slots = _railGames.Children.Where(c => c is Panel p && p.Children.OfType<Button>().Any(b => b.Classes.Contains("rail-game"))).ToList();
+        var captionBlock = _railGames.Children.OfType<TextBlock>().FirstOrDefault();
+        var free = height - 2 - plus - gap - (captionBlock is null ? 0 : caption + gap);
+        var fit = Math.Max(0, (int)Math.Floor((free + gap) / (item + gap)));
+        for (var i = 0; i < slots.Count; i++) slots[i].IsVisible = i < fit;
+        if (captionBlock is not null) captionBlock.IsVisible = fit > 0;
+    }
+    /// <summary>Второстепенные пункты (друзья, «На чай», настройки) — всегда значками, без подписей.</summary>
+    readonly HashSet<Button> _secondary = [];
     /// <summary>Слой над страницей для анимаций открытия игры (9.3): снимок старой страницы, вспышки, рамки.</summary>
     readonly Panel _pageFx = new() { IsHitTestVisible = false, IsVisible = false, ClipToBounds = true };
     /// <summary>Слой под страницей: снимок прежнего экрана, который новая страница «прорезает».</summary>
@@ -93,10 +112,13 @@ public sealed partial class MainWindow
     void SetNav(Button b, bool active, Control? badge = null)
     {
         if (!_nav.TryGetValue(b, out var n)) return;
+        var secondary = _secondary.Contains(b);
+        var compact = _railCompact || secondary;
         b.Classes.Set("active", active);
-        b.Height = _railCompact ? 46 : 58;
-        b.Content = NavContent(n.Icon, Label(n.Label), active, badge, _railCompact);
-        ToolTip.SetTip(b, _railCompact ? Label(n.Label) : null);
+        b.Classes.Set("secondary", secondary);
+        b.Height = secondary ? 42 : _railCompact ? 46 : 58;
+        b.Content = NavContent(n.Icon, Label(n.Label), active, badge, compact);
+        ToolTip.SetTip(b, compact ? Label(n.Label) : null);
         ToolTip.SetPlacement(b, PlacementMode.Right);
     }
 
@@ -108,12 +130,13 @@ public sealed partial class MainWindow
         // недавние игры посередине, друзья, настройки и аккаунт — внизу.
         var rail = new DockPanel { Width = RailWidth, LastChildFill = true };
         var top = new StackPanel { Spacing = 2, Margin = new Thickness(0, 4, 0, 2), HorizontalAlignment = HorizontalAlignment.Center };
-        foreach (var b in new[] { _homeButton, _libraryButton, _modsButton, _creatorButton, _panelButton }) top.Children.Add(b);
-        top.Children.Add(RailLine(new Thickness(0, 8, 0, 6)));
+        foreach (var b in new[] { _homeButton, _feedButton, _libraryButton, _modsButton, _creatorButton, _panelButton }) top.Children.Add(b);
+        top.Children.Add(RailLine(new Thickness(0, 8, 0, 2)));
         DockPanel.SetDock(top, Dock.Top);
         var bottom = new StackPanel { Spacing = 2, Margin = new Thickness(0, 4, 0, 10), HorizontalAlignment = HorizontalAlignment.Center };
         bottom.Children.Add(RailLine(new Thickness(0, 4, 0, 6)));
-        foreach (var b in new[] { _friendsButton, _statsButton, _donateButton, _settingsButton }) bottom.Children.Add(b);
+        // 9.3: второстепенное — значками без подписей (подсказка при наведении), чтобы панель не шумела.
+        foreach (var b in new[] { _friendsButton, _statsButton, _donateButton, _settingsButton }) { _secondary.Add(b); bottom.Children.Add(b); }
         // Аккаунт — самым нижним пунктом: аватар с точкой «в сети».
         _accountButton.Classes.Clear();
         _accountButton.Classes.Add("nav");
@@ -129,7 +152,11 @@ public sealed partial class MainWindow
         DockPanel.SetDock(bottom, Dock.Bottom);
         rail.Children.Add(top);
         rail.Children.Add(bottom);
-        rail.Children.Add(new ScrollViewer { Content = _railGames, VerticalScrollBarVisibility = ScrollBarVisibility.Hidden });
+        // 9.3: недавние игры — только те, что помещаются целиком: без обрезанной обложки внизу.
+        _railGames.VerticalAlignment = VerticalAlignment.Top;
+        _railGamesHost = new Border { ClipToBounds = true, Child = _railGames, Padding = new Thickness(0, 2, 0, 0) };
+        _railGamesHost.SizeChanged += (_, e) => FitRailGames(e.NewSize.Height);
+        rail.Children.Add(_railGamesHost);
         var railBorder = new Border { Child = rail, Background = Ui.Res("Rail") };
         _railHost = railBorder;
         railBorder.IsVisible = !Settings.Data.Bool("railHidden");
@@ -302,27 +329,35 @@ public sealed partial class MainWindow
     void RenderRail()
     {
         _railGames.Children.Clear();
-        foreach (var g in RailGames())
+        var games = RailGames().ToList();
+        // Подпись раздела — панель читается блоками, а не сплошным столбцом значков.
+        if (games.Count > 0)
+            _railGames.Children.Add(new TextBlock
+            {
+                Text = I18n.T("v93.rail.games").ToUpper(I18n.Culture), FontSize = 9.5, FontWeight = FontWeight.Bold, LetterSpacing = 1.2,
+                Foreground = Ui.Res("Faint"), HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 4, 0, -2),
+            });
+        foreach (var g in games)
         {
             var id = g.Def.Id;
-            var art = new Border { Width = 40, Height = 54, CornerRadius = new CornerRadius(7), ClipToBounds = true, Child = Ui.GameImage(g.Def, 120, art: Images.Art.Cover) };
+            var art = new Border { Width = 34, Height = 46, CornerRadius = new CornerRadius(7), ClipToBounds = true, Child = Ui.GameImage(g.Def, 120, art: Images.Art.Cover) };
             var running = Features.Launcher.IsRunning(id);
-            // Точка состояния: зелёная — можно играть с модами, жёлтая — сначала поставить загрузчик, мигает — игра запущена.
+            // 9.3: точка — только когда есть что сказать: игра запущена (зелёная, мигает) или нужен загрузчик (жёлтая).
             var ready = g.LoaderInstalled || g.Def.Loader is Games.LoaderKind.None or Games.LoaderKind.Minecraft;
             var dot = new Border
             {
-                Width = running ? 13 : 11, Height = running ? 13 : 11, CornerRadius = new CornerRadius(7), Background = running || ready ? Ui.Res("Good") : Ui.Res("Warn"),
+                Width = running ? 12 : 10, Height = running ? 12 : 10, CornerRadius = new CornerRadius(6), Background = running ? Ui.Res("Good") : Ui.Res("Warn"),
                 BorderBrush = Ui.Res("Rail"), BorderThickness = new Thickness(2), Margin = new Thickness(0, 0, -3, -3),
-                HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom,
+                HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom, IsVisible = running || !ready,
             };
             if (running) dot.Classes.Add("pulse");
             var b = new Button
             {
-                Classes = { "rail" }, Width = 46, Height = 60, CornerRadius = new CornerRadius(9),
+                Classes = { "rail", "rail-game" }, Width = 40, Height = 52, CornerRadius = new CornerRadius(9),
                 Content = new Panel { Children = { art, dot } },
             };
             b.ClipToBounds = false;
-            if (_current?.GameId == id) b.Classes.Add("active");
+            if (_current?.GameId == id || running) b.Classes.Add("active");
             b.Click += (_, _) => Navigate(() => new GamePage(id));
             b.ContextFlyout = GameCard.Menu(g);
             ToolTip.SetTip(b, running ? $"{g.Def.Name} · {I18n.T("run.running")}" : g.Def.Name);
@@ -333,15 +368,17 @@ public sealed partial class MainWindow
             _railGames.Children.Add(slot);
         }
         var plus = RailIcon(Icons.Plus, () => Navigate(() => new AddGamePage()), I18n.T("add.title"));
-        plus.Width = plus.Height = 40;
+        plus.Width = plus.Height = 34;
         plus.CornerRadius = new CornerRadius(9);
         plus.Classes.Set("active", _current is AddGamePage);
         plus.HorizontalAlignment = HorizontalAlignment.Center;
         ToolTip.SetPlacement(plus, PlacementMode.Right);
         _railGames.Children.Add(new Panel { Classes = { "rail-item" }, Width = RailWidth, Margin = new Thickness(0, 2, 0, 6), Children = { new Border { Classes = { "rail-pip" } }, plus } });
+        if (_railGamesHost is { } host) FitRailGames(host.Bounds.Height);
 
         // Разделы: выбранный — значком цвета акцента и полоской слева.
-        SetNav(_homeButton, _current is HomePage or SearchPage);
+        SetNav(_homeButton, _current is HomePage { IsFeed: false } or SearchPage);
+        SetNav(_feedButton, _current is HomePage { IsFeed: true });
         // 9.3: «Игры» и «Моды» на панели — по желанию (Настройки → Внешний вид → Рамка окна);
         // без них их место занимает «Панель», и она подсвечена на страницах библиотеки и модов.
         var sections = Settings.Data.Bool("railGamesMods");

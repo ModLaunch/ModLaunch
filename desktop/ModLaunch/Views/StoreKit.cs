@@ -20,7 +20,8 @@ public static class StoreKit
 {
     /// <summary>Поля страницы и ширина колонки: одна сетка для главной, библиотеки и страницы игры.</summary>
     public const double Gutter = 36;
-    public const double MaxWidth = 1480;
+    /// <summary>9.3: на большом мониторе колонка не сжимается в узкую полосу посередине.</summary>
+    public const double MaxWidth = 2300;
     public const double Gap = 12;
 
     /// <summary>Колонка страницы: по центру, с одинаковыми полями слева и справа.</summary>
@@ -381,6 +382,22 @@ public static class StoreKit
             foreach (var c in list) c.Height = Math.Round(w * 9 / 16) + extra;
         };
         return grid;
+    }
+
+    /// <summary>
+    /// 9.3: высота плитки растёт вместе с шириной (на большом экране — не длинная узкая полоса,
+    /// а та же пропорция). baseWidth — ширина, при которой высота равна baseHeight.
+    /// </summary>
+    public static T Scaled<T>(T c, double baseHeight, double baseWidth = 1300, double maxScale = 1.4) where T : Control
+    {
+        c.Height = baseHeight;
+        c.SizeChanged += (_, e) =>
+        {
+            if (e.NewSize.Width <= 1) return;
+            var h = Math.Round(baseHeight * Math.Clamp(e.NewSize.Width / baseWidth, 0.88, maxScale));
+            if (Math.Abs(c.Height - h) > 1) c.Height = h;
+        };
+        return c;
     }
 
     /// <summary>Заготовка карточки, пока данные грузятся.</summary>

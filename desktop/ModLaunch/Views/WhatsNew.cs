@@ -12,7 +12,8 @@ public static class WhatsNew
 {
     static readonly (string Icon, string Key, Func<Page>? Open)[] Items =
     [
-        (Icons.Sparkles, "new.v93.feed", () => new HomePage()),
+        (Icons.Home, "new.v93.home", () => new HomePage()),
+        (Icons.Flame, "new.v93.feed", () => new HomePage(feed: true)),
         (Icons.Bag, "new.v93.market", () => new MarketPage()),
         (Icons.Play, "new.v93.gamefx", () => new LibraryPage()),
         (Icons.Sidebar, "new.v93.rail", null),

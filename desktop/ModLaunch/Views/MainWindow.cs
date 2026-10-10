@@ -41,7 +41,7 @@ public sealed partial class MainWindow : Window
     public static MainWindow? Current { get; private set; }
 
     readonly ContentControl _page = new() { Name = "Page" };
-    readonly StackPanel _railGames = new() { Spacing = 10, HorizontalAlignment = HorizontalAlignment.Stretch };
+    readonly StackPanel _railGames = new() { Spacing = 7, HorizontalAlignment = HorizontalAlignment.Stretch };
     readonly TextBlock _title = new() { FontWeight = FontWeight.SemiBold, VerticalAlignment = VerticalAlignment.Center, FontSize = 14 };
     readonly StackPanel _crumbs = new() { Orientation = Orientation.Horizontal, Spacing = 6, VerticalAlignment = VerticalAlignment.Center };
     readonly ContentControl _aside = new();
@@ -58,7 +58,7 @@ public sealed partial class MainWindow : Window
         StrokeLineCap = PenLineCap.Round, IsHitTestVisible = false, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
     };
     Border? _adWrap;
-    readonly Button _back, _forward, _downloads, _settingsButton, _friendsButton, _statsButton, _donateButton, _creatorButton, _libraryButton, _modsButton, _panelButton, _homeButton;
+    readonly Button _back, _forward, _downloads, _settingsButton, _friendsButton, _statsButton, _donateButton, _creatorButton, _libraryButton, _modsButton, _panelButton, _homeButton, _feedButton;
     readonly LayoutTransformControl _scale = new();
     Control? _railHost;
     Panel? _layers;
@@ -118,8 +118,9 @@ public sealed partial class MainWindow : Window
         _back = Ui.Button("", GoBack, "icon ghost", Icons.Back, I18n.T("nav.back"));
         _forward = Ui.Button("", GoForward, "icon ghost", Icons.Forward, I18n.T("nav.forward"));
         // 9.2 Store: разделы — подписанными пунктами на боковой панели, как в Microsoft Store.
-        // 9.3: первый пункт — логотип ModLaunch и «Лента» (рекомендации вместо «Главной»).
-        _homeButton = NavButton(LogoIcon, "v93.nav.feed", () => Navigate(() => new HomePage()));
+        // 9.3: первый пункт — логотип ModLaunch и «Главная», за ним — «Лента» рекомендаций.
+        _homeButton = NavButton(LogoIcon, "v93.nav.home", () => Navigate(() => new HomePage()));
+        _feedButton = NavButton(Icons.Flame, "v93.nav.feed", () => Navigate(() => new HomePage(feed: true)));
         _libraryButton = NavButton(Icons.Gamepad, "v92.nav.games", () => Navigate(() => new LibraryPage()));
         _modsButton = NavButton(Icons.Package, "v92.nav.mods", () => Navigate(() => new ModsCenterPage()));
         _panelButton = NavButton(Icons.Grid, "v92.nav.panel", () => Navigate(() => new ControlPanelPage()));
@@ -339,7 +340,7 @@ public sealed partial class MainWindow : Window
         return OrderedGames()
             .Where(g => !hidden.Contains(g.Def.Id) && g.Status == Detect.Found)
             .OrderByDescending(g => Features.PlayTime.Get(g.Def.Id).LastPlayed ?? DateTime.MinValue)
-            .Take(8);
+            .Take(Look.Store ? 5 : 8);
     }
 
     /// <summary>Все игры в порядке, заданном в настройках (остальные — как в программе).</summary>

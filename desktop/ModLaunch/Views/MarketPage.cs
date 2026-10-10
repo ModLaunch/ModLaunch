@@ -323,7 +323,7 @@ public sealed partial class MarketPage : Page
             return b;
         }
         var stage = new Border { Classes = { "store-tile", "hero" }, Child = new Panel { Children = { host, Arrow(Icons.ChevronLeft, -1), Arrow(Icons.ChevronRight, 1) } } };
-        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("2*,*"), ColumnSpacing = StoreKit.Gap, Height = 380 };
+        var grid = StoreKit.Scaled(new Grid { ColumnDefinitions = new ColumnDefinitions("2*,*"), ColumnSpacing = StoreKit.Gap }, 380);
         grid.Children.Add(stage);
         Grid.SetColumn(info, 1);
         grid.Children.Add(info);
@@ -709,9 +709,9 @@ public sealed partial class MarketPage : Page
             Ui.Row(10, Gx.Price(MarketViews.PriceText(l), l.Free), StoreKit.Pill(I18n.T("mk.kind." + l.Kind)), StoreKit.Pill(I18n.T("mod.by", ("author", l.Author)))));
         words.VerticalAlignment = VerticalAlignment.Bottom;
         words.Margin = new Thickness(36, 0, 36, 32);
-        var stage = new Border { Classes = { "store-tile", "hero" }, Height = 440, Child = new Panel { Children = { art, new Border { Background = Gx.ShadeUp(0.25, 240) }, new Border { Background = Gx.ShadeLeft(0.7, 160) }, Gx.Haze(true), words } } };
+        var stage = new Border { Classes = { "store-tile", "hero" }, Child = new Panel { Children = { art, new Border { Background = Gx.ShadeUp(0.25, 240) }, new Border { Background = Gx.ShadeLeft(0.7, 160) }, Gx.Haze(true), words } } };
         StoreKit.OnClick(stage, () => MarketTiles.Open(l));
-        col.Children.Add(stage);
+        col.Children.Add(StoreKit.Scaled(stage, 440));
         if (Animate.On) Animate.From(stage, "translateX(60px) scale(0.97)", 420, 0, new Avalonia.Animation.Easings.BackEaseOut());
 
         void Next() { _queueAt++; Build(); }

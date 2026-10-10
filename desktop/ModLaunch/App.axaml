@@ -773,5 +773,40 @@
     </Style>
     <Style Selector="Button.style-card.on"><Setter Property="BorderBrush" Value="{StaticResource Brand}"/></Style>
     <Style Selector="Window.juicy Button.style-card:pointerover"><Setter Property="RenderTransform" Value="translateY(-4px)"/></Style>
+
+    <!-- ============================== 9.3 ============================== -->
+    <!-- Обложки игр на боковой панели — приглушены, пока на них не навели или не открыли -->
+    <Style Selector="Button.rail-game">
+      <Setter Property="Opacity" Value="0.66"/>
+      <Setter Property="Transitions">
+        <Transitions>
+          <DoubleTransition Property="Opacity" Duration="0:0:0.16"/>
+          <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.2" Easing="CubicEaseOut"/>
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Button.rail-game:pointerover"><Setter Property="Opacity" Value="1"/></Style>
+    <Style Selector="Window.juicy Button.rail-game:pointerover"><Setter Property="RenderTransform" Value="scale(1.06)"/></Style>
+    <Style Selector="Button.rail-game.active"><Setter Property="Opacity" Value="1"/></Style>
+    <!-- Второстепенные пункты панели — мельче и тише -->
+    <Style Selector="Button.nav.secondary"><Setter Property="Width" Value="52"/></Style>
+    <!-- Быстрые действия на главной -->
+    <Style Selector="Button.quick">
+      <Setter Property="Background" Value="{StaticResource Surface2}"/>
+      <Setter Property="BorderBrush" Value="{StaticResource Line}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="CornerRadius" Value="10"/>
+      <Setter Property="Transitions">
+        <Transitions>
+          <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.2" Easing="CubicEaseOut"/>
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Button.quick:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource Surface3}"/>
+      <Setter Property="BorderBrush" Value="{StaticResource Brand}"/>
+    </Style>
+    <Style Selector="Window.juicy Button.quick:pointerover"><Setter Property="RenderTransform" Value="translateY(-2px)"/></Style>
+    <Style Selector="Window.juicy Button.quick:pressed"><Setter Property="RenderTransform" Value="scale(0.95)"/></Style>
   </Application.Styles>
 </Application>

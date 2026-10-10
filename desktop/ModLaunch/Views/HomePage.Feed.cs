@@ -36,6 +36,7 @@ public sealed class FeedBlock(FeedLayout layout, string theme)
 public sealed partial class HomePage
 {
     const int FeedStart = 5, FeedStep = 3, FeedMax = 40;
+    const double FeedGap = 8;
 
     static readonly List<FeedBlock> _plan = [];
     static readonly HashSet<string> _used = [];
@@ -99,7 +100,7 @@ public sealed partial class HomePage
         if (_plan.Count == 0) _plan.Add(PlanFirst(mine));
         if (_feedReady) { FillPending(mine); while (_plan.Count < FeedStart) _plan.Add(Plan(_plan.Count, mine)); }
 
-        var col = StoreKit.Column(spacing: 26, top: 22);
+        var col = StoreKit.Column(spacing: 18, top: 18);
         if (Starter(mine) is { } starter) col.Children.Add(Intro(starter, 0));
         col.Children.Add(FeedHeader(mine));
         _feedColumn = col;
@@ -471,7 +472,8 @@ public sealed partial class HomePage
         }
         else
         {
-            var grid = new Grid { ColumnDefinitions = new ColumnDefinitions(b.Layout.Cols), RowDefinitions = new RowDefinitions(b.Layout.Rows), ColumnSpacing = StoreKit.Gap, RowSpacing = StoreKit.Gap, Height = b.Layout.Height };
+            // 9.3: плитки ленты — вплотную (зазор 8), высота блока растёт с шириной окна.
+            var grid = StoreKit.Scaled(new Grid { ColumnDefinitions = new ColumnDefinitions(b.Layout.Cols), RowDefinitions = new RowDefinitions(b.Layout.Rows), ColumnSpacing = FeedGap, RowSpacing = FeedGap }, b.Layout.Height, maxScale: 1.12);
             var cols = b.Layout.Cols.Split(',').Length;
             for (var i = 0; i < b.Layout.Cells.Length; i++)
             {
@@ -488,7 +490,7 @@ public sealed partial class HomePage
         }
         if (animate) Stitch(tiles, index);
         var caption = Caption(b, index);
-        return caption is null ? body : Ui.Col(12, caption, body);
+        return caption is null ? body : Ui.Col(8, caption, body);
     }
 
     /// <summary>
@@ -792,7 +794,7 @@ public sealed partial class HomePage
             "center" => (Icons.Package, I18n.T("mc.title"), () => MainWindow.Current?.Navigate(() => new ModsCenterPage())),
             "workshop" => (Icons.Globe, I18n.T("v93.mk.workshop"), () => MainWindow.Current?.Navigate(() => new MarketPage("workshop"))),
             "sell" => (Icons.Bag, I18n.T("v93.promo.sell"), () => MainWindow.Current?.Navigate(() => new MarketPage("studio"))),
-            "style" => (Icons.Palette, I18n.T("v92.style.title"), () => StylePicker.Show()),
+            "style" => (Icons.Palette, I18n.T("v92.style.section"), () => StylePicker.Show()),
             "bigpicture" => (Icons.Tv, "Big Picture", BigPictureWindow.Open),
             "friends" => (Icons.Users, I18n.T("v92.nav.friends"), () => MainWindow.Current?.Navigate(() => new FriendsPage())),
             _ => (Icons.Plus, I18n.T("add.title"), () => MainWindow.Current?.Navigate(() => new AddGamePage())),
@@ -1026,7 +1028,7 @@ public sealed partial class HomePage
                         GradientStops = { new GradientStop(Color.Parse("#5B3FD6"), 0), new GradientStop(Color.Parse("#B81E26"), 0.5), new GradientStop(Color.Parse("#16924C"), 1) },
                     },
                 };
-                (icon, title, text) = (Icons.Palette, I18n.T("v92.style.title"), I18n.T("v93.promo.style"));
+                (icon, title, text) = (Icons.Palette, I18n.T("v92.style.section"), I18n.T("v93.promo.style"));
                 open = () => StylePicker.Show();
                 break;
             case "bigpicture":

@@ -11,6 +11,43 @@ public static class V93Shots
     static ScrollViewer? Scroller(Control? page) => page is UserControl { Content: ScrollViewer sv } ? sv : null;
 
     [DemoShots]
+    static void Home93Shots(Shots s)
+    {
+        var w = s.Window;
+        w.Navigate(() => new HomePage());
+        s.Pump(1500);
+        w.Navigate(() => new HomePage());
+        s.Pump(1200);
+        s.Save("v93-0-home");
+        if (Scroller(w.CurrentPage) is { } sv) sv.Offset = new Vector(0, 600);
+        s.Pump(600);
+        s.Save("v93-0-home-down");
+        foreach (var style in Look.Styles)
+        {
+            Look.SetStyle(style.Id);
+            w.Navigate(() => new HomePage());
+            s.Pump(1000);
+            s.Save($"v93-0-{style.Id}-home");
+        }
+        Look.SetStyle("dark");
+
+        // Большой монитор на весь экран: колонка не сжимается в полосу посередине.
+        var (wasW, wasH) = (w.Width, w.Height);
+        w.Width = 2560;
+        w.Height = 1440;
+        s.Pump(600);
+        w.Navigate(() => new HomePage());
+        s.Pump(1200);
+        s.Save("v93-0-home-wide");
+        w.Navigate(() => new HomePage(feed: true));
+        s.Pump(1200);
+        s.Save("v93-0-feed-wide");
+        w.Width = wasW;
+        w.Height = wasH;
+        s.Pump(600);
+    }
+
+    [DemoShots]
     static void Feed93Shots(Shots s)
     {
         var w = s.Window;
@@ -18,9 +55,9 @@ public static class V93Shots
         var hub = Demo.Hub();
         MarketData.Demo(listings, hub);
         HomePage.DemoFeed(listings, hub);
-        w.Navigate(() => new HomePage());
+        w.Navigate(() => new HomePage(feed: true));
         s.Pump(1500);
-        w.Navigate(() => new HomePage());
+        w.Navigate(() => new HomePage(feed: true));
         s.Pump(1200);
         s.Save("v93-1-feed");
         foreach (var y in new[] { 900, 1900, 2900, 3900 })
@@ -31,7 +68,7 @@ public static class V93Shots
         }
         // Обложки модов, «чипы» для маленьких модов и раскрытый топ.
         HomePage.DemoLayouts(true, "bannerChips", "topFold", "chips", "bigL4", "towersL");
-        w.Navigate(() => new HomePage());
+        w.Navigate(() => new HomePage(feed: true));
         s.Pump(1200);
         s.Save("v93-1-feed-new");
         foreach (var y in new[] { 450, 1100, 1700 })
@@ -44,7 +81,7 @@ public static class V93Shots
         foreach (var style in Look.Styles)
         {
             Look.SetStyle(style.Id);
-            w.Navigate(() => new HomePage());
+            w.Navigate(() => new HomePage(feed: true));
             s.Pump(1000);
             s.Save($"v93-2-{style.Id}-feed");
             if (Scroller(w.CurrentPage) is { } sv) sv.Offset = new Vector(0, 1400);
