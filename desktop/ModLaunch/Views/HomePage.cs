@@ -77,7 +77,8 @@ public sealed partial class HomePage : Page
         }
 
         // «Выбор ModLaunch» — карусель лучших модов для ваших игр.
-        if (_featured is null) { if (!_featuredLoading) { _featuredLoading = true; Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = LoadFeatured(mine)); } }
+        // Подборки грузим, когда игры уже найдены: при самом первом показе главной список ещё пуст.
+        if (_featured is null) { if (!_featuredLoading && mine.Count > 0) { _featuredLoading = true; Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = LoadFeatured(mine)); } }
         else if (!tiles && _featured.Count > 0 && Settings.Data.Bool("homePopular", true))
         {
             _featuredView ??= new Featured(_featured);
@@ -250,24 +251,33 @@ public sealed partial class HomePage : Page
 
     async Task LoadFeatured(List<GameState> mine)
     {
-        var lists = new List<List<(GameState, Sources.ModInfo)>>();
-        foreach (var g in mine.Where(g => g.Def.Picks.Length > 0).Take(6))
+        // 9.2: подборки всех игр — параллельно, а не по очереди.
+        async Task<List<(GameState, Sources.ModInfo)>> PicksOf(GameState g)
         {
             try
             {
                 var ids = g.Def.Picks.Take(4).ToList();
                 var mods = Program.Demo ? Demo.Many(g.Def, ids) : await Sources.Catalog.Many(g.Def, ids);
-                lists.Add(mods.Where(m => !Actions.IsInstalled(g, m.Id)).Concat(mods.Where(m => Actions.IsInstalled(g, m.Id))).Select(m => (g, m)).ToList());
+                return mods.Where(m => !Actions.IsInstalled(g, m.Id)).Concat(mods.Where(m => Actions.IsInstalled(g, m.Id))).Select(m => (g, m)).ToList();
             }
-            catch { }
+            catch { return []; }
         }
+        var lists = (await Task.WhenAll(mine.Where(g => g.Def.Picks.Length > 0).Take(6).Select(PicksOf))).ToList();
         // Чередуем игры: мод из первой, из второй… — чтобы карусель не была про одну игру.
         var result = new List<(GameState, Sources.ModInfo)>();
         for (var i = 0; result.Count < 10 && lists.Any(l => l.Count > i); i++)
             foreach (var l in lists) if (l.Count > i && result.Count < 10) result.Add(l[i]);
         _featured = result;
-        foreach (var g in mine) await Views.Aside.PopularAsync(g);
-        Build();
+        RebuildCurrent();
+        // Популярные моды для полки — тоже все сразу; главная перерисуется, когда придут.
+        try { await Task.WhenAll(mine.Select(g => Views.Aside.PopularAsync(g))); } catch { }
+        RebuildCurrent();
+    }
+
+    /// <summary>Перерисовать главную, если она сейчас на экране (эта страница могла уже смениться новой).</summary>
+    static void RebuildCurrent()
+    {
+        if (MainWindow.Current?.CurrentPage is HomePage home) home.Build();
     }
 
     Control TopMods(List<GameState> mine)

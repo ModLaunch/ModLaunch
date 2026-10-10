@@ -44,7 +44,8 @@ public sealed partial class HomePage
         col.Children.Add(games);
 
         // Загрузка подборок — один раз за сеанс; по готовности главная перерисуется.
-        if (_featured is null && !_featuredLoading) { _featuredLoading = true; Dispatcher.UIThread.Post(() => _ = LoadFeatured(mine)); }
+        // Подборки — когда игры уже найдены (при самом первом показе главной список игр ещё пуст).
+        if (_featured is null && !_featuredLoading && mine.Count > 0) { _featuredLoading = true; Dispatcher.UIThread.Post(() => _ = LoadFeatured(mine)); }
 
         // Популярные моды — по очереди из каждой игры, чтобы список не был про одну.
         if (mine.Count > 0 && Settings.Data.Bool("homePopular", true))
