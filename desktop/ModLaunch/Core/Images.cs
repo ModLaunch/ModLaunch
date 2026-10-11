@@ -54,6 +54,16 @@ public static class Images
     public static Bitmap? GameAsset(Games.GameDef def, Art art, int width)
     {
         width = Bucket(width);
+        // 9.4: официальная картинка из Microsoft Store (Minecraft), если уже скачана.
+        if (OfficialArt.File(def, art) is { } official)
+        {
+            var stamp = File.GetLastWriteTimeUtc(official).Ticks;
+            var hit = Memory.GetOrAdd($"official:{official}:{stamp}:{width}", _ =>
+            {
+                try { using var s = File.OpenRead(official); return Bitmap.DecodeToWidth(s, width); } catch { return null; }
+            });
+            if (hit is not null) return hit;
+        }
         var key = def.ArtKey ?? (def.SteamAppId > 0 ? def.SteamAppId.ToString() : null);
         if (key is null) return null;
         var name = $"art/{key}-{Kind(art)}.{(art == Art.Logo ? "png" : "jpg")}";

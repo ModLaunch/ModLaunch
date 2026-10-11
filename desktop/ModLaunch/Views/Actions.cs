@@ -148,9 +148,9 @@ public static partial class Actions
         var temporary = true;
         if (!string.IsNullOrEmpty(apiKey) && Settings.NexusPremium)
         {
-            var url = await Nexus.DownloadLink(game.NexusDomain!, modId, file.FileId, apiKey, ct: ct);
-            archive = await Http.Download(url, file.FileName ?? $"{modId}.zip",
-                new Progress<double>(r => progress.Report(new InstallStep("install.download", mod.Name, Ratio: r))), ct: ct);
+            var urls = await Nexus.DownloadLinks(game.NexusDomain!, modId, file.FileId, apiKey, ct: ct);
+            archive = await Http.Download(urls, file.FileName ?? $"{modId}.zip",
+                new Progress<double>(r => progress.Report(new InstallStep("install.download", mod.Name, Ratio: r))), null, ct);
         }
         else
         {
@@ -246,8 +246,8 @@ public static partial class Actions
         {
             progress.Report(new InstallStep("install.deps", $"#{parsed.ModId}"));
             var info = await Nexus.FileInfo(parsed.Domain, parsed.ModId, parsed.FileId, apiKey, ct);
-            var url = await Nexus.DownloadLink(parsed.Domain, parsed.ModId, parsed.FileId, apiKey, parsed.Key, parsed.Expires, ct);
-            var archive = await Http.Download(url, info.FileName ?? "mod.zip", new Progress<double>(r => progress.Report(new InstallStep("install.download", info.Name, Ratio: r))), ct: ct);
+            var urls = await Nexus.DownloadLinks(parsed.Domain, parsed.ModId, parsed.FileId, apiKey, parsed.Key, parsed.Expires, ct);
+            var archive = await Http.Download(urls, info.FileName ?? "mod.zip", new Progress<double>(r => progress.Report(new InstallStep("install.download", info.Name, Ratio: r))), null, ct);
             try
             {
                 progress.Report(new InstallStep("install.extract", info.Name));

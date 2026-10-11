@@ -39,7 +39,7 @@ public sealed class AddGamePage : Page
 
     public override void Build()
     {
-        var content = new StackPanel { Spacing = 18, Margin = new Thickness(34, 26, 34, 34), MaxWidth = 1100 };
+        var content = StoreKit.Fit(new StackPanel { Spacing = 18, Margin = new Thickness(34, 26, 34, 34), MaxWidth = 1100 }, 1700);
         var head = new DockPanel();
         var actions = Ui.Row(8,
             Ui.Button(I18n.T("add.exe"), PickExe, "", Icons.FilePlus),

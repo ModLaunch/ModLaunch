@@ -17,10 +17,102 @@ public sealed class Job
     public DateTime Started { get; } = DateTime.Now;
     public CancellationTokenSource Cancel { get; } = new();
 
-    /// <summary>Сколько скачано и сколько всего (байты; 0 — пока не качаем) и скорость в байтах в секунду.</summary>
-    public long Received { get; set; }
-    public long Total { get; set; }
-    public double Speed { get; set; }
+    // ---- байты (9.4): в одной задаче может идти несколько загрузок сразу — файлы модпака,
+    // части большого файла. Каждая пишет в свой Transfer, задача складывает их в общую цифру.
+    readonly object _bytesGate = new();
+    readonly List<Transfer> _transfers = [];
+    long _finished;
+    double _speed;
+    long _speedBytes;
+    DateTime _speedAt;
+
+    /// <summary>Объём всей пачки заранее (модпак знает размеры файлов) — полоса идёт по байтам всей пачки.</summary>
+    public long Planned { get; set; }
+
+    /// <summary>Шаг «распаковка» и подобные: байты не показываем (Total = 0), полоса идёт по шагам.</summary>
+    public bool ShowBytes { get; set; } = true;
+
+    /// <summary>Начать загрузку внутри задачи.</summary>
+    public Transfer BeginTransfer()
+    {
+        var t = new Transfer();
+        lock (_bytesGate) _transfers.Add(t);
+        return t;
+    }
+
+    /// <summary>Загрузка закончилась: удачная — её байты остаются в «скачано», неудачная (будет другая попытка) — нет.</summary>
+    public void EndTransfer(Transfer t, bool done)
+    {
+        lock (_bytesGate)
+        {
+            if (!_transfers.Remove(t)) return;
+            if (done && Planned > 0) _finished += Math.Max(t.Got, t.Size);
+        }
+    }
+
+    /// <summary>Сколько скачано (байты).</summary>
+    public long Received
+    {
+        get { lock (_bytesGate) return _finished + _transfers.Sum(t => t.Got); }
+    }
+
+    /// <summary>Сколько всего (байты; 0 — пока не качаем или размер неизвестен).</summary>
+    public long Total
+    {
+        get
+        {
+            lock (_bytesGate)
+            {
+                if (!ShowBytes || Status != JobStatus.Running) return 0;
+                if (Planned > 0) return Math.Max(Planned, _finished + _transfers.Sum(t => t.Got));
+                if (_transfers.Count == 0 || _transfers.Any(t => t.Size <= 0)) return 0;
+                return _transfers.Sum(t => t.Size);
+            }
+        }
+    }
+
+    /// <summary>Скорость в байтах в секунду, сглаженная, чтобы цифры не прыгали.</summary>
+    public double Speed
+    {
+        get { lock (_bytesGate) return _transfers.Count == 0 && Planned <= 0 ? 0 : _speed; }
+    }
+
+    /// <summary>Пришли байты: раз в полсекунды пересчитать скорость и дать знать интерфейсу. true — пересчитали.</summary>
+    public bool Tick()
+    {
+        var now = DateTime.UtcNow;
+        long bytes;
+        lock (_bytesGate)
+        {
+            var seconds = (now - _speedAt).TotalSeconds;
+            if (seconds < 0.5) return false;
+            bytes = _finished + _transfers.Sum(t => t.Got);
+            if (_speedAt != default && seconds < 5)
+            {
+                var current = Math.Max(0, (bytes - _speedBytes) / seconds);
+                _speed = _speed == 0 ? current : _speed * 0.7 + current * 0.3;
+            }
+            _speedBytes = bytes;
+            _speedAt = now;
+        }
+        return true;
+    }
+
+    /// <summary>Для снимков экрана: строка «скачано X из Y, скорость Z».</summary>
+    internal Job WithDemoBytes(long got, long total, double speed)
+    {
+        var t = BeginTransfer();
+        t.SetSize(total);
+        t.SetGot(got);
+        lock (_bytesGate) _speed = speed;
+        return this;
+    }
+
+    /// <summary>Задача закончилась — скорость и байты сбросить.</summary>
+    internal void ResetBytes()
+    {
+        lock (_bytesGate) { _transfers.Clear(); _speed = 0; _speedAt = default; }
+    }
 
     /// <summary>Остановлена кнопкой «Пауза»: «Продолжить» докачает с того же места.</summary>
     public bool Paused { get; set; }
@@ -36,6 +128,18 @@ public sealed class Job
 
     /// <summary>Уже запущена заново — второй клик по старой строке ничего не делает.</summary>
     internal bool Retried { get; set; }
+}
+
+/// <summary>Одна загрузка внутри задачи: сколько пришло и сколько всего (0 — неизвестно). Пишут из разных потоков.</summary>
+public sealed class Transfer
+{
+    long _got;
+    long _size;
+    public long Got => Interlocked.Read(ref _got);
+    public long Size => Interlocked.Read(ref _size);
+    public void SetSize(long size) => Interlocked.Exchange(ref _size, size);
+    public void SetGot(long got) => Interlocked.Exchange(ref _got, got);
+    public void Add(long bytes) => Interlocked.Add(ref _got, bytes);
 }
 
 /// <summary>
@@ -179,7 +283,7 @@ public static class Jobs
                 job.Error = e is OperationCanceledException ? I18n.T("err.nexus.offline", ("reason", "timeout")) : Explain(e);
                 job.Step = I18n.T("dl.failed");
             }
-            job.Speed = 0;
+            job.ResetBytes();
             lock (Gate) _running--;
             Complete(job);
             Pump();
@@ -200,6 +304,9 @@ public static class Jobs
 
     static void Raise(Job job) => OnUi(() => Changed?.Invoke(job));
 
+    /// <summary>Байты пришли (из потока загрузки): перерисовать строку — Job.Tick сам ограничивает частоту.</summary>
+    public static void Touch(Job job) { if (job.Tick()) Raise(job); }
+
     /// <summary>Список и события — только в потоке интерфейса (без окна, в проверках, — сразу).</summary>
     static void OnUi(Action action)
     {
@@ -214,7 +321,7 @@ public static class Jobs
         {
             job.Step = Describe(step);
             job.Ratio = step.Ratio;
-            if (step.Code != "install.download" && step.Code != "loader.download") job.Total = 0;
+            job.ShowBytes = step.Code is "install.download" or "loader.download";
             Raise(job);
         }
     }

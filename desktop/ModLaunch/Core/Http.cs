@@ -1,4 +1,5 @@
 using System.Net.Http.Headers;
+using System.Runtime.ExceptionServices;
 using System.Security.Cryptography;
 using System.Text.Json.Nodes;
 
@@ -86,19 +87,82 @@ public static class Http
     static readonly HashSet<string> Writing = [];
     static bool _partsCleaned;
 
+    /// <summary>Контрольные суммы файла (любые известные): sha256, sha1 (Modrinth, модпаки), sha512.</summary>
+    public sealed record Hashes(string? Sha256 = null, string? Sha1 = null, string? Sha512 = null)
+    {
+        public bool Any => !string.IsNullOrEmpty(Sha256) || !string.IsNullOrEmpty(Sha1) || !string.IsNullOrEmpty(Sha512);
+    }
+
+    /// <summary>Файл не совпал с контрольной суммой — с другого зеркала может прийти правильный.</summary>
+    public sealed class HashMismatchException(string file) : IOException($"checksum mismatch: {file}");
+
     /// <summary>
     /// Скачать файл во временную папку. Возвращает путь. Недокачанное лежит в «.part»:
     /// после обрыва, паузы или ошибки загрузка продолжится с того же места (если сервер умеет).
-    /// Сеть пропала — ещё три попытки через 1, 2 и 4 секунды.
+    /// Сеть пропала — ещё несколько попыток с паузой 1, 2, 4… секунды.
     /// </summary>
-    public static async Task<string> Download(string url, string fileName, IProgress<double>? progress = null, string? sha256 = null, CancellationToken ct = default)
+    public static Task<string> Download(string url, string fileName, IProgress<double>? progress = null, string? sha256 = null, CancellationToken ct = default) =>
+        Download([url], fileName, progress, new Hashes(sha256), ct);
+
+    /// <summary>
+    /// 9.4: загрузка с зеркалами — ссылки пробуются по очереди: одна не отвечает, файл битый или
+    /// не тот — берём следующую. Большие файлы качаются в несколько потоков (как в менеджерах
+    /// загрузок), байты всех загрузок одной задачи складываются в её общую полосу.
+    /// </summary>
+    public static async Task<string> Download(IReadOnlyList<string> urls, string fileName, IProgress<double>? progress, Hashes? hashes, CancellationToken ct = default)
     {
         CleanOldParts();
+        var list = urls.Where(u => !string.IsNullOrWhiteSpace(u)).Distinct().ToList();
+        if (list.Count == 0) throw new ArgumentException(I18n.T("mr.noFile"));
+        Exception? last = null;
+        foreach (var url in list)
+        {
+            try { return await DownloadOne(url, fileName, progress, hashes ?? new Hashes(), ct); }
+            catch (Exception e) when (!ct.IsCancellationRequested && e is not OfflineException && e is not NoSpaceException && url != list[^1])
+            {
+                last = e;
+            }
+        }
+        throw last ?? new IOException(fileName);
+    }
+
+    /// <summary>Не хватает места на диске — повторять бессмысленно.</summary>
+    public sealed class NoSpaceException(string message) : IOException(message);
+
+    /// <summary>Сколько частей у большого файла (Настройки → Загрузки); 1 — один поток.</summary>
+    public static int Segments
+    {
+        get => _segments;
+        set => _segments = Math.Clamp(value, 1, 8);
+    }
+    static volatile int _segments = 4;
+
+    /// <summary>Настройки загрузок (части и предел скорости) — при запуске и после изменения в настройках.</summary>
+    public static void ApplySettings()
+    {
+        Segments = Settings.Data.Long("dlSegments") is var n && n > 0 ? (int)n : 4;
+        Throttle.Limit = (long)(Settings.Data.Double("dlLimitMb") * 1024 * 1024);
+    }
+
+    /// <summary>С какого размера файл качается частями: мелочь быстрее одним потоком.</summary>
+    public static long SegmentMin { get; set; } = 8L << 20;
+
+    static async Task<string> DownloadOne(string url, string fileName, IProgress<double>? progress, Hashes hashes, CancellationToken ct)
+    {
         var job = Jobs.CurrentJob;
+        var transfer = job?.BeginTransfer() ?? new Transfer();
         var part = Reserve(PartName(url, fileName));
         var meta = part + ".meta";
+        var ok = false;
         try
         {
+            // Прошлый раз файл качался частями — продолжаем частями.
+            if (ReadMeta(meta) is { Segmented: true } saved && Segments > 1)
+            {
+                var resumed = await Segmented(saved.Url ?? url, part, meta, saved.Validator, saved.Size, fileName, progress, transfer, job, ct, fresh: false);
+                if (resumed is not null) { ok = true; return Finish(part, meta, fileName, hashes); }
+            }
+
             var failures = 0;
             while (true)
             {
@@ -108,7 +172,7 @@ public static class Http
                     var have = File.Exists(part) ? new FileInfo(part).Length : 0;
                     // Докачиваем, только если знаем, что файл на сервере тот же (ETag / Last-Modified):
                     // иначе к старому куску прилипнет новый файл и архив выйдет битым.
-                    var validator = have > 0 && File.Exists(meta) ? File.ReadAllText(meta).Trim() : "";
+                    var validator = have > 0 ? ReadMeta(meta)?.Validator ?? "" : "";
                     if (have > 0 && validator == "") { File.Delete(part); have = 0; }
                     using var request = new HttpRequestMessage(HttpMethod.Get, url);
                     if (have > 0)
@@ -117,18 +181,12 @@ public static class Http
                         request.Headers.TryAddWithoutValidation("If-Range", validator);
                     }
 
-                    HttpResponseMessage response;
-                    using (var wait = CancellationTokenSource.CreateLinkedTokenSource(ct))
-                    {
-                        wait.CancelAfter(TimeSpan.FromSeconds(45));
-                        try { response = await Files.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, wait.Token); }
-                        catch (OperationCanceledException) when (!ct.IsCancellationRequested) { throw new TimeoutException("server did not answer in 45 s"); }
-                    }
+                    var response = await Send(request, ct);
                     using var answer = response;
                     if (response.StatusCode == System.Net.HttpStatusCode.RequestedRangeNotSatisfiable)
                     {
                         // Кусок уже целый (дальше сервер отдавать нечего) — готово; иначе начинаем заново.
-                        if (response.Content.Headers.ContentRange?.Length is long full && full == have) return Finish(part, meta, fileName, sha256);
+                        if (response.Content.Headers.ContentRange?.Length is long full && full == have) { ok = true; return Finish(part, meta, fileName, hashes); }
                         File.Delete(part);
                         throw new IOException("range not satisfiable");
                     }
@@ -139,21 +197,34 @@ public static class Http
 
                     var resumed = have > 0 && response.StatusCode == System.Net.HttpStatusCode.PartialContent;
                     if (!resumed) have = 0;
+                    var total = response.Content.Headers.ContentLength is long length ? length + have : 0;
+                    EnsureSpace(total - have, fileName);
                     if (!resumed)
                     {
-                        var etag = response.Headers.ETag?.ToString() ?? response.Content.Headers.LastModified?.ToString("R") ?? "";
-                        if (etag != "" && response.Headers.AcceptRanges.Contains("bytes")) File.WriteAllText(meta, etag);
+                        var etag = Validator(response);
+                        var ranges = response.Headers.AcceptRanges.Contains("bytes");
+                        // Большой файл, сервер умеет отдавать куски и знает версию файла — качаем частями.
+                        if (Segments > 1 && total >= SegmentMin && ranges && etag != "")
+                        {
+                            var finalUrl = response.RequestMessage?.RequestUri?.ToString() ?? url;
+                            answer.Dispose();
+                            var done = await Segmented(finalUrl, part, meta, etag, total, fileName, progress, transfer, job, ct, fresh: true);
+                            if (done is not null) { ok = true; return Finish(part, meta, fileName, hashes); }
+                            // Сервер передумал отдавать куски — качаем одним потоком.
+                            failures = 0;
+                            continue;
+                        }
+                        if (etag != "" && ranges) WriteMeta(meta, new Meta(etag, false, 0, null));
                         else if (File.Exists(meta)) File.Delete(meta);
                     }
-                    var total = response.Content.Headers.ContentLength is long length ? length + have : 0;
                     long received = have;
+                    transfer.SetSize(total);
+                    transfer.SetGot(received);
                     await using (var input = await response.Content.ReadAsStreamAsync(ct))
                     await using (var output = new FileStream(part, resumed ? FileMode.Append : FileMode.Create, FileAccess.Write, FileShare.None, 1 << 17, true))
                     {
                         var buffer = new byte[1 << 17];
-                        var meter = new SpeedMeter(received);
                         var reported = DateTime.MinValue;
-                        if (job is not null) { job.Total = total; job.Received = received; }
                         // Минуту ни байта — связь зависла: считаем обрывом и пробуем снова.
                         using var stall = CancellationTokenSource.CreateLinkedTokenSource(ct);
                         stall.CancelAfter(TimeSpan.FromSeconds(60));
@@ -167,21 +238,22 @@ public static class Http
                             await output.WriteAsync(buffer.AsMemory(0, read), ct);
                             received += read;
                             gained += read;
+                            transfer.Add(read);
+                            await Throttle.Take(read, ct);
                             // Интерфейсу хватает 10 обновлений в секунду — чаще только тормозит окно.
                             var now = DateTime.UtcNow;
                             if ((now - reported).TotalMilliseconds >= 100)
                             {
                                 reported = now;
                                 if (total > 0) progress?.Report((double)received / total);
-                                if (job is not null) job.Received = received;
+                                if (job is not null) Jobs.Touch(job);
                             }
-                            if (job is not null && meter.Tick(received) is double speed) job.Speed = speed;
                         }
-                        if (job is not null) job.Received = received;
                         if (total > 0 && received != total) throw new IOException("download cut off");
                     }
                     progress?.Report(1);
-                    return Finish(part, meta, fileName, sha256);
+                    ok = true;
+                    return Finish(part, meta, fileName, hashes);
                 }
                 catch (Exception e) when (!ct.IsCancellationRequested && !Hopeless(e))
                 {
@@ -195,20 +267,209 @@ public static class Http
         finally
         {
             lock (Writing) Writing.Remove(part);
-            if (job is not null) { job.Total = 0; job.Speed = 0; }
+            job?.EndTransfer(transfer, ok);
         }
     }
 
-    /// <summary>Проверить контрольную сумму и подпись архива, отдать готовый файл.</summary>
-    static string Finish(string part, string meta, string fileName, string? sha256)
+    /// <summary>Запрос с ожиданием ответа не дольше 45 с (сам файл может идти сколько угодно).</summary>
+    static async Task<HttpResponseMessage> Send(HttpRequestMessage request, CancellationToken ct)
+    {
+        using var wait = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        wait.CancelAfter(TimeSpan.FromSeconds(45));
+        try { return await Files.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, wait.Token); }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested) { throw new TimeoutException("server did not answer in 45 s"); }
+    }
+
+    /// <summary>Чем сервер подтверждает, что файл тот же: сильный ETag, иначе дата изменения (слабый ETag для докачки не годится).</summary>
+    static string Validator(HttpResponseMessage response)
+    {
+        if (response.Headers.ETag is { IsWeak: false } strong) return strong.ToString();
+        return response.Content.Headers.LastModified?.ToString("R") ?? "";
+    }
+
+    /// <summary>Что записано рядом с недокачанным файлом: версия файла на сервере и, если качался частями, — размер и ссылка.</summary>
+    sealed record Meta(string Validator, bool Segmented, long Size, string? Url);
+
+    static Meta? ReadMeta(string meta)
+    {
+        try
+        {
+            if (!File.Exists(meta)) return null;
+            var lines = File.ReadAllLines(meta);
+            if (lines.Length == 0 || lines[0].Trim() == "") return null;
+            if (lines.Length >= 3 && lines[1].StartsWith("seg ", StringComparison.Ordinal) && long.TryParse(lines[1][4..], out var size) && size > 0)
+                return new Meta(lines[0].Trim(), true, size, lines[2].Trim());
+            return new Meta(lines[0].Trim(), false, 0, null);
+        }
+        catch { return null; }
+    }
+
+    static void WriteMeta(string meta, Meta m) =>
+        File.WriteAllText(meta, m.Segmented ? $"{m.Validator}\nseg {m.Size}\n{m.Url}" : m.Validator);
+
+    /// <summary>Перед загрузкой: хватит ли места во временной папке (с запасом 64 МБ).</summary>
+    static void EnsureSpace(long need, string fileName)
+    {
+        if (need <= 0) return;
+        try
+        {
+            var root = Path.GetPathRoot(Paths.DownloadsTemp);
+            if (string.IsNullOrEmpty(root)) return;
+            var free = new DriveInfo(root).AvailableFreeSpace;
+            if (free < need + (64L << 20))
+                throw new NoSpaceException(I18n.T("dl.noSpace", ("file", fileName), ("need", Size(need)), ("free", Size(free)), ("drive", root.TrimEnd('\\', '/'))));
+        }
+        catch (NoSpaceException) { throw; }
+        catch { }
+    }
+
+    static string Size(long bytes) => bytes switch
+    {
+        >= 1L << 30 => $"{bytes / (double)(1L << 30):0.#} GB",
+        >= 1L << 20 => $"{bytes / (double)(1L << 20):0.#} MB",
+        _ => $"{Math.Max(1, bytes / 1024)} KB",
+    };
+
+    /// <summary>
+    /// Загрузка частями: файл делится на N кусков, каждый качается своим соединением в свой
+    /// «.sN»-файл (с докачкой), потом куски склеиваются. Возвращает путь к целому файлу или
+    /// null, если сервер перестал отдавать куски (тогда качаем одним потоком).
+    /// </summary>
+    static async Task<string?> Segmented(string url, string part, string meta, string validator, long size, string fileName,
+        IProgress<double>? progress, Transfer transfer, Job? job, CancellationToken ct, bool fresh)
+    {
+        var count = Math.Max(2, Segments);
+        var piece = size / count;
+        var ranges = Enumerable.Range(0, count).Select(i => (Start: i * piece, End: i == count - 1 ? size - 1 : (i + 1) * piece - 1, File: $"{part}.s{i}")).ToList();
+        void Wipe()
+        {
+            foreach (var r in ranges) try { File.Delete(r.File); } catch { }
+            try { File.Delete(meta); } catch { }
+        }
+        if (fresh)
+        {
+            Wipe();
+            try { File.Delete(part); } catch { }
+            WriteMeta(meta, new Meta(validator, true, size, url));
+        }
+        // Кусок не может быть длиннее своего места — значит, это кусок другого деления: начинаем заново.
+        if (ranges.Any(r => File.Exists(r.File) && new FileInfo(r.File).Length > r.End - r.Start + 1)) { Wipe(); return null; }
+        var have = ranges.Sum(r => File.Exists(r.File) ? new FileInfo(r.File).Length : 0);
+        EnsureSpace(size - have, fileName);
+        transfer.SetSize(size);
+        transfer.SetGot(have);
+        long reportedAt = 0;
+        using var stop = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var restart = false;
+
+        async Task Piece((long Start, long End, string File) r)
+        {
+            var failures = 0;
+            while (true)
+            {
+                long gained = 0;
+                try
+                {
+                    var got = File.Exists(r.File) ? new FileInfo(r.File).Length : 0;
+                    var length = r.End - r.Start + 1;
+                    if (got >= length) return;
+                    using var request = new HttpRequestMessage(HttpMethod.Get, url);
+                    request.Headers.Range = new RangeHeaderValue(r.Start + got, r.End);
+                    request.Headers.TryAddWithoutValidation("If-Range", validator);
+                    using var response = await Send(request, stop.Token);
+                    if (response.StatusCode != System.Net.HttpStatusCode.PartialContent || response.Content.Headers.ContentRange?.From != r.Start + got)
+                    {
+                        // Сервер прислал весь файл (поменялся или не умеет куски) — так не склеить.
+                        if (response.IsSuccessStatusCode) { restart = true; stop.Cancel(); return; }
+                        throw new HttpRequestException($"{(int)response.StatusCode} {response.ReasonPhrase} — {url}", null, response.StatusCode);
+                    }
+                    await using var input = await response.Content.ReadAsStreamAsync(stop.Token);
+                    await using var output = new FileStream(r.File, FileMode.Append, FileAccess.Write, FileShare.None, 1 << 16, true);
+                    var buffer = new byte[1 << 16];
+                    using var stall = CancellationTokenSource.CreateLinkedTokenSource(stop.Token);
+                    stall.CancelAfter(TimeSpan.FromSeconds(60));
+                    while (got < length)
+                    {
+                        int read;
+                        try { read = await input.ReadAsync(buffer.AsMemory(0, (int)Math.Min(buffer.Length, length - got)), stall.Token); }
+                        catch (OperationCanceledException) when (!stop.IsCancellationRequested) { throw new TimeoutException("no data for 60 s"); }
+                        if (read <= 0) break;
+                        stall.CancelAfter(TimeSpan.FromSeconds(60));
+                        await output.WriteAsync(buffer.AsMemory(0, read), stop.Token);
+                        got += read;
+                        gained += read;
+                        transfer.Add(read);
+                        await Throttle.Take(read, stop.Token);
+                        var now = Environment.TickCount64;
+                        var last = Interlocked.Read(ref reportedAt);
+                        if (now - last >= 100 && Interlocked.CompareExchange(ref reportedAt, now, last) == last)
+                        {
+                            progress?.Report((double)transfer.Got / size);
+                            if (job is not null) Jobs.Touch(job);
+                        }
+                    }
+                    if (got < length) throw new IOException("download cut off");
+                    return;
+                }
+                catch (Exception e) when (!stop.IsCancellationRequested && !Hopeless(e))
+                {
+                    failures = gained > 0 ? 1 : failures + 1;
+                    if (failures > 6) throw;
+                    await Task.Delay(TimeSpan.FromSeconds(Math.Min(15, 1 << (failures - 1))), stop.Token);
+                }
+            }
+        }
+
+        try
+        {
+            await Task.WhenAll(ranges.Select(Piece));
+        }
+        catch (Exception e) when (!ct.IsCancellationRequested)
+        {
+            if (!restart)
+            {
+                // Ссылка устарела (подписанные ссылки Nexus живут недолго) — при докачке начинаем с нуля.
+                if (!fresh && Hopeless(e) && e is not OfflineException and not NoSpaceException) { Wipe(); return null; }
+                ExceptionDispatchInfo.Capture(e is AggregateException { InnerException: { } inner } ? inner : e).Throw();
+            }
+        }
+        if (restart) { Wipe(); transfer.SetGot(0); return null; }
+        ct.ThrowIfCancellationRequested();
+
+        // Склеиваем куски по порядку.
+        await using (var output = new FileStream(part, FileMode.Create, FileAccess.Write, FileShare.None, 1 << 17, true))
+            foreach (var r in ranges)
+                await using (var input = new FileStream(r.File, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 17, true))
+                    await input.CopyToAsync(output, ct);
+        foreach (var r in ranges) try { File.Delete(r.File); } catch { }
+        if (new FileInfo(part).Length != size) { try { File.Delete(part); } catch { } try { File.Delete(meta); } catch { } throw new IOException("download cut off"); }
+        progress?.Report(1);
+        return part;
+    }
+
+    /// <summary>Проверить контрольные суммы и подпись архива, отдать готовый файл.</summary>
+    static string Finish(string part, string meta, string fileName, Hashes hashes)
     {
         void Drop() { try { File.Delete(part); } catch { } try { File.Delete(meta); } catch { } }
-        if (sha256 is not null && !string.Equals(Sha256(part), sha256, StringComparison.OrdinalIgnoreCase)) { Drop(); throw new IOException("checksum mismatch"); }
+        if (!Matches(part, hashes)) { Drop(); throw new HashMismatchException(fileName); }
         if (LooksBroken(part, fileName)) { Drop(); throw new IOException(I18n.T("dl.broken")); }
         var target = Path.Combine(Paths.DownloadsTemp, $"{DateTime.UtcNow.Ticks}-{Safe(fileName)}");
         File.Move(part, target);
         try { File.Delete(meta); } catch { }
         return target;
+    }
+
+    /// <summary>Совпадает ли файл со всеми известными контрольными суммами.</summary>
+    public static bool Matches(string file, Hashes hashes)
+    {
+        if (!hashes.Any) return true;
+        using var stream = File.OpenRead(file);
+        if (hashes.Sha256 is { Length: > 0 } a && !a.Equals(Convert.ToHexString(SHA256.HashData(stream)), StringComparison.OrdinalIgnoreCase)) return false;
+        stream.Position = 0;
+        if (hashes.Sha1 is { Length: > 0 } b && !b.Equals(Convert.ToHexString(SHA1.HashData(stream)), StringComparison.OrdinalIgnoreCase)) return false;
+        stream.Position = 0;
+        if (hashes.Sha512 is { Length: > 0 } c && !c.Equals(Convert.ToHexString(SHA512.HashData(stream)), StringComparison.OrdinalIgnoreCase)) return false;
+        return true;
     }
 
     /// <summary>Архив, который не начинается со своей подписи (zip — PK, 7z, rar), — битый или вовсе не архив.</summary>
@@ -228,7 +489,7 @@ public static class Http
     }
 
     /// <summary>Ответ «нет такого файла» или «нельзя» — повторять бесполезно.</summary>
-    static bool Hopeless(Exception e) => e is OfflineException ||
+    static bool Hopeless(Exception e) => e is OfflineException or NoSpaceException or HashMismatchException ||
         e is HttpRequestException { StatusCode: { } code } && (int)code is >= 400 and < 500 && (int)code is not (408 or 429);
 
     /// <summary>Имя недокачанного файла: одно и то же для той же ссылки (без подписи после «?» — у Nexus она каждый раз новая).</summary>
@@ -264,26 +525,6 @@ public static class Http
         catch { }
     }
 
-    /// <summary>Скорость загрузки, сглаженная, чтобы цифры не прыгали; обновляется раз в полсекунды.</summary>
-    sealed class SpeedMeter(long start)
-    {
-        long _bytes = start;
-        DateTime _at = DateTime.UtcNow;
-        double _speed;
-
-        public double? Tick(long received)
-        {
-            var now = DateTime.UtcNow;
-            var seconds = (now - _at).TotalSeconds;
-            if (seconds < 0.5) return null;
-            var current = (received - _bytes) / seconds;
-            _speed = _speed == 0 ? current : _speed * 0.7 + current * 0.3;
-            _bytes = received;
-            _at = now;
-            return _speed;
-        }
-    }
-
     [SelfTest]
     static string PartNameIgnoresSignature()
     {
@@ -304,4 +545,41 @@ public static class Http
     }
 
     static string Safe(string name) => string.Concat(name.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c));
+}
+
+/// <summary>
+/// 9.4: ограничение скорости всех загрузок вместе (Настройки → Загрузки), как в Steam: игра по сети
+/// не тормозит, пока качается модпак. Ведро токенов на одну секунду: байты «тратят» токены,
+/// токены копятся со скоростью предела.
+/// </summary>
+public static class Throttle
+{
+    static readonly object Gate = new();
+    static double _tokens;
+    static long _at = Environment.TickCount64;
+    static long _limit;
+
+    /// <summary>Предел в байтах в секунду; 0 — без ограничения.</summary>
+    public static long Limit
+    {
+        get => Interlocked.Read(ref _limit);
+        set => Interlocked.Exchange(ref _limit, Math.Max(0, value));
+    }
+
+    public static async ValueTask Take(int bytes, CancellationToken ct)
+    {
+        var limit = Limit;
+        if (limit <= 0) return;
+        TimeSpan wait;
+        lock (Gate)
+        {
+            var now = Environment.TickCount64;
+            _tokens = Math.Min(limit, _tokens + (now - _at) / 1000.0 * limit);
+            _at = now;
+            _tokens -= bytes;
+            if (_tokens >= 0) return;
+            wait = TimeSpan.FromSeconds(-_tokens / limit);
+        }
+        await Task.Delay(wait < TimeSpan.FromMilliseconds(5) ? TimeSpan.FromMilliseconds(5) : wait, ct);
+    }
 }

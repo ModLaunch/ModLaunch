@@ -160,7 +160,15 @@ public sealed partial class MinecraftPage
         var col = Ui.Col(14);
         var head = new DockPanel();
         var buttons = Ui.Row(8, Ui.Button(I18n.T("common.retry"), Build, "", Icons.Refresh));
-        if (File.Exists(path)) buttons.Children.Add(Ui.Button(I18n.T("log.open"), () => Ui.OpenUrl(path), "", Icons.External));
+        if (File.Exists(path))
+        {
+            // 9.4: «Поделиться» — лог на mclo.gs, ссылка в буфер обмена (как в Modrinth App).
+            var share = Ui.Button(I18n.T("share.log"), () => { }, "primary", Icons.Upload);
+            share.Click += (_, _) => ShareLog(path, share);
+            ToolTip.SetTip(share, I18n.T("share.hint"));
+            buttons.Children.Add(share);
+            buttons.Children.Add(Ui.Button(I18n.T("log.open"), () => Ui.OpenUrl(path), "", Icons.External));
+        }
         buttons.Children.Add(Ui.Button("", () => Actions.OpenFolder(Directory.CreateDirectory(Path.Combine(a.Dir, "logs")).FullName), "icon ghost", Icons.Folder, I18n.T("games.openFolder")));
         DockPanel.SetDock(buttons, Dock.Right);
         head.Children.Add(buttons);
@@ -184,8 +192,11 @@ public sealed partial class MinecraftPage
                 var cause = CrashCause(file);
                 var row = new DockPanel();
                 var open = Ui.Button(I18n.T("ctx.open"), () => Ui.OpenUrl(file), "ghost", Icons.External);
-                DockPanel.SetDock(open, Dock.Right);
-                row.Children.Add(open);
+                var shareCrash = Ui.Button("", () => { }, "icon ghost", Icons.Upload, I18n.T("share.log"));
+                shareCrash.Click += (_, _) => ShareLog(file, shareCrash);
+                var actions = Ui.Row(4, shareCrash, open);
+                DockPanel.SetDock(actions, Dock.Right);
+                row.Children.Add(actions);
                 row.Children.Add(Ui.Col(2, Ui.Text(Ui.Ago(c.LastWriteTimeUtc) + " · " + c.Name, "small"), Ui.Text(cause, "small", color: Ui.Res("Bad"))));
                 list.Children.Add(new Border { Background = Ui.Res("Surface2"), CornerRadius = new CornerRadius(12), Padding = new Thickness(14, 10), Child = row });
             }

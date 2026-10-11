@@ -94,7 +94,7 @@ public sealed class SearchPage : Page
 
     public override void Build()
     {
-        var col = new StackPanel { Spacing = 18, Margin = new Thickness(40, 30, 40, 40), MaxWidth = 1200 };
+        var col = StoreKit.Fit(new StackPanel { Spacing = 18, Margin = new Thickness(40, 30, 40, 40), MaxWidth = 1200 }, 1800);
         col.Children.Add(Ui.Col(6, Ui.Text(I18n.T("gsearch.title"), "h1"), Ui.Text(I18n.T("gsearch.lead"), "muted")));
         if (_box.Parent is Panel old) old.Children.Remove(_box);
         if (_found.Parent is Panel oldFound) oldFound.Children.Remove(_found);

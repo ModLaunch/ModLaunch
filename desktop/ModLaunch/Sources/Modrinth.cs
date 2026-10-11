@@ -10,7 +10,7 @@ public sealed record MrProject(
     public string Url => $"https://modrinth.com/{Type}/{Slug}";
 }
 
-public sealed record MrFile(string Url, string Name, bool Primary, long Size, string? Sha1);
+public sealed record MrFile(string Url, string Name, bool Primary, long Size, string? Sha1, string? Sha512 = null);
 public sealed record MrDep(string? ProjectId, string? VersionId, string Kind);
 public sealed record MrVersion(string Id, string ProjectId, string Number, string Name, string Type, List<string> Loaders, List<string> GameVersions,
     List<MrFile> Files, List<MrDep> Deps, DateTime? Published, long Downloads, string Changelog)
@@ -92,7 +92,7 @@ public static class Modrinth
     public static MrVersion FromVersion(JsonNode v) => new(
         v.Str("id") ?? "", v.Str("project_id") ?? "", v.Str("version_number") ?? "", v.Str("name") ?? "", v.Str("version_type") ?? "release",
         Strs(v["loaders"]), Strs(v["game_versions"]),
-        (v["files"] as JsonArray ?? []).OfType<JsonNode>().Select(f => new MrFile(f.Str("url") ?? "", f.Str("filename") ?? "", f.Bool("primary"), f.Long("size"), f["hashes"].Str("sha1"))).ToList(),
+        (v["files"] as JsonArray ?? []).OfType<JsonNode>().Select(f => new MrFile(f.Str("url") ?? "", f.Str("filename") ?? "", f.Bool("primary"), f.Long("size"), f["hashes"].Str("sha1"), f["hashes"].Str("sha512"))).ToList(),
         (v["dependencies"] as JsonArray ?? []).OfType<JsonNode>().Select(d => new MrDep(d.Str("project_id"), d.Str("version_id"), d.Str("dependency_type") ?? "required")).ToList(),
         Time(v.Str("date_published")), v.Long("downloads"), v.Str("changelog") ?? "");
 
@@ -154,7 +154,7 @@ public static class Modrinth
         }
         var file = v.File ?? throw new InvalidOperationException(I18n.T("mr.noFile"));
         progress?.Report(p.Title);
-        var temp = await Http.Download(file.Url, file.Name, ct: ct);
+        var temp = await Http.Download([file.Url], file.Name, null, new Http.Hashes(Sha1: file.Sha1, Sha512: file.Sha512), ct);
         var dir = Directory.CreateDirectory(Path.Combine(Folder, SubFolder(p.Type))).FullName;
         // Старая версия того же проекта — убрать, чтобы не было двух копий.
         if (InstalledOf(p.Id) is { } old && old.File != file.Name) { try { File.Delete(Path.Combine(dir, old.File)); } catch { } }

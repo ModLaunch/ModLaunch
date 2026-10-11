@@ -31,6 +31,12 @@ public sealed class McInstance
     public string? PackProject { get; set; }
     public string? PackVersion { get; set; }
     public string? Icon { get; set; }
+    /// <summary>9.4: сколько наиграно в этой сборке (мс) — как «Played» в Modrinth App.</summary>
+    public long PlayMs { get; set; }
+    /// <summary>9.4: размер окна игры (0 — как решит лаунчер) и своя Java (пусто — лаунчер выберет сам).</summary>
+    public int Width { get; set; }
+    public int Height { get; set; }
+    public string JavaPath { get; set; } = "";
 
     public bool Modded => Loader != "vanilla";
     public string LoaderTitle => Mc.LoaderTitle(Loader);
@@ -47,6 +53,7 @@ public sealed class McInstance
         ["dir"] = Dir, ["linked"] = Linked, ["source"] = Source, ["memoryMb"] = MemoryMb, ["javaArgs"] = JavaArgs,
         ["created"] = Created.ToString("o"), ["lastPlayed"] = LastPlayed?.ToString("o"),
         ["packProject"] = PackProject, ["packVersion"] = PackVersion, ["icon"] = Icon,
+        ["playMs"] = PlayMs, ["width"] = Width, ["height"] = Height, ["javaPath"] = JavaPath,
     };
 
     public static McInstance FromJson(string id, JsonNode n) => new()
@@ -66,6 +73,10 @@ public sealed class McInstance
         PackProject = n.Str("packProject"),
         PackVersion = n.Str("packVersion"),
         Icon = n.Str("icon"),
+        PlayMs = Math.Max(0, n.Long("playMs")),
+        Width = (int)Math.Clamp(n.Long("width"), 0, 7680),
+        Height = (int)Math.Clamp(n.Long("height"), 0, 4320),
+        JavaPath = n.Str("javaPath") ?? "",
     };
 }
 
@@ -287,6 +298,20 @@ public static partial class Mc
         return i;
     }
 
+    /// <summary>Убрать сборку из списка без вопросов (недоделанная установка модпака).</summary>
+    public static void Forget(McInstance i)
+    {
+        OnUi(() =>
+        {
+            InstancesStore.Remove(i.Id);
+            if (Store.Str("active") == i.Id) Store.Remove("active");
+            Settings.Save();
+        });
+        try { McProfiles.Remove(i); } catch { }
+        try { File.Delete(McContent.MetaPath(i)); } catch { }
+        OnUi(Notify);
+    }
+
     public static void Rename(McInstance i, string name)
     {
         if (name.Trim() == "") return;
@@ -323,6 +348,8 @@ public static partial class Mc
         foreach (var file in new[] { "options.txt", "servers.dat" })
             try { if (File.Exists(Path.Combine(source.Dir, file))) File.Copy(Path.Combine(source.Dir, file), Path.Combine(copy.Dir, file), true); } catch { }
         copy.JavaArgs = source.JavaArgs;
+        (copy.Width, copy.Height, copy.JavaPath) = (source.Width, source.Height, source.JavaPath);
+        copy.Icon = source.Icon is { } icon && !(Path.IsPathFullyQualified(icon) && icon.StartsWith(source.Dir, StringComparison.OrdinalIgnoreCase)) ? icon : null;
         Save(copy);
         McContent.CopyMeta(source, copy);
         return copy;

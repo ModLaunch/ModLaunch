@@ -223,7 +223,7 @@ public static class UpdateReview
         // Загрузки: идёт с байтами и скоростью, ждёт, на паузе, ошибка, готово.
         var demo = new List<Job>
         {
-            new() { Title = "Nautilus", GameName = "Subnautica", Status = JobStatus.Running, Step = I18n.T("dl.download"), Received = 12_900_000, Total = 41_200_000, Speed = 2_300_000, Ratio = 0.31 },
+            new Job { Title = "Nautilus", GameName = "Subnautica", Status = JobStatus.Running, Step = I18n.T("dl.download"), Ratio = 0.31 }.WithDemoBytes(12_900_000, 41_200_000, 2_300_000),
             new() { Title = I18n.T("upd.job", ("n", 2)), GameName = "Lethal Company", Status = JobStatus.Running, Step = I18n.T("dl.extract") + " " + I18n.T("dl.detail.of", ("i", 1), ("n", 2), ("name", "LethalLib")), Ratio = -1 },
             new() { Title = "More Suits", GameName = "Lethal Company", Status = JobStatus.Queued },
             new() { Title = "Slot Extender", GameName = "Subnautica", Status = JobStatus.Canceled, Paused = true, Step = I18n.T("dl.paused") },

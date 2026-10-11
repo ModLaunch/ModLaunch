@@ -12,6 +12,11 @@ public static class WhatsNew
 {
     static readonly (string Icon, string Key, Func<Page>? Open)[] Items =
     [
+        (Icons.Cube, "new.v94.minecraft", () => new MinecraftPage("builds")),
+        (Icons.Users, "new.v94.servers", () => new MinecraftPage("servers")),
+        (Icons.Download, "new.v94.downloads", () => new SettingsPage("downloads")),
+        (Icons.Gamepad, "new.v94.get", () => new LibraryPage()),
+        (Icons.Check, "new.v94.fixes", null),
         (Icons.Home, "new.v93.home", () => new HomePage()),
         (Icons.Flame, "new.v93.feed", () => new HomePage(feed: true)),
         (Icons.Bag, "new.v93.market", () => new MarketPage()),

@@ -518,6 +518,45 @@ public sealed partial class GamePage
         grid.Children.Add(left);
         Grid.SetColumn(picture, 1);
         grid.Children.Add(picture);
-        return Ui.Card(grid, 26);
+        var where = Ui.Card(grid, 26);
+        return _g.Def.SteamAppId > 0 ? Ui.Col(16, GetGameCard(), where) : where;
+    }
+
+    /// <summary>9.4: игры нет — поставить её через Steam и смотреть, как она качается; потом ModLaunch найдёт её сам.</summary>
+    Control GetGameCard()
+    {
+        var def = _g.Def;
+        var progress = Features.GetGame.Progress(def.Id);
+        var icon = new Border { Width = 52, Height = 52, CornerRadius = new CornerRadius(14), Background = Ui.Res("BrandSoft"), Child = Ui.Icon(Icons.Download, 24, Ui.Res("Brand2")), VerticalAlignment = VerticalAlignment.Top };
+        var words = Ui.Col(6, Ui.Text(I18n.T("get.title", ("game", def.Name)), "h2"));
+        var buttons = Ui.Row(10);
+        if (progress is not null)
+        {
+            var line = !progress.Started ? I18n.T("get.waiting")
+                : progress.Total > 0 ? I18n.T("get.progress", ("done", Size(progress.Done)), ("total", Size(progress.Total)))
+                : I18n.T("get.preparing");
+            words.Children.Add(Ui.Text(line, "muted", wrap: true));
+            var ratio = progress.Total > 0 ? (double)progress.Done / progress.Total : -1;
+            words.Children.Add(new ProgressBar { Minimum = 0, Maximum = 1, Value = Math.Clamp(ratio, 0, 1), IsIndeterminate = ratio < 0, Height = 6, MinHeight = 6, MaxWidth = 520, HorizontalAlignment = HorizontalAlignment.Left });
+            buttons.Children.Add(Ui.Button(I18n.T("get.stop"), () => { Features.GetGame.StopWatching(def.Id); Build(); }, "ghost", Icons.Close));
+        }
+        else if (Features.GetGame.SteamInstalled)
+        {
+            words.Children.Add(Ui.Text(I18n.T("get.text", ("game", def.Name)), "muted", wrap: true));
+            buttons.Children.Add(Ui.Button(I18n.T("get.steam"), () => { Features.GetGame.InstallViaSteam(_g); Build(); }, "primary", Icons.Download));
+            buttons.Children.Add(Ui.Button(I18n.T("get.store"), () => Ui.OpenUrl(Features.GetGame.StoreUrl(def)), "", Icons.External));
+        }
+        else
+        {
+            words.Children.Add(Ui.Text(I18n.T("get.noSteam", ("game", def.Name)), "muted", wrap: true));
+            buttons.Children.Add(Ui.Button(I18n.T("get.getSteam"), Features.GetGame.GetSteam, "primary", Icons.Download));
+            buttons.Children.Add(Ui.Button(I18n.T("get.store"), () => Ui.OpenUrl(Features.GetGame.StoreUrl(def)), "", Icons.External));
+        }
+        words.Children.Add(buttons);
+        var row = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*"), ColumnSpacing = 18 };
+        row.Children.Add(icon);
+        Grid.SetColumn(words, 1);
+        row.Children.Add(words);
+        return Ui.Card(row, 24);
     }
 }

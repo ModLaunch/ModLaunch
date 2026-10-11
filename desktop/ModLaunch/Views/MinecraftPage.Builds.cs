@@ -28,8 +28,10 @@ public sealed partial class MinecraftPage
             col.Children.Add(Ui.Text(I18n.T("mine.builds.none"), "muted"));
         else
         {
-            var grid = new UniformGrid { Columns = 3 };
+            // Колонок столько, сколько влезает (на большом мониторе — больше), как библиотека Modrinth App.
+            var grid = new UniformGrid { Columns = 3, Margin = new Thickness(0, 0, -14, 0) };
             foreach (var i in builds) grid.Children.Add(BuildCard(i, i.Id == active?.Id));
+            grid.SizeChanged += (_, e) => { var cols = Math.Clamp((int)(e.NewSize.Width / 340), 1, 6); if (grid.Columns != cols) grid.Columns = cols; };
             col.Children.Add(grid);
         }
 
@@ -66,7 +68,10 @@ public sealed partial class MinecraftPage
     Control BuildCard(McInstance i, bool active)
     {
         var mods = McContent.Count(i, "mod");
-        Control icon = i.Icon is { Length: > 0 } url ? Ui.Thumb(url, i.Name, 52, 14, 104) : LoaderBadge(i.Loader, 52);
+        // 9.4: у каждой сборки своя картинка; щелчок по ней — сменить.
+        var icon = new Button { Classes = { "bare" }, Padding = new Thickness(0), Background = Brushes.Transparent, Content = InstanceIcon(i, 64, 16), Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand) };
+        ToolTip.SetTip(icon, I18n.T("mc94.icon.change"));
+        icon.Click += (_, _) => IconDialog(i);
         var head = Ui.Col(3, new TextBlock { Text = i.Name, Classes = { "h3" }, TextTrimming = TextTrimming.CharacterEllipsis }, Ui.Text(i.Label, "small brand"));
         head.VerticalAlignment = VerticalAlignment.Center;
         var top = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*"), ColumnSpacing = 12 };
@@ -77,6 +82,7 @@ public sealed partial class MinecraftPage
         var facts = new List<string>();
         if (i.Modded) facts.Add(I18n.T("mine.mods." + I18n.Plural(mods, "one", "few", "many"), ("n", mods)));
         facts.Add(i.LastPlayed is null ? I18n.T("mine.aside.never") : I18n.T("mine.aside.played", ("ago", Ui.Ago(i.LastPlayed))));
+        if (i.PlayMs > 0) facts.Add(Features.PlayTime.Format(i.PlayMs));
         if (i.Linked) facts.Add(McImport.SourceTitle(i.Source ?? ""));
 
         var play = Ui.Button(I18n.T("games.play"), () => Play(i), "primary", Icons.Play);
@@ -91,6 +97,12 @@ public sealed partial class MinecraftPage
         foot.Children.Add(buttons);
 
         var body = Ui.Col(12, top, Ui.Text(string.Join(" · ", facts), "small muted"), foot);
+        if (McModrinth.PackUpdate(i) is { } pv)
+            body.Children.Insert(2, new Border
+            {
+                Background = Ui.Res("BrandSoft"), CornerRadius = new CornerRadius(8), Padding = new Thickness(10, 5), HorizontalAlignment = HorizontalAlignment.Left,
+                Child = Ui.Row(6, Ui.Icon(Icons.ArrowUp, 13, Ui.Res("Brand2")), Ui.Text(I18n.T("mc94.pack.short", ("version", pv.Number)), "small", color: Ui.Res("Brand2"))),
+            });
         var card = new Border { Classes = { "card" }, Padding = new Thickness(16), Margin = new Thickness(0, 0, 14, 14), Child = body };
         if (active) { card.BorderBrush = Ui.Hex("#3FB950"); card.BorderThickness = new Thickness(1.5); }
         return Ctx.Attach(card, () => BuildMenu(i));
@@ -102,7 +114,10 @@ public sealed partial class MinecraftPage
         Ctx.Item(I18n.T("mine.tab.settings"), Icons.Sliders, () => { Mc.Active = i; Go("settings"); }),
         "-",
         Ctx.Item(I18n.T("mine.build.rename"), Icons.Edit, () => RenameDialog(i)),
+        Ctx.Item(I18n.T("mc94.icon.change"), Icons.Image, () => IconDialog(i)),
         Ctx.Item(I18n.T("mine.build.duplicate"), Icons.Copy, () => DuplicateDialog(i)),
+        Ctx.Item(I18n.T("mc94.export.title"), Icons.Upload, () => ExportDialog(i)),
+        McModrinth.PackUpdate(i) is { } pv ? Ctx.Item(I18n.T("mc94.pack.go") + " · " + pv.Number, Icons.ArrowUp, () => UpdatePack(i, pv)) : null,
         Ctx.Folder(I18n.T("games.openFolder"), i.Dir),
         "-",
         Ctx.Item(i.Linked ? I18n.T("mine.build.unlink") : I18n.T("mine.build.delete"), Icons.Trash, () => DeleteDialog(i)));

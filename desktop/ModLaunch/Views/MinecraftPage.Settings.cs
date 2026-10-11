@@ -17,8 +17,10 @@ public sealed partial class MinecraftPage
         var a = Mc.Active;
         if (a is not null)
         {
+            col.Children.Add(IconCard(a));
             col.Children.Add(VersionCard(a));
             col.Children.Add(MemoryCard(a));
+            col.Children.Add(WindowJavaCard(a));
         }
         col.Children.Add(LauncherCard());
         if (a is not null) col.Children.Add(DangerCard(a));
@@ -164,7 +166,7 @@ public sealed partial class MinecraftPage
         void Show() => memText.Text = I18n.T("mine.memory.value", ("gb", memory.Value.ToString("0.#", I18n.Culture)));
         Show();
         memory.PropertyChanged += (_, e) => { if (e.Property == RangeBase.ValueProperty) Show(); };
-        var args = new TextBox { Text = a.JavaArgs, Watermark = "-Dfile.encoding=UTF-8", Width = 560 };
+        var args = new TextBox { Text = a.JavaArgs, Watermark = "-Dfile.encoding=UTF-8", Width = 560, HorizontalAlignment = HorizontalAlignment.Left };
         var save = Ui.Button(I18n.T("common.save"), () =>
         {
             a.MemoryMb = (int)(memory.Value * 1024);

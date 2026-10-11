@@ -95,13 +95,10 @@ public static class McModrinth
         }
         var file = v.File ?? throw new InvalidOperationException(I18n.T("mr.noFile"));
         var dir = Directory.CreateDirectory(i.Folder(kind)).FullName;
-        var temp = await Http.Download(file.Url, file.Name, new Progress<double>(r => progress?.Report(new InstallStep("install.download", p.Title, Ratio: r))), ct: ct);
+        string temp;
+        try { temp = await Http.Download([file.Url], file.Name, new Progress<double>(r => progress?.Report(new InstallStep("install.download", p.Title, Ratio: r))), new Http.Hashes(Sha1: file.Sha1, Sha512: file.Sha512), ct); }
+        catch (Http.HashMismatchException) { throw new InvalidOperationException(I18n.T("mine.err.hash", ("file", file.Name))); }
         var sha1 = McContent.Sha1(temp);
-        if (file.Sha1 is { Length: > 0 } want && !want.Equals(sha1, StringComparison.OrdinalIgnoreCase))
-        {
-            try { File.Delete(temp); } catch { }
-            throw new InvalidOperationException(I18n.T("mine.err.hash", ("file", file.Name)));
-        }
         // Старая версия того же проекта — убираем, чтобы в папке не было двух копий.
         if (McContent.Find(i, kind, p.Id) is { } old && old.Key != file.Name)
             try { File.Delete(Path.Combine(dir, old.File)); } catch { }
@@ -152,7 +149,7 @@ public static class McModrinth
     }
 
     public sealed record PackIndex(string Name, string GameVersion, string Loader, string LoaderVersion, List<PackFile> Files);
-    public sealed record PackFile(string Path, string? Sha1, string[] Urls, long Size, bool Client);
+    public sealed record PackFile(string Path, string? Sha1, string[] Urls, long Size, bool Client, string? Sha512 = null);
 
     /// <summary>modrinth.index.json из .mrpack.</summary>
     public static PackIndex ReadIndex(string mrpack)
@@ -169,58 +166,154 @@ public static class McModrinth
             : ("vanilla", "");
         var files = (j["files"] as JsonArray ?? []).OfType<JsonNode>().Select(x => new PackFile(
             x.Str("path") ?? "", x["hashes"].Str("sha1"), Modrinth.Strs(x["downloads"]).ToArray(), x.Long("fileSize"),
-            x["env"].Str("client") != "unsupported")).Where(x => x.Path != "").ToList();
+            x["env"].Str("client") != "unsupported", x["hashes"].Str("sha512"))).Where(x => x.Path != "").ToList();
         return new PackIndex(j.Str("name") ?? Path.GetFileNameWithoutExtension(mrpack), deps.Str("minecraft") ?? "", loader, lv, files);
     }
 
-    /// <summary>Сборка из файла .mrpack: папка, файлы с проверкой SHA-1, overrides, загрузчик.</summary>
+    /// <summary>
+    /// Сборка из файла .mrpack: папка, файлы с проверкой SHA-1/SHA-512 (каждый — со всех зеркал по очереди,
+    /// до 8 сразу), overrides, загрузчик. Не вышло — недоделанная сборка убирается, а не остаётся сломанной.
+    /// </summary>
     public static async Task<McInstance> ImportPack(string mrpack, string? name, IProgress<InstallStep>? progress, CancellationToken ct)
     {
         var index = ReadIndex(mrpack);
         var i = Mc.Create(name ?? index.Name, index.GameVersion, index.Loader, index.LoaderVersion);
         i.Source = "mrpack";
         Mc.Save(i);
-        var root = Path.GetFullPath(i.Dir);
+        try
+        {
+            var root = Path.GetFullPath(i.Dir);
+            await DownloadPackFiles(root, index, progress, ct);
+            McContent.SetPackFiles(i, index.Files.Where(f => f.Client && f.Urls.Length > 0).Select(f => (f.Path, f.Sha1 ?? "")));
+            progress?.Report(new InstallStep("install.extract", index.Name));
+            ExtractOverrides(mrpack, root);
+            await McInstall.EnsureVersion(i, progress, ct);
+            McProfiles.Sync(i);
+            _ = McContent.Identify(i);
+            return i;
+        }
+        catch
+        {
+            // Недоделанную сборку не оставляем: в списке была бы сборка без половины модов.
+            Mc.Forget(i);
+            _ = Task.Run(() => { try { Directory.Delete(i.Dir, true); } catch { } });
+            throw;
+        }
+    }
+
+    /// <summary>Файлы модпака: каждый — со всех зеркал по очереди, с проверкой SHA-1/SHA-512, до 8 сразу; полоса — по байтам всего пака.
+    /// Уже лежащий файл с тем же SHA-1 не качается заново (обновление пака); выключенный человеком мод остаётся выключенным.</summary>
+    static async Task DownloadPackFiles(string root, PackIndex index, IProgress<InstallStep>? progress, CancellationToken ct)
+    {
         var files = index.Files.Where(f => f.Client && f.Urls.Length > 0).ToList();
+        var todo = new List<(PackFile File, string Target)>();
+        foreach (var f in files)
+        {
+            var target = Path.GetFullPath(Path.Combine(root, f.Path));
+            if (!target.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) continue;
+            var disabled = target + ".disabled";
+            var existing = File.Exists(target) ? target : File.Exists(disabled) ? disabled : null;
+            if (existing is not null && f.Sha1 is { Length: > 0 } sha && sha.Equals(McContent.Sha1(existing), StringComparison.OrdinalIgnoreCase)) continue;
+            todo.Add((f, existing == disabled ? disabled : target));
+        }
+        if (Jobs.CurrentJob is { } job) job.Planned = todo.Sum(t => Math.Max(0, t.File.Size));
         var done = 0;
-        using var gate = new SemaphoreSlim(6);
-        await Task.WhenAll(files.Select(async f =>
+        using var gate = new SemaphoreSlim(8);
+        try
         {
-            await gate.WaitAsync(ct);
-            try
+            await Task.WhenAll(todo.Select(async t =>
             {
-                var target = Path.GetFullPath(Path.Combine(root, f.Path));
-                if (!target.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) return;
+                await gate.WaitAsync(ct);
+                try
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(t.Target)!);
+                    var name = Path.GetFileName(t.File.Path);
+                    string temp;
+                    try { temp = await Http.Download(t.File.Urls, name, null, new Http.Hashes(Sha1: t.File.Sha1, Sha512: t.File.Sha512), ct); }
+                    catch (Http.HashMismatchException) { throw new InvalidOperationException(I18n.T("mine.err.hash", ("file", name))); }
+                    File.Move(temp, t.Target, true);
+                    var n = Interlocked.Increment(ref done);
+                    progress?.Report(new InstallStep("install.download", name, n, todo.Count, (double)n / todo.Count));
+                }
+                finally { gate.Release(); }
+            }));
+        }
+        finally { if (Jobs.CurrentJob is { } j) j.Planned = 0; }
+    }
+
+    /// <summary>overrides/ и client-overrides/ из .mrpack — поверх папки сборки (только внутрь неё).</summary>
+    static void ExtractOverrides(string mrpack, string root)
+    {
+        using var zip = ZipFile.OpenRead(mrpack);
+        foreach (var prefix in new[] { "overrides/", "client-overrides/" })
+        {
+            foreach (var e in zip.Entries.Where(e => e.FullName.StartsWith(prefix, StringComparison.Ordinal) && !e.FullName.EndsWith('/')))
+            {
+                var target = Path.GetFullPath(Path.Combine(root, e.FullName[prefix.Length..]));
+                if (!target.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) continue;
                 Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-                var temp = await Http.Download(f.Urls[0], Path.GetFileName(target), ct: ct);
-                if (f.Sha1 is { Length: > 0 } want && !want.Equals(McContent.Sha1(temp), StringComparison.OrdinalIgnoreCase))
-                {
-                    try { File.Delete(temp); } catch { }
-                    throw new InvalidOperationException(I18n.T("mine.err.hash", ("file", Path.GetFileName(target))));
-                }
-                File.Move(temp, target, true);
-                var n = Interlocked.Increment(ref done);
-                progress?.Report(new InstallStep("install.download", Path.GetFileName(target), n, files.Count, (double)n / files.Count));
-            }
-            finally { gate.Release(); }
-        }));
-        progress?.Report(new InstallStep("install.extract", index.Name));
-        using (var zip = ZipFile.OpenRead(mrpack))
-        {
-            foreach (var prefix in new[] { "overrides/", "client-overrides/" })
-            {
-                foreach (var e in zip.Entries.Where(e => e.FullName.StartsWith(prefix, StringComparison.Ordinal) && !e.FullName.EndsWith('/')))
-                {
-                    var target = Path.GetFullPath(Path.Combine(root, e.FullName[prefix.Length..]));
-                    if (!target.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) continue;
-                    Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-                    e.ExtractToFile(target, true);
-                }
+                e.ExtractToFile(target, true);
             }
         }
-        await McInstall.EnsureVersion(i, progress, ct);
-        McProfiles.Sync(i);
-        _ = McContent.Identify(i);
-        return i;
+    }
+
+    // ---------------------------------------------------------------- обновление модпака
+
+    static readonly Dictionary<string, MrVersion> PackUpdates = [];
+
+    /// <summary>Найденное обновление модпака сборки (после CheckPack).</summary>
+    public static MrVersion? PackUpdate(McInstance i) { lock (PackUpdates) return PackUpdates.TryGetValue(i.Id, out var v) ? v : null; }
+
+    /// <summary>Есть ли у модпака версия новее той, что стоит (свежий релиз проекта).</summary>
+    public static async Task<MrVersion?> CheckPack(McInstance i, CancellationToken ct = default)
+    {
+        if (i.PackProject is null || i.PackVersion is null) return null;
+        if (Program.Demo) return null;
+        var versions = await Versions(i.PackProject, "modpack", null, ct);
+        var latest = versions.FirstOrDefault(v => v.Type == "release") ?? versions.FirstOrDefault();
+        var current = versions.FirstOrDefault(v => v.Id == i.PackVersion);
+        var newer = latest is not null && latest.Id != i.PackVersion && (current?.Published is null || latest.Published > current.Published) ? latest : null;
+        lock (PackUpdates) { if (newer is null) PackUpdates.Remove(i.Id); else PackUpdates[i.Id] = newer; }
+        return newer;
+    }
+
+    /// <summary>
+    /// Обновить модпак на месте, как Modrinth App: файлы старой версии пака, которых нет в новой, — убрать;
+    /// новые и изменившиеся — скачать; overrides — поверх; версия игры и загрузчик — из нового пака.
+    /// Миры, скриншоты и моды, которые человек добавил сам, не трогаются.
+    /// </summary>
+    public static async Task UpdatePack(McInstance i, MrVersion v, IProgress<InstallStep>? progress, CancellationToken ct)
+    {
+        var file = v.File ?? throw new InvalidOperationException(I18n.T("mr.noFile"));
+        progress?.Report(new InstallStep("install.download", i.Name));
+        var mrpack = await Http.Download([file.Url], file.Name, new Progress<double>(r => progress?.Report(new InstallStep("install.download", i.Name, Ratio: r))),
+            new Http.Hashes(Sha1: file.Sha1, Sha512: file.Sha512), ct);
+        try
+        {
+            var index = ReadIndex(mrpack);
+            var root = Path.GetFullPath(i.Dir);
+            var fresh = index.Files.Where(f => f.Client && f.Urls.Length > 0).Select(f => f.Path.Replace('\\', '/')).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach (var old in McContent.PackFiles(i).Keys.Where(p => !fresh.Contains(p)))
+            {
+                var target = Path.GetFullPath(Path.Combine(root, old));
+                if (!target.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) continue;
+                try { File.Delete(target); } catch { }
+                try { File.Delete(target + ".disabled"); } catch { }
+            }
+            await DownloadPackFiles(root, index, progress, ct);
+            progress?.Report(new InstallStep("install.extract", index.Name));
+            ExtractOverrides(mrpack, root);
+            i.GameVersion = index.GameVersion;
+            i.Loader = index.Loader;
+            i.LoaderVersion = index.LoaderVersion;
+            i.PackVersion = v.Id;
+            Mc.Save(i);
+            McContent.SetPackFiles(i, index.Files.Where(f => f.Client && f.Urls.Length > 0).Select(f => (f.Path, f.Sha1 ?? "")));
+            await McInstall.EnsureVersion(i, progress, ct);
+            McProfiles.Sync(i);
+            lock (PackUpdates) PackUpdates.Remove(i.Id);
+            _ = McContent.Identify(i);
+        }
+        finally { try { File.Delete(mrpack); } catch { } }
     }
 }

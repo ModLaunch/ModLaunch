@@ -79,6 +79,7 @@ public sealed class FriendsDock : Panel
     {
         _open = open ?? !_open;
         _panel.IsVisible = _open;
+        if (!_open) Render();
         if (_open)
         {
             Animate.Pop(_panel);
@@ -89,9 +90,13 @@ public sealed class FriendsDock : Panel
 
     public void Render()
     {
-        IsVisible = Settings.Data.Bool("friendsDock", true);
         var view = Friends.View();
         var online = view.Friends.Where(f => f.State != "offline").ToList();
+        // 9.4: кнопка в углу — только когда есть что показать (кто-то в сети, заявка) или панель открыта.
+        // Иначе она лежала поверх страниц и закрывала кнопки; «Друзья» есть на боковой панели.
+        var railHasFriends = !Settings.Data.Bool("railHidden") && Settings.Data.Bool("railFriends", true);
+        var worth = view.SignedIn && (online.Count > 0 || view.Incoming.Count > 0);
+        IsVisible = Settings.Data.Bool("friendsDock", true) && (_open || worth || !railHasFriends);
         var faces = new Panel { Width = Math.Max(1, Math.Min(3, online.Count)) * 16 + 10, Height = 26 };
         for (var i = 0; i < Math.Min(3, online.Count); i++)
         {

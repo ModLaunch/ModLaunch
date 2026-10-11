@@ -126,14 +126,14 @@ public sealed class ControlPanelPage : Page
 
     public override void Build()
     {
-        var col = new StackPanel { Spacing = 22, Margin = new Thickness(40, 26, 40, 40), MaxWidth = 1640 };
+        var col = StoreKit.Fit(new StackPanel { Spacing = 22, Margin = new Thickness(40, 26, 40, 40), MaxWidth = 1640 });
 
         // Приветствие и сводка.
         var hour = DateTime.Now.Hour;
         var hello = I18n.T(hour < 6 ? "cp.hi.night" : hour < 12 ? "cp.hi.morning" : hour < 18 ? "cp.hi.day" : "cp.hi.evening",
             ("name", Social.Account.Get().Name ?? "")).TrimEnd(' ', ',');
         var found = AppState.Games.Where(g => g.Status == Detect.Found).ToList();
-        var mods = found.Sum(g => g.Registry?.List().Count ?? 0);
+        var mods = found.Sum(g => g.ModCount);
         var played = AppState.Games.Sum(g => PlayTime.Get(g.Def.Id).TotalMs);
         var head = new DockPanel();
         var edit = Ui.Button(_editing ? I18n.T("cp.done") : I18n.T("cp.customize"), () => { _editing = !_editing; Build(); }, _editing ? "primary" : "ghost", _editing ? Icons.Check : Icons.Edit);
@@ -146,7 +146,7 @@ public sealed class ControlPanelPage : Page
         var stats = new UniformGrid { Columns = 5 };
         stats.Children.Add(Stat(Icons.Gamepad, I18n.T("cp.s.games"), found.Count.ToString(I18n.Culture), () => W.Navigate(() => new LibraryPage())));
         stats.Children.Add(Stat(Icons.Package, I18n.T("cp.s.mods"), mods.ToString(I18n.Culture), () => W.Navigate(() => new ModsCenterPage())));
-        stats.Children.Add(Stat(Icons.ArrowUp, I18n.T("cp.s.updates"), _checking ? "…" : _updates < 0 ? "?" : _updates.ToString(I18n.Culture), CheckUpdates,
+        stats.Children.Add(Stat(Icons.ArrowUp, I18n.T("cp.s.updates"), _checking ? "…" : _updates < 0 ? "—" : _updates.ToString(I18n.Culture), CheckUpdates,
             _updates > 0 ? Ui.Res("Warn") : null));
         stats.Children.Add(Stat(Icons.Clock, I18n.T("cp.s.played"), PlayTime.Format(played), null));
         stats.Children.Add(Stat(Icons.Cube, I18n.T("cp.s.minecraft"), Minecraft.Mc.Instances().Count.ToString(I18n.Culture), () => W.Navigate(() => new MinecraftPage("builds"))));
@@ -180,7 +180,7 @@ public sealed class ControlPanelPage : Page
                 DockPanel.SetDock(buttons, Dock.Right);
                 line.Children.Add(buttons);
                 var info = Ui.Col(2, Ui.Text(g.Def.Name, "h3"),
-                    Ui.Text(I18n.T("cp.gameLine", ("mods", g.Registry?.List().Count ?? 0), ("time", PlayTime.Format(p.TotalMs)), ("last", p.LastPlayed is null ? "—" : Ui.Ago(p.LastPlayed))), "small muted"));
+                    Ui.Text(I18n.T("cp.gameLine", ("mods", g.ModCount), ("time", PlayTime.Format(p.TotalMs)), ("last", p.LastPlayed is null ? "—" : Ui.Ago(p.LastPlayed))), "small muted"));
                 info.VerticalAlignment = VerticalAlignment.Center;
                 line.Children.Add(Ui.Row(12, new Border { Width = 92, Height = 43, CornerRadius = new CornerRadius(8), ClipToBounds = true, Child = Ui.GameImage(g.Def, 200) }, info));
                 var card = Ui.Card(line, 10);

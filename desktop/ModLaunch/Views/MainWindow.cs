@@ -201,6 +201,8 @@ public sealed partial class MainWindow : Window
         // Где нажали в последний раз — отсюда «вырастает» страница мода.
         AddHandler(PointerPressedEvent, (_, e) => _lastPress = e.GetPosition(this), Avalonia.Interactivity.RoutingStrategies.Tunnel, handledEventsToo: true);
         Images.Prewarm(AppState.Games.Select(g => g.Def));
+        // 9.4: официальные картинки Minecraft — в фоне; как скачаются, перерисовать рамку и страницу.
+        OfficialArt.Refresh(() => Avalonia.Threading.Dispatcher.UIThread.Post(() => { RenderRail(); _current?.Build(); }));
         Navigate(StartPage());
         WhatsNew.MaybeShow();
         RenderRail();
@@ -419,6 +421,7 @@ public sealed partial class MainWindow : Window
         Settings.Data["railHidden"] = !Settings.Data.Bool("railHidden");
         Settings.Save();
         ApplyScale();
+        _friendsDock?.Render();
     }
 
     // ---------------------------------------------------------------- значок в трее

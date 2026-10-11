@@ -30,6 +30,21 @@ public static class StoreKit
         Spacing = spacing, Margin = new Thickness(Gutter, top, Gutter, 40), MaxWidth = MaxWidth, HorizontalAlignment = HorizontalAlignment.Stretch,
     };
 
+    /// <summary>
+    /// 9.4: одна сетка для всех страниц — те же поля слева и справа, что у «Главной» и библиотеки,
+    /// и ширина до MaxWidth (на большом мониторе страница не стоит узкой полосой посередине).
+    /// Для страниц со старой разметкой: поля и ширина подменяются в стиле Store.
+    /// </summary>
+    public static T Fit<T>(T page, double maxWidth = MaxWidth) where T : Layoutable
+    {
+        if (!Look.Store) return page;
+        var top = page.Margin.Top;
+        page.Margin = new Thickness(Gutter, top, Gutter, 40);
+        page.MaxWidth = maxWidth;
+        page.HorizontalAlignment = HorizontalAlignment.Stretch;
+        return page;
+    }
+
     public static IBrush White => Brushes.White;
 
     /// <summary>«Ваши игры ›» — заголовок раздела; со ссылкой — весь заголовок кликабельный.</summary>

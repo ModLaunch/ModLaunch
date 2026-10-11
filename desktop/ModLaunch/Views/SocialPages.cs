@@ -37,7 +37,7 @@ public sealed class FriendsPage : Page
 
     public override void Build()
     {
-        var col = new StackPanel { Spacing = 16, Margin = new Thickness(34, 26, 34, 34), MaxWidth = 900 };
+        var col = StoreKit.Fit(new StackPanel { Spacing = 16, Margin = new Thickness(34, 26, 34, 34), MaxWidth = 900 }, 1700);
         col.Children.Add(Ui.Text(I18n.T("friends.title"), "h1"));
         var view = Friends.View();
         if (!view.Configured) col.Children.Add(Ui.Card(Ui.Text(I18n.T("err.friendsOff"), "muted"), 22));
@@ -177,7 +177,7 @@ public sealed class StatsPage : Page
 
     public override void Build()
     {
-        var col = new StackPanel { Spacing = 16, Margin = new Thickness(34, 26, 34, 34), MaxWidth = 1000 };
+        var col = StoreKit.Fit(new StackPanel { Spacing = 16, Margin = new Thickness(34, 26, 34, 34), MaxWidth = 1000 }, 1700);
         var head = new DockPanel();
         var refresh = Ui.Button(I18n.T("stats.refresh"), () => _ = Load(), "", Icons.Refresh);
         DockPanel.SetDock(refresh, Dock.Right);

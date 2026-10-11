@@ -16,6 +16,7 @@ public partial class App : Application
         Guard.Install();
         I18n.Set(Settings.Language);
         Look.Apply();
+        Http.ApplySettings();
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             // Программа выходит, когда закрыто главное окно, — даже если где-то осталось

@@ -45,6 +45,25 @@ public static partial class McContent
 
     static JsonObject FilesOf(McInstance i) => Meta(i).Data.Obj("files");
 
+    /// <summary>9.4: какие файлы положил модпак (путь → sha1) — при обновлении пака старые убираются, свои файлы человека остаются.</summary>
+    public static Dictionary<string, string> PackFiles(McInstance i)
+    {
+        lock (Gate)
+            return Meta(i).Data.Obj("packFiles").Select(kv => (kv.Key, Hash: kv.Value is System.Text.Json.Nodes.JsonValue v && v.TryGetValue<string>(out var h) ? h : ""))
+                .ToDictionary(x => x.Key, x => x.Hash, StringComparer.OrdinalIgnoreCase);
+    }
+
+    public static void SetPackFiles(McInstance i, IEnumerable<(string Path, string Sha1)> files)
+    {
+        lock (Gate)
+        {
+            var o = new JsonObject();
+            foreach (var (path, sha1) in files) o[path.Replace('\\', '/')] = sha1;
+            Meta(i).Data["packFiles"] = o;
+            try { Meta(i).Save(); } catch { }
+        }
+    }
+
     /// <summary>Ключ записи: «mods/sodium.jar».</summary>
     static string RecordKey(string kind, string key) => Mc.KindFolder(kind) + "/" + key;
 

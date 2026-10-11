@@ -63,6 +63,17 @@ public static class JsonExt
         return 0;
     }
 
+    public static double Double(this JsonNode? node, string key)
+    {
+        if (node is not JsonObject o || !o.TryGetPropertyValue(key, out var v) || v is not JsonValue jv) return 0;
+        if (jv.TryGetValue<double>(out var d)) return d;
+        if (jv.TryGetValue<long>(out var l)) return l;
+        if (jv.TryGetValue<int>(out var i)) return i;
+        if (jv.TryGetValue<decimal>(out var m)) return (double)m;
+        if (jv.TryGetValue<string>(out var s) && double.TryParse(s, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out d)) return d;
+        return 0;
+    }
+
     public static bool Bool(this JsonNode? node, string key, bool fallback = false) =>
         node is JsonObject o && o.TryGetPropertyValue(key, out var v) && v is JsonValue jv && jv.TryGetValue<bool>(out var b) ? b : fallback;
 

@@ -52,6 +52,18 @@ public static class McLaunch
                     if (FindGame(since) is { } game)
                     {
                         Features.Launcher.Track(Mc.Def!, game);
+                        // 9.4: время в игре — и у самой сборки.
+                        var started = DateTime.Now;
+                        try { await game.WaitForExitAsync(); } catch { return; }
+                        var played = (long)(DateTime.Now - started).TotalMilliseconds;
+                        if (played > 0)
+                            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                            {
+                                if (Mc.Get(i.Id) is not { } fresh) return;
+                                fresh.PlayMs += played;
+                                Mc.Save(fresh);
+                                Mc.Notify();
+                            });
                         return;
                     }
                 }

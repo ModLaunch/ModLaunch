@@ -20,6 +20,7 @@ public sealed partial class MinecraftPage
         if (a is null) return NoBuildView();
         var col = new StackPanel { Spacing = 14 };
 
+        if (PackUpdateBanner(a) is { } pack) col.Children.Add(pack);
         var updates = McContent.Updates(a);
         if (updates.Count > 0) col.Children.Add(UpdatesBanner(a, updates));
 

@@ -162,13 +162,15 @@ public sealed partial class SettingsPage : Page
         var current = Groups.SelectMany(g => g.Items).FirstOrDefault(i => i.Id == _tab);
         if (current.Id is null) current = Groups[0].Items[0];
         var title = new TextBlock { Text = I18n.T(current.Key), FontSize = 30, FontWeight = FontWeight.Bold };
-        var titleWords = Ui.Col(4, title, Ui.Text(I18n.T("set.d." + current.Id + ".long"), "muted", wrap: true));
+        // Раздел — строкой над заголовком («Система»), а не одиноким словом в углу.
+        var crumbs = new TextBlock
+        {
+            Text = I18n.T(Groups.First(g => g.Items.Any(i => i.Id == current.Id)).Group).ToUpper(I18n.Culture),
+            FontSize = 11, FontWeight = FontWeight.Bold, LetterSpacing = 1.1, Foreground = Ui.Res("Faint"),
+        };
+        var titleWords = Ui.Col(2, crumbs, title, Ui.Text(I18n.T("set.d." + current.Id + ".long"), "muted", wrap: true));
         titleWords.VerticalAlignment = VerticalAlignment.Center;
         var pageHead = new DockPanel { Margin = new Thickness(0, 0, 0, 6) };
-        var crumbs = Ui.Text(I18n.T(Groups.First(g => g.Items.Any(i => i.Id == current.Id)).Group), "small muted");
-        crumbs.VerticalAlignment = VerticalAlignment.Top;
-        DockPanel.SetDock(crumbs, Dock.Right);
-        pageHead.Children.Add(crumbs);
         pageHead.Children.Add(Ui.Row(16, Badge(current.Icon, current.Color, 56), titleWords));
 
         var right = new StackPanel { Spacing = 18, Margin = new Thickness(24, 26, 34, 34), MaxWidth = 1500 };
@@ -412,7 +414,7 @@ public sealed partial class SettingsPage : Page
         col.Children.Add(Section(I18n.T("look.chrome"), I18n.T("look.chrome.hint"),
             Toggle(I18n.T("look.brand"), I18n.T("look.brand.hint"), Settings.Data.Bool("showBrand", true), v => { Settings.Data["showBrand"] = v; Chrome(); }),
             Toggle(I18n.T("look.rail"), I18n.T("look.rail.hint"), !Settings.Data.Bool("railHidden"), v => { Settings.Data["railHidden"] = !v; Chrome(); }),
-            Toggle(I18n.T("look.railFriends"), I18n.T("look.railFriends.hint"), Settings.Data.Bool("railFriends", true), v => { Settings.Data["railFriends"] = v; Chrome(); }),
+            Toggle(I18n.T("look.railFriends"), I18n.T("look.railFriends.hint"), Settings.Data.Bool("railFriends", true), v => { Settings.Data["railFriends"] = v; Chrome(); MainWindow.Current?.RefreshFriendsDock(); }),
             Toggle(I18n.T("v93.set.railSections"), I18n.T("v93.set.railSections.hint"), Settings.Data.Bool("railGamesMods"), v => { Settings.Data["railGamesMods"] = v; Chrome(); })));
 
         // «Перемешать плитки» — только у главной «Витрины» (у Store плитки стоят ровной сеткой).
@@ -423,6 +425,7 @@ public sealed partial class SettingsPage : Page
             Toggle(I18n.T("v91.set.fx"), I18n.T("v91.set.fx.hint"), Settings.Data.Bool("installFx", true), v => Settings.Data["installFx"] = v),
             Toggle(I18n.T("v92.set.openfx"), I18n.T("v92.set.openfx.hint"), Settings.Data.Bool("modOpenFx", true), v => Settings.Data["modOpenFx"] = v),
             Toggle(I18n.T("v93.set.gamefx"), I18n.T("v93.set.gamefx.hint"), Settings.Data.Bool("gameOpenFx", true), v => Settings.Data["gameOpenFx"] = v),
+            Toggle(I18n.T("v94.set.officialArt"), I18n.T("v94.set.officialArt.hint"), Settings.Data.Bool("officialArt", true), v => { Settings.Data["officialArt"] = v; if (v) OfficialArt.Refresh(); }),
             Toggle(I18n.T("v4.continue"), I18n.T("v4.continue.text"), Settings.Data.Bool("homeContinue", true), v => Settings.Data["homeContinue"] = v),
             Toggle(I18n.T("home.favorites"), I18n.T("home.favorites.text"), Settings.Data.Bool("homeFavorites", true), v => Settings.Data["homeFavorites"] = v),
             Toggle(I18n.T("look.home.popular"), I18n.T("look.home.popular.hint"), Settings.Data.Bool("homePopular", true), v => Settings.Data["homePopular"] = v),
@@ -552,7 +555,7 @@ public sealed partial class SettingsPage : Page
             ("games", ["settings.games", "games.deep"]),
             ("launch", ["settings.tab.launch", "ov.title", "launch.args", "launch.time"]),
             ("backups", ["settings.tab.backups", "bak.keep"]),
-            ("downloads", ["v4.archive", "dl.parallel"]),
+            ("downloads", ["v4.archive", "dl.parallel", "dl.pieces", "dl.limit"]),
             ("graphics", ["settings.tab.graphics"]),
             ("updates", ["settings.tab.updates", "upd.auto", "upd.beforePlay"]),
             ("accounts", ["settings.tab.accounts", "acc.title"]),
@@ -756,7 +759,42 @@ public sealed partial class SettingsPage : Page
         DockPanel.SetDock(parallel, Dock.Right);
         parallelRow.Children.Add(parallel);
         parallelRow.Children.Add(Ui.Col(2, Ui.Text(I18n.T("dl.parallel"), "h3"), Ui.Text(I18n.T("dl.parallel.hint"), "small muted", wrap: true)));
-        return Ui.Col(16, Section(I18n.T("dl.title"), null, parallelRow), Section(I18n.T("v4.archive"), I18n.T("v4.archive.hint"),
+
+        // 9.4: большие файлы — в несколько потоков; общий предел скорости.
+        var pieces = new ComboBox { Width = 140, VerticalAlignment = VerticalAlignment.Center };
+        int[] pieceValues = [1, 2, 4, 6, 8];
+        foreach (var v in pieceValues) pieces.Items.Add(v == 1 ? I18n.T("dl.pieces.off") : v.ToString(I18n.Culture));
+        pieces.SelectedIndex = Math.Max(0, Array.IndexOf(pieceValues, Http.Segments));
+        pieces.SelectionChanged += (_, _) =>
+        {
+            if (pieces.SelectedIndex < 0) return;
+            Settings.Data["dlSegments"] = pieceValues[pieces.SelectedIndex];
+            Settings.Save();
+            Http.ApplySettings();
+        };
+        var piecesRow = new DockPanel();
+        DockPanel.SetDock(pieces, Dock.Right);
+        piecesRow.Children.Add(pieces);
+        piecesRow.Children.Add(Ui.Col(2, Ui.Text(I18n.T("dl.pieces"), "h3"), Ui.Text(I18n.T("dl.pieces.hint"), "small muted", wrap: true)));
+
+        var speed = new ComboBox { Width = 140, VerticalAlignment = VerticalAlignment.Center };
+        double[] speedValues = [0, 1, 2, 5, 10, 20, 50];
+        foreach (var v in speedValues) speed.Items.Add(v == 0 ? I18n.T("dl.limit.none") : I18n.T("dl.limit.mb", ("n", v.ToString("0", I18n.Culture))));
+        var current = Settings.Data.Double("dlLimitMb");
+        speed.SelectedIndex = Math.Max(0, Array.FindIndex(speedValues, v => Math.Abs(v - current) < 0.01));
+        speed.SelectionChanged += (_, _) =>
+        {
+            if (speed.SelectedIndex < 0) return;
+            Settings.Data["dlLimitMb"] = speedValues[speed.SelectedIndex];
+            Settings.Save();
+            Http.ApplySettings();
+        };
+        var speedRow = new DockPanel();
+        DockPanel.SetDock(speed, Dock.Right);
+        speedRow.Children.Add(speed);
+        speedRow.Children.Add(Ui.Col(2, Ui.Text(I18n.T("dl.limit"), "h3"), Ui.Text(I18n.T("dl.limit.hint"), "small muted", wrap: true)));
+
+        return Ui.Col(16, Section(I18n.T("dl.title"), I18n.T("dl.section.hint"), parallelRow, piecesRow, speedRow), Section(I18n.T("v4.archive"), null,
             Toggle(I18n.T("v4.archive.keep"), I18n.T("v4.archive.hint"), DownloadArchive.Keep, v => Settings.Data["keepArchives"] = v),
             limitRow,
             Ui.Text(I18n.T("v4.archive.size", ("n", count), ("size", GamePage.Size(bytes))), "muted"),

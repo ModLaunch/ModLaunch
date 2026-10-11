@@ -120,8 +120,13 @@ public static class McInstall
         if (FindJava(min) is { } found) return found;
         var want = min <= 21 ? 21 : 25;
         progress?.Report(new InstallStep("loader.download", $"Java {want}"));
-        var url = $"https://api.adoptium.net/v3/binary/latest/{want}/ga/windows/x64/jre/hotspot/normal/eclipse";
-        var zip = await Http.Download(url, $"temurin-{want}-jre.zip", new Progress<double>(r => progress?.Report(new InstallStep("loader.download", $"Java {want}", Ratio: r))), ct: ct);
+        // Eclipse Temurin (JRE), а если Adoptium недоступен — сборка OpenJDK от Microsoft.
+        string[] urls =
+        [
+            $"https://api.adoptium.net/v3/binary/latest/{want}/ga/windows/x64/jre/hotspot/normal/eclipse",
+            $"https://aka.ms/download-jdk/microsoft-jdk-{want}-windows-x64.zip",
+        ];
+        var zip = await Http.Download(urls, $"java-{want}-windows.zip", new Progress<double>(r => progress?.Report(new InstallStep("loader.download", $"Java {want}", Ratio: r))), null, ct);
         var target = Path.Combine(Paths.DataDir, "java", $"temurin-{want}");
         if (Directory.Exists(target)) Directory.Delete(target, true);
         progress?.Report(new InstallStep("loader.unpack", $"Java {want}"));
@@ -220,7 +225,12 @@ public static class McProfiles
         profile["lastVersionId"] = i.VersionId;
         profile["gameDir"] = i.Dir;
         profile["javaArgs"] = JavaArgs(i);
-        profile["icon"] = Icon;
+        // 9.4: у установки в лаунчере — та же картинка, что у сборки в ModLaunch.
+        profile["icon"] = McIcons.DataUrl(i) ?? Icon;
+        if (i.Width > 0 && i.Height > 0) profile["resolution"] = new JsonObject { ["width"] = i.Width, ["height"] = i.Height };
+        else profile.Remove("resolution");
+        if (i.JavaPath != "" && File.Exists(i.JavaPath)) profile["javaDir"] = i.JavaPath;
+        else profile.Remove("javaDir");
         if (played || profile["lastUsed"] is null) profile["lastUsed"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
         profiles[key] = profile;
         var tmp = file + ".modlaunch.tmp";

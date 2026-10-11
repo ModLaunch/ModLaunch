@@ -113,7 +113,7 @@ public sealed partial class CreatorPage : Page
 
     public override void Build()
     {
-        var content = new StackPanel { Spacing = 22, Margin = new Thickness(40, 24, 40, 40), MaxWidth = 1640 };
+        var content = StoreKit.Fit(new StackPanel { Spacing = 22, Margin = new Thickness(40, 24, 40, 40), MaxWidth = 1640 });
 
         // Шапка: логотип и название; на «Главной» крупно, на вкладках — компактно (эскиз: «Creator Hub» сверху).
         var home = _tab == "home";

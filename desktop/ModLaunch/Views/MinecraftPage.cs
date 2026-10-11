@@ -23,7 +23,7 @@ public sealed partial class MinecraftPage : Page
         _tab = tab switch
         {
             "" or "installed" => Mc.Active is null ? "builds" : "mods",
-            "catalog" or "mods" or "builds" or "settings" or "worlds" or "shots" or "log" => tab,
+            "catalog" or "mods" or "builds" or "settings" or "worlds" or "servers" or "shots" or "log" => tab,
             "saves" => "worlds",
             "config" or "tools" => "settings",
             "profiles" => "builds",
@@ -57,6 +57,7 @@ public sealed partial class MinecraftPage : Page
         "builds" => I18n.T("mine.tab.builds"),
         "settings" => I18n.T("mine.tab.settings"),
         "worlds" => I18n.T("mine.tab.worlds"),
+        "servers" => I18n.T("mc94.servers.title"),
         "shots" => I18n.T("shots.tab"),
         "log" => I18n.T("games.log"),
         _ => I18n.T("mine.tab.mods"),
@@ -84,7 +85,7 @@ public sealed partial class MinecraftPage : Page
 
     public override void Build()
     {
-        var content = new StackPanel { Spacing = 24, Margin = new Thickness(40, 26, 40, 40), MaxWidth = 1640 };
+        var content = StoreKit.Fit(new StackPanel { Spacing = 24, Margin = new Thickness(40, 26, 40, 40), MaxWidth = 1640 });
         content.Children.Add(Header());
         if (G.Status == Detect.Found)
         {
@@ -95,6 +96,7 @@ public sealed partial class MinecraftPage : Page
                 "builds" => BuildsView(),
                 "settings" => SettingsView(),
                 "worlds" => WorldsView(),
+                "servers" => ServersView(),
                 "shots" => ShotsView(),
                 "log" => LogView(),
                 _ => ContentView(),
@@ -200,7 +202,7 @@ public sealed partial class MinecraftPage : Page
             new TextBlock { Text = a?.Name ?? I18n.T("mine.build.none"), FontWeight = FontWeight.SemiBold, MaxWidth = 210, TextTrimming = TextTrimming.CharacterEllipsis },
             Ui.Text(a?.Label ?? I18n.T("mine.build.create"), "tiny muted"));
         words.VerticalAlignment = VerticalAlignment.Center;
-        var button = new Button { Classes = { "glass" }, Padding = new Thickness(10, 7, 12, 7), Content = Ui.Row(10, LoaderBadge(a?.Loader ?? "vanilla", 32), words, Ui.Icon(Icons.ChevronDown, 14)) };
+        var button = new Button { Classes = { "glass" }, Padding = new Thickness(10, 7, 12, 7), Content = Ui.Row(10, a is null ? LoaderBadge("vanilla", 32) : InstanceIcon(a, 32, 9), words, Ui.Icon(Icons.ChevronDown, 14)) };
         button.Click += (_, _) =>
         {
             var items = Mc.Instances().Select(i => (object?)Ctx.Item((i.Id == a?.Id ? "✓  " : "") + i.Name + "  ·  " + i.Label, LoaderIcon(i.Loader), () => { Mc.Active = i; Mc.Notify(); })).ToList();
@@ -294,6 +296,7 @@ public sealed partial class MinecraftPage : Page
         var extra = new List<(string Id, string Text, string Icon)>
         {
             ("worlds", I18n.T("mine.tab.worlds"), Icons.Globe),
+            ("servers", I18n.T("mc94.servers.title"), Icons.Users),
             ("shots", I18n.T("shots.tab"), Icons.Image),
             ("log", I18n.T("games.log"), Icons.Alert),
         };
@@ -363,10 +366,13 @@ public sealed partial class MinecraftPage : Page
         var col = Ui.Col(14,
             Ui.Text(I18n.T("mine.notFound.title"), "h2"),
             Ui.Text(I18n.T("mine.notFound.text"), "muted", wrap: true),
+            // 9.4: лаунчер ставится прямо отсюда — официальный установщик Mojang; или через Microsoft Store.
             Ui.Row(10,
-                Ui.Button(I18n.T("mine.notFound.download"), () => Ui.OpenUrl("https://www.minecraft.net/download"), "primary", Icons.Download),
+                Ui.Button(I18n.T("get.mcLauncher"), () => { Features.GetGame.InstallMinecraftLauncher(); W.OpenDownloads(); }, "primary", Icons.Download),
+                Ui.Button(I18n.T("get.msStore"), () => Ui.OpenUrl(Features.GetGame.LauncherStore), "", Icons.External),
                 Ui.Button(I18n.T("games.detectAgain"), () => _ = AppState.DetectOne(G), "", Icons.Refresh),
-                Ui.Button(I18n.T("games.setPath"), () => Actions.PickGameFolder(G), "ghost", Icons.Folder)));
+                Ui.Button(I18n.T("games.setPath"), () => Actions.PickGameFolder(G), "ghost", Icons.Folder)),
+            Ui.Text(I18n.T("get.mcLauncher.hint"), "small muted", wrap: true));
         return Ui.Card(col, 26);
     }
 
@@ -439,6 +445,8 @@ public sealed partial class MinecraftPage : Page
             {
                 await McContent.Identify(a);
                 await McContent.CheckUpdates(a);
+                // 9.4: вышла ли новая версия модпака, из которого сделана сборка.
+                try { await McModrinth.CheckPack(a); } catch { }
             });
         }
         catch { }
@@ -453,7 +461,7 @@ public sealed partial class MinecraftPage : Page
         if (a is null) return null;
         var col = Ui.Col(18);
         col.Children.Add(Ui.Col(10,
-            Ui.Row(10, LoaderBadge(a.Loader, 40), Ui.Col(2, Ui.Text(a.Name, "h3"), Ui.Text(a.Label, "small muted"))),
+            Ui.Row(10, InstanceIcon(a, 44, 12), Ui.Col(2, Ui.Text(a.Name, "h3"), Ui.Text(a.Label, "small muted"))),
             Ui.Text(a.Linked ? I18n.T("mine.aside.linked", ("source", McImport.SourceTitle(a.Source ?? ""))) : I18n.T("mine.aside.own"), "small muted", wrap: true)));
         var stats = new Grid { ColumnDefinitions = new ColumnDefinitions("*,*"), RowDefinitions = new RowDefinitions("Auto,Auto"), ColumnSpacing = 10, RowSpacing = 10 };
         var cells = new[]
@@ -473,7 +481,8 @@ public sealed partial class MinecraftPage : Page
         col.Children.Add(stats);
         col.Children.Add(Ui.Col(6,
             Ui.Text(I18n.T("mine.aside.memory", ("gb", (a.MemoryMb / 1024.0).ToString("0.#", I18n.Culture))), "small"),
-            Ui.Text(a.LastPlayed is null ? I18n.T("mine.aside.never") : I18n.T("mine.aside.played", ("ago", Ui.Ago(a.LastPlayed))), "small muted")));
+            Ui.Text(a.LastPlayed is null ? I18n.T("mine.aside.never") : I18n.T("mine.aside.played", ("ago", Ui.Ago(a.LastPlayed))), "small muted"),
+            a.PlayMs > 0 ? Ui.Text(I18n.T("time.total", ("time", Features.PlayTime.Format(a.PlayMs))), "small muted") : new Control()));
         col.Children.Add(Ui.Col(8,
             Ui.Button(I18n.T("games.openFolder"), () => Actions.OpenFolder(a.Dir), "", Icons.Folder),
             Ui.Button(I18n.T("mine.tab.catalog"), () => Go("catalog"), "", Icons.Bag)));

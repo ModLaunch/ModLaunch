@@ -189,7 +189,11 @@ public static partial class Nexus
         $"https://www.nexusmods.com/{domain}/mods/{modId}?tab=files&file_id={fileId}";
 
     /// <summary>Прямая ссылка на файл — только для Premium (или со ссылкой nxm с ключом).</summary>
-    public static async Task<string> DownloadLink(string domain, string modId, long fileId, string apiKey, string? key = null, string? expires = null, CancellationToken ct = default)
+    public static async Task<string> DownloadLink(string domain, string modId, long fileId, string apiKey, string? key = null, string? expires = null, CancellationToken ct = default) =>
+        (await DownloadLinks(domain, modId, fileId, apiKey, key, expires, ct))[0];
+
+    /// <summary>9.4: все зеркала Nexus для файла (CDN и серверы в разных странах) — загрузчик пробует их по очереди.</summary>
+    public static async Task<List<string>> DownloadLinks(string domain, string modId, long fileId, string apiKey, string? key = null, string? expires = null, CancellationToken ct = default)
     {
         var url = $"{V1}/games/{domain}/mods/{modId}/files/{fileId}/download_link.json";
         if (key is not null) url += $"?key={Uri.EscapeDataString(key)}&expires={Uri.EscapeDataString(expires ?? "")}";
@@ -199,7 +203,8 @@ public static partial class Nexus
         using var response = await Http.Client.SendAsync(request, ct);
         if (!response.IsSuccessStatusCode) throw new HttpRequestException($"{(int)response.StatusCode} {response.ReasonPhrase}");
         var data = JsonNode.Parse(await response.Content.ReadAsStringAsync(ct)) as JsonArray;
-        return data?.FirstOrDefault().Str("URI") ?? throw new InvalidOperationException(I18n.T("err.nexus.noLink"));
+        var links = (data ?? []).Select(x => x.Str("URI")).OfType<string>().Where(u => u != "").Distinct().ToList();
+        return links.Count > 0 ? links : throw new InvalidOperationException(I18n.T("err.nexus.noLink"));
     }
 
     /// <summary>Сведения о моде и файле по ссылке nxm:// (нужен ключ API).</summary>

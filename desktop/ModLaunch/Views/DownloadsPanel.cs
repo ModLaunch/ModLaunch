@@ -62,6 +62,13 @@ public sealed partial class MainWindow
     {
         _dlHeader.Children.Clear();
         var buttons = Ui.Row(2);
+        // 9.4: всё на паузу / продолжить всё — как в менеджерах загрузок.
+        var pausable = Jobs.All.Where(j => j.Status == JobStatus.Running && j.Total > 0).ToList();
+        var paused = Jobs.All.Where(j => j.Status == JobStatus.Canceled && j.Paused && !j.Retried).ToList();
+        if (pausable.Count > 1)
+            buttons.Children.Add(Ui.Button("", () => { foreach (var j in pausable) Jobs.Cancel(j, pause: true); DrawDownloads(); }, "icon ghost", Icons.Pause, I18n.T("dl.pauseAll")));
+        if (paused.Count > 1)
+            buttons.Children.Add(Ui.Button("", () => { foreach (var j in paused) Jobs.Retry(j); DrawDownloads(); }, "icon ghost", Icons.Play, I18n.T("dl.resumeAll")));
         if (Actions.CollectionRun is not null)
             buttons.Children.Add(Ui.Button("", () => { Actions.StopQueue(); DrawDownloads(); }, "icon ghost", Icons.Stop, I18n.T("dl.stopQueue")));
         if (Jobs.All.Any(j => !j.Active))
@@ -74,7 +81,14 @@ public sealed partial class MainWindow
         var queued = Jobs.All.Count(j => j.Status == JobStatus.Queued);
         var title = Ui.Col(2, Ui.Text(I18n.T("dl.title"), "h3"));
         if (running + queued > 0)
-            title.Children.Add(Ui.Text(queued > 0 ? I18n.T("dl.summary.queued", ("n", running), ("q", queued)) : I18n.T("dl.summary", ("n", running)), "small muted"));
+        {
+            var line = queued > 0 ? I18n.T("dl.summary.queued", ("n", running), ("q", queued)) : I18n.T("dl.summary", ("n", running));
+            // Общая скорость всех загрузок — видно, во что упирается связь.
+            var speed = Jobs.All.Where(j => j.Status == JobStatus.Running).Sum(j => j.Speed);
+            if (speed > 1) line += " · " + I18n.T("dl.speed", ("speed", GamePage.Size((long)speed)));
+            if (Throttle.Limit > 0) line += " · " + I18n.T("dl.limited", ("speed", GamePage.Size(Throttle.Limit)));
+            title.Children.Add(Ui.Text(line, "small muted"));
+        }
         title.VerticalAlignment = VerticalAlignment.Center;
         _dlHeader.Children.Add(title);
     }

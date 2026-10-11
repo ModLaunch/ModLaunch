@@ -68,7 +68,7 @@ public sealed class ModrinthPage : Page
 
     public override void Build()
     {
-        var col = new StackPanel { Spacing = 18, Margin = new Thickness(40, 26, 40, 40), MaxWidth = 1640 };
+        var col = StoreKit.Fit(new StackPanel { Spacing = 18, Margin = new Thickness(40, 26, 40, 40), MaxWidth = 1640 });
 
         var logo = new Border { Width = 56, Height = 56, CornerRadius = new CornerRadius(16), Background = Ui.Hex("#1BD96A"), Child = Ui.Icon(Icons.Package, 28, Brushes.Black) };
         var words = Ui.Col(3, Ui.Text("Modrinth", "h1"), Ui.Text(I18n.T("mr.subtitle"), "muted"));

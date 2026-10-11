@@ -8,7 +8,7 @@ namespace ModLaunch.Minecraft;
 public sealed record McFound(string Name, string Dir, string Source, string GameVersion, string Loader, string LoaderVersion, int Mods);
 
 /// <summary>
-/// Сборки из других лаунчеров: Modrinth App, Prism Launcher, CurseForge — и моды в самой .minecraft.
+/// Сборки из других лаунчеров: Modrinth App, Prism Launcher (и PolyMC, MultiMC), CurseForge, ATLauncher, GDLauncher — и моды в самой .minecraft.
 /// Версию и загрузчик берём из их файлов, а если их нет — из последнего лога игры.
 /// </summary>
 public static partial class McImport
@@ -20,6 +20,10 @@ public static partial class McImport
     {
         "modrinth-app" => "Modrinth App",
         "prism" => "Prism Launcher",
+        "polymc" => "PolyMC",
+        "multimc" => "MultiMC",
+        "atlauncher" => "ATLauncher",
+        "gdlauncher" => "GDLauncher",
         "curseforge" => "CurseForge",
         "minecraft" => ".minecraft",
         "mrpack" => "Modrinth (.mrpack)",
@@ -32,6 +36,8 @@ public static partial class McImport
         try { list.AddRange(ModrinthApp()); } catch { }
         try { list.AddRange(Prism()); } catch { }
         try { list.AddRange(CurseForge()); } catch { }
+        try { list.AddRange(ATLauncher()); } catch { }
+        try { list.AddRange(GDLauncher()); } catch { }
         try { if (RootMods() is { } root) list.Add(root); } catch { }
         var linked = Mc.Instances().Select(i => Norm(i.Dir)).ToHashSet(StringComparer.OrdinalIgnoreCase);
         return list.Where(f => !linked.Contains(Norm(f.Dir))).ToList();
@@ -70,10 +76,28 @@ public static partial class McImport
         }
     }
 
+    /// <summary>Prism Launcher и его предки с тем же форматом: PolyMC и MultiMC (тот — переносной, ищем в типичных местах).</summary>
     static IEnumerable<McFound> Prism()
     {
-        var root = Path.Combine(AppData, "PrismLauncher", "instances");
-        if (!Directory.Exists(root)) yield break;
+        var roots = new List<(string Dir, string Source)>
+        {
+            (Path.Combine(AppData, "PrismLauncher", "instances"), "prism"),
+            (Path.Combine(AppData, "PolyMC", "instances"), "polymc"),
+            (Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "PrismLauncher", "instances"), "prism"),
+            (Path.Combine(Home, "MultiMC", "instances"), "multimc"),
+            (Path.Combine(Home, "Desktop", "MultiMC", "instances"), "multimc"),
+            (Path.Combine(Home, "Downloads", "MultiMC", "instances"), "multimc"),
+            (@"C:\MultiMC\instances", "multimc"),
+        };
+        foreach (var (root, source) in roots)
+        {
+            if (!Directory.Exists(root)) continue;
+            foreach (var found in MmcInstances(root, source)) yield return found;
+        }
+    }
+
+    static IEnumerable<McFound> MmcInstances(string root, string source)
+    {
         foreach (var dir in Directory.EnumerateDirectories(root))
         {
             var pack = Path.Combine(dir, "mmc-pack.json");
@@ -94,7 +118,7 @@ public static partial class McImport
                 }
             }
             var game = new[] { ".minecraft", "minecraft" }.Select(d => Path.Combine(dir, d)).FirstOrDefault(Directory.Exists) ?? Path.Combine(dir, ".minecraft");
-            yield return new McFound(name, game, "prism", gv, loader, lv, Mods(game));
+            yield return new McFound(name, game, source, gv, loader, lv, Mods(game));
         }
     }
 
@@ -110,6 +134,81 @@ public static partial class McImport
             var (loader, lv) = ParseCurseLoader(j?["baseModLoader"].Str("name") ?? "");
             yield return new McFound(j.Str("name") ?? Path.GetFileName(dir), dir, "curseforge", j.Str("gameVersion") ?? "", loader, lv, Mods(dir));
         }
+    }
+
+    /// <summary>ATLauncher: instances\&lt;имя&gt;\instance.json — версия игры в "id", загрузчик в launcher.loaderVersion.</summary>
+    static IEnumerable<McFound> ATLauncher()
+    {
+        foreach (var root in new[] { Path.Combine(AppData, "ATLauncher", "instances"), Path.Combine(Home, "ATLauncher", "instances") })
+        {
+            if (!Directory.Exists(root)) continue;
+            foreach (var dir in Directory.EnumerateDirectories(root))
+            {
+                var file = Path.Combine(dir, "instance.json");
+                if (!File.Exists(file)) continue;
+                if (ParseATLauncher(File.ReadAllText(file), Path.GetFileName(dir)) is not { } f) continue;
+                yield return f with { Dir = dir, Mods = Mods(dir) };
+            }
+        }
+    }
+
+    public static McFound? ParseATLauncher(string json, string folder)
+    {
+        var j = JsonNode.Parse(json);
+        if (j is null) return null;
+        var gv = j.Str("id") ?? j["launcher"].Str("version") ?? "";
+        var lvNode = j["launcher"]?["loaderVersion"];
+        var type = (lvNode.Str("type") ?? "").ToLowerInvariant();
+        var loader = type is "fabric" or "quilt" or "forge" or "neoforge" ? type : "vanilla";
+        var lv = loader == "vanilla" ? "" : lvNode.Str("version") ?? "";
+        return new McFound(j["launcher"].Str("name") ?? folder, "", "atlauncher", gv, loader, lv, 0);
+    }
+
+    /// <summary>GDLauncher: новый (Carbon) — data\instances\&lt;имя&gt;\instance.json и папка instance; старый — instances\&lt;имя&gt;\config.json.</summary>
+    static IEnumerable<McFound> GDLauncher()
+    {
+        var carbon = Path.Combine(AppData, "gdlauncher_carbon", "data", "instances");
+        if (Directory.Exists(carbon))
+            foreach (var dir in Directory.EnumerateDirectories(carbon))
+            {
+                var file = Path.Combine(dir, "instance.json");
+                var game = Path.Combine(dir, "instance");
+                if (!File.Exists(file) || !Directory.Exists(game)) continue;
+                if (ParseGdCarbon(File.ReadAllText(file), Path.GetFileName(dir)) is { } f) yield return f with { Dir = game, Mods = Mods(game) };
+            }
+        var legacy = Path.Combine(AppData, "gdlauncher_next", "instances");
+        if (Directory.Exists(legacy))
+            foreach (var dir in Directory.EnumerateDirectories(legacy))
+            {
+                var file = Path.Combine(dir, "config.json");
+                if (!File.Exists(file)) continue;
+                var j = JsonNode.Parse(File.ReadAllText(file));
+                var loaderType = (j?["loader"].Str("loaderType") ?? "vanilla").ToLowerInvariant();
+                var loader = loaderType is "fabric" or "quilt" or "forge" or "neoforge" ? loaderType : "vanilla";
+                yield return new McFound(Path.GetFileName(dir), dir, "gdlauncher", j?["loader"].Str("mcVersion") ?? "", loader, loader == "vanilla" ? "" : j?["loader"].Str("loaderVersion") ?? "", Mods(dir));
+            }
+    }
+
+    public static McFound? ParseGdCarbon(string json, string folder)
+    {
+        var j = JsonNode.Parse(json);
+        if (j is null) return null;
+        var standard = j["game_configuration"]?["version"]?["Standard"];
+        var gv = standard.Str("release") ?? "";
+        var first = (standard?["modloaders"] as JsonArray ?? []).OfType<JsonNode>().FirstOrDefault();
+        var type = (first.Str("type_") ?? first.Str("type") ?? "").ToLowerInvariant();
+        var loader = type is "fabric" or "quilt" or "forge" or "neoforge" ? type : "vanilla";
+        return new McFound(j.Str("name") ?? folder, "", "gdlauncher", gv, loader, loader == "vanilla" ? "" : first.Str("version") ?? "", 0);
+    }
+
+    [SelfTest]
+    static string ReadsOtherLaunchers()
+    {
+        var at = ParseATLauncher("""{"id":"1.20.1","launcher":{"name":"Create Above","loaderVersion":{"type":"Fabric","version":"0.15.11"}}}""", "x");
+        var gd = ParseGdCarbon("""{"name":"Skyblock","game_configuration":{"version":{"Standard":{"release":"1.21.1","modloaders":[{"type_":"NeoForge","version":"21.1.77"}]}}}}""", "y");
+        if (at is not { Name: "Create Above", GameVersion: "1.20.1", Loader: "fabric", LoaderVersion: "0.15.11" }) throw new Exception("ATLauncher: " + at);
+        if (gd is not { Name: "Skyblock", GameVersion: "1.21.1", Loader: "neoforge", LoaderVersion: "21.1.77" }) throw new Exception("GDLauncher: " + gd);
+        return "ATLauncher and GDLauncher instances read";
     }
 
     /// <summary>«forge-47.2.0», «neoforge-21.1.77», «fabric-0.15.7-1.20.1» → загрузчик и версия.</summary>
