@@ -1,0 +1,337 @@
+// Проверка правил Firestore на эмуляторе: firebase emulators:exec --only firestore "npm test"
+// (из папки firebase/, см. .github/workflows/rules.yml). Деньги — в копейках.
+import { test, before, after, beforeEach } from 'node:test';
+import { readFileSync } from 'node:fs';
+import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
+import { doc, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp, increment, collection, getDocs, query, where } from 'firebase/firestore';
+
+const FEE = 10;
+let env;
+
+const ADMIN = { uid: 'admin1', email: 'admin@ml.test' };
+const SELLER = { uid: 'seller1', email: 'seller@ml.test' };
+const BUYER = { uid: 'buyer1', email: 'buyer@ml.test' };
+const OTHER = { uid: 'other1', email: 'other@ml.test' };
+
+const db = (who) => env.authenticatedContext(who.uid, { email: who.email, email_verified: true }).firestore();
+const anon = (uid) => env.authenticatedContext(uid, {}).firestore();
+const raw = async (fn) => env.withSecurityRulesDisabled(async (c) => fn(c.firestore()));
+
+const LOT = 'seller1_lot';
+const FREE = 'seller1_free';
+const PRICE = 19900;
+const fee = (p) => Math.floor(p * FEE / 100);
+
+function listing(price, sales = 0) {
+  return {
+    uid: SELLER.uid, author: 'Seller', title: 'Lot', summary: '', description: '', kind: 'model', game: 'subnautica',
+    price, license: 'personal', version: '1.0.0', preview: '', tags: [], images: [], size: 10, sha256: '', chunks: 1,
+    fileName: 'a.zip', status: 'active', sales, created: new Date(), updated: new Date(),
+  };
+}
+
+const ZERO = { balance: 0, earned: 0, spent: 0, paidOut: 0, toppedUp: 0, seq: 0 };
+
+async function walletOf(uid) {
+  let w = null;
+  await raw(async (d) => { const s = await getDoc(doc(d, 'wallets', uid)); w = s.exists() ? s.data() : null; });
+  return w ?? { ...ZERO };
+}
+
+/** Новое состояние кошелька и запись журнала — как в приложении (Creator/Wallet.cs). */
+function next(prev, kind, amount) {
+  const n = {
+    balance: (prev.balance ?? 0) + amount,
+    earned: (prev.earned ?? 0) + (kind === 'sale' ? amount : 0),
+    spent: (prev.spent ?? 0) + (kind === 'purchase' ? -amount : 0),
+    paidOut: (prev.paidOut ?? 0) + (kind === 'payout' || kind === 'payout-return' ? -amount : 0),
+    toppedUp: (prev.toppedUp ?? 0) + (kind === 'topup' ? amount : 0),
+    seq: (prev.seq ?? 0) + 1,
+  };
+  return n;
+}
+
+function ledger(batch, d, uid, prev, kind, amount, { ref = '', party = '', note = '', by }) {
+  const n = next(prev, kind, amount);
+  batch.set(doc(d, 'wallets', uid), { ...n, updated: serverTimestamp() });
+  batch.set(doc(d, 'wallets', uid, 'ledger', String(n.seq)), {
+    kind, amount, balance: n.balance, seq: n.seq, ref, party, note, by, created: serverTimestamp(),
+  });
+  return n;
+}
+
+before(async () => {
+  env = await initializeTestEnvironment({
+    projectId: 'modlaunch-rules-test',
+    firestore: { rules: readFileSync(new URL('../firestore.rules', import.meta.url), 'utf8') },
+  });
+});
+after(async () => { await env?.cleanup(); });
+
+beforeEach(async () => {
+  await env.clearFirestore();
+  await raw(async (d) => {
+    await setDoc(doc(d, 'admins', ADMIN.email), { note: 'test' });
+    await setDoc(doc(d, 'market', LOT), listing(PRICE));
+    await setDoc(doc(d, 'market', FREE), listing(0));
+    // У покупателя 500 ₽ — пополнение, проведённое админом (запись 1 в журнале).
+    await setDoc(doc(d, 'wallets', BUYER.uid), { balance: 50000, earned: 0, spent: 0, paidOut: 0, toppedUp: 50000, seq: 1, updated: new Date() });
+    await setDoc(doc(d, 'wallets', BUYER.uid, 'ledger', '1'), { kind: 'topup', amount: 50000, balance: 50000, seq: 1, ref: 'seed', party: '', note: '', by: ADMIN.uid, created: new Date() });
+  });
+});
+
+/** Покупка платного лота — одна пачка, как Market.Buy. */
+async function buy(who = BUYER, { amount = -PRICE, price = PRICE, claimed = false, withWallet = true, lot = LOT } = {}) {
+  const d = db(who);
+  const prev = await walletOf(who.uid);
+  const b = writeBatch(d);
+  b.set(doc(d, 'market', lot, 'sales', who.uid), {
+    buyerName: 'Buyer', seller: SELLER.uid, title: 'Lot', price, fee: fee(price), claimed, created: serverTimestamp(),
+  });
+  if (withWallet) ledger(b, d, who.uid, prev, 'purchase', amount, { ref: lot, party: SELLER.uid, by: who.uid });
+  b.update(doc(d, 'market', lot), { sales: increment(1) });
+  b.set(doc(d, 'wallets', who.uid, 'purchases', lot), { title: 'Lot', kind: 'model', seller: 'Seller', price, created: serverTimestamp() });
+  return b.commit();
+}
+
+async function claim(who = SELLER, { amount = PRICE - fee(PRICE), buyer = BUYER.uid } = {}) {
+  const d = db(who);
+  const prev = await walletOf(who.uid);
+  const b = writeBatch(d);
+  b.update(doc(d, 'market', LOT, 'sales', buyer), { claimed: true });
+  ledger(b, d, who.uid, prev, 'sale', amount, { ref: LOT, party: buyer, by: who.uid });
+  return b.commit();
+}
+
+// ---------------------------------------------------------------- покупка
+
+test('покупка: списание, продажа и библиотека одной пачкой', async () => {
+  await assertSucceeds(buy());
+  const w = await walletOf(BUYER.uid);
+  if (w.balance !== 50000 - PRICE || w.spent !== PRICE || w.seq !== 2) throw new Error(JSON.stringify(w));
+});
+
+test('покупка: сумма списания не равна цене — отказ', async () => {
+  await assertFails(buy(BUYER, { amount: -100 }));
+});
+
+test('покупка: без списания — отказ', async () => {
+  await assertFails(buy(BUYER, { withWallet: false }));
+});
+
+test('покупка: денег не хватает — отказ', async () => {
+  await raw(async (d) => updateDoc(doc(d, 'market', LOT), { price: 90000 }));
+  await assertFails(buy(BUYER, { amount: -90000, price: 90000 }));
+});
+
+test('покупка: второй раз тот же лот — отказ', async () => {
+  await assertSucceeds(buy());
+  await assertFails(buy());
+});
+
+test('бесплатный лот: без кошелька, сразу «claimed»', async () => {
+  await assertSucceeds(buy(OTHER, { price: 0, claimed: true, withWallet: false, lot: FREE }));
+  await assertFails(buy(BUYER, { price: 0, claimed: false, withWallet: false, lot: FREE }));
+});
+
+// ---------------------------------------------------------------- кошелёк
+
+test('нельзя начислить себе деньги «из воздуха»', async () => {
+  const d = db(BUYER);
+  const prev = await walletOf(BUYER.uid);
+  for (const kind of ['grant', 'topup', 'sale', 'payout-return']) {
+    const b = writeBatch(d);
+    ledger(b, d, BUYER.uid, prev, kind, 100000, { ref: 'x', note: 'hi', by: BUYER.uid });
+    await assertFails(b.commit());
+  }
+  // И просто поменять баланс без журнала.
+  await assertFails(updateDoc(doc(d, 'wallets', BUYER.uid), { balance: 9999999 }));
+});
+
+test('журнал не меняется и не удаляется', async () => {
+  const d = db(BUYER);
+  await assertFails(updateDoc(doc(d, 'wallets', BUYER.uid, 'ledger', '1'), { amount: 1 }));
+  await assertFails(deleteDoc(doc(d, 'wallets', BUYER.uid, 'ledger', '1')));
+  await assertFails(deleteDoc(doc(d, 'wallets', BUYER.uid)));
+});
+
+test('нельзя пропустить номер записи (seq + 2)', async () => {
+  const d = db(BUYER);
+  const prev = await walletOf(BUYER.uid);
+  const b = writeBatch(d);
+  ledger(b, d, BUYER.uid, { ...prev, seq: prev.seq + 1 }, 'purchase', -PRICE, { ref: LOT, party: SELLER.uid, by: BUYER.uid });
+  await assertFails(b.commit());
+});
+
+test('покупатель не пишет в кошелёк продавца', async () => {
+  await assertSucceeds(buy());
+  const d = db(BUYER);
+  const b = writeBatch(d);
+  b.update(doc(d, 'market', LOT, 'sales', BUYER.uid), { claimed: true });
+  ledger(b, d, SELLER.uid, { ...ZERO }, 'sale', PRICE - fee(PRICE), { ref: LOT, party: BUYER.uid, by: BUYER.uid });
+  await assertFails(b.commit());
+});
+
+test('чужой кошелёк и журнал не читаются', async () => {
+  await assertFails(getDoc(doc(db(OTHER), 'wallets', BUYER.uid)));
+  await assertFails(getDocs(collection(db(OTHER), 'wallets', BUYER.uid, 'ledger')));
+  await assertSucceeds(getDoc(doc(db(BUYER), 'wallets', BUYER.uid)));
+  await assertSucceeds(getDoc(doc(db(ADMIN), 'wallets', BUYER.uid)));
+});
+
+// ---------------------------------------------------------------- выручка продавца
+
+test('продавец забирает выручку один раз', async () => {
+  await assertSucceeds(buy());
+  await assertSucceeds(claim());
+  const w = await walletOf(SELLER.uid);
+  if (w.balance !== PRICE - fee(PRICE) || w.earned !== PRICE - fee(PRICE) || w.seq !== 1) throw new Error(JSON.stringify(w));
+  await assertFails(claim());
+});
+
+test('выручка: сумма без комиссии или чужая продажа — отказ', async () => {
+  await assertSucceeds(buy());
+  await assertFails(claim(SELLER, { amount: PRICE }));
+  await assertFails(claim(OTHER));
+});
+
+test('продавец видит свои продажи, чужой — нет', async () => {
+  await assertSucceeds(buy());
+  await assertSucceeds(getDocs(query(collection(db(SELLER), 'market', LOT, 'sales'), where('claimed', '==', false))));
+  await assertFails(getDocs(collection(db(OTHER), 'market', LOT, 'sales')));
+});
+
+// ---------------------------------------------------------------- вывод
+
+async function payout(who, amount, pid) {
+  const d = db(who);
+  const prev = await walletOf(who.uid);
+  const b = writeBatch(d);
+  b.set(doc(d, 'payouts', pid), { uid: who.uid, author: 'Seller', amount, method: 'card 1234', status: 'pending', note: '', created: serverTimestamp() });
+  ledger(b, d, who.uid, prev, 'payout', -amount, { ref: pid, by: who.uid });
+  return b.commit();
+}
+
+test('вывод: списание вместе с заявкой; больше баланса — нельзя', async () => {
+  await assertSucceeds(buy());
+  await assertSucceeds(claim());
+  await assertFails(payout(SELLER, 999999, `${SELLER.uid}_20261011120000`));
+  await assertSucceeds(payout(SELLER, 10000, `${SELLER.uid}_20261011120001`));
+  const w = await walletOf(SELLER.uid);
+  if (w.balance !== PRICE - fee(PRICE) - 10000 || w.paidOut !== 10000) throw new Error(JSON.stringify(w));
+});
+
+test('вывод: заявка без списания — отказ', async () => {
+  await assertFails(setDoc(doc(db(SELLER), 'payouts', `${SELLER.uid}_20261011120002`),
+    { uid: SELLER.uid, author: 'Seller', amount: 100, method: 'x', status: 'pending', note: '', created: serverTimestamp() }));
+});
+
+test('админ: «переведено» — отметка, «отклонено» — с возвратом денег', async () => {
+  await assertSucceeds(buy());
+  await assertSucceeds(claim());
+  const p1 = `${SELLER.uid}_20261011120003`, p2 = `${SELLER.uid}_20261011120004`;
+  await assertSucceeds(payout(SELLER, 5000, p1));
+  await assertSucceeds(payout(SELLER, 5000, p2));
+  await assertSucceeds(updateDoc(doc(db(ADMIN), 'payouts', p1), { status: 'paid', note: 'ok' }));
+  // Отклонить без возврата — нельзя; не админу — нельзя.
+  await assertFails(updateDoc(doc(db(ADMIN), 'payouts', p2), { status: 'rejected', note: '' }));
+  const back = async (who) => {
+    const d = db(who);
+    const prev = await walletOf(SELLER.uid);
+    const b = writeBatch(d);
+    b.update(doc(d, 'payouts', p2), { status: 'rejected', note: 'wrong card' });
+    ledger(b, d, SELLER.uid, prev, 'payout-return', 5000, { ref: p2, by: who.uid });
+    return b.commit();
+  };
+  await assertFails(back(SELLER));
+  await assertSucceeds(back(ADMIN));
+  await assertFails(back(ADMIN));
+  const w = await walletOf(SELLER.uid);
+  if (w.paidOut !== 5000) throw new Error(JSON.stringify(w));
+});
+
+// ---------------------------------------------------------------- пополнение и начисления
+
+test('пополнение: заявка пользователя, зачисление только админом и один раз', async () => {
+  const tid = `${OTHER.uid}_20261011120000`;
+  await assertSucceeds(setDoc(doc(db(OTHER), 'topups', tid), { uid: OTHER.uid, author: 'Other', amount: 30000, reference: 'tx-1', status: 'pending', created: serverTimestamp() }));
+  const approve = async (who) => {
+    const d = db(who);
+    const prev = await walletOf(OTHER.uid);
+    const b = writeBatch(d);
+    b.update(doc(d, 'topups', tid), { status: 'done' });
+    ledger(b, d, OTHER.uid, prev, 'topup', 30000, { ref: tid, by: who.uid });
+    return b.commit();
+  };
+  await assertFails(approve(OTHER));
+  await assertSucceeds(approve(ADMIN));
+  await assertFails(approve(ADMIN));
+  const w = await walletOf(OTHER.uid);
+  if (w.balance !== 30000 || w.toppedUp !== 30000 || w.seq !== 1) throw new Error(JSON.stringify(w));
+});
+
+test('начисление админом — только с пояснением; баланс не уходит в минус', async () => {
+  const grant = async (who, amount, note) => {
+    const d = db(who);
+    const prev = await walletOf(BUYER.uid);
+    const b = writeBatch(d);
+    ledger(b, d, BUYER.uid, prev, 'grant', amount, { note, by: who.uid });
+    return b.commit();
+  };
+  await assertFails(grant(ADMIN, 1000, ''));
+  await assertSucceeds(grant(ADMIN, 1000, 'bonus'));
+  await assertFails(grant(ADMIN, -999999, 'too much'));
+  await assertFails(grant(BUYER, 1000, 'self'));
+});
+
+test('админ без подтверждённой почты — не админ', async () => {
+  const d = env.authenticatedContext(ADMIN.uid, { email: ADMIN.email, email_verified: false }).firestore();
+  const prev = await walletOf(BUYER.uid);
+  const b = writeBatch(d);
+  ledger(b, d, BUYER.uid, prev, 'grant', 1000, { note: 'x', by: ADMIN.uid });
+  await assertFails(b.commit());
+});
+
+// ---------------------------------------------------------------- отзывы, друзья, Hub
+
+const KEY = '0123456789abcdef0123456789abcdef';
+function review(uid, extra = {}) {
+  return { game: 'subnautica', mod: '1262', modName: 'Nautilus', key: KEY, uid, name: 'Me', stars: 5, text: 'good', deleted: false,
+    app: '9.5.0', created: serverTimestamp(), updated: serverTimestamp(), ...extra };
+}
+
+test('отзывы: свой — можно (и анониму), чужой uid — нельзя, «админ» — только админу', async () => {
+  await assertSucceeds(setDoc(doc(anon('anon1'), 'reviews', `anon1_${KEY}`), review('anon1')));
+  await assertFails(setDoc(doc(db(OTHER), 'reviews', `${BUYER.uid}_${KEY}`), review(BUYER.uid)));
+  await assertFails(setDoc(doc(db(BUYER), 'reviews', `${BUYER.uid}_${KEY}`), review(BUYER.uid, { role: 'admin' })));
+  await assertSucceeds(getDocs(collection(anon('x'), 'reviews')));
+});
+
+test('отзывы: админ скрывает, автор не может вернуть', async () => {
+  await assertSucceeds(setDoc(doc(db(BUYER), 'reviews', `${BUYER.uid}_${KEY}`), review(BUYER.uid)));
+  await assertFails(updateDoc(doc(db(OTHER), 'reviews', `${BUYER.uid}_${KEY}`), { deleted: true, stars: 0, text: '', moderated: true, updated: serverTimestamp() }));
+  await assertSucceeds(updateDoc(doc(db(ADMIN), 'reviews', `${BUYER.uid}_${KEY}`), { deleted: true, stars: 0, text: '', moderated: true, updated: serverTimestamp() }));
+  await assertFails(updateDoc(doc(db(BUYER), 'reviews', `${BUYER.uid}_${KEY}`), { deleted: false, stars: 4, text: 'again', updated: serverTimestamp() }));
+});
+
+test('друзья: свой профиль пишет только хозяин', async () => {
+  const p = { name: 'Me', code: 'ABCDEFGH', state: 'online', game: '', gameName: '', app: '9.5.0', seen: serverTimestamp(), since: new Date(Date.now() - 1000) };
+  await assertSucceeds(setDoc(doc(db(BUYER), 'profiles', BUYER.uid), p));
+  await assertFails(setDoc(doc(db(OTHER), 'profiles', BUYER.uid), p));
+  await assertFails(setDoc(doc(anon('anon2'), 'profiles', 'anon2'), p));
+});
+
+test('Hub: карточку создаёт автор со своим префиксом', async () => {
+  const c = { uid: BUYER.uid, author: 'Me', name: 'Mod', summary: '', description: '', game: 'subnautica', version: '1.0.0', kind: 'script', code: '',
+    tags: [], images: [], size: 0, sha256: '', chunks: 0, fileName: '', changelog: '', app: '9.5.0', likes: 0, downloads: 0, comments: 0,
+    created: serverTimestamp(), updated: serverTimestamp() };
+  await assertSucceeds(setDoc(doc(db(BUYER), 'creations', `${BUYER.uid}_mod`), c));
+  await assertFails(setDoc(doc(db(BUYER), 'creations', `${OTHER.uid}_mod`), c));
+});
+
+test('лоты: продавец создаёт свой; чужое и «продажи +1» без продажи — нельзя', async () => {
+  const l = { ...listing(1000), created: serverTimestamp(), updated: serverTimestamp() };
+  await assertSucceeds(setDoc(doc(db(SELLER), 'market', `${SELLER.uid}_new`), l));
+  await assertFails(setDoc(doc(db(OTHER), 'market', `${SELLER.uid}_new2`), l));
+  await assertFails(updateDoc(doc(db(OTHER), 'market', LOT), { sales: increment(1) }));
+});

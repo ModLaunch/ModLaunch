@@ -1,0 +1,28 @@
+# 9.5: правила Firestore (firebase/firestore.rules) — на настоящем эмуляторе Firestore.
+# Проверяет покупки, выручку, вывод, пополнения, журнал кошелька, отзывы, друзей и Hub
+# (firebase/test/rules.test.mjs). Падает — правила нельзя публиковать.
+name: rules
+on:
+  workflow_dispatch:
+  push:
+    branches: ['**']
+    paths: ['firebase/**', '.github/workflows/rules.yml']
+jobs:
+  firestore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Зависимости
+        working-directory: firebase/test
+        run: npm ci || npm install --no-audit --no-fund
+      - name: Эмулятор и тесты
+        working-directory: firebase
+        run: npx --yes firebase-tools@15 emulators:exec --only firestore --project modlaunch-rules-test "cd test && npm test"
