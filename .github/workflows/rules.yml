@@ -25,4 +25,12 @@ jobs:
         run: npm ci || npm install --no-audit --no-fund
       - name: Эмулятор и тесты
         working-directory: firebase
-        run: npx --yes firebase-tools@15 emulators:exec --only firestore --project modlaunch-rules-test "cd test && npm test"
+        run: npx --yes firebase-tools@15 emulators:exec --only firestore --project modlaunch-rules-test "cd test && node --test --test-concurrency=1 --test-reporter=spec --test-reporter-destination=stdout --test-reporter=tap --test-reporter-destination=tap.txt rules.test.mjs"
+      - name: Итог — в отметки проверки
+        if: always()
+        working-directory: firebase/test
+        run: |
+          pass=$(grep -c '^ok ' tap.txt || true)
+          fail=$(grep -c '^not ok ' tap.txt || true)
+          echo "::notice title=Firestore rules::passed $pass, failed $fail"
+          grep '^not ok ' tap.txt | while read -r line; do echo "::error title=rules::$line"; done || true
