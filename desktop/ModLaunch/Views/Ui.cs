@@ -23,6 +23,8 @@ public static class Icons
     public const string Forward = "M5 12h14 M12 5l7 7-7 7";
     public const string Minimize = "M5 12h14";
     public const string Maximize = "M5 5h14v14H5z";
+    /// <summary>«Восстановить» — два квадрата, как у Windows, когда окно развёрнуто.</summary>
+    public const string Restore = "M8 8h11v11H8z M5 16V5h11";
     public const string Close = "M18 6L6 18 M6 6l12 12";
     public const string Trash = "M3 6h18 M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6 M10 11v6 M14 11v6 M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2";
     public const string Check = "M20 6L9 17l-5-5";

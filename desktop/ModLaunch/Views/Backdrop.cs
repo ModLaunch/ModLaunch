@@ -51,7 +51,9 @@ public sealed class Backdrop : Control
 
     void Restart()
     {
-        if (_style == "aurora" && Look.Animations) _timer.Start();
+        // 9.5: в дизайне Store фон почти весь закрыт карточками, а каждый кадр «авроры» заставлял
+        // перерисовывать всю страницу (15 раз в секунду) — отсюда подтормаживания. Там фон неподвижен.
+        if (_style == "aurora" && Look.Animations && !Look.Store) _timer.Start();
         else _timer.Stop();
     }
 

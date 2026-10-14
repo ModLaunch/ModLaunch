@@ -98,7 +98,7 @@ public sealed partial class MainWindow
             col.Children.Add(Ui.Row(12, Ui.Thumb(null, p.Name ?? p.Email ?? "?", 48, 24, person: true), who));
             col.Children.Add(new Border { Height = 1, Background = Ui.Res("Line"), Margin = new Thickness(0, 2) });
             col.Children.Add(MenuRow(I18n.T("acc.menu.account"), Icons.User, () => Navigate(() => new AccountPage())));
-            col.Children.Add(MenuRow(I18n.T("acc.s.wallet"), Icons.Bag, () => Navigate(() => new AccountPage("wallet"))));
+            col.Children.Add(MenuRow(I18n.T("acc.s.wallet"), Icons.Bag, () => Navigate(() => new MarketPage("wallet"))));
             col.Children.Add(MenuRow(I18n.T("acc.s.purchases"), Icons.Download, () => Navigate(() => new AccountPage("purchases"))));
             col.Children.Add(MenuRow(I18n.T("st.tab"), Icons.Chart, () => Navigate(() => new MarketPage("studio"))));
             col.Children.Add(MenuRow(I18n.T("acc.menu.friends"), Icons.Users, () => Navigate(() => new FriendsPage())));

@@ -200,8 +200,12 @@ public static partial class Friends
 
     // ---------------------------------------------------------------- список
 
+    /// <summary>Для снимков экрана: друзья без сервера.</summary>
+    internal static FriendsView? DemoView { get; set; }
+
     public static FriendsView View()
     {
+        if (Program.Demo && DemoView is { } demo) return demo;
         var signedIn = Account.SignedIn;
         var mine = signedIn && File.Data.Str("uid") == Account.Uid;
         var view = File.Data["view"];

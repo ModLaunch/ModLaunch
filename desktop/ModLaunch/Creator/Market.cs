@@ -18,13 +18,13 @@ public sealed record Listing(
     public bool Active => Status == "active";
 }
 
-public sealed record Sale(string ListingId, string Buyer, string BuyerName, string Seller, string Title, long Price, long Fee, DateTime? Created)
+public sealed record Sale(string ListingId, string Buyer, string BuyerName, string Seller, string Title, long Price, long Fee, DateTime? Created, bool Claimed = true)
 {
     public long Net => Price - Fee;
 }
 
 public sealed record Purchase(string ListingId, string Title, string Kind, string Seller, long Price, DateTime? Created);
-public sealed record Wallet(long Balance, long Earned, long Spent, long PaidOut);
+public sealed record Wallet(long Balance, long Earned, long Spent, long PaidOut, long ToppedUp = 0, long Seq = 0);
 public sealed record Payout(string Id, string Uid, string Author, long Amount, string Method, string Status, string Note, DateTime? Created);
 public sealed record TopUp(string Id, string Uid, string Author, long Amount, string Reference, string Status, DateTime? Created);
 public sealed record ListingReview(string Uid, string Author, int Stars, string Text, DateTime? Created);
@@ -58,7 +58,6 @@ public sealed class ListingDraft
 /// </summary>
 public static class Market
 {
-    public const string Platform = "_platform";
     public const int MaxPreview = 4000;
     public const long MaxFile = 8 * 1024 * 1024;
     const int ChunkChars = 900_000;
@@ -110,7 +109,7 @@ public static class Market
 
     static string Id(JsonObject doc) { var n = doc.Str("name") ?? ""; return n[(n.LastIndexOf('/') + 1)..]; }
 
-    static async Task<List<JsonObject>> Query(string collection, string? field, string? value, string? parent = null, string order = "created", int limit = 300, string? token = null)
+    static async Task<List<JsonObject>> Query(string collection, string? field, object? value, string? parent = null, string order = "created", int limit = 300, string? token = null)
     {
         var q = new JsonObject
         {
@@ -174,7 +173,9 @@ public static class Market
         return (rows?["documents"] as JsonArray ?? []).OfType<JsonObject>().Select(d =>
         {
             var f = Firebase.FromFields(d["fields"] as JsonObject);
-            return new Sale(l.Id, Id(d), f.S("buyerName"), f.S("seller"), f.S("title"), f.L("price"), f.L("fee"), Firebase.Time(f.S("created")));
+            // Старые продажи (до 9.5) поля claimed не имеют — выручка по ним уже зачислена.
+            var claimed = !f.TryGetValue("claimed", out var c) || c is not false;
+            return new Sale(l.Id, Id(d), f.S("buyerName"), f.S("seller"), f.S("title"), f.L("price"), f.L("fee"), Firebase.Time(f.S("created")), claimed);
         }).OrderByDescending(s => s.Created).ToList();
     }
 
@@ -215,60 +216,77 @@ public static class Market
         catch (ServiceError e) when (e.Code is "NOT_FOUND" or "DENIED") { return false; }
     }
 
-    // ---------------------------------------------------------------- кошелёк
+    // ---------------------------------------------------------------- кошелёк (9.5: журнал, см. Creator/Wallet.cs)
 
-    static Wallet WalletOf(JsonObject? doc)
-    {
-        var f = Firebase.FromFields(doc?["fields"] as JsonObject);
-        return new Wallet(f.L("balance"), f.L("earned"), f.L("spent"), f.L("paidOut"));
-    }
+    static Wallet ToWallet(WalletState w) => new(w.Balance, w.Earned, w.Spent, w.PaidOut, w.ToppedUp, w.Seq);
 
-    static async Task<JsonObject?> WalletDoc(string uid, string? token)
-    {
-        try { return await Hub.Call(Firebase.Url($"/wallets/{uid}"), HttpMethod.Get, null, token) as JsonObject; }
-        catch (ServiceError e) when (e.Code == "NOT_FOUND") { return null; }
-    }
-
-    static JsonObject CreateWallet(string uid) => new()
-    {
-        ["update"] = new JsonObject
-        {
-            ["name"] = Firebase.Doc($"wallets/{uid}"),
-            ["fields"] = Firebase.ToFields(new Dictionary<string, object?> { ["balance"] = 0L, ["earned"] = 0L, ["spent"] = 0L, ["paidOut"] = 0L }),
-        },
-        ["currentDocument"] = new JsonObject { ["exists"] = false },
-    };
-
-    /// <summary>Свой кошелёк; нет — заводим пустой.</summary>
-    public static async Task<Wallet> MyWallet()
+    /// <summary>
+    /// Свой кошелёк. claim — сначала забрать выручку за новые продажи (на «Кошельке» и в «Студии»):
+    /// покупатель платит в журнал площадки-посредника, а продавец переносит деньги к себе сам.
+    /// </summary>
+    public static async Task<Wallet> MyWallet(bool claim = false)
     {
         var (uid, token, _) = await Hub.Member();
-        var doc = await WalletDoc(uid, token);
-        if (doc is not null) return WalletOf(doc);
-        try { await Hub.Commit([CreateWallet(uid)], token); } catch (ServiceError e) when (e.Code == "EXISTS") { }
-        return new Wallet(0, 0, 0, 0);
+        if (claim) { try { await ClaimSales(); } catch (ServiceError) { } }
+        return ToWallet(await Ledger.Read(uid, token));
     }
 
-    static async Task EnsurePlatform(string token)
+    /// <summary>Журнал своего кошелька (свежие записи сверху).</summary>
+    public static async Task<List<LedgerEntry>> MyLedger(int limit = 100)
     {
-        if (await WalletDoc(Platform, token) is not null) return;
-        try { await Hub.Commit([CreateWallet(Platform)], token); } catch (ServiceError e) when (e.Code is "EXISTS" or "DENIED") { }
+        var (uid, token, _) = await Hub.Member();
+        return await Ledger.History(uid, token, limit);
     }
 
-    static JsonObject Credit(string wallet, Dictionary<string, object?> mark, params (string Field, long By)[] by) => new()
+    /// <summary>Выручка, которую ещё не забрали: продажи своих лотов с claimed = false.</summary>
+    public static async Task<List<Sale>> Unclaimed(IEnumerable<Listing>? mine = null)
     {
-        ["update"] = new JsonObject { ["name"] = Firebase.Doc($"wallets/{wallet}"), ["fields"] = Firebase.ToFields(mark) },
-        ["updateMask"] = new JsonObject { ["fieldPaths"] = new JsonArray(mark.Keys.Select(k => (JsonNode)k).ToArray()) },
-        ["updateTransforms"] = new JsonArray(by.Select(b => (JsonNode)new JsonObject
+        var (_, token, _) = await Hub.Member();
+        mine ??= await Mine();
+        var list = new List<Sale>();
+        foreach (var l in mine.Where(l => l.Sales > 0 && l.Price > 0))
+            foreach (var d in await Query("sales", "claimed", false, parent: $"market/{l.Id}", token: token))
+            {
+                var f = Firebase.FromFields(d["fields"] as JsonObject);
+                list.Add(new Sale(l.Id, Id(d), f.S("buyerName"), f.S("seller"), f.S("title"), f.L("price"), f.L("fee"), Firebase.Time(f.S("created")), false));
+            }
+        return list;
+    }
+
+    /// <summary>Забрать выручку за новые продажи: по записи «sale» в журнал за каждую.</summary>
+    public static async Task<(int Count, long Amount)> ClaimSales()
+    {
+        var (uid, token, _) = await Hub.Member();
+        var count = 0;
+        long amount = 0;
+        foreach (var s in await Unclaimed())
         {
-            ["fieldPath"] = b.Field, ["increment"] = new JsonObject { ["integerValue"] = b.By.ToString() },
-        }).ToArray()),
-        ["currentDocument"] = new JsonObject { ["exists"] = true },
-    };
+            var net = s.Price - s.Fee;
+            if (net <= 0) continue;
+            var sale = s;
+            await Ledger.Apply(uid, "sale", net, token, uid, sale.ListingId, sale.Buyer, extra: _ =>
+            [
+                new JsonObject
+                {
+                    ["update"] = new JsonObject { ["name"] = Firebase.Doc($"market/{sale.ListingId}/sales/{sale.Buyer}"), ["fields"] = Firebase.ToFields(new Dictionary<string, object?> { ["claimed"] = true }) },
+                    ["updateMask"] = new JsonObject { ["fieldPaths"] = new JsonArray("claimed") },
+                    ["currentDocument"] = new JsonObject { ["exists"] = true },
+                },
+            ]);
+            count++;
+            amount += net;
+        }
+        if (count > 0) Invalidate();
+        return (count, amount);
+    }
 
     // ---------------------------------------------------------------- покупка
 
-    /// <summary>Купить лот (или забрать бесплатный). Деньги переходят одной пачкой; правила базы сверяют суммы.</summary>
+    /// <summary>
+    /// Купить лот (или забрать бесплатный). Платный: продажа, списание с журналом, +1 продажа и
+    /// копия в «Библиотеку» — одной пачкой; правила базы сверяют цену, комиссию и сумму списания.
+    /// Выручку продавец заберёт сам (ClaimSales), поэтому покупатель в чужой кошелёк не пишет.
+    /// </summary>
     public static async Task Buy(Listing l)
     {
         var (uid, token, name) = await Hub.Member();
@@ -278,13 +296,9 @@ public static class Market
         if (!fresh.Active) throw new ServiceError("NOT_FOUND");
         var price = fresh.Price;
         var fee = Fee(price);
-        var wallet = await MyWallet();
-        if (wallet.Balance < price) throw new ServiceError("NO_MONEY");
-        await EnsurePlatform(token);
 
-        var mark = new Dictionary<string, object?> { ["lastSale"] = l.Id, ["lastBuyer"] = uid };
-        var writes = new JsonArray
-        {
+        JsonObject[] Docs() =>
+        [
             new JsonObject
             {
                 ["update"] = new JsonObject
@@ -293,14 +307,12 @@ public static class Market
                     ["fields"] = Firebase.ToFields(new Dictionary<string, object?>
                     {
                         ["buyerName"] = name, ["seller"] = fresh.Uid, ["title"] = fresh.Title, ["price"] = price, ["fee"] = fee,
+                        ["claimed"] = price == 0,
                     }),
                 },
                 ["updateTransforms"] = new JsonArray(Hub.ServerTime("created")),
                 ["currentDocument"] = new JsonObject { ["exists"] = false },
             },
-            Credit(uid, new() { ["lastSale"] = l.Id }, ("balance", -price), ("spent", price)),
-            Credit(fresh.Uid, mark, ("balance", price - fee), ("earned", price - fee)),
-            Credit(Platform, mark, ("balance", fee), ("earned", fee)),
             Hub.Increment($"market/{l.Id}", "sales", 1),
             new JsonObject
             {
@@ -314,8 +326,15 @@ public static class Market
                 },
                 ["updateTransforms"] = new JsonArray(Hub.ServerTime("created")),
             },
-        };
-        await Hub.Commit(writes, token);
+        ];
+
+        if (price == 0) await Hub.Commit([.. Docs()], token);
+        else
+        {
+            var wallet = await Ledger.Read(uid, token);
+            if (wallet.Balance < price) throw new ServiceError("NO_MONEY");
+            await Ledger.Apply(uid, "purchase", -price, token, uid, l.Id, fresh.Uid, Hub.Clip(fresh.Title, 300), _ => Docs());
+        }
         Owned.Add(l.Id);
         Invalidate();
     }
@@ -331,7 +350,6 @@ public static class Market
         if (!Regex.IsMatch(d.Version, @"^\d+\.\d+\.\d+$")) throw new ServiceError("INVALID", "version");
         if (d.Price is < 0 or > 100_000_000) throw new ServiceError("INVALID", "price");
         if (existing is null && d.File is null) throw new ServiceError("NO_FILE");
-        await MyWallet();
         var id = existing?.Id ?? Hub.DocId(uid, title);
         if (existing is null && await Get(id) is not null) throw new ServiceError("EXISTS");
 
@@ -490,19 +508,17 @@ public static class Market
         ["currentDocument"] = new JsonObject { ["exists"] = false },
     };
 
-    /// <summary>Заявка на вывод: деньги сразу уходят с баланса в «ожидает», админ переводит и отмечает.</summary>
+    /// <summary>Заявка на вывод: деньги сразу уходят с баланса (запись «payout»), админ переводит и отмечает.</summary>
     public static async Task RequestPayout(long amount, string method)
     {
         var (uid, token, name) = await Hub.Member();
         if (amount < MinPayout) throw new ServiceError("MIN_PAYOUT", Money(MinPayout));
         if (Hub.Clip(method, 300) == "") throw new ServiceError("INVALID");
-        var wallet = await MyWallet();
+        var wallet = await Ledger.Read(uid, token);
         if (wallet.Balance < amount) throw new ServiceError("NO_MONEY");
         var id = $"{uid}_{DateTime.UtcNow:yyyyMMddHHmmss}";
-        await Hub.Commit([
-            NewDoc($"payouts/{id}", new() { ["uid"] = uid, ["author"] = name, ["amount"] = amount, ["method"] = Hub.Clip(method, 300), ["status"] = "pending", ["note"] = "" }),
-            Credit(uid, new() { ["lastPayout"] = id }, ("balance", -amount), ("paidOut", amount)),
-        ], token);
+        await Ledger.Apply(uid, "payout", -amount, token, uid, id, extra: _ =>
+            [NewDoc($"payouts/{id}", new() { ["uid"] = uid, ["author"] = name, ["amount"] = amount, ["method"] = Hub.Clip(method, 300), ["status"] = "pending", ["note"] = "" })]);
     }
 
     /// <summary>Заявка на пополнение: человек оплатил по ссылке, админ сверяет и зачисляет.</summary>
@@ -553,42 +569,48 @@ public static class Market
         return (await Query("topups", "status", "pending", token: token)).Select(TopUpOf).OrderBy(p => p.Created).ToList();
     }
 
+    /// <summary>
+    /// Доход площадки (админ): комиссия со всех продаж. Отдельного «кошелька площадки» больше нет —
+    /// он был бы одним документом на все покупки сразу (очередь и отказы при наплыве).
+    /// </summary>
     public static async Task<Wallet> PlatformWallet()
     {
-        var (_, token, _) = await Hub.Member();
-        return WalletOf(await WalletDoc(Platform, token));
+        long fees = 0, volume = 0;
+        foreach (var l in (await All(force: true)).Where(l => l.Sales > 0 && l.Price > 0))
+            foreach (var s in await Sales(l)) { fees += s.Fee; volume += s.Price; }
+        return new Wallet(fees, fees, volume, 0);
     }
 
     static JsonObject SetStatus(string path, string status, string note = "") => new()
     {
         ["update"] = new JsonObject { ["name"] = Firebase.Doc(path), ["fields"] = Firebase.ToFields(new Dictionary<string, object?> { ["status"] = status, ["note"] = note }) },
         ["updateMask"] = new JsonObject { ["fieldPaths"] = new JsonArray("status", "note") },
+        ["currentDocument"] = new JsonObject { ["exists"] = true },
     };
 
-    /// <summary>Выплата: отметить переведённой или отклонить (деньги вернутся на баланс).</summary>
+    /// <summary>Выплата: отметить переведённой или отклонить — деньги вернутся записью «payout-return».</summary>
     public static async Task ResolvePayout(Payout p, bool paid, string note = "")
     {
-        var (_, token, _) = await Hub.Member();
-        var writes = new JsonArray { SetStatus($"payouts/{p.Id}", paid ? "paid" : "rejected", Hub.Clip(note, 300)) };
-        if (!paid) writes.Add(Credit(p.Uid, new() { ["lastAdmin"] = p.Id }, ("balance", p.Amount), ("paidOut", -p.Amount)));
-        await Hub.Commit(writes, token);
+        var (admin, token, _) = await Hub.Member();
+        if (paid) { await Hub.Commit([SetStatus($"payouts/{p.Id}", "paid", Hub.Clip(note, 300))], token); return; }
+        await Ledger.Apply(p.Uid, "payout-return", p.Amount, token, admin, p.Id, note: Hub.Clip(note, 300),
+            extra: _ => [SetStatus($"payouts/{p.Id}", "rejected", Hub.Clip(note, 300))]);
     }
 
-    /// <summary>Пополнение: зачислить на баланс или отклонить.</summary>
+    /// <summary>Пополнение: зачислить (запись «topup») или отклонить.</summary>
     public static async Task ResolveTopUp(TopUp t, bool ok)
     {
-        var (_, token, _) = await Hub.Member();
-        var writes = new JsonArray { SetStatus($"topups/{t.Id}", ok ? "done" : "rejected") };
-        if (ok) writes.Add(Credit(t.Uid, new() { ["lastAdmin"] = t.Id }, ("balance", t.Amount)));
-        await Hub.Commit(writes, token);
+        var (admin, token, _) = await Hub.Member();
+        if (!ok) { await Hub.Commit([SetStatus($"topups/{t.Id}", "rejected")], token); return; }
+        await Ledger.Apply(t.Uid, "topup", t.Amount, token, admin, t.Id, extra: _ => [SetStatus($"topups/{t.Id}", "done")]);
     }
 
-    /// <summary>Ручное начисление админом (бонус, возврат).</summary>
-    public static async Task Grant(string uid, long amount)
+    /// <summary>Ручное начисление или списание админом (бонус, возврат, исправление) — с пояснением в журнале.</summary>
+    public static async Task Grant(string uid, long amount, string note)
     {
-        var (_, token, _) = await Hub.Member();
-        if (await WalletDoc(uid, token) is null) throw new ServiceError("NOT_FOUND");
-        await Hub.Commit([Credit(uid, new() { ["lastAdmin"] = "grant" }, ("balance", amount))], token);
+        var (admin, token, _) = await Hub.Member();
+        if (!System.Text.RegularExpressions.Regex.IsMatch(uid, "^[A-Za-z0-9]{6,128}$") || amount == 0 || Hub.Clip(note, 300) == "") throw new ServiceError("INVALID");
+        await Ledger.Apply(uid, "grant", amount, token, admin, note: Hub.Clip(note, 300));
     }
 
     public static string Explain(Exception e) => Firebase.Explain("market", e);

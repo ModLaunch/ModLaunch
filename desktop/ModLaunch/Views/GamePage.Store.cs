@@ -215,7 +215,7 @@ public sealed partial class GamePage
         {
             // Вход на страницу игры: арт мягко «отъезжает», обложка и надписи выезжают.
             Animate.From(hero, "scale(1.1)", 1400, 0, new Avalonia.Animation.Easings.QuadraticEaseOut(), 1);
-            Animate.From(coverHost, "translateY(24px) scale(0.94)", 560, 60, new Avalonia.Animation.Easings.BackEaseOut());
+            Animate.From(coverHost, "translateY(14px)", 460, 60, new Avalonia.Animation.Easings.QuinticEaseOut());
             Animate.From(info, "translateX(-22px)", 520, 140);
         }
         return new Panel { ClipToBounds = true, Children = { art, grid } };

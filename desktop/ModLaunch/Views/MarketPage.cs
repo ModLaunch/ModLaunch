@@ -20,7 +20,7 @@ namespace ModLaunch.Views;
 /// </summary>
 public sealed partial class MarketPage : Page
 {
-    public static readonly string[] Tabs = ["store", "browse", "workshop", "queue", "authors", "wishlist", "library", "studio"];
+    public static readonly string[] Tabs = ["store", "browse", "workshop", "queue", "authors", "wishlist", "library", "wallet", "studio"];
 
     string _tab;
     string _query = "";
@@ -71,8 +71,8 @@ public sealed partial class MarketPage : Page
         if (MarketData.Listings is null && !MarketData.Loading) _ = MarketData.Load();
         _rotate?.Stop();
         var col = StoreKit.Column(spacing: 22, top: 20);
-        col.Children.Add(Header());
-        col.Children.Add(NavBar());
+        // 9.5: одна шапка и одна навигация на весь Creator Hub (рынок и мастерская) — HubNav.
+        col.Children.Add(HubNav.Header(_tab, Go, () => { MarketData.Reload(); if (_tab == "studio") ReloadStudio(); }));
         var loading = MarketData.Listings is null;
         col.Children.Add(_tab switch
         {
@@ -82,6 +82,7 @@ public sealed partial class MarketPage : Page
             "authors" => loading ? Skeleton() : Authors(),
             "wishlist" => loading ? Skeleton() : Wishlist(),
             "library" => Library(),
+            "wallet" => new WalletPanel(),
             "studio" => Studio(),
             _ => loading ? Skeleton() : Front(),
         });
@@ -104,59 +105,7 @@ public sealed partial class MarketPage : Page
         return col;
     }
 
-    // ---------------------------------------------------------------- шапка и разделы
-
-    Control Header()
-    {
-        var title = new TextBlock { Text = "Creator Hub", FontFamily = Gx.Display, FontSize = 26, FontWeight = FontWeight.Bold, LetterSpacing = -0.6 };
-        var words = Ui.Col(3, title, Ui.Text(I18n.T("v93.mk.sub", ("n", 100 - Market.FeePercent)), "muted"));
-        words.VerticalAlignment = VerticalAlignment.Center;
-        var left = Ui.Row(16, CreatorLogo.Tile(52), words);
-
-        var right = Ui.Row(10);
-        right.VerticalAlignment = VerticalAlignment.Center;
-        if (Social.Account.SignedIn && MarketData.Wallet is { } w)
-        {
-            var wallet = new Button
-            {
-                Classes = { "chip" }, Padding = new Thickness(12, 7),
-                Content = Ui.Row(8, Ui.Icon(Icons.Bag, 15, Ui.Res("Brand2")), new TextBlock { Text = Market.Money(w.Balance), FontWeight = FontWeight.Bold, VerticalAlignment = VerticalAlignment.Center }),
-            };
-            ToolTip.SetTip(wallet, I18n.T("v93.mk.wallet"));
-            wallet.Click += (_, _) => MainWindow.Current?.Navigate(() => new AccountPage("wallet"));
-            right.Children.Add(wallet);
-        }
-        right.Children.Add(Ui.Button(I18n.T("v93.mk.create"), () => MainWindow.Current?.Navigate(() => new CreatorPage()), "", Icons.Edit));
-        right.Children.Add(Ui.Button(I18n.T("mk.sell"), () => MarketViews.Editor(null, MarketData.Reload), "primary", Icons.Plus));
-        var head = new DockPanel();
-        DockPanel.SetDock(right, Dock.Right);
-        head.Children.Add(right);
-        head.Children.Add(left);
-        return head;
-    }
-
-    /// <summary>Полоса разделов рынка, как меню магазина Steam: слева — витрина, справа — своё.</summary>
-    Control NavBar()
-    {
-        Button Item(string id, string? icon, string? count = null)
-        {
-            var label = I18n.T("v93.mk.tab." + id);
-            var text = count is null ? label : $"{label}  {count}";
-            var b = Ui.Button(text, () => Go(id), "pivot", icon);
-            if (_tab == id) b.Classes.Add("active");
-            b.Padding = new Thickness(12, 9);
-            return b;
-        }
-        var leftRow = Ui.Row(2, Item("store", Icons.Home), Item("browse", Icons.Search), Item("workshop", Icons.Globe), Item("queue", Icons.Shuffle), Item("authors", Icons.Users));
-        var wish = MarketLocal.WishCount;
-        var rightRow = Ui.Row(2, Item("wishlist", Icons.Heart, wish > 0 ? wish.ToString() : null), Item("library", Icons.Layers), Item("studio", Icons.Chart));
-        var bar = new DockPanel();
-        DockPanel.SetDock(rightRow, Dock.Right);
-        bar.Children.Add(rightRow);
-        bar.Children.Add(leftRow);
-        // Полоска акцента под выбранным разделом — как у вкладок страницы игры.
-        return new Border { Classes = { "market-nav" }, Padding = new Thickness(4), CornerRadius = new CornerRadius(10), Background = Ui.Res("Surface"), BorderBrush = Ui.Res("Line"), BorderThickness = new Thickness(1), Child = bar };
-    }
+    // ---------------------------------------------------------------- разделы
 
     static Control Section(string title, Action? all = null, Control? right = null, string? eyebrow = null)
     {
@@ -712,7 +661,7 @@ public sealed partial class MarketPage : Page
         var stage = new Border { Classes = { "store-tile", "hero" }, Child = new Panel { Children = { art, new Border { Background = Gx.ShadeUp(0.25, 240) }, new Border { Background = Gx.ShadeLeft(0.7, 160) }, Gx.Haze(true), words } } };
         StoreKit.OnClick(stage, () => MarketTiles.Open(l));
         col.Children.Add(StoreKit.Scaled(stage, 440));
-        if (Animate.On) Animate.From(stage, "translateX(60px) scale(0.97)", 420, 0, new Avalonia.Animation.Easings.BackEaseOut());
+        if (Animate.On) Animate.From(stage, "translateX(24px)", 340, 0, new Avalonia.Animation.Easings.QuinticEaseOut());
 
         void Next() { _queueAt++; Build(); }
         var wished = MarketLocal.Wished(l.Id);

@@ -24,7 +24,7 @@ public sealed partial class MainWindow
     /// <summary>Всё, что раньше занимало шапку отдельными кнопками.</summary>
     MenuFlyout MoreMenu()
     {
-        var hasAside = _aside.Content is not null;
+        var hasAside = _asideAvailable;
         var asideOpen = Settings.Data.Bool("asideOpen", false);
         return Ctx.Menu(
             hasAside ? Ctx.Item(asideOpen ? I18n.T("top.aside.hide") : I18n.T("top.aside.show"), Icons.Sidebar, ToggleAside, gesture: "Ctrl+I") : null,
@@ -49,7 +49,7 @@ public sealed partial class MainWindow
         if (panel.IsVisible) Reveal(panel);
     }
 
-    static void Reveal(Control c) => Animate.From(c, "translateY(-10px) scale(0.97)", 300, 0, new BackEaseOut());
+    static void Reveal(Control c) => Animate.From(c, "translateY(-8px)", 260, 0, new QuinticEaseOut());
 
     /// <summary>Реклама в шапке — только когда окну хватает ширины, чтобы не теснить поиск.</summary>
     void UpdateAdVisibility()

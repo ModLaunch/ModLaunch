@@ -36,27 +36,22 @@ public static class V91Shots
         // Три анимации «Скачать»: начало, середина и карточка с прогрессом.
         var sub = AppState.Game("subnautica");
         var card = new FxCard("Nautilus", "SubnauticaModding · Subnautica", null, sub.Def);
-        foreach (var (kind, name) in new[] { (FxKind.Frame, "frame"), (FxKind.Shatter, "shatter"), (FxKind.Wave, "wave") })
+        foreach (var (kind, name) in new[] { (FxKind.Arc, "arc"), (FxKind.Spark, "spark"), (FxKind.Lift, "lift") })
         {
             w.Navigate(() => new GamePage("subnautica", "catalog"));
             s.Pump(1200);
-            var run = InstallFx.Demo(w, kind, card);
+            // Нажали «Установить» у второго мода списка — оттуда и взлёт.
+            var run = InstallFx.Demo(w, kind, card, new Avalonia.Point(1240, 330));
             if (run is null) { System.Console.WriteLine("::warning title=screenshots::fx " + name + " not prepared"); continue; }
-            foreach (var ms in new[] { 220, 480 })
+            foreach (var ms in new[] { 160, 480, 760 })
             {
                 run.Seek(ms);
                 s.Pump(120);
                 s.Save($"v91-2-fx-{name}-{ms}");
             }
-            run.Seek(1400);
+            run.Seek(run.Duration + 120);
             s.Pump(120);
-            s.Save($"v91-2-fx-{name}-card");
-            if (kind == FxKind.Wave)
-            {
-                run.SeekReturn(0.55);
-                s.Pump(120);
-                s.Save("v91-2-fx-return");
-            }
+            s.Save($"v91-2-fx-{name}-land");
             run.Close();
             s.Pump(200);
         }

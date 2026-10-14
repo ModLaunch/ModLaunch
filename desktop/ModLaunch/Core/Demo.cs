@@ -54,7 +54,7 @@ public static class Demo
         sn.Path = Settings.GamePath("subnautica");
         sn.Status = Detect.Found;
         var registry = sn.Registry!;
-        foreach (var (id, name, days, on) in new[] { ("1262", "Nautilus", 24, true), ("12", "Map Mod", 23, true), ("142", "Slot Extender", 22, false) })
+        foreach (var (id, name, days, on, cat) in new[] { ("1262", "Nautilus", 24, true, "Libraries"), ("12", "Map Mod", 23, true, "Gameplay"), ("142", "Slot Extender", 22, false, "Buildables") })
         {
             Directory.CreateDirectory(Path.Combine(on ? registry.ModsDir : Path.Combine(registry.StorageDir, "disabled"), name));
             registry.Add(new JsonObject
@@ -63,6 +63,7 @@ public static class Demo
                 ["folder"] = name, ["enabled"] = on, ["missing"] = false,
                 ["installedAt"] = DateTime.UtcNow.AddDays(-days).ToString("o"),
                 ["url"] = $"https://www.nexusmods.com/subnautica/mods/{id}",
+                ["categories"] = new JsonArray(cat),
             });
         }
         // Лог с ошибкой мода, сохранения и копии, профили.
@@ -98,6 +99,8 @@ public static class Demo
         Downloads = 900_000 / (i + 1),
         UpdatedAt = DateTime.UtcNow.AddDays(-(i * 37 % 1400)),
         Categories = [i % 3 == 0 ? "Gameplay" : i % 3 == 1 ? "Buildables" : "Vehicles and Upgrades"],
+        // 9.5: часть модов Subnautica работает на Nautilus — для советов «Работает с вашим Nautilus».
+        Dependencies = game.Catalog == CatalogKind.Nexus && id != "1262" && i % 4 == 1 ? ["1262"] : [],
         Url = "https://example.invalid/",
     };
 

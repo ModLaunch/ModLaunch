@@ -86,6 +86,8 @@ public sealed partial class MainWindow : Window
     internal Control? FxDownloads => _downloads;
 
     Point? _lastPress;
+    /// <summary>Где нажали в последний раз (координаты окна) — оттуда взлетает анимация загрузки.</summary>
+    internal Point? LastPressInWindow => _lastPress;
 
     /// <summary>Последнее нажатие в координатах области страницы (null — нажатия не было или оно вне страницы).</summary>
     Point? ClickInPage()
@@ -183,6 +185,8 @@ public sealed partial class MainWindow : Window
         InitDrop();
         _scale.Child = BuildLayout();
         Content = _scale;
+        PropertyChanged += (_, e) => { if (e.Property == WindowStateProperty || e.Property == OffScreenMarginProperty) ApplyWindowState(); };
+        Opened += (_, _) => { HookCaptionHitTest(); ApplyWindowState(); };
         ApplyScale();
         UpdateAdVisibility();
         Look.Changed += () => { ApplyScale(); RenderRail(); _current?.Build(); RenderAside(); RenderGlow(); };
@@ -199,7 +203,15 @@ public sealed partial class MainWindow : Window
 
         SmoothScroll.Attach(this);
         // Где нажали в последний раз — отсюда «вырастает» страница мода.
-        AddHandler(PointerPressedEvent, (_, e) => _lastPress = e.GetPosition(this), Avalonia.Interactivity.RoutingStrategies.Tunnel, handledEventsToo: true);
+        AddHandler(PointerPressedEvent, (_, e) => { _lastPress = e.GetPosition(this); _pointerDown = true; }, Avalonia.Interactivity.RoutingStrategies.Tunnel, handledEventsToo: true);
+        // 9.5: перерисовка страницы, пришедшая между нажатием и отпусканием кнопки мыши, ждёт отпускания —
+        // иначе кнопка, по которой щёлкнули, пропадала вместе со старой страницей и щелчок терялся.
+        AddHandler(PointerReleasedEvent, (_, _) =>
+        {
+            _pointerDown = false;
+            if (_rebuildWaiting) { _rebuildWaiting = false; Dispatcher.UIThread.Post(OnStateChanged, DispatcherPriority.Background); }
+        }, Avalonia.Interactivity.RoutingStrategies.Tunnel, handledEventsToo: true);
+        AddHandler(PointerCaptureLostEvent, (_, _) => _pointerDown = false, Avalonia.Interactivity.RoutingStrategies.Bubble, handledEventsToo: true);
         Images.Prewarm(AppState.Games.Select(g => g.Def));
         // 9.4: официальные картинки Minecraft — в фоне; как скачаются, перерисовать рамку и страницу.
         OfficialArt.Refresh(() => Avalonia.Threading.Dispatcher.UIThread.Post(() => { RenderRail(); _current?.Build(); }));
@@ -261,6 +273,60 @@ public sealed partial class MainWindow : Window
         return b;
     }
 
+    Button? _maxButton;
+    Panel? _winButtons;
+
+    /// <summary>
+    /// 9.5: развёрнутое окно Windows выходит за края экрана на толщину рамки — без отступа верх
+    /// шапки и кнопки «свернуть/закрыть» обрезались. Отступ = OffScreenMargin. И значок
+    /// «развернуть» меняется на «восстановить».
+    /// </summary>
+    void ApplyWindowState()
+    {
+        Padding = WindowState == WindowState.Maximized ? OffScreenMargin : default;
+        if (_maxButton is not null)
+        {
+            var max = WindowState == WindowState.Maximized;
+            _maxButton.Content = Ui.Icon(max ? Icons.Restore : Icons.Maximize, 14);
+            ToolTip.SetTip(_maxButton, I18n.T(max ? "win.restore" : "win.maximize"));
+        }
+    }
+
+    /// <summary>
+    /// 9.5: Windows считает верхние пиксели окна рамкой «потянуть, чтобы изменить размер» —
+    /// щелчок по верху кнопок «свернуть/закрыть» начинал менять размер окна вместо нажатия.
+    /// Над кнопками шапки отвечаем Windows «это обычная часть окна» (HTCLIENT).
+    /// </summary>
+    void HookCaptionHitTest()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        try
+        {
+            Win32Properties.AddWndProcHookCallback(this, (IntPtr hwnd, uint msg, IntPtr wParam, IntPtr lParam, ref bool handled) =>
+            {
+                const uint WM_NCHITTEST = 0x0084;
+                if (msg != WM_NCHITTEST) return IntPtr.Zero;
+                var raw = lParam.ToInt64();
+                var screen = new PixelPoint((short)(raw & 0xFFFF), (short)((raw >> 16) & 0xFFFF));
+                Point local;
+                try { local = this.PointToClient(screen); } catch { return IntPtr.Zero; }
+                if (OverCaptionControl(local)) { handled = true; return new IntPtr(1); }
+                return IntPtr.Zero;
+            });
+        }
+        catch { }
+    }
+
+    /// <summary>Попадает ли точка (в координатах окна) в кнопку или поле шапки.</summary>
+    bool OverCaptionControl(Point p)
+    {
+        if (_winButtons is { } wb && wb.IsVisible && wb.TranslatePoint(new Point(0, 0), this) is { } at
+            && new Rect(at, wb.Bounds.Size * _appliedScale).Inflate(new Thickness(0, 12, 12, 0)).Contains(p)) return true;
+        // Остальные кнопки и поиск в шапке — тоже не «рамка».
+        if (p.Y > 60 * _appliedScale) return false;
+        return this.InputHitTest(p) is Visual v && (v.FindAncestorOfType<Button>(true) is not null || v.FindAncestorOfType<TextBox>(true) is not null);
+    }
+
     void RebuildChrome()
     {
         _search.Watermark = _current?.SearchHint ?? I18n.T("search.home");
@@ -271,8 +337,11 @@ public sealed partial class MainWindow : Window
         RenderDownloads();
     }
 
+    bool _pointerDown, _rebuildWaiting;
+
     void OnStateChanged()
     {
+        if (_pointerDown) { _rebuildWaiting = true; return; }
         RenderRail();
         _current?.Build();
         RenderAside();
@@ -311,12 +380,27 @@ public sealed partial class MainWindow : Window
     /// <summary>Перестроить правую панель (страница вызывает, когда догрузила данные).</summary>
     public void RenderAside()
     {
+        // 9.5: закрытую панель не строим (это 5–10 мс на каждый переход) — только запоминаем, есть ли она у страницы.
+        var open = Settings.Data.Bool("asideOpen", false);
         Control? content = null;
-        try { content = _current?.Aside(); } catch { }
+        if (open) { try { content = _current?.Aside(); } catch { } }
         _aside.Content = content;
-        _asideToggle?.Classes.Set("active", Settings.Data.Bool("asideOpen", false));
-        if (_asideToggle is not null) _asideToggle.IsVisible = content is not null;
+        _asideAvailable = open ? content is not null : HasAside(_current);
+        _asideToggle?.Classes.Set("active", open);
+        if (_asideToggle is not null) _asideToggle.IsVisible = _asideAvailable;
         UpdateAsideVisibility();
+    }
+
+    bool _asideAvailable;
+
+    static readonly Dictionary<Type, bool> AsideTypes = [];
+    static bool HasAside(Page? page)
+    {
+        if (page is null) return false;
+        var type = page.GetType();
+        if (!AsideTypes.TryGetValue(type, out var has))
+            AsideTypes[type] = has = type.GetMethod(nameof(Page.Aside), Type.EmptyTypes)?.DeclaringType != typeof(Page);
+        return has;
     }
 
     void UpdateAsideVisibility() =>
@@ -788,6 +872,7 @@ public sealed partial class MainWindow : Window
     {
         try { await Task.WhenAny(Task.Run(Social.Friends.GoOffline), Task.Delay(1000)); } catch { }
         try { Settings.Save(); } catch { }
+        try { Core.JsonFile.FlushAll(); } catch { }
         if (Application.Current?.ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop) desktop.Shutdown();
         else Environment.Exit(0);
     }

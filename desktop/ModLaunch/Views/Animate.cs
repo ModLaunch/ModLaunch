@@ -63,15 +63,18 @@ public static class Animate
     /// <summary>Страница въезжает снизу — только при переходе, не при перерисовке.</summary>
     public static void PageIn(Control page) => From(page, "translateY(18px)", 340);
 
-    /// <summary>Волна: карточки поднимаются по очереди (задержка ограничена, чтобы длинные списки не ждали).</summary>
+    /// <summary>
+    /// Волна: карточки поднимаются по очереди (задержка ограничена, чтобы длинные списки не ждали).
+    /// 9.5: без «отскока» и без увеличения — карточка не вылезает за край сетки и соседей.
+    /// </summary>
     public static void Rise(Control c, int index) =>
-        From(c, "translateY(26px) scale(0.94)", 460, Math.Min(index * 32, 420), new BackEaseOut());
+        From(c, "translateY(12px)", 380, Math.Min(index * 28, 300), new QuinticEaseOut());
 
-    /// <summary>Всплывающее окно «выпрыгивает».</summary>
-    public static void Pop(Control c) => From(c, "scale(0.9)", 360, 0, new BackEaseOut());
+    /// <summary>Всплывающее окно появляется — чуть увеличиваясь, без «перелёта».</summary>
+    public static void Pop(Control c) => From(c, "scale(0.96)", 260, 0, new CubicEaseOut());
 
-    /// <summary>Уведомление въезжает справа с отскоком, уходит — растворяясь.</summary>
-    public static void ToastIn(Control c) => From(c, "translateX(60px) scale(0.96)", 420, 0, new BackEaseOut());
+    /// <summary>Уведомление въезжает справа, уходит — растворяясь.</summary>
+    public static void ToastIn(Control c) => From(c, "translateX(40px)", 320, 0, new QuinticEaseOut());
 
     public static void ToastOut(Control c, Action remove)
     {

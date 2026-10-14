@@ -160,7 +160,7 @@ public sealed partial class CreatorPage
 
         var actions = Ui.Row(10,
             Ui.Button(I18n.T("mk.new"), () => MarketViews.Editor(null, ReloadStudio), "primary", Icons.Plus),
-            Ui.Button(I18n.T("st.payout"), () => MainWindow.Current?.Navigate(() => new AccountPage("wallet")), "", Icons.Upload),
+            Ui.Button(I18n.T("st.payout"), () => MainWindow.Current?.Navigate(() => new MarketPage("wallet")), "", Icons.Upload),
             Ui.Button("", ReloadStudio, "icon ghost", Icons.Refresh, I18n.T("cr.refresh")));
         col.Children.Add(actions);
 

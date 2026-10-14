@@ -77,14 +77,16 @@ public static class GetGame
             var g = AppState.Games.FirstOrDefault(x => x.Def.Id == id);
             if (g is null || g.Status == Detect.Found) { StopWatching(id); continue; }
             var p = Read(g.Def.SteamAppId);
-            lock (Watching) Watching[id] = p;
+            SteamProgress? was;
+            lock (Watching) { was = Watching.GetValueOrDefault(id); Watching[id] = p; }
             if (p.Installed)
             {
                 StopWatching(id);
                 _ = Found(g);
             }
+            // Перерисовать только страницу этой игры и только если цифры изменились — не всё окно каждые 4 секунды.
+            else if (p != was && Views.MainWindow.Current?.CurrentPage is Views.GamePage page && page.GameId == id) page.Build();
         }
-        AppState.Notify();
     }
 
     static async Task Found(GameState g)

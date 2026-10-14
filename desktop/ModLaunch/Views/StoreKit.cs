@@ -82,7 +82,8 @@ public static class StoreKit
         {
             Content = row, HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
             // Запас сверху и снизу — под подъём и тень карточки при наведении.
-            Padding = new Thickness(0, 6, 0, 14), Margin = new Thickness(0, -6, 0, -14),
+            // 9.5: и по бокам — крайние карточки при наведении не обрезаются краем полки.
+            Padding = new Thickness(4, 8, 4, 14), Margin = new Thickness(-4, -8, -4, -14),
         };
         Button Arrow(string icon, int dir)
         {

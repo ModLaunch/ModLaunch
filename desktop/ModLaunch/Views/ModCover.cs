@@ -24,7 +24,10 @@ public static class ModCover
         HorizontalAlignment iconH = HorizontalAlignment.Center, VerticalAlignment iconV = VerticalAlignment.Center, double iconShare = 0.62)
     {
         var fallback = Fallback(g, m, decode, iconH, iconV);
-        var back = new Image { Stretch = Stretch.UniformToFill, Effect = new BlurEffect { Radius = 34 }, IsVisible = false, IsHitTestVisible = false };
+        // 9.5: размытый фон — не BlurEffect (он пересчитывался в каждом кадре прокрутки), а та же
+        // картинка, уменьшенная до 20 пикселей и растянутая со сглаживанием: на вид так же, но бесплатно.
+        var back = new Image { Stretch = Stretch.UniformToFill, IsVisible = false, IsHitTestVisible = false };
+        RenderOptions.SetBitmapInterpolationMode(back, BitmapInterpolationMode.HighQuality);
         var dim = new Border { Background = new SolidColorBrush(Color.FromArgb(110, 6, 6, 10)), IsVisible = false, IsHitTestVisible = false };
         var wide = new Image { Classes = { "zoom" }, Stretch = Stretch.UniformToFill, IsVisible = false, IsHitTestVisible = false };
         // Квадратный значок — в рамке со скруглением и тенью; размер — доля меньшей стороны плитки.
@@ -57,7 +60,7 @@ public static class ModCover
             }
             else
             {
-                back.Source = bmp;
+                back.Source = Tiny(bmp);
                 squareImage.Source = bmp;
                 back.IsVisible = dim.IsVisible = frame.IsVisible = square.IsVisible = true;
             }
@@ -74,11 +77,27 @@ public static class ModCover
         return host;
     }
 
+    static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Bitmap, Bitmap> Small = new();
+
+    /// <summary>Крошечная копия картинки (20 px по ширине) — для «размытого» фона.</summary>
+    static Bitmap Tiny(Bitmap bmp)
+    {
+        if (Small.TryGetValue(bmp, out var hit)) return hit;
+        var w = Math.Min(20, bmp.PixelSize.Width);
+        var h = Math.Max(1, (int)Math.Round(w * bmp.PixelSize.Height / (double)Math.Max(1, bmp.PixelSize.Width)));
+        Bitmap small;
+        try { small = bmp.CreateScaledBitmap(new PixelSize(w, h), BitmapInterpolationMode.HighQuality); }
+        catch { small = bmp; }
+        Small.AddOrUpdate(bmp, small);
+        return small;
+    }
+
     /// <summary>Пока нет картинки: размытый тёмный арт игры и буквы названия мода в цветной плашке.</summary>
     static Control Fallback(GameState g, ModInfo m, int decode, HorizontalAlignment h, VerticalAlignment v)
     {
-        var art = Ui.GameImage(g.Def, Math.Min(decode, 768), art: Images.Art.Hero);
-        art.Effect = new BlurEffect { Radius = 16 };
+        // Маленькая копия арта, растянутая со сглаживанием, — мягкое «размытие» без BlurEffect.
+        var art = Ui.GameImage(g.Def, 64, art: Images.Art.Hero);
+        RenderOptions.SetBitmapInterpolationMode(art, BitmapInterpolationMode.HighQuality);
         var initials = string.Concat(m.Name.Split(' ', '-', '_', '.').Where(w => w.Length > 0 && char.IsLetterOrDigit(w[0])).Take(2).Select(w => char.ToUpperInvariant(w[0])));
         if (initials == "") initials = "M";
         var hue = (int)(m.Name.Aggregate(23u, (h, c) => h * 31 + c) % 360);

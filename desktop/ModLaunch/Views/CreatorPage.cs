@@ -115,46 +115,36 @@ public sealed partial class CreatorPage : Page
     {
         var content = StoreKit.Fit(new StackPanel { Spacing = 22, Margin = new Thickness(40, 24, 40, 40), MaxWidth = 1640 });
 
-        // Шапка: логотип и название; на «Главной» крупно, на вкладках — компактно (эскиз: «Creator Hub» сверху).
-        var home = _tab == "home";
-        var words = home
-            ? Ui.Col(4, Ui.Text("Creator Hub", "h1"), Ui.Text(I18n.T("cr.home.hello"), "muted"))
-            : Ui.Col(2, Ui.Text("Creator Hub", "h2"), Ui.Text(I18n.T("cr.subtitle"), "small muted"));
-        words.VerticalAlignment = VerticalAlignment.Center;
-        content.Children.Add(Ui.Row(home ? 18 : 14, CreatorLogo.Tile(home ? 64 : 44), words));
-
-        var tabs = new List<Control>();
-        foreach (var (id, key, icon) in MainTabs)
+        // 9.5: та же шапка и навигация, что у рынка (HubNav): мастерская — это раздел «Автору».
+        var hubTab = _tab switch
         {
-            var tab = id;
-            var b = Ui.Button(I18n.T(key), () => Go(tab), "tab", icon);
-            if (_tab == id) b.Classes.Add("active");
-            tabs.Add(b);
-        }
-        // Открыт раздел из «Ещё» — он тоже виден вкладкой, чтобы было понятно, где мы.
-        var extra = Array.FindIndex(MoreTabs, t => t.Id == _tab);
-        if (extra >= 0)
+            "examples" => "templates",
+            "docs" => "docs",
+            "hub" => "workshop",
+            "market" => "store",
+            "studio" => "studio",
+            _ => "projects",
+        };
+        content.Children.Add(HubNav.Header(hubTab, sold: () => { _ = LoadMarket(force: true); _studio = null; }));
+        // Внутри «Проектов» — свои вкладки: обзор, все мои, коды, модели.
+        if (hubTab == "projects")
         {
-            var (extraId, extraKey, extraIcon) = MoreTabs[extra];
-            tabs.Add(Ui.Button(I18n.T(extraKey), () => Go(extraId), "tab active", extraIcon));
+            var tabs = new List<Control>();
+            foreach (var (id, key, icon) in MainTabs.Where(t => t.Id != "examples"))
+            {
+                var tab = id;
+                var b = Ui.Button(I18n.T(key), () => Go(tab), "tab", icon);
+                if (_tab == id) b.Classes.Add("active");
+                tabs.Add(b);
+            }
+            var create = Ui.Button(I18n.T("v95.hub.newProject"), CreateNew, "primary", Icons.Plus);
+            create.VerticalAlignment = VerticalAlignment.Center;
+            var bar = new DockPanel();
+            DockPanel.SetDock(create, Dock.Right);
+            bar.Children.Add(create);
+            bar.Children.Add(Ui.TabBar(tabs.ToArray()));
+            content.Children.Add(bar);
         }
-        var bar = new DockPanel();
-        var more = Ui.Row(2);
-        foreach (var (id, key, icon) in MoreTabs)
-        {
-            if (id == _tab) continue;
-            var tab = id;
-            var link = Ui.Button(I18n.T(key), () => Go(tab), "ghost", icon);
-            link.Foreground = Ui.Res("Muted");
-            link.Padding = new Thickness(10, 6);
-            link.FontSize = 13;
-            more.Children.Add(link);
-        }
-        more.VerticalAlignment = VerticalAlignment.Center;
-        DockPanel.SetDock(more, Dock.Right);
-        bar.Children.Add(more);
-        bar.Children.Add(Ui.TabBar(tabs.ToArray()));
-        content.Children.Add(bar);
 
         content.Children.Add(_tab switch
         {

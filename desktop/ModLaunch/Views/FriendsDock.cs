@@ -159,7 +159,7 @@ public sealed class FriendsDock : Panel
             _list.Children.Add(Ui.Text(I18n.T("friends.empty"), "small muted", wrap: true));
     }
 
-    static Control Row(string name, string line, IBrush color, Control? right)
+    internal static Control Row(string name, string line, IBrush color, Control? right)
     {
         var dot = new Border { Width = 10, Height = 10, CornerRadius = new CornerRadius(5), Background = color, BorderBrush = Ui.Res("Surface"), BorderThickness = new Thickness(2), HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom };
         var face = new Panel { Width = 36, Height = 36, Children = { Ui.Thumb(null, name, 36, 18, person: true), dot } };

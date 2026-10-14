@@ -37,7 +37,7 @@ public sealed partial class MarketPage
                 try
                 {
                     var mine = await Market.Mine();
-                    _studio = new StudioData(mine, await Market.AllSales(mine), await Market.MyWallet());
+                    _studio = new StudioData(mine, await Market.AllSales(mine), await Market.MyWallet(claim: true));
                 }
                 catch (Exception e) { _studioError = Market.Explain(e); }
                 _studioLoading = false;
@@ -70,8 +70,8 @@ public sealed partial class MarketPage
         col.Children.Add(stats);
 
         var actions = Ui.Row(10,
-            Ui.Button(I18n.T("mk.new"), () => MarketViews.Editor(null, ReloadStudio), "primary", Icons.Plus),
-            Ui.Button(I18n.T("st.payout"), () => MainWindow.Current?.Navigate(() => new AccountPage("wallet")), "", Icons.Upload),
+            Ui.Button(I18n.T("mk.new"), () => ListingWizard.Show(null, ReloadStudio), "primary", Icons.Plus),
+            Ui.Button(I18n.T("st.payout"), () => Go("wallet"), "", Icons.Upload),
             Ui.Button(I18n.T("v93.mk.studio.workspace"), () => MainWindow.Current?.Navigate(() => new CreatorPage("mine")), "", Icons.Edit),
             Ui.Button("", ReloadStudio, "icon ghost", Icons.Refresh, I18n.T("cr.refresh")));
         col.Children.Add(actions);

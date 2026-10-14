@@ -66,6 +66,8 @@ public static partial class Hub
         var status = (int)reply.Status;
         if (status is 429 or 503 || Regex.IsMatch(reason, "RESOURCE_EXHAUSTED|quota", RegexOptions.IgnoreCase)) throw new ServiceError("BUSY", reason);
         if (status == 404) throw new ServiceError("NOT_FOUND", reason);
+        // 9.5: кошелёк изменился с момента чтения (условие updateTime) — повторим с новым состоянием.
+        if (reason.Contains("FAILED_PRECONDITION") || reason.Contains("ABORTED")) throw new ServiceError("PRECONDITION", reason);
         if (reason.Contains("ALREADY_EXISTS") || status == 409) throw new ServiceError("EXISTS", reason);
         if (status == 403 || reason.Contains("PERMISSION_DENIED")) throw new ServiceError("DENIED", reason);
         throw new ServiceError("SERVER", reason);

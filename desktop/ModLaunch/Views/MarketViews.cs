@@ -161,7 +161,7 @@ public static class MarketViews
             if (e is Social.ServiceError { Code: "NO_MONEY" })
                 w.Dialog(I18n.T("mk.noMoney.title"), Ui.Text(I18n.T("mk.noMoney.text", ("price", Market.Money(l.Price))), "muted", wrap: true),
                     Ui.Button(I18n.T("common.close"), w.CloseDialog),
-                    Ui.Button(I18n.T("acc.wallet.topup"), () => { w.CloseDialog(); w.Navigate(() => new AccountPage("wallet")); }, "primary", Icons.Plus));
+                    Ui.Button(I18n.T("acc.wallet.topup"), () => { w.CloseDialog(); w.Navigate(() => new MarketPage("wallet")); }, "primary", Icons.Plus));
             else w.Toast(Market.Explain(e), bad: true);
         }
     }
@@ -182,121 +182,6 @@ public static class MarketViews
     // ---------------------------------------------------------------- редактор лота
 
     /// <summary>Выставить новый лот или изменить свой.</summary>
-    public static void Editor(Listing? l, Action? done = null)
-    {
-        var w = MainWindow.Current!;
-        if (!Social.Account.SignedIn && !Program.Screenshot) { w.Navigate(() => new AccountPage()); return; }
-
-        TextBox Box(string value, string hint, bool multi = false, int max = 200, bool mono = false)
-        {
-            var b = new TextBox
-            {
-                Text = value, Watermark = hint, AcceptsReturn = multi, TextWrapping = multi && !mono ? TextWrapping.Wrap : TextWrapping.NoWrap,
-                MinHeight = multi ? 90 : 0, MaxLength = max, VerticalContentAlignment = multi ? VerticalAlignment.Top : VerticalAlignment.Center,
-            };
-            if (mono) { b.FontFamily = Mono; b.FontSize = 12.5; b.MinHeight = 120; }
-            return b;
-        }
-        Control Field(string label, Control input) => Ui.Col(5, Ui.Text(label, "small muted"), input);
-        ComboBox Combo(IEnumerable<string> items, int index, double width) => new() { ItemsSource = items.ToList(), SelectedIndex = Math.Max(0, index), Width = width };
-
-        var title = Box(l?.Title ?? "", I18n.T("mk.f.title"), max: 60);
-        title.IsEnabled = l is null;
-        var summary = Box(l?.Summary ?? "", I18n.T("mk.f.summary"), max: 200);
-        var description = Box(l?.Description ?? "", I18n.T("mk.f.description"), multi: true, max: 5000);
-        var preview = Box(l?.Preview ?? "", I18n.T("mk.f.preview.hint"), multi: true, max: Market.MaxPreview, mono: true);
-        var images = Box(string.Join("\n", l?.Images ?? []), I18n.T("hub.f.images"), multi: true, max: 2400);
-        var version = Box(l?.Version ?? "1.0.0", "1.0.0", max: 20);
-        version.Width = 120;
-        var price = Box(l is null ? "0" : (l.Price / 100m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture), "0", max: 12);
-        price.Width = 140;
-        var kind = Combo(Market.Kinds.Select(k => I18n.T("mk.kind." + k)), Array.IndexOf(Market.Kinds, l?.Kind ?? "model"), 200);
-        var license = Combo(Market.Licenses.Select(k => I18n.T("mk.license." + k)), Array.IndexOf(Market.Licenses, l?.License ?? "personal"), 240);
-        var gameIds = new List<string> { "" };
-        gameIds.AddRange(AppState.Games.Select(g => g.Def.Id));
-        var game = Combo(new[] { I18n.T("mk.anyGame") }.Concat(AppState.Games.Select(g => g.Def.Name)), gameIds.IndexOf(l?.Game ?? ""), 240);
-        var hidden = new CheckBox { Content = I18n.T("mk.f.hidden"), IsChecked = l is { Active: false } };
-
-        var net = Ui.Text("", "small brand");
-        void Net()
-        {
-            var p = Market.ParseMoney(price.Text);
-            net.Text = p is null ? I18n.T("mk.f.price.bad")
-                : p == 0 ? I18n.T("mk.f.price.free")
-                : I18n.T("mk.f.net", ("net", Market.Money(p.Value - Market.Fee(p.Value))), ("fee", Market.FeePercent));
-        }
-        price.TextChanged += (_, _) => Net();
-        Net();
-
-        string? file = null;
-        var fileText = Ui.Text(l is { FileName.Length: > 0 } ? $"{l.FileName} · {GamePage.Size(l.Size)}" : I18n.T("mk.f.noFile"), "small muted");
-        var pick = Ui.Button(I18n.T("mk.f.pick"), async () =>
-        {
-            var f = await Pickers.AnyFile(w, I18n.T("mk.f.pick"));
-            if (f is null) return;
-            file = f;
-            fileText.Text = $"{Path.GetFileName(f)} · {GamePage.Size(new FileInfo(f).Length)}";
-        }, "", Icons.FilePlus);
-
-        var chosen = new HashSet<string>(l?.Tags ?? []);
-        var tags = new WrapPanel();
-        foreach (var tag in Hub.Tags)
-        {
-            var t = tag;
-            var chip = Ui.Button("#" + I18n.T("hub.tag." + tag), () => { }, "chip");
-            chip.Margin = new Thickness(0, 0, 6, 6);
-            chip.Padding = new Thickness(10, 4);
-            chip.FontSize = 12;
-            if (chosen.Contains(tag)) chip.Classes.Add("active");
-            chip.Click += (_, _) =>
-            {
-                if (!chosen.Remove(t) && chosen.Count < 6) chosen.Add(t);
-                chip.Classes.Set("active", chosen.Contains(t));
-            };
-            tags.Children.Add(chip);
-        }
-
-        var bar = new ProgressBar { Minimum = 0, Maximum = 1, IsVisible = false };
-        var form = Ui.Col(12,
-            Field(I18n.T("mk.f.title"), title),
-            Ui.Row(12, Field(I18n.T("mk.f.kind"), kind), Field(I18n.T("mk.f.game"), game)),
-            Ui.Row(12, Field(I18n.T("mk.f.price", ("cur", Market.Currency)), price), Field(I18n.T("mk.f.license"), license), Field(I18n.T("hub.f.version"), version)),
-            net,
-            Field(I18n.T("mk.f.summary"), summary),
-            Field(I18n.T("mk.f.description"), description),
-            Field(I18n.T("mk.f.preview"), preview),
-            Field(I18n.T("hub.f.images"), images),
-            Field(I18n.T("hub.f.tags"), tags),
-            Field(I18n.T("mk.f.file"), Ui.Row(10, pick, fileText)),
-            hidden,
-            bar);
-
-        Button? save = null;
-        save = Ui.Button(l is null ? I18n.T("mk.f.publish") : I18n.T("common.save"), async () =>
-        {
-            var p = Market.ParseMoney(price.Text);
-            if (p is null) { w.Toast(I18n.T("mk.f.price.bad"), bad: true); return; }
-            var d = new ListingDraft
-            {
-                Title = title.Text ?? "", Summary = summary.Text ?? "", Description = description.Text ?? "",
-                Kind = Market.Kinds[Math.Max(0, kind.SelectedIndex)], License = Market.Licenses[Math.Max(0, license.SelectedIndex)],
-                Game = gameIds[Math.Max(0, game.SelectedIndex)], Price = p.Value, Version = (version.Text ?? "").Trim(),
-                Preview = preview.Text ?? "", Tags = chosen.ToList(), Hidden = hidden.IsChecked == true, File = file,
-                Images = (images.Text ?? "").Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList(),
-            };
-            save!.IsEnabled = false;
-            bar.IsVisible = true;
-            try
-            {
-                await Market.Save(d, l, new Progress<double>(r => bar.Value = r));
-                w.CloseDialog();
-                w.Toast(I18n.T(l is null ? "mk.published" : "mk.saved", ("title", d.Title)));
-                done?.Invoke();
-            }
-            catch (Exception e) { w.Toast(Market.Explain(e), bad: true); save.IsEnabled = true; bar.IsVisible = false; }
-        }, "primary", Icons.Upload);
-
-        w.Dialog(l is null ? I18n.T("mk.new") : I18n.T("mk.edit"), new ScrollViewer { MaxHeight = 600, Content = form }, 720,
-            Ui.Button(I18n.T("common.cancel"), w.CloseDialog), save);
-    }
+    /// <summary>9.5: выставить или изменить лот — пошаговый мастер с живым превью (ListingWizard).</summary>
+    public static void Editor(Listing? l, Action? done = null) => ListingWizard.Show(l, done);
 }

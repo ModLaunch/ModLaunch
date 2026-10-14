@@ -55,7 +55,10 @@ public static class Program
         try { if (!Features.Nxm.IsRegistered()) Features.Nxm.Register(); } catch { }
         // Свои ссылки modlaunch:// (кнопка «Открыть в ModLaunch» на сайте Hub) — всегда наши.
         try { if (!Features.Nxm.IsRegistered("modlaunch")) Features.Nxm.Register("modlaunch"); } catch { }
+        // 9.5: настройки и списки модов пишутся на диск в фоне (при выходе — дописываются).
+        Core.JsonFile.DeferWrites = true;
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+        Core.JsonFile.FlushAll();
         // Окно закрыто — выходим сразу, не дожидаясь фоновых загрузок и проверок.
         Environment.Exit(0);
         return 0;

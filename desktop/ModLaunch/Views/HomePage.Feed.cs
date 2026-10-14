@@ -221,6 +221,8 @@ public sealed partial class HomePage
     {
         var options = new List<(string Theme, double Weight)> { ("mix", 2.2) };
         var last = _recentThemes.TakeLast(3).ToHashSet();
+        // 9.5: блок «Для вас» — моды по вашим модам, если таких набралось хотя бы на полблока.
+        if (Allowed(FeedKind.Mod) && !last.Contains("foryou") && FreshRecs(mine) >= 3) options.Add(("foryou", 1.6));
         foreach (var g in mine.Where(g => g.Def.HasCatalog))
             if (ModsOf(g).Any() && !last.Contains("game:" + g.Def.Id)) options.Add(("game:" + g.Def.Id, 1.3));
         if (Allowed(FeedKind.Listing) && (_feedMarket ?? []).Count(l => !_used.Contains("l:" + l.Id)) >= 2 && !last.Contains("market")) options.Add(("market", 1.1));
@@ -254,6 +256,27 @@ public sealed partial class HomePage
 
     static void Use(GameState g) => _gameUses[g.Def.Id] = _gameUses.GetValueOrDefault(g.Def.Id) + 1;
 
+    static readonly Dictionary<string, (string Stamp, List<Features.Suggestion> List)> _recs = [];
+
+    /// <summary>
+    /// 9.5: советы по вашим модам для игры («Работает с вашим X», «Похоже на X») — из подборки и
+    /// популярных, что уже загружены. Считаются заново, только когда что-то из этого изменилось.
+    /// </summary>
+    static List<Features.Suggestion> RecsOf(GameState g)
+    {
+        if (!g.Def.HasCatalog) return [];
+        var stamp = $"{_featured?.Count ?? -1}|{Views.Aside.Popular(g)?.Count ?? -1}|{g.ModCount}";
+        if (_recs.TryGetValue(g.Def.Id, out var c) && c.Stamp == stamp) return c.List;
+        var pool = Candidates(g).ToList();
+        List<Features.Suggestion> list;
+        try { list = pool.Count == 0 ? [] : Features.Recommend.For(g, pool, Features.Recommend.OwnedOf(g, pool)); }
+        catch { list = []; }
+        _recs[g.Def.Id] = (stamp, list);
+        return list;
+    }
+
+    static int FreshRecs(List<GameState> mine) => mine.Sum(g => RecsOf(g).Count(s => !_used.Contains("m:" + g.Def.Id + "/" + s.Mod.Id)));
+
     /// <summary>Подходящая плитка для места: сначала по теме блока, потом что найдётся.</summary>
     static FeedItem Take(FeedBlock block, Slot slot, List<GameState> mine)
     {
@@ -274,6 +297,17 @@ public sealed partial class HomePage
         FeedItem? ModItem()
         {
             if (!Allowed(FeedKind.Mod)) return null;
+            // 9.5: в блоке «Для вас» (и иногда в любом) — мод по вашим модам, с причиной на плитке.
+            if (block.Theme == "foryou" || FeedRng.NextDouble() < 0.3)
+            {
+                var recs = themeGame is not null ? RecsOf(themeGame) : mine.SelectMany(RecsOf).OrderByDescending(s => s.Score).ToList();
+                var pick = recs.Where(s => !_used.Contains("m:" + s.Game.Def.Id + "/" + s.Mod.Id)).Take(3).OrderBy(_ => FeedRng.Next()).FirstOrDefault();
+                if (pick is not null)
+                {
+                    _used.Add("m:" + pick.Game.Def.Id + "/" + pick.Mod.Id);
+                    return new FeedItem(FeedKind.Mod, pick.Game, pick.Mod, Tag: "for:" + pick.Reason);
+                }
+            }
             IEnumerable<GameState> games = themeGame is not null ? [themeGame, .. mine.Where(g => g != themeGame).OrderBy(_ => FeedRng.Next())] : mine.OrderBy(_ => FeedRng.Next());
             foreach (var g in games)
             {
@@ -363,6 +397,7 @@ public sealed partial class HomePage
         // Тема блока важнее размера места: в блоке рынка — лоты, в блоке Мастерской — её моды.
         if (block.Theme == "market") order.Insert(0, ListingItem);
         if (block.Theme == "workshop") order.Insert(0, HubItem);
+        if (block.Theme == "foryou" && slot is not (Slot.List or Slot.T)) order.Insert(0, ModItem);
         // Раскрывающийся топ — всегда топ (если есть игра с популярными модами).
         if (block.Layout.Fold) order.Insert(0, TopItem);
         foreach (var f in order) if (f() is { } item) return item;
@@ -432,6 +467,7 @@ public sealed partial class HomePage
             var id = g.Def.Id;
             open = () => MainWindow.Current?.Navigate(() => new GamePage(id, "catalog"));
         }
+        else if (b.Theme == "foryou") { text = I18n.T("v95.feed.cap.forYou"); }
         else if (b.Theme == "market") { text = I18n.T("v93.feed.cap.market"); open = () => MainWindow.Current?.Navigate(() => new MarketPage()); }
         else if (b.Theme == "workshop") { text = I18n.T("v93.feed.cap.workshop"); open = () => MainWindow.Current?.Navigate(() => new MarketPage("workshop")); }
         else text = I18n.T("v93.feed.cap.mix");
@@ -503,8 +539,9 @@ public sealed partial class HomePage
         for (var i = 0; i < tiles.Count; i++)
         {
             var (t, x) = tiles[i];
-            var from = x < 0.34 ? "translateX(-46px) scale(0.96)" : x > 0.66 ? "translateX(46px) scale(0.96)" : "translateY(34px) scale(0.95)";
-            Animate.From(t, from, 440, baseDelay + i * 45, new BackEaseOut());
+            // 9.5: сдвиг небольшой и без «отскока» — плитки не вылетают за края ленты.
+            var from = x < 0.34 ? "translateX(-14px)" : x > 0.66 ? "translateX(14px)" : "translateY(14px)";
+            Animate.From(t, from, 380, baseDelay + i * 35, new QuinticEaseOut());
         }
     }
 
@@ -627,7 +664,7 @@ public sealed partial class HomePage
         return t;
     }
 
-    static string ModEyebrow(string tag) => tag switch
+    static string ModEyebrow(string tag) => tag.StartsWith("for:", StringComparison.Ordinal) ? tag[4..] : tag switch
     {
         "pick" => I18n.T("v91.home.pick"),
         "recent" => I18n.T("mc.recent"),
@@ -699,7 +736,8 @@ public sealed partial class HomePage
     static Control ModSmall(GameState g, ModInfo m, string tag)
     {
         var top = new Panel { ClipToBounds = true, Children = { ModCover.Create(g, m, 768) } };
-        var label = Gx.Tag(ModEyebrow(tag), null, null, 10.5);
+        var forYou = tag.StartsWith("for:", StringComparison.Ordinal);
+        var label = Gx.Tag(forYou ? I18n.T("rec.tag") : ModEyebrow(tag), forYou ? Ui.Res("Brand") : null, forYou ? Ui.Res("OnBrand") : null, 10.5);
         label.Margin = new Thickness(10);
         top.Children.Add(label);
         var foot = new DockPanel { Margin = new Thickness(12, 10, 10, 12) };
@@ -709,7 +747,10 @@ public sealed partial class HomePage
         foot.Children.Add(action);
         foot.Children.Add(Ui.Col(2,
             new TextBlock { Text = m.Name, FontWeight = FontWeight.SemiBold, FontSize = 14.5, TextTrimming = TextTrimming.CharacterEllipsis },
-            new TextBlock { Text = m.Downloads > 0 ? $"{g.Def.ShortName} · ↓ {I18n.Compact(m.Downloads)}" : g.Def.ShortName, FontSize = 12, Foreground = Ui.Res("Muted"), TextTrimming = TextTrimming.CharacterEllipsis }));
+            forYou
+                ? new TextBlock { Text = "✦ " + tag[4..], FontSize = 12, Foreground = Ui.Res("Brand2"), TextTrimming = TextTrimming.CharacterEllipsis }
+                : new TextBlock { Text = m.Downloads > 0 ? $"{g.Def.ShortName} · ↓ {I18n.Compact(m.Downloads)}" : g.Def.ShortName, FontSize = 12, Foreground = Ui.Res("Muted"), TextTrimming = TextTrimming.CharacterEllipsis }));
+        if (forYou) ToolTip.SetTip(foot, $"{g.Def.Name}: {tag[4..]}");
         var grid = new Grid { RowDefinitions = new RowDefinitions("*,Auto") };
         grid.Children.Add(top);
         Grid.SetRow(foot, 1);
@@ -872,7 +913,7 @@ public sealed partial class HomePage
                 StoreKit.OnClick(row, () => MainWindow.Current?.Navigate(() => new ModPage(id, mm)));
                 list.Children.Add(row);
                 // Строки «ложатся» сверху одна за другой.
-                if (animate) Animate.From(row, "translateY(-26px) scale(0.97)", 420, (i - 3) * 60, new BackEaseOut());
+                if (animate) Animate.From(row, "translateY(-10px)", 320, (i - 3) * 45, new QuinticEaseOut());
             }
         }
         if (open) Fill(false);

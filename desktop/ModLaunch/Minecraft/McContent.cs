@@ -351,6 +351,9 @@ public static partial class McContent
     /// <summary>Для снимков экрана: подставные обновления.</summary>
     public static class Demo
     {
+        /// <summary>Подставить обновления сборки так, будто их нашла проверка.</summary>
+        public static void Seed(McInstance i) { var list = Updates(i); lock (Found) Found[i.Id] = list; }
+
         public static List<McUpdate> Updates(McInstance i) =>
             List(i, "mod").Where(x => x.ProjectId is "AANobbMI" or "gvQqBUqZ").Select(x => new McUpdate(x,
                 new MrVersion("new-" + x.ProjectId, x.ProjectId!, (x.Version ?? "1.0") + ".1", "", "release", [i.Loader], [i.GameVersion],

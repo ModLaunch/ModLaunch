@@ -103,7 +103,7 @@ public sealed class AccountPage : Page
         else body = _tab switch
         {
             "security" => Security(p),
-            "wallet" => WalletTab(),
+            "wallet" => new WalletPanel(),
             "purchases" => PurchasesTab(),
             "selling" => Selling(),
             "data" => DataTab(p),
@@ -254,71 +254,6 @@ public sealed class AccountPage : Page
 
     // ---------------------------------------------------------------- кошелёк
 
-    Control WalletTab()
-    {
-        if ((_wallet is null || _payouts is null || _topups is null) && !_busy)
-            Load("wallet", async () => { _wallet = await Market.MyWallet(); _payouts = await Market.MyPayouts(); _topups = await Market.MyTopUps(); });
-        var col = Ui.Col(16);
-        if (_wallet is null) { col.Children.Add(Loading()); return col; }
-
-        var stats = new UniformGrid { Columns = 4 };
-        stats.Children.Add(Stat(I18n.T("st.balance"), Market.Money(_wallet.Balance), Ui.Res("Brand2")));
-        stats.Children.Add(Stat(I18n.T("st.earned"), Market.Money(_wallet.Earned), Ui.Res("Good")));
-        stats.Children.Add(Stat(I18n.T("acc.spent"), Market.Money(_wallet.Spent)));
-        stats.Children.Add(Stat(I18n.T("acc.paidOut"), Market.Money(_wallet.PaidOut)));
-        col.Children.Add(stats);
-
-        // Пополнение.
-        var amount = new TextBox { Watermark = "500", Width = 140 };
-        var reference = new TextBox { Watermark = I18n.T("acc.topup.ref"), Width = 340, MaxLength = 300 };
-        var uid = Account.Uid ?? "";
-        var topRows = new List<Control>
-        {
-            Ui.Row(8, Ui.Text(I18n.T("acc.topup.id"), "small muted"), new SelectableTextBlock { Text = uid, FontSize = 12 },
-                Ui.Button("", async () => { if (TopLevel.GetTopLevel(this)?.Clipboard is { } c) { await c.SetTextAsync(uid); MainWindow.Current?.Toast(I18n.T("acc.copied")); } }, "icon ghost", Icons.List, I18n.T("acc.copy"))),
-        };
-        if (Market.TopUpUrl != "") topRows.Add(Ui.Button(I18n.T("acc.topup.pay"), () => Ui.OpenUrl(Market.TopUpUrl.Replace("{uid}", uid)), "", Icons.External));
-        topRows.Add(Ui.Row(8, amount, Ui.Text(Market.Currency, "muted"), reference,
-            Ui.Button(I18n.T("acc.topup.send"), () =>
-            {
-                var a = Market.ParseMoney(amount.Text);
-                if (a is null or 0) { MainWindow.Current?.Toast(I18n.T("mk.f.price.bad"), bad: true); return; }
-                Call(() => Market.RequestTopUp(a.Value, reference.Text ?? ""), I18n.T("acc.topup.sent"));
-            }, "primary", Icons.Plus)));
-        col.Children.Add(Card(I18n.T("acc.wallet.topup"), I18n.T("acc.topup.text"), topRows.ToArray()));
-
-        // Вывод.
-        var outAmount = new TextBox { Watermark = (Market.MinPayout / 100).ToString(I18n.Culture), Width = 140 };
-        var method = new TextBox { Watermark = I18n.T("acc.payout.method"), Width = 340, MaxLength = 300 };
-        col.Children.Add(Card(I18n.T("acc.payout"), I18n.T("acc.payout.text", ("min", Market.Money(Market.MinPayout))),
-            Ui.Row(8, outAmount, Ui.Text(Market.Currency, "muted"), method,
-                Ui.Button(I18n.T("acc.payout.send"), () =>
-                {
-                    var a = Market.ParseMoney(outAmount.Text);
-                    if (a is null or 0) { MainWindow.Current?.Toast(I18n.T("mk.f.price.bad"), bad: true); return; }
-                    Call(() => Market.RequestPayout(a.Value, method.Text ?? ""), I18n.T("acc.payout.sent"));
-                }, "primary", Icons.Upload)),
-            Ui.Button(I18n.T("acc.payout.all"), () => { outAmount.Text = (_wallet.Balance / 100m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture); }, "ghost")));
-
-        // История заявок.
-        var history = Ui.Col(6);
-        var items = (_topups ?? []).Select(t => (t.Created, I18n.T("acc.h.topup"), "+" + Market.Money(t.Amount), t.Status, t.Reference))
-            .Concat((_payouts ?? []).Select(p => (p.Created, I18n.T("acc.h.payout"), "−" + Market.Money(p.Amount), p.Status, p.Method + (p.Note != "" ? " · " + p.Note : ""))))
-            .OrderByDescending(x => x.Created).ToList();
-        if (items.Count == 0) history.Children.Add(Ui.Text(I18n.T("acc.h.empty"), "muted"));
-        foreach (var (when, what, sum, status, note) in items)
-        {
-            var line = new DockPanel();
-            var right = Ui.Row(12, Ui.Text(I18n.T("acc.status." + status), "small", color: status switch { "pending" => Ui.Res("Warn"), "rejected" => Ui.Res("Bad"), _ => Ui.Res("Good") }), Ui.Text(sum, "h3"));
-            DockPanel.SetDock(right, Dock.Right);
-            line.Children.Add(right);
-            line.Children.Add(Ui.Col(2, Ui.Text(what, ""), Ui.Text(Ui.Ago(when) + (note != "" ? " · " + note : ""), "small muted")));
-            history.Children.Add(Ui.Card(line, 12));
-        }
-        col.Children.Add(Card(I18n.T("acc.history"), null, history));
-        return col;
-    }
-
     // ---------------------------------------------------------------- покупки
 
     Control PurchasesTab()
@@ -446,12 +381,14 @@ public sealed class AccountPage : Page
 
         var uid = new TextBox { Watermark = "UID", Width = 300 };
         var sum = new TextBox { Watermark = "100", Width = 120 };
+        var why = new TextBox { Watermark = I18n.T("v95.adm.grant.note"), Width = 260, MaxLength = 300 };
         col.Children.Add(Card(I18n.T("adm.grant"), I18n.T("adm.grant.text"),
-            Ui.Row(8, uid, sum, Ui.Text(Market.Currency, "muted"), Ui.Button(I18n.T("adm.grant.go"), () =>
+            Ui.Row(8, uid, sum, Ui.Text(Market.Currency, "muted"), why, Ui.Button(I18n.T("adm.grant.go"), () =>
             {
                 var v = Market.ParseMoney(sum.Text);
                 if (v is null or 0) { MainWindow.Current?.Toast(I18n.T("mk.f.price.bad"), bad: true); return; }
-                Call(() => Market.Grant((uid.Text ?? "").Trim(), v.Value), I18n.T("adm.done"));
+                if (string.IsNullOrWhiteSpace(why.Text)) { MainWindow.Current?.Toast(I18n.T("v95.adm.grant.noteNeeded"), bad: true); return; }
+                Call(() => Market.Grant((uid.Text ?? "").Trim(), v.Value, why.Text ?? ""), I18n.T("adm.done"));
             }, "primary", Icons.Plus)),
             Ui.Button(I18n.T("cr.refresh"), () => { Reset(); Build(); }, "ghost", Icons.Refresh)));
         return col;

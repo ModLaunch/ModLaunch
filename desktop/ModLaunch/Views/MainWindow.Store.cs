@@ -227,11 +227,14 @@ public sealed partial class MainWindow
         tools.HorizontalAlignment = HorizontalAlignment.Right;
         tools.Margin = new Thickness(12, 0, 8, 0);
 
+        // 9.5: кнопки окна как у Windows — во всю высоту полосы, вплотную к углу (мышь можно «бросить» в угол).
+        _maxButton = WinButton(Icons.Maximize, () => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized, I18n.T("win.maximize"));
         var winButtons = Ui.Row(0,
             WinButton(Icons.Minimize, () => WindowState = WindowState.Minimized, I18n.T("win.minimize")),
-            WinButton(Icons.Maximize, () => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized, I18n.T("win.maximize")),
+            _maxButton,
             WinButton(Icons.Close, Close, I18n.T("win.close"), "close"));
         winButtons.VerticalAlignment = VerticalAlignment.Top;
+        _winButtons = winButtons;
 
         // Поиск — ровно по центру между левой и правой частью (как в Microsoft Store).
         var titlebar = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto,*,Auto"), Height = TitleHeight, Background = Brushes.Transparent };
@@ -326,10 +329,30 @@ public sealed partial class MainWindow
         return layers;
     }
 
+    string? _railKey;
+    readonly List<(string Id, Panel Slot, Button Button)> _railGameSlots = [];
+    Button? _railPlus;
+
     void RenderRail()
     {
-        _railGames.Children.Clear();
         var games = RailGames().ToList();
+        // 9.5: игры на панели перестраиваются, только когда изменился их список или состояние
+        // (запущена, нужен загрузчик), тема или язык. При переходе между страницами — только подсветка.
+        var key = string.Join("|", games.Select(g => $"{g.Def.Id}:{g.Def.Name}:{Features.Launcher.IsRunning(g.Def.Id)}:{g.LoaderInstalled}")) + $"#{Look.Theme}{Look.Accent}{I18n.Lang}";
+        if (key == _railKey && _railPlus is not null)
+        {
+            foreach (var (id, slot, button) in _railGameSlots)
+            {
+                button.Classes.Set("active", _current?.GameId == id || Features.Launcher.IsRunning(id));
+                slot.Classes.Set("active", _current?.GameId == id);
+            }
+            _railPlus.Classes.Set("active", _current is AddGamePage);
+        }
+        else
+        {
+        _railKey = key;
+        _railGameSlots.Clear();
+        _railGames.Children.Clear();
         // Подпись раздела — панель читается блоками, а не сплошным столбцом значков.
         if (games.Count > 0)
             _railGames.Children.Add(new TextBlock
@@ -366,6 +389,7 @@ public sealed partial class MainWindow
             var slot = new Panel { Classes = { "rail-item" }, Width = RailWidth, Children = { new Border { Classes = { "rail-pip" } }, b } };
             slot.Classes.Set("active", _current?.GameId == id);
             _railGames.Children.Add(slot);
+            _railGameSlots.Add((id, slot, b));
         }
         var plus = RailIcon(Icons.Plus, () => Navigate(() => new AddGamePage()), I18n.T("add.title"));
         plus.Width = plus.Height = 34;
@@ -374,7 +398,9 @@ public sealed partial class MainWindow
         plus.HorizontalAlignment = HorizontalAlignment.Center;
         ToolTip.SetPlacement(plus, PlacementMode.Right);
         _railGames.Children.Add(new Panel { Classes = { "rail-item" }, Width = RailWidth, Margin = new Thickness(0, 2, 0, 6), Children = { new Border { Classes = { "rail-pip" } }, plus } });
+        _railPlus = plus;
         if (_railGamesHost is { } host) FitRailGames(host.Bounds.Height);
+        }
 
         // Разделы: выбранный — значком цвета акцента и полоской слева.
         SetNav(_homeButton, _current is HomePage { IsFeed: false } or SearchPage);

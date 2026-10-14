@@ -152,9 +152,9 @@
     <Style Selector="Button.win">
       <Setter Property="Background" Value="Transparent"/>
       <Setter Property="BorderThickness" Value="0"/>
-      <Setter Property="CornerRadius" Value="8"/>
-      <Setter Property="Width" Value="44"/>
-      <Setter Property="Height" Value="36"/>
+      <Setter Property="CornerRadius" Value="0"/>
+      <Setter Property="Width" Value="46"/>
+      <Setter Property="Height" Value="40"/>
       <Setter Property="Padding" Value="0"/>
       <Setter Property="HorizontalContentAlignment" Value="Center"/>
       <Setter Property="VerticalContentAlignment" Value="Center"/>
@@ -347,7 +347,7 @@
     <Style Selector="Button.card-btn">
       <Setter Property="Transitions">
         <Transitions>
-          <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.28" Easing="BackEaseOut"/>
+          <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.22" Easing="CubicEaseOut"/>
         </Transitions>
       </Setter>
     </Style>
@@ -367,13 +367,13 @@
     <Style Selector="Border.cover-art">
       <Setter Property="Transitions">
         <Transitions>
-          <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.32" Easing="BackEaseOut"/>
+          <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.24" Easing="CubicEaseOut"/>
           <BoxShadowsTransition Property="BoxShadow" Duration="0:0:0.25"/>
         </Transitions>
       </Setter>
     </Style>
     <Style Selector="Window.juicy Button.cover-btn:pointerover Border.cover-art">
-      <Setter Property="RenderTransform" Value="translateY(-7px) scale(1.03)"/>
+      <Setter Property="RenderTransform" Value="translateY(-4px)"/>
       <Setter Property="BoxShadow" Value="0 20 34 -12 #C0000000"/>
     </Style>
     <Style Selector="Image.zoom">
@@ -400,7 +400,7 @@
     <Style Selector="Window.juicy Button.cover-btn:pointerover Button.cover-play"><Setter Property="RenderTransform" Value="translateY(0px) scale(1)"/></Style>
     <Style Selector="Window.juicy Button.cover-btn:pointerover Button.cover-play:pressed"><Setter Property="RenderTransform" Value="scale(0.88)"/></Style>
     <!-- Боковая панель: значки чуть подпрыгивают -->
-    <Style Selector="Window.juicy Button.rail:pointerover"><Setter Property="RenderTransform" Value="scale(1.1)"/></Style>
+    <Style Selector="Window.juicy Button.rail:pointerover"><Setter Property="RenderTransform" Value="scale(1.05)"/></Style>
     <Style Selector="Window.juicy Button.rail:pressed"><Setter Property="RenderTransform" Value="scale(0.9)"/></Style>
     <!-- Вкладки и чипы: активная слегка «вдавлена» -->
     <Style Selector="Window.juicy Button.tab:pointerover, Window.juicy Button.chip:pointerover"><Setter Property="RenderTransform" Value="translateY(-2px)"/></Style>
@@ -751,6 +751,38 @@
     </Style>
     <Style Selector="Button.pivot.active"><Setter Property="Foreground" Value="{StaticResource Text}"/></Style>
     <Style Selector="Window.juicy Button.pivot:pressed"><Setter Property="RenderTransform" Value="scale(0.96)"/></Style>
+    <!-- 9.5: страницы раздела Creator Hub — выбранная на мягкой подложке акцента -->
+    <Style Selector="Border.market-nav Button.pivot.active /template/ ContentPresenter"><Setter Property="Background" Value="{StaticResource BrandSoft}"/></Style>
+    <Style Selector="Border.market-nav Button.pivot.active"><Setter Property="Foreground" Value="{StaticResource Brand2}"/></Style>
+    <!-- 9.5: мастер «Продать работу» — плитки выбора (тип, лицензия) -->
+    <Style Selector="Button.lw-kind">
+      <Setter Property="Background" Value="{StaticResource Surface2}"/>
+      <Setter Property="BorderBrush" Value="{StaticResource Line}"/>
+      <Setter Property="BorderThickness" Value="1.5"/>
+      <Setter Property="CornerRadius" Value="12"/>
+      <Setter Property="FontWeight" Value="Normal"/>
+    </Style>
+    <Style Selector="Button.lw-kind:pointerover /template/ ContentPresenter"><Setter Property="BorderBrush" Value="{StaticResource Brand2}"/></Style>
+    <Style Selector="Button.lw-kind.active /template/ ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource BrandSoft}"/>
+      <Setter Property="BorderBrush" Value="{StaticResource Brand}"/>
+    </Style>
+    <!-- 9.5: разделы Creator Hub (Магазин · Моё · Автору) — переключатель с заливкой -->
+    <Style Selector="Button.hub-group">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Foreground" Value="{StaticResource Muted}"/>
+      <Setter Property="CornerRadius" Value="8"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="FontSize" Value="13.5"/>
+    </Style>
+    <Style Selector="Button.hub-group:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource Hover}"/>
+      <Setter Property="Foreground" Value="{StaticResource Text}"/>
+    </Style>
+    <Style Selector="Button.hub-group.active /template/ ContentPresenter"><Setter Property="Background" Value="{StaticResource Brand}"/></Style>
+    <Style Selector="Button.hub-group.active"><Setter Property="Foreground" Value="{StaticResource OnBrand}"/></Style>
+    <Style Selector="Button.hub-group.active:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{StaticResource Brand}"/><Setter Property="Foreground" Value="{StaticResource OnBrand}"/></Style>
+    <Style Selector="Window.juicy Button.hub-group:pressed"><Setter Property="RenderTransform" Value="scale(0.96)"/></Style>
 
     <!-- Карточка-образец оформления (Тёмная, Красно-белая, Чёрно-зелёная) -->
     <Style Selector="Button.style-card">
@@ -786,7 +818,7 @@
       </Setter>
     </Style>
     <Style Selector="Button.rail-game:pointerover"><Setter Property="Opacity" Value="1"/></Style>
-    <Style Selector="Window.juicy Button.rail-game:pointerover"><Setter Property="RenderTransform" Value="scale(1.06)"/></Style>
+    <Style Selector="Window.juicy Button.rail-game:pointerover"><Setter Property="RenderTransform" Value="scale(1.04)"/></Style>
     <Style Selector="Button.rail-game.active"><Setter Property="Opacity" Value="1"/></Style>
     <!-- Второстепенные пункты панели — мельче и тише -->
     <Style Selector="Button.nav.secondary"><Setter Property="Width" Value="52"/></Style>

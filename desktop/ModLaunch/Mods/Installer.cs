@@ -90,6 +90,8 @@ public static partial class Installer
                     ["url"] = entry.Url,
                     ["icon"] = entry.Icon,
                     ["dependencies"] = new JsonArray(entry.Dependencies.Select(d => (JsonNode)d).ToArray()),
+                    // 9.5: разделы каталога — по ним «Для вас» находит похожие моды.
+                    ["categories"] = new JsonArray(entry.Categories.Take(8).Select(c => (JsonNode)c).ToArray()),
                     ["requestedBy"] = entry.Id == mod.Id ? null : stale ? before!.Str("requestedBy") : mod.Id,
                 }, progress, ct);
                 // Обновлённая зависимость могла лечь в папку с другим именем — старую убираем, чтобы не было двух версий.

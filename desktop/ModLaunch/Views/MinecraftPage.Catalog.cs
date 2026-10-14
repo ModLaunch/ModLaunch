@@ -23,6 +23,11 @@ public sealed partial class MinecraftPage
     readonly HashSet<string> _busy = [];
     CancellationTokenSource? _cts;
 
+    /// <summary>9.5: в какую сборку ставить из каталога (по умолчанию — выбранная). Каталог подбирает моды под неё.</summary>
+    static string? _targetId, _targetBase;
+    /// <summary>Смена выбранной сборки в шапке сбрасывает выбор «ставить в» — каталог снова для выбранной.</summary>
+    static McInstance? Target => _targetId is not null && _targetBase == Mc.Active?.Id ? Mc.Get(_targetId) ?? Mc.Active : Mc.Active;
+
     /// <summary>Популярные категории Modrinth для каждого вида (идентификаторы как на сайте).</summary>
     static readonly Dictionary<string, string[]> Categories = new()
     {
@@ -46,7 +51,7 @@ public sealed partial class MinecraftPage
         if (Shown) Build();
         try
         {
-            var target = _type == "modpack" ? null : Mc.Active;
+            var target = _type == "modpack" ? null : Target;
             var (hits, total) = await McModrinth.Search(_query, _type, _sort, reset ? 0 : _hits.Count, target, _category, cts.Token);
             if (cts.IsCancellationRequested) return;
             _hits.AddRange(hits.Where(h => _hits.All(x => x.Id != h.Id)));
@@ -60,7 +65,7 @@ public sealed partial class MinecraftPage
 
     Control CatalogView()
     {
-        var a = Mc.Active;
+        var a = Target;
         var col = new StackPanel { Spacing = 14 };
 
         // Вид: моды, модпаки, ресурспаки, шейдеры, датапаки.
@@ -104,9 +109,27 @@ public sealed partial class MinecraftPage
             ? I18n.T("mine.catalog.packs")
             : a is null ? I18n.T("mine.catalog.noBuild") : I18n.T("mine.catalog.for", ("build", a.Name), ("label", a.Label));
         var summary = Ui.Row(10, Ui.Icon(_type == "modpack" ? Icons.Layers : Icons.Check, 14, Ui.Res("Brand")), Ui.Text(target, "small"));
+        summary.VerticalAlignment = VerticalAlignment.Center;
         if (!_loading || _hits.Count > 0)
             summary.Children.Add(Ui.Text("·  " + (_query == "" ? I18n.T("mr.total", ("n", I18n.Compact(_total))) : I18n.T("mr.found", ("n", I18n.Compact(_total)), ("q", _query))), "small muted"));
-        col.Children.Add(summary);
+        // 9.5: «Ставить в: [сборка ▾]» — любая из своих сборок, каталог сразу подстраивается под неё.
+        if (_type != "modpack" && a is not null && Mc.Instances() is { Count: > 1 } builds)
+        {
+            var pick = new Button { Classes = { "chip", "active" }, Padding = new Thickness(6, 4, 10, 4), Content = Ui.Row(8, InstanceIcon(a, 22, 6), Ui.Text(I18n.T("mc941.target", ("build", a.Name)), "small"), Ui.Icon(Icons.ChevronDown, 12)) };
+            pick.Click += (_, _) =>
+            {
+                var menu = Ctx.Menu(builds.Select(b => (object?)Ctx.Item((b.Id == a.Id ? "✓  " : "") + b.Name + "  ·  " + b.Label, Icons.Layers, () => { _targetId = b.Id; _targetBase = Mc.Active?.Id; _ = LoadCatalog(reset: true); })).ToArray());
+                menu.Placement = PlacementMode.BottomEdgeAlignedRight;
+                menu.ShowAt(pick);
+            };
+            ToolTip.SetTip(pick, I18n.T("mc941.target.tip"));
+            var line = new DockPanel();
+            DockPanel.SetDock(pick, Dock.Right);
+            line.Children.Add(pick);
+            line.Children.Add(summary);
+            col.Children.Add(line);
+        }
+        else col.Children.Add(summary);
 
         if (_error is not null)
             col.Children.Add(Ui.Card(Ui.Col(8, Ui.Text(I18n.T("mr.error"), "h3"), Ui.Text(_error, "muted", wrap: true),
@@ -142,6 +165,21 @@ public sealed partial class MinecraftPage
             : (I18n.T("mr.install"), Icons.Download, "primary");
         var install = Ui.Button(label, () => Install(p), cls, icon, pack ? I18n.T("mine.catalog.packs") : null);
         install.IsEnabled = !busy && !installed;
+        // 9.5: стрелка рядом — поставить в другую сборку.
+        Control action = install;
+        var others = pack ? [] : Mc.Instances().Where(b => b.Id != a?.Id).ToList();
+        if (others.Count > 0 && !busy)
+        {
+            var more = new Button { Classes = { "icon", "ghost" }, Width = 30, Height = 32, Padding = new Thickness(0), Content = Ui.Icon(Icons.ChevronDown, 14) };
+            ToolTip.SetTip(more, I18n.T("mc941.installTo"));
+            more.Click += (_, _) =>
+            {
+                var menu = Ctx.Menu(others.Select(b => (object?)Ctx.Item(I18n.T("mc941.into", ("build", b.Name)) + "  ·  " + b.Label, Icons.Layers, () => Install(p, null, b))).ToArray());
+                menu.Placement = PlacementMode.BottomEdgeAlignedRight;
+                menu.ShowAt(more);
+            };
+            action = Ui.Row(2, install, more);
+        }
 
         var cats = new WrapPanel();
         foreach (var c in p.Categories.Where(c => !Mc.Loaders.Contains(c) && c != "minecraft").Take(4))
@@ -157,8 +195,8 @@ public sealed partial class MinecraftPage
             new TextBlock { Text = p.Description, TextWrapping = TextWrapping.Wrap, MaxLines = 2, TextTrimming = TextTrimming.CharacterEllipsis, Foreground = Ui.Res("Muted"), FontSize = 13, Height = 36 },
             cats);
         var foot = new DockPanel();
-        DockPanel.SetDock(install, Dock.Right);
-        foot.Children.Add(install);
+        DockPanel.SetDock(action, Dock.Right);
+        foot.Children.Add(action);
         var stats = Ui.Row(12,
             Ui.Row(4, Ui.Icon(Icons.Download, 12, Ui.Res("Muted")), Ui.Text(I18n.Compact(p.Downloads), "small muted")),
             Ui.Row(4, Ui.Icon(Icons.Heart, 12, Ui.Res("Muted")), Ui.Text(I18n.Compact(p.Follows), "small muted")));
@@ -177,6 +215,7 @@ public sealed partial class MinecraftPage
         return Ctx.Attach(card, () => Ctx.Menu(
             Ctx.Item(I18n.T("ctx.open"), Icons.Eye, () => Details(p)),
             Ctx.Item(pack ? I18n.T("mine.pack.install") : I18n.T("mr.install"), Icons.Download, () => Install(p), !busy && !installed),
+            pack ? null : Mc.Instances().Where(b => b.Id != a?.Id).Select(b => (object?)Ctx.Item(I18n.T("mc941.into", ("build", b.Name)), Icons.Layers, () => Install(p, null, b), !busy)).ToList(),
             Ctx.Item(I18n.T("mr.versions"), Icons.Layers, () => Details(p)),
             "-",
             Ctx.Link(I18n.T("ctx.openSite"), p.Url),
@@ -184,10 +223,10 @@ public sealed partial class MinecraftPage
             Ctx.Copy(I18n.T("ctx.copyName"), p.Title)));
     }
 
-    void Install(MrProject p, MrVersion? v = null)
+    void Install(MrProject p, MrVersion? v = null, McInstance? into = null)
     {
         if (KindOf(p) == "modpack") { InstallPack(p, v); return; }
-        var a = Mc.Active;
+        var a = into ?? Target;
         if (a is null) { CreateDialog(); return; }
         _busy.Add(p.Id);
         Build();
@@ -198,7 +237,8 @@ public sealed partial class MinecraftPage
                 var done = await McModrinth.Install(a, p, v, progress, ct);
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
-                    W.Toast(done.Count > 1 ? I18n.T("mr.installedMany", ("title", p.Title), ("n", done.Count - 1)) : I18n.T("mr.installedOne", ("title", p.Title)));
+                    var into = a.Id == Target?.Id ? "" : " → " + a.Name;
+                    W.Toast((done.Count > 1 ? I18n.T("mr.installedMany", ("title", p.Title), ("n", done.Count - 1)) : I18n.T("mr.installedOne", ("title", p.Title))) + into);
                     if (KindOf(p) == "shader" && a.Modded && !HasShaderMod(a)) W.Toast(I18n.T("mine.hint.shaders", ("mod", ShaderMod(a).Name)));
                 });
             }
@@ -235,24 +275,39 @@ public sealed partial class MinecraftPage
     }
 
     /// <summary>Карточка проекта: описание, снимки и версии, которые подходят сборке.</summary>
-    async void Details(MrProject p)
+    async void Details(MrProject p, McInstance? into = null)
     {
-        var a = Mc.Active;
+        var a = into ?? Target;
         var kind = KindOf(p);
         var body = Ui.Col(12,
             Ui.Row(14, Ui.Thumb(p.Icon, p.Title, 64, 16, 128), Ui.Col(4, Ui.Text(I18n.T("mod.by", ("author", p.Author)), "brand"), Ui.Text(p.Description, "muted", wrap: true))),
             Ui.Text(I18n.T("common.loading"), "small muted"));
         ((StackPanel)body.Children[0]).Children[1].MaxWidth = 620;
         var list = Ui.Col(6);
+        // 9.5: в какую сборку — выбор прямо в карточке; версии ниже подбираются под неё.
+        var builds = Mc.Instances();
+        if (kind != "modpack" && a is not null && builds.Count > 1)
+        {
+            var box = new ComboBox { Width = 320, ItemsSource = builds.Select(b => $"{b.Name}  ·  {b.Label}").ToList(), SelectedIndex = Math.Max(0, builds.FindIndex(b => b.Id == a.Id)) };
+            box.SelectionChanged += (_, _) =>
+            {
+                if (box.SelectedIndex < 0 || builds[box.SelectedIndex].Id == a.Id) return;
+                var chosen = builds[box.SelectedIndex];
+                W.CloseDialog();
+                Details(p, chosen);
+            };
+            body.Children.Insert(1, Ui.Row(10, Ui.Text(I18n.T("mc941.into.label"), "small muted"), box));
+        }
         W.Dialog(p.Title, new ScrollViewer { MaxHeight = 580, Content = Ui.Col(14, body, list) }, 780,
             Ui.Button(I18n.T("ctx.openSite"), () => Ui.OpenUrl(p.Url), "ghost", Icons.External),
             Ui.Button(I18n.T("common.close"), W.CloseDialog),
-            Ui.Button(kind == "modpack" ? I18n.T("mine.pack.install") : I18n.T("mr.install"), () => { W.CloseDialog(); Install(p); }, "primary", Icons.Download));
-        if (Program.Demo) { body.Children.RemoveAt(1); return; }
+            Ui.Button(kind == "modpack" ? I18n.T("mine.pack.install") : I18n.T("mr.install"), () => { W.CloseDialog(); Install(p, null, a); }, "primary", Icons.Download));
+        var loadingLine = body.Children.OfType<TextBlock>().LastOrDefault();
+        if (Program.Demo) { if (loadingLine is not null) body.Children.Remove(loadingLine); return; }
         try
         {
             var (_, text, gallery) = await Modrinth.Project(p.Id);
-            body.Children.RemoveAt(1);
+            if (loadingLine is not null) body.Children.Remove(loadingLine);
             if (gallery.Count > 0)
             {
                 var shots = Ui.Row(8);
@@ -270,7 +325,7 @@ public sealed partial class MinecraftPage
             {
                 var vv = v;
                 var line = new DockPanel();
-                var go = Ui.Button(I18n.T("mr.install"), () => { W.CloseDialog(); Install(p, vv); }, "ghost", Icons.Download);
+                var go = Ui.Button(I18n.T("mr.install"), () => { W.CloseDialog(); Install(p, vv, a); }, "ghost", Icons.Download);
                 DockPanel.SetDock(go, Dock.Right);
                 line.Children.Add(go);
                 var type = v.Type == "release" ? "" : v.Type + " · ";
@@ -281,7 +336,7 @@ public sealed partial class MinecraftPage
         }
         catch (Exception e)
         {
-            if (body.Children.Count > 1 && body.Children[1] is TextBlock) body.Children.RemoveAt(1);
+            if (loadingLine is not null) body.Children.Remove(loadingLine);
             body.Children.Add(Ui.Text(Jobs.Explain(e), "small", color: Ui.Res("Bad"), wrap: true));
         }
     }

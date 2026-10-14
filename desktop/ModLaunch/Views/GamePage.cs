@@ -578,6 +578,7 @@ public sealed partial class GamePage : Page
 
         var host = new StackPanel { Spacing = 10 };
         _listHost = host;
+        _listGen++;
         RenderList();
         // Если за это время страницу уже перестроили, этот список больше не нужен.
         if (ReferenceEquals(_listHost, host)) col.Children.Add(host);
@@ -632,9 +633,36 @@ public sealed partial class GamePage : Page
     }
     bool IsInstalling(ModInfo mod) => Actions.IsBusy(_g, mod.Id);
 
+    int _listGen;
+
+    /// <summary>
+    /// 9.5: длинный список — первые строки сразу, остальные порциями в фоне (после ввода и отрисовки):
+    /// страница открывается сразу и не «замирает», пока строятся полсотни карточек. Если список
+    /// прокручен вниз (перерисовка после установки мода), строим всё сразу — чтобы не прыгала прокрутка.
+    /// </summary>
+    void AddRows(Panel host, List<Func<Control>> rows, Control? tail = null)
+    {
+        var gen = _listGen;
+        var chunked = (_scroll?.Offset.Y ?? 0) < 200;
+        var first = chunked ? Math.Min(rows.Count, 10) : rows.Count;
+        for (var i = 0; i < first; i++) host.Children.Add(rows[i]());
+        if (tail is not null) host.Children.Add(tail);
+        var next = first;
+        void Step()
+        {
+            if (gen != _listGen || next >= rows.Count) return;
+            var end = Math.Min(rows.Count, next + 8);
+            var at = tail is not null && host.Children.Contains(tail) ? host.Children.IndexOf(tail) : host.Children.Count;
+            for (; next < end; next++) host.Children.Insert(at++, rows[next]());
+            if (next < rows.Count) Avalonia.Threading.Dispatcher.UIThread.Post(Step, Avalonia.Threading.DispatcherPriority.Background);
+        }
+        if (next < rows.Count) Avalonia.Threading.Dispatcher.UIThread.Post(Step, Avalonia.Threading.DispatcherPriority.Background);
+    }
+
     void RenderList()
     {
         if (_listHost is null) return;
+        _listGen++;
         _listHost.Children.Clear();
 
         if (_section == "picks") { RenderPicks(); return; }
@@ -665,23 +693,26 @@ public sealed partial class GamePage : Page
         if (OnlyWorking && Features.Compat.CanFilter(_g.Def)) shown = shown.Where(m => Features.Compat.Works(_g.Def, m)).ToList();
         var tiles = _view == "grid" ? new WrapPanel() : null;
         if (tiles is not null) _listHost.Children.Add(tiles);
+        var rows = new List<Func<Control>>();
         for (var i = 0; i < shown.Count; i++)
         {
             var mod = shown[i];
             var badge = BadgeFor(mod, i);
             void Install() => _ = Actions.Install(_g, mod);
             void Open() => MainWindow.Current?.Navigate(() => new ModPage(_g.Def.Id, mod));
-            if (tiles is not null) tiles.Children.Add(ModRow.Tile(_g.Def, mod, IsInstalled(mod), IsInstalling(mod), Install, Open, badge));
-            else _listHost.Children.Add(ModRow.Build(_g.Def, mod, IsInstalled(mod), IsInstalling(mod), picks.Contains(mod.Id), Install, Open, badge));
+            if (tiles is not null) rows.Add(() => ModRow.Tile(_g.Def, mod, IsInstalled(mod), IsInstalling(mod), Install, Open, badge));
+            else rows.Add(() => ModRow.Build(_g.Def, mod, IsInstalled(mod), IsInstalling(mod), picks.Contains(mod.Id), Install, Open, badge));
         }
 
+        Button? more = null;
         if (_hasMore)
         {
-            var more = Ui.Button(_loading ? I18n.T("catalog.loading") : I18n.T("catalog.more"), () => _ = Load(reset: false), "", Icons.Refresh);
+            more = Ui.Button(_loading ? I18n.T("catalog.loading") : I18n.T("catalog.more"), () => _ = Load(reset: false), "", Icons.Refresh);
             more.IsEnabled = !_loading;
             more.HorizontalAlignment = HorizontalAlignment.Center;
-            _listHost.Children.Add(more);
         }
+        if (tiles is not null) { AddRows(tiles, rows); if (more is not null) _listHost.Children.Add(more); }
+        else AddRows(_listHost, rows, more);
     }
 
     internal static Control Skeleton() => new Border
@@ -754,9 +785,11 @@ public sealed partial class GamePage : Page
             return;
         }
         var byId = _picks.ToDictionary(m => m.Id, StringComparer.OrdinalIgnoreCase);
+        var rows = new List<Func<Control>>();
         foreach (var id in _g.Def.Picks)
             if (byId.TryGetValue(id, out var mod))
-                _listHost!.Children.Add(ModRow.Build(_g.Def, mod, IsInstalled(mod), IsInstalling(mod), true, () => _ = Actions.Install(_g, mod), () => MainWindow.Current?.Navigate(() => new ModPage(_g.Def.Id, mod))));
+                rows.Add(() => ModRow.Build(_g.Def, mod, IsInstalled(mod), IsInstalling(mod), true, () => _ = Actions.Install(_g, mod), () => MainWindow.Current?.Navigate(() => new ModPage(_g.Def.Id, mod))));
+        AddRows(_listHost!, rows);
         if (_listHost!.Children.Count == 0)
             _listHost.Children.Add(Ui.Card(Ui.Text(_error ?? I18n.T("catalog.error"), "muted", wrap: true), 22));
     }

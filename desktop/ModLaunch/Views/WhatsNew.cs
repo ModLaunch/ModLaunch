@@ -39,6 +39,9 @@ public static class WhatsNew
         (Icons.Sidebar, "new.v85.rail", null),
     ];
 
+    /// <summary>9.5: самые свежие пункты — для карточки «Что нового» на главной.</summary>
+    public static IEnumerable<(string Icon, string Key, Func<Page>? Open)> Latest(int n) => Items.Take(n);
+
     /// <summary>«Настройки» первой найденной игры с модами.</summary>
     static Page ConfigPage()
     {
