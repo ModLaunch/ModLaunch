@@ -308,7 +308,7 @@
     "err.friends.SIGN_IN": "Freunde gehören zu einem ModLaunch-Konto: Meld dich an oder erstell eines.",
     "err.friends.OFFLINE": "Der Freunde-Server ist nicht erreichbar. Prüf deine Internetverbindung.",
     "err.friends.BUSY": "Der Freunde-Server ist gerade ausgelastet. Versuch es in ein paar Minuten erneut.",
-    "err.friends.DENIED": "Der Freunde-Server hat die Anfrage abgelehnt. Meist heißt das, dass die Regeln aus firebase/friends.rules nicht in Firebase eingefügt sind.",
+    "err.friends.DENIED": "Der Freunde-Server hat die Anfrage abgelehnt. Meist heißt das, dass die Regeln aus firebase/firestore.rules nicht in Firebase eingefügt sind.",
     "err.friends.NOT_FOUND": "Diese Anfrage gibt es nicht mehr: Die Liste wurde aktualisiert.",
     "err.friends.EXISTS": "Schon erledigt: Die Liste wurde aktualisiert.",
     "err.friends.PRECONDITION": "Schon erledigt: Die Liste wurde aktualisiert.",

@@ -51,9 +51,10 @@ public sealed class ListingDraft
 /// <summary>
 /// Маркет Creator Hub: продажа моделей, частей кода, скриптов и ассетов за баланс
 /// ModLaunch. Покупка — одна пачка записей в Firestore: продажа, списание у
-/// покупателя, зачисление продавцу (за вычетом комиссии площадки) и комиссия в
-/// кошелёк площадки. Сходятся ли суммы, проверяют правила базы
-/// (firebase/market.rules), а не программа. Пополнение и выплаты — заявками,
+/// покупателя с записью в его журнале, +1 продажа и копия в библиотеку. Выручку
+/// (за вычетом комиссии площадки) продавец забирает в свой кошелёк сам — ClaimSales.
+/// Сходятся ли суммы, проверяют правила базы (firebase/firestore.rules), а не
+/// программа; кошельки — Creator/Wallet.cs. Пополнение и выплаты — заявками,
 /// их подтверждает админ (почта в коллекции admins).
 /// </summary>
 public static class Market
@@ -65,7 +66,7 @@ public static class Market
     public static readonly string[] Kinds = ["model", "code", "script", "asset", "pack"];
     public static readonly string[] Licenses = ["personal", "commercial", "open"];
 
-    /// <summary>Комиссия площадки, %. Должна совпадать с FEE в firebase/market.rules.</summary>
+    /// <summary>Комиссия площадки, %. Должна совпадать с FEE в firebase/firestore.rules.</summary>
     public static readonly int FeePercent;
     public static readonly string Currency;
     public static readonly long MinPayout;

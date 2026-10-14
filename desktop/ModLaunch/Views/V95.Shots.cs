@@ -103,4 +103,52 @@ public static class V95Shots
         Jobs.All.Remove(running);
         Friends.DemoView = null;
     }
+
+    [DemoShots]
+    static void Hub95Shots(Shots s)
+    {
+        var w = s.Window;
+        var listings = Demo.Listings();
+        MarketData.Demo(listings, Demo.Hub());
+        var now = DateTime.UtcNow;
+        var ledger = new List<LedgerEntry>
+        {
+            new(7, "sale", 8_910, 412_300, listings[0].Id, "b1", "", "demoMira", now.AddHours(-2)),
+            new(6, "sale", 22_410, 403_390, listings[1].Id, "b2", "", "demoMira", now.AddHours(-5)),
+            new(5, "payout-return", 50_000, 380_980, "p1", "", "Неверные реквизиты", "admin", now.AddDays(-1)),
+            new(4, "payout", -50_000, 330_980, "p1", "", "", "demoMira", now.AddDays(-2)),
+            new(3, "purchase", -9_900, 380_980, listings[2].Id, "demoKira", "Сортировка инвентаря", "demoMira", now.AddDays(-3)),
+            new(2, "topup", 300_000, 390_880, "t1", "", "", "admin", now.AddDays(-6)),
+            new(1, "sale", 90_880, 90_880, listings[0].Id, "b0", "", "demoMira", now.AddDays(-9)),
+        };
+        WalletPanel.Demo(new WalletPanel.Data(new Wallet(412_300, 122_200, 9_900, 0, 300_000, 7), ledger,
+            [new("p2", "demoMira", "Mira", 100_000, "Карта •• 4412", "pending", "", now.AddHours(-1))], [], 2, 31_320));
+        w.Navigate(() => new MarketPage("wallet"));
+        s.Pump(1200);
+        s.Save("v95-5-wallet");
+        if (Scroller(w.CurrentPage) is { } sv) sv.Offset = new Vector(0, 520);
+        s.Pump(600);
+        s.Save("v95-5-wallet-down");
+
+        w.Navigate(() => new MarketPage("store"));
+        s.Pump(1200);
+        s.Save("v95-6-hub-store");
+        w.Navigate(() => new CreatorPage("home"));
+        s.Pump(1200);
+        s.Save("v95-6-hub-projects");
+        w.Navigate(() => new CreatorPage("examples"));
+        s.Pump(1000);
+        s.Save("v95-6-hub-templates");
+
+        for (var step = 0; step < 3; step++)
+        {
+            ListingWizard.ShotStep = step;
+            ListingWizard.Show(step == 0 ? null : listings[0]);
+            s.Pump(900);
+            s.Save($"v95-7-wizard-{step + 1}");
+            w.CloseDialog();
+        }
+        ListingWizard.ShotStep = -1;
+        WalletPanel.Reset();
+    }
 }

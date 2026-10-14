@@ -308,7 +308,7 @@
     "err.friends.SIGN_IN": "好友存在于 ModLaunch 账号中，请登录或创建一个。",
     "err.friends.OFFLINE": "无法连接好友服务器。请检查网络连接。",
     "err.friends.BUSY": "好友服务器现在很忙。请几分钟后重试。",
-    "err.friends.DENIED": "好友服务器拒绝了请求。通常是因为 firebase/friends.rules 中的规则没有粘贴到 Firebase。",
+    "err.friends.DENIED": "好友服务器拒绝了请求。通常是因为 firebase/firestore.rules 中的规则没有粘贴到 Firebase。",
     "err.friends.NOT_FOUND": "该请求已不存在，列表已刷新。",
     "err.friends.EXISTS": "已经完成，列表已刷新。",
     "err.friends.PRECONDITION": "已经完成，列表已刷新。",

@@ -308,7 +308,7 @@
     "err.friends.SIGN_IN": "Os amigos vivem numa conta do ModLaunch: entre ou crie uma.",
     "err.friends.OFFLINE": "Não foi possível alcançar o servidor de amigos. Verifique sua conexão com a internet.",
     "err.friends.BUSY": "O servidor de amigos está ocupado agora. Tente de novo em alguns minutos.",
-    "err.friends.DENIED": "O servidor de amigos recusou o pedido. Geralmente isso significa que as regras de firebase/friends.rules não foram coladas no Firebase.",
+    "err.friends.DENIED": "O servidor de amigos recusou o pedido. Geralmente isso significa que as regras de firebase/firestore.rules não foram coladas no Firebase.",
     "err.friends.NOT_FOUND": "Esse pedido não existe mais: a lista foi atualizada.",
     "err.friends.EXISTS": "Já feito: a lista foi atualizada.",
     "err.friends.PRECONDITION": "Já feito: a lista foi atualizada.",

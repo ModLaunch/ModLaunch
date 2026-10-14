@@ -126,7 +126,7 @@ public sealed partial class SettingsPage
     {
         try
         {
-            using var stream = AssetLoader.Open(new Uri("avares://ModLaunch/Assets/server-rules.txt"));
+            using var stream = AssetLoader.Open(new Uri("avares://ModLaunch/Assets/firestore.rules"));
             using var reader = new StreamReader(stream);
             return reader.ReadToEnd();
         }

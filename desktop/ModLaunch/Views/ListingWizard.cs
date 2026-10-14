@@ -232,7 +232,7 @@ public static class ListingWizard
         void Show(int s)
         {
             step = s;
-            stepsHost.Content = new ScrollViewer { Content = steps[s], MaxHeight = 470, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Padding = new Thickness(0, 0, 12, 0) };
+            stepsHost.Content = new ScrollViewer { Content = steps[s], Height = 440, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Padding = new Thickness(0, 0, 12, 0) };
             dots.Children.Clear();
             for (var i = 0; i < 3; i++)
             {

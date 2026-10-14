@@ -43,7 +43,7 @@ public sealed class HubDraft
 /// ModLaunch Hub — свой сайт модов внутри программы, без посредников. Всё
 /// хранится в Firestore проекта ModLaunch: карточки модов (creations), история
 /// версий, лайки, комментарии, жалобы и сами файлы — кусками по ~650 КБ
-/// (blobs), с проверкой SHA-256 при скачивании. Правила — firebase/creations.rules.
+/// (blobs), с проверкой SHA-256 при скачивании. Правила — firebase/firestore.rules.
 /// </summary>
 public static partial class Hub
 {

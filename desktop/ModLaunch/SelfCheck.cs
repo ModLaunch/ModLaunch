@@ -473,7 +473,7 @@ public static class SelfCheck
             catch (Social.ServiceError e) when (e.Code == "DENIED")
             {
                 // Правила Firestore вставляет владелец проекта — это не поломка программы.
-                return "rules from firebase/creations.rules are not published yet (PERMISSION_DENIED)";
+                return "rules from firebase/firestore.rules are not published yet (PERMISSION_DENIED)";
             }
         });
 

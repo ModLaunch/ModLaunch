@@ -142,7 +142,23 @@
     "lw.miss.title": "Напишите название",
     "lw.miss.file": "Выберите файл товара",
     "lw.miss.big": "Файл больше {max}",
-    "lw.miss.version": "Версия — три числа через точку, например 1.0.0"
+    "lw.miss.version": "Версия — три числа через точку, например 1.0.0",
+    "svc.connect.title": "Подключить друзей, Hub, отзывы и рынок",
+    "svc.connect.text": "Один раз, около минуты. Это полный файл правил базы: друзья, ModLaunch Hub, отзывы, рынок и кошельки. Платные функции Firebase не нужны — хватает бесплатного тарифа.",
+    "svc.step3": "Во вкладке «Правила» выделите всё (Ctrl+A) и вставьте скопированное вместо старого текста — это полный файл, ничего добавлять не нужно.",
+    "v93.mk.tab.store": "Витрина",
+    "new.v95.home": "Главная — сводка важного",
+    "new.v95.home.text": "Что требует внимания (обновления, ошибки загрузок, проблемы игр, заявки), «Продолжить», советы по вашим модам, друзья в сети, загрузки и новости — на одном экране.",
+    "new.v95.forYou": "Советы по вашим модам",
+    "new.v95.forYou.text": "ModLaunch смотрит, что у вас стоит, и советует похожее: «Работает с вашим LethalLib», «От того же автора», «Похоже на …». И на «Главной», и отдельным блоком в «Ленте».",
+    "new.v95.wallet": "Кошелёк с выпиской",
+    "new.v95.wallet.text": "Каждое движение денег записано в журнал, сервер проверяет основание каждой записи. Выручка за продажи зачисляется сама, пополнить и вывести — в два нажатия.",
+    "new.v95.hub": "Удобный Creator Hub",
+    "new.v95.hub.text": "Три раздела — «Магазин», «Моё», «Автору» — вместо двух разных экранов. «Продать работу» — мастер из трёх шагов с живым превью карточки и расчётом «вы получите».",
+    "new.v95.mcinto": "Моды — сразу в нужную сборку",
+    "new.v95.mcinto.text": "В каталоге Minecraft выберите, в какую сборку ставить, — или поставьте мод в другую сборку стрелкой на карточке.",
+    "new.v95.fixes": "Исправления и скорость",
+    "new.v95.fixes.text": "Кнопки «свернуть/развернуть/закрыть» нажимаются с первого раза, кнопки в «Загрузках» больше не пропадают, новые анимации загрузки, анимации не вылетают за края, страницы открываются быстрее."
   },
   "en": {
     "win.restore": "Restore down",
@@ -287,6 +303,27 @@
     "lw.miss.title": "Write a title",
     "lw.miss.file": "Pick the file to sell",
     "lw.miss.big": "The file is larger than {max}",
-    "lw.miss.version": "Version is three numbers, e.g. 1.0.0"
+    "lw.miss.version": "Version is three numbers, e.g. 1.0.0",
+    "svc.connect.title": "Connect friends, Hub, reviews and market",
+    "svc.connect.text": "Once, about a minute. This is the complete database rules file: friends, ModLaunch Hub, reviews, market and wallets. No paid Firebase features needed — the free plan is enough.",
+    "svc.step3": "On the Rules tab select everything (Ctrl+A) and paste the copied text instead — it is the complete file, nothing else to add.",
+    "v93.mk.tab.store": "Featured",
+    "new.v95.home": "Home — what matters",
+    "new.v95.home.text": "What needs attention (updates, failed downloads, game problems, requests), Continue, suggestions based on your mods, friends online, downloads and news — on one screen.",
+    "new.v95.forYou": "Suggestions from your mods",
+    "new.v95.forYou.text": "ModLaunch looks at what you have installed and suggests more: \"Works with your LethalLib\", \"Same author\", \"Like …\". On Home and as a block in the Feed.",
+    "new.v95.wallet": "Wallet with a statement",
+    "new.v95.wallet.text": "Every money movement is in the ledger and the server checks the reason for each entry. Sales revenue is credited automatically; top up and withdraw in two clicks.",
+    "new.v95.hub": "A friendlier Creator Hub",
+    "new.v95.hub.text": "Three sections — Shop, Mine, Create — instead of two different screens. \"Sell your work\" is a three-step wizard with a live card preview and \"you get\".",
+    "new.v95.mcinto": "Mods straight into a build",
+    "new.v95.mcinto.text": "In the Minecraft catalog choose which build mods go into — or send a mod to another build with the arrow on its card.",
+    "new.v95.fixes": "Fixes and speed",
+    "new.v95.fixes.text": "Minimize/maximize/close work on the first click, Downloads buttons no longer vanish, new download animations, animations stay inside the edges, pages open faster."
+  },
+  "uk": {
+    "svc.connect.title": "Підключити друзів, Hub, відгуки й ринок",
+    "svc.connect.text": "Один раз, близько хвилини. Це повний файл правил бази: друзі, ModLaunch Hub, відгуки, ринок і гаманці. Платні функції Firebase не потрібні.",
+    "svc.step3": "На вкладці «Правила» виділіть усе (Ctrl+A) і вставте скопійоване замість старого тексту — це повний файл."
   }
 }

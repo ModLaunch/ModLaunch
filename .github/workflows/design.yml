@@ -11,7 +11,7 @@ on:
         default: ''
   push:
     branches: ['claude/design-**']
-    paths: ['desktop/**', '.github/workflows/design.yml']
+    paths: ['desktop/**', 'firebase/firestore.rules', '.github/workflows/design.yml']
 permissions:
   contents: write
 jobs:

@@ -238,7 +238,7 @@
     "err.creator.SIGN_IN": "发布需要 ModLaunch 账号：请登录或创建一个。",
     "err.creator.OFFLINE": "无法连接图库。请检查网络连接。",
     "err.creator.BUSY": "图库负载过高。请几分钟后重试。",
-    "err.creator.DENIED": "ModLaunch Hub 拒绝了请求。如果项目是你的，请把 firebase/creations.rules 中的规则粘贴到 Firebase 控制台（Firestore → Rules）。",
+    "err.creator.DENIED": "ModLaunch Hub 拒绝了请求。如果项目是你的，请把 firebase/firestore.rules 中的规则粘贴到 Firebase 控制台（Firestore → Rules）。",
     "err.creator.NOT_FOUND": "这个模组已不在图库中。",
     "err.creator.INVALID": "脚本有错误。",
     "err.creator.TOO_BIG": "脚本超过 20,000 个字符。",

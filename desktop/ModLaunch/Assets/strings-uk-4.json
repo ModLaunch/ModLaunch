@@ -238,7 +238,7 @@
     "err.creator.SIGN_IN": "Для публікації потрібен обліковий запис ModLaunch: увійдіть або створіть його.",
     "err.creator.OFFLINE": "Не вдається зв’язатися з галереєю. Перевірте з’єднання.",
     "err.creator.BUSY": "Галерея перевантажена. Спробуйте ще раз за кілька хвилин.",
-    "err.creator.DENIED": "ModLaunch Hub відхилив запит. Якщо проєкт ваш, вставте правила з firebase/creations.rules у консоль Firebase (Firestore → Rules).",
+    "err.creator.DENIED": "ModLaunch Hub відхилив запит. Якщо проєкт ваш, вставте правила з firebase/firestore.rules у консоль Firebase (Firestore → Rules).",
     "err.creator.NOT_FOUND": "Цього мода вже немає в галереї.",
     "err.creator.INVALID": "У скрипті є помилки.",
     "err.creator.TOO_BIG": "Скрипт довший за 20 000 символів.",

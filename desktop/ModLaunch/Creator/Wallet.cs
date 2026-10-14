@@ -139,6 +139,17 @@ public static class Ledger
     }
 
     [SelfTest]
+    static string RulesShipWithApp()
+    {
+        using var stream = Avalonia.Platform.AssetLoader.Open(new Uri("avares://ModLaunch/Assets/firestore.rules"));
+        var text = new StreamReader(stream).ReadToEnd();
+        foreach (var part in new[] { "rules_version = '2'", "match /friendships/", "match /creations/", "match /reviews/", "function mWalletOk", "match /ledger/" })
+            if (!text.Contains(part)) throw new Exception("rules file misses " + part);
+        if (!text.Contains($"function mFee() {{ return {Market.FeePercent}; }}")) throw new Exception("fee in rules differs from market.config.json");
+        return $"complete rules file inside the app ({text.Length / 1024} KB), fee {Market.FeePercent}% matches";
+    }
+
+    [SelfTest]
     static string MathMatchesRules()
     {
         var w = WalletState.Zero;

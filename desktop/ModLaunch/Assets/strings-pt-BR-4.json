@@ -238,7 +238,7 @@
     "err.creator.SIGN_IN": "Publicar exige uma conta do ModLaunch: entre ou crie uma.",
     "err.creator.OFFLINE": "Não foi possível alcançar a galeria. Verifique sua conexão.",
     "err.creator.BUSY": "A galeria está sobrecarregada. Tente de novo em alguns minutos.",
-    "err.creator.DENIED": "O ModLaunch Hub recusou o pedido. Se o projeto é seu, cole as regras de firebase/creations.rules no console do Firebase (Firestore → Rules).",
+    "err.creator.DENIED": "O ModLaunch Hub recusou o pedido. Se o projeto é seu, cole as regras de firebase/firestore.rules no console do Firebase (Firestore → Rules).",
     "err.creator.NOT_FOUND": "Este mod não está mais na galeria.",
     "err.creator.INVALID": "O script tem erros.",
     "err.creator.TOO_BIG": "O script tem mais de 20.000 caracteres.",

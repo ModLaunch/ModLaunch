@@ -238,7 +238,7 @@
     "err.creator.SIGN_IN": "Zum Veröffentlichen braucht es ein ModLaunch-Konto: Meld dich an oder erstell eines.",
     "err.creator.OFFLINE": "Die Galerie ist nicht erreichbar. Prüf deine Verbindung.",
     "err.creator.BUSY": "Die Galerie ist überlastet. Versuch es in ein paar Minuten erneut.",
-    "err.creator.DENIED": "ModLaunch Hub hat die Anfrage abgelehnt. Wenn das Projekt dir gehört, füg die Regeln aus firebase/creations.rules in die Firebase-Konsole ein (Firestore → Rules).",
+    "err.creator.DENIED": "ModLaunch Hub hat die Anfrage abgelehnt. Wenn das Projekt dir gehört, füg die Regeln aus firebase/firestore.rules in die Firebase-Konsole ein (Firestore → Rules).",
     "err.creator.NOT_FOUND": "Diese Mod ist nicht mehr in der Galerie.",
     "err.creator.INVALID": "Das Skript hat Fehler.",
     "err.creator.TOO_BIG": "Das Skript ist länger als 20.000 Zeichen.",
