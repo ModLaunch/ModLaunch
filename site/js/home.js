@@ -6,7 +6,7 @@
 Object.assign(EN, {
   'nav.how': 'How it works',
   'hero.chip': 'Out now:',
-  'hero.chip2': 'the new “Showcase” design',
+  'hero.chip2': 'a Home that sums things up, and suggestions from your mods',
   'hero.t1': 'Mods in one click.',
   'hero.t2': 'No guides, no archives, no copying files by hand.',
   'hero.lead': 'ModLaunch finds the games on your PC, installs the mod loader and every mod with its dependencies, then keeps them up to date. 18 games — from Stardew Valley to Minecraft — and any other with the “+” button.',
@@ -115,6 +115,8 @@ Object.assign(EN, {
   'news.eyebrow': 'What’s new',
   'news.title': 'Latest versions',
   'news.all': 'All versions',
+  'news.95': 'What matters, on Home', 'news.95a': 'A summary: what to update, what failed, who’s online', 'news.95b': 'Suggestions based on the mods you already have', 'news.95c': 'Creator Hub: Shop, Mine, Create and a selling wizard', 'news.95d': 'A wallet with a statement — every movement is checked',
+  'news.94': 'Minecraft like Modrinth App', 'news.94a': 'Build pictures, .mrpack export, build servers', 'news.94b': 'Mods straight into the build you pick', 'news.94c': 'Multi-part downloads with mirrors and resume', 'news.94d': 'No game? Install it via Steam right from ModLaunch',
   'news.90': '“Showcase” design', 'news.90a': 'Big game art and “Continue playing” on Home', 'news.90b': 'Game covers on the side rail', 'news.90c': 'Full-width game art on the game page', 'news.90d': 'Links from mods can’t launch programs',
   'news.85': 'Minecraft', 'news.85a': 'Fabric, Quilt, Forge and NeoForge install themselves', 'news.85b': 'Builds with their own mods and worlds', 'news.85c': 'A Modrinth catalog that fits your version and loader', 'news.85d': 'Modpacks, .mrpack and one-click updates',
   'news.70': 'ModLaunch 3 design', 'news.70a': 'Breadcrumbs, info panel and game-colored glow', 'news.70b': '“ModLaunch pick” carousel and top mods', 'news.70c': 'Grid catalog, “Hot” badges, hide installed', 'news.70d': 'Steam-style collections and sorting',
