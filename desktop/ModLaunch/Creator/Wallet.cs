@@ -141,6 +141,7 @@ public static class Ledger
     [SelfTest]
     static string RulesShipWithApp()
     {
+        if (Avalonia.Application.Current is null) return "skipped (no UI assets in --selfcheck)";
         using var stream = Avalonia.Platform.AssetLoader.Open(new Uri("avares://ModLaunch/Assets/firestore.rules"));
         var text = new StreamReader(stream).ReadToEnd();
         foreach (var part in new[] { "rules_version = '2'", "match /friendships/", "match /creations/", "match /reviews/", "function mWalletOk", "match /ledger/" })

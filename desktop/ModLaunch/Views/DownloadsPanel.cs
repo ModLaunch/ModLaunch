@@ -240,6 +240,8 @@ public sealed partial class MainWindow
     [SelfTest]
     static string DownloadRowKeepsItsButtons()
     {
+        // --selfcheck перед выпуском идёт без интерфейса (нет стилей и ресурсов) — проверка строк — в --selftest.
+        if (Avalonia.Application.Current is null) return "skipped (no UI in --selfcheck)";
         var job = new Job { Title = "big.zip", GameName = "test", Status = JobStatus.Running };
         var t = job.BeginTransfer();
         t.SetSize(1000);
