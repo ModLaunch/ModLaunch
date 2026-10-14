@@ -1,0 +1,17 @@
+Fatal error. System.AccessViolationException: Attempted to read or write protected memory. This is often an indication that other memory is corrupt.
+Repeat 2 times:
+--------------------------------
+   at SkiaSharp.SkiaApi.sk_image_encode(IntPtr)
+--------------------------------
+   at Avalonia.Skia.Helpers.ImageSavingHelper.SaveImage(SkiaSharp.SKImage, System.IO.Stream, System.Nullable`1<Int32>)
+   at Avalonia.Skia.Helpers.ImageSavingHelper.SaveImage(SkiaSharp.SKImage, System.String, System.Nullable`1<Int32>)
+   at Avalonia.Skia.WriteableBitmapImpl.Save(System.String, System.Nullable`1<Int32>)
+   at ModLaunch.Program+<>c__DisplayClass24_0.<Screenshots>g__Save|1(System.String)
+   at ModLaunch.Views.UpdateReview.UpdatesShots(ModLaunch.Shots)
+   at System.RuntimeMethodHandle.InvokeMethod(System.Object, Void**, System.Signature, Boolean)
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(System.Object, IntPtr*)
+   at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(System.Object, System.Span`1<System.Object>, System.Reflection.BindingFlags)
+   at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(System.Object, System.Reflection.BindingFlags, System.Reflection.Binder, System.Object[], System.Globalization.CultureInfo)
+   at System.Reflection.MethodBase.Invoke(System.Object, System.Object[])
+   at ModLaunch.Program.Screenshots(System.String, Boolean)
+   at ModLaunch.Program.Main(System.String[])
