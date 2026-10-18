@@ -191,7 +191,7 @@ public abstract class Target
             if (text.Contains($"\"name\":\"{name}\"")) return null;
             var close = text.LastIndexOf(']');
             if (close < 0) return "plugins.js has an unexpected format: enable the plugin in the RPG Maker editor";
-            var entry = JsonSerializer.Serialize(new { name, status = true, description = d.About, parameters = new { } });
+            var entry = new JsonObject { ["name"] = name, ["status"] = true, ["description"] = d.About, ["parameters"] = new JsonObject() }.ToJsonString();
             var before = text[..close].TrimEnd();
             var sep = before.EndsWith('[') ? "\n" : ",\n";
             File.WriteAllText(path, before + sep + entry + "\n" + text[close..]);

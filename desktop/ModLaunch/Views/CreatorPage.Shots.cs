@@ -4,6 +4,23 @@ namespace ModLaunch.Views;
 
 public sealed partial class CreatorPage
 {
+    /// <summary>9.7: вкладка ModScript X с примером, поставленным в ненастоящую игру на Ren'Py.</summary>
+    [DemoShots]
+    static void ModScriptXShots(Shots s)
+    {
+        var game = Path.Combine(Path.GetTempPath(), "modlaunch-shots-renpy");
+        Directory.CreateDirectory(Path.Combine(game, "game"));
+        File.WriteAllText(Path.Combine(game, "game", "script.rpy"), "default gold = 0\nlabel start:\n    \"Hi\"\n");
+        _mxFile = NewExample();
+        _mxGame = game;
+        _mxLog.Clear();
+        _mxLog.AddRange(Inject(_mxFile, game));
+        _mxLog.AddRange(Inspect(_mxFile, game));
+        s.Window.Navigate(() => new CreatorPage("inject"));
+        s.Pump(700);
+        s.Save("creator-modscriptx");
+    }
+
     [DemoShots]
     static void MarketShots(Shots s)
     {

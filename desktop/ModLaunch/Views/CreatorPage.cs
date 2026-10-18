@@ -88,7 +88,7 @@ public sealed partial class CreatorPage : Page
     public static readonly (string Id, string Key, string Icon)[] MainTabs =
     [
         ("home", "cr.tab.home", Icons.Home), ("mine", "v91.cr.tab.my", Icons.Edit), ("codes", "v91.cr.tab.codes", Icons.Code),
-        ("models", "v91.cr.tab.models", Icons.Cube), ("examples", "v91.cr.tab.templates", Icons.Wand),
+        ("models", "v91.cr.tab.models", Icons.Cube), ("inject", "v97.cr.tab.inject", Icons.Zap), ("examples", "v91.cr.tab.templates", Icons.Wand),
     ];
 
     public static readonly (string Id, string Key, string Icon)[] MoreTabs =
@@ -156,6 +156,7 @@ public sealed partial class CreatorPage : Page
             "market" => MarketView(),
             "studio" => Studio(),
             "docs" => Docs(),
+            "inject" => Injector(),
             _ => _open is null ? Mine() : Editor(),
         });
         Content = new ScrollViewer { Content = content, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };

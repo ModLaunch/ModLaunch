@@ -12,6 +12,7 @@ public static class WhatsNew
 {
     static readonly (string Icon, string Key, Func<Page>? Open)[] Items =
     [
+        (Icons.Zap, "new.v97.modscriptx", () => new CreatorPage("inject")),
         (Icons.Home, "new.v95.home", () => new HomePage()),
         (Icons.Sparkles, "new.v95.forYou", () => new HomePage(feed: true)),
         (Icons.Bag, "new.v95.wallet", () => new MarketPage("wallet")),
