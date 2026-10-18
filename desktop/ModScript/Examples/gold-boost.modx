@@ -1,0 +1,30 @@
+# ModScript X example: one file for every engine.
+mod "Gold Boost"
+version 1.0.0
+author "ModLaunch"
+about "Start with more gold and get a bonus on every load"
+
+# Shared variables: available in every language.
+let bonus = 250
+let start_gold = bonus * 2
+
+hook start {
+    set gold = start_gold
+    say "Gold Boost: you start with {start_gold} gold"
+}
+
+hook load {
+    if gold < bonus {
+        add gold bonus
+        log "Gold Boost: +{bonus}"
+    }
+}
+
+# Native code goes only to its own language.
+native javascript {
+    console.log("Gold Boost loaded in RPG Maker");
+}
+
+native python {
+    gold = 0
+}
