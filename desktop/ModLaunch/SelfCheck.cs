@@ -358,6 +358,27 @@ public static class SelfCheck
             if (broken.Ok || broken.Diags.Count < 2) throw new Exception("errors not reported");
             return Task.FromResult($"{Creator.Templates.All.Length} examples ok; errors: {string.Join(", ", broken.Diags.Select(d => d.Message))}");
         });
+        await Check("modscript x 9.7: .modx → Ren'Py, RPG Maker, inject and eject", () =>
+        {
+            const string src = "mod \"Check X\"\nlet bonus = 5\nhook start {\n  add gold bonus\n  say \"+{bonus}\"\n}\n";
+            var dir = Path.Combine(Path.GetTempPath(), "modlaunch-mx-" + Guid.NewGuid().ToString("N")[..8]);
+            try
+            {
+                Directory.CreateDirectory(Path.Combine(dir, "renpy", "game"));
+                File.WriteAllText(Path.Combine(dir, "renpy", "game", "script.rpy"), "label start:\n");
+                var r = ModScriptX.Injector.Inject(src, Path.Combine(dir, "renpy"), null);
+                if (!r.Doc.Ok || r.Target?.Id != "renpy") throw new Exception(string.Join("; ", r.Doc.Diags.Select(d => $"{d.Line} {d.Message}")));
+                var rpy = File.ReadAllText(Path.Combine(dir, "renpy", r.Files.Single()));
+                if (!rpy.Contains("gold += bonus") || !rpy.Contains("config.start_callbacks.append")) throw new Exception(rpy);
+                Directory.CreateDirectory(Path.Combine(dir, "rpg", "js"));
+                File.WriteAllText(Path.Combine(dir, "rpg", "js", "plugins.js"), "var $plugins =\n[\n];\n");
+                var j = ModScriptX.Injector.Inject(src, Path.Combine(dir, "rpg"), null);
+                if (!File.ReadAllText(Path.Combine(dir, "rpg", "js", "plugins.js")).Contains("ModScript_Check_X")) throw new Exception("plugins.js not updated");
+                if (ModScriptX.Injector.Eject("Check_X", Path.Combine(dir, "rpg")).Count != 1) throw new Exception("eject");
+                return Task.FromResult($"{j.Target!.Title}: {j.Files.Single()}");
+            }
+            finally { try { Directory.Delete(dir, true); } catch (IOException) { } }
+        });
         await Check("creator: pack Content Patcher + Thunderstore", async () =>
         {
             var cp = await Creator.Projects.Pack(Creator.ModScript.Compile(Creator.Templates.ById("sdv-seeds")!.Code), null);

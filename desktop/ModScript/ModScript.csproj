@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    ModScript X — отдельный инжектор-переходник между языками скриптов игр.
+    Один файл .modx переводится в родной язык движка (Python, JavaScript, Lua,
+    C#, GDScript) и кладётся в папку модов игры. Ядро языка (выражения, let,
+    стандартная библиотека) общее с конструктором ModLaunch.
+    Сборка: dotnet publish -c Release -r win-x64 -o Setup/out
+    Установщик: makensis Setup/modscript.nsi (NSIS 3)
+  -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>modscript</AssemblyName>
+    <RootNamespace>ModScriptX</RootNamespace>
+    <Version>1.0.0</Version>
+    <Product>ModScript X</Product>
+    <Description>ModScript X — one .modx script, every game scripting language</Description>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <ApplicationIcon>..\ModLaunch\Assets\icon.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <DebugType>none</DebugType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\ModLaunch\Creator\ModScript.cs" Link="Core\ModScript.cs" />
+    <Compile Include="..\ModLaunch\Creator\ModScript.Lib.cs" Link="Core\ModScript.Lib.cs" />
+    <None Include="Examples\*.modx" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

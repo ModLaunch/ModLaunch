@@ -1,0 +1,4 @@
+bin/
+obj/
+Setup/out/
+Setup/*.exe
