@@ -5,7 +5,8 @@
     Один файл .modx переводится в родной язык движка (Python, JavaScript, Lua,
     C#, GDScript) и кладётся в папку модов игры. Ядро языка (выражения, let,
     стандартная библиотека) общее с конструктором ModLaunch.
-    Сборка: dotnet publish -c Release -r win-x64
+    Сборка: dotnet publish -c Release -r win-x64 -o Setup/out
+    Установщик: makensis Setup/modscript.nsi (NSIS 3)
   -->
 
   <PropertyGroup>
@@ -20,11 +21,13 @@
     <Product>ModScript X</Product>
     <Description>ModScript X — one .modx script, every game scripting language</Description>
     <InvariantGlobalization>true</InvariantGlobalization>
+    <ApplicationIcon>..\ModLaunch\Assets\icon.ico</ApplicationIcon>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">
     <SelfContained>true</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
     <DebugType>none</DebugType>
   </PropertyGroup>
 

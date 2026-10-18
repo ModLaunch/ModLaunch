@@ -48,7 +48,14 @@ modscript eject   <modId> --game <gameDir>
 modscript selftest
 ```
 
-Build: `dotnet build desktop/ModScript` (or `dotnet publish -c Release -r win-x64` for one exe).
+## Install on Windows
+
+Run `ModScriptX-Setup-1.0.0.exe`. No admin rights needed: it installs to
+`%LOCALAPPDATA%\Programs\ModScript X`, adds `modscript` to your PATH, registers `.modx` files
+(open in Notepad, right-click → "Check with ModScript X") and adds a Start menu entry.
+Uninstall from Windows Settings → Apps.
+
+Build it yourself: `dotnet publish -c Release -r win-x64 -o Setup/out`, then `makensis Setup/modscript.nsi` (NSIS 3).
 
 ## Limits
 

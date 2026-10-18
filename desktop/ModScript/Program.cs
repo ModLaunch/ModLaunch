@@ -2,7 +2,9 @@ using ModLaunch.Creator;
 using ModScriptX;
 
 // ModScript X — консольный инжектор .modx. Сообщения на английском: инструмент международный.
-return Cli.Run(args);
+var exitCode = Cli.Run(args);
+Cli.PauseIfOwnConsole();
+return exitCode;
 
 static class Cli
 {
@@ -73,6 +75,26 @@ static class Cli
             Console.Error.WriteLine("error: " + e.Message);
             return 1;
         }
+    }
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+    static extern uint GetConsoleProcessList(uint[] list, uint count);
+
+    /// <summary>
+    /// Запуск двойным щелчком (или из проводника по .modx): окно консоли наше
+    /// и закроется сразу — даём прочитать результат.
+    /// </summary>
+    public static void PauseIfOwnConsole()
+    {
+        if (!OperatingSystem.IsWindows() || Console.IsInputRedirected) return;
+        try
+        {
+            if (GetConsoleProcessList(new uint[2], 2) > 1) return;
+            Console.WriteLine();
+            Console.Write("Press Enter to close…");
+            Console.ReadLine();
+        }
+        catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException) { }
     }
 
     static string Explain(string key) => key switch
