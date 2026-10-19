@@ -83,7 +83,7 @@ public sealed class AccountPage : Page
         if (!p.SignedIn) _tab = "profile";
 
         var tabs = new StackPanel { Spacing = 4, Width = 230 };
-        var head = Ui.Row(12, Ui.Thumb(null, p.Name ?? p.Email ?? "?", 44, 22, person: true),
+        var head = Ui.Row(12, ProfileKit.Avatar(p.SignedIn ? p.Name ?? p.Email ?? "?" : "?", 46),
             Ui.Col(2, Ui.Text(p.SignedIn ? p.Name ?? "" : I18n.T("acc.menu.guest"), "h3"), Ui.Text(p.SignedIn ? p.Email ?? "" : I18n.T("acc.page.guest"), "small muted")));
         head.Margin = new Thickness(8, 6, 8, 10);
         tabs.Children.Add(head);
@@ -185,11 +185,26 @@ public sealed class AccountPage : Page
     {
         var col = Ui.Col(16);
         var badge = p.Verified ? Ui.Text("✓ " + I18n.T("acc.verified"), "small", color: Ui.Res("Good")) : Ui.Text(I18n.T("acc.unverified"), "small", color: Ui.Res("Warn"));
-        var who = Ui.Row(18, Ui.Thumb(null, p.Name ?? "?", 84, 42, person: true),
-            Ui.Col(4, new TextBlock { Text = p.Name ?? "", FontSize = 26, FontWeight = FontWeight.Bold }, Ui.Text(p.Email ?? "", "muted"),
-                Ui.Row(12, badge, Ui.Text(p.Since is DateTime s ? I18n.T("acc.since", ("date", s.ToString("d", I18n.Culture))) : "", "small muted"),
-                    p.Admin ? Ui.Text("👑 " + I18n.T("acc.admin.title"), "small brand") : new Panel())));
-        col.Children.Add(Ui.Card(who, 24));
+        // 9.9: шапка аккаунта — надетый баннер, аватар в рамке, титул и уровень игрока.
+        var all = Features.Achievements.All();
+        var (level, _, next) = Features.Achievements.Level(all);
+        var words = Ui.Col(5,
+            new TextBlock { Text = p.Name ?? "", FontFamily = Gx.Display, FontSize = 28, FontWeight = FontWeight.Bold, Foreground = Brushes.White },
+            Ui.Row(10, ProfileKit.Title(), new TextBlock { Text = I18n.T("v99.acc.level", ("n", level)), FontSize = 12.5, FontWeight = FontWeight.SemiBold, Foreground = Ui.Hex("#E6E7EE"), VerticalAlignment = VerticalAlignment.Center }),
+            new TextBlock { Text = p.Email ?? "", FontSize = 13, Foreground = Ui.Hex("#C9CFDB") },
+            Ui.Row(12, badge, new TextBlock { Text = p.Since is DateTime s ? I18n.T("acc.since", ("date", s.ToString("d", I18n.Culture))) : "", FontSize = 12, Foreground = Ui.Hex("#C9CFDB") },
+                p.Admin ? Ui.Text("👑 " + I18n.T("acc.admin.title"), "small brand") : new Panel()));
+        words.VerticalAlignment = VerticalAlignment.Bottom;
+        var toProfile = Ui.Button(I18n.T("v99.home.profile"), () => MainWindow.Current?.Navigate(() => new ProfilePage()), "primary", Icons.Trophy);
+        toProfile.VerticalAlignment = VerticalAlignment.Bottom;
+        ToolTip.SetTip(toProfile, I18n.T("v98.level.next", ("n", next)));
+        var whoGrid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"), ColumnSpacing = 20, Margin = new Thickness(24, 0, 24, 22), VerticalAlignment = VerticalAlignment.Bottom };
+        whoGrid.Children.Add(ProfileKit.Avatar(p.Name ?? "?", 96, ring: 5));
+        Grid.SetColumn(words, 1);
+        whoGrid.Children.Add(words);
+        Grid.SetColumn(toProfile, 2);
+        whoGrid.Children.Add(toProfile);
+        col.Children.Add(new Border { Classes = { "card" }, Padding = new Thickness(0), ClipToBounds = true, Height = 230, Child = new Panel { Children = { ProfileKit.Banner(), whoGrid } } });
 
         if (_wallet is null && !_busy) Load("profile", async () => { _wallet = await Market.MyWallet(); _purchases = await Market.Purchases(); });
         var stats = new UniformGrid { Columns = 4 };

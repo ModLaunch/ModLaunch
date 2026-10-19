@@ -30,6 +30,7 @@ public sealed partial class MainWindow
     {
         _accountButton.Click += (_, _) => ToggleAccountPanel();
         Social.Account.Changed += () => Dispatcher.UIThread.Post(() => { RenderAccount(); if (_accountPanel.IsVisible) RenderAccountPanel(); });
+        Features.Cosmetics.Changed += () => Dispatcher.UIThread.Post(RenderAccount);
     }
 
     // ---------------------------------------------------------------- экран запуска
@@ -53,6 +54,8 @@ public sealed partial class MainWindow
     // ---------------------------------------------------------------- аккаунт
 
     /// <summary>Кнопка аккаунта на боковой панели: аватар с зелёной точкой или значок «войти».</summary>
+    public void RefreshAccount() => RenderAccount();
+
     void RenderAccount()
     {
         var p = Social.Account.Get();
@@ -65,12 +68,8 @@ public sealed partial class MainWindow
                 BorderBrush = Ui.Res("Rail"), BorderThickness = new Thickness(2),
                 HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom,
             };
-            // 9.3: аватар в кольце цвета акцента — как профиль игрока.
-            var ring = new Border
-            {
-                Width = 40, Height = 40, CornerRadius = new CornerRadius(20), BorderThickness = new Thickness(2), BorderBrush = Ui.Res("Brand"), Padding = new Thickness(2),
-                Child = Ui.Thumb(null, name, 32, 16, person: true),
-            };
+            // 9.9: аватар в надетой рамке (награда за достижения).
+            var ring = ProfileKit.Avatar(name, 40, ring: 3);
             _accountButton.Content = new Panel { Width = 40, Height = 40, Children = { ring, online } };
             ToolTip.SetTip(_accountButton, name);
         }
@@ -91,12 +90,26 @@ public sealed partial class MainWindow
     {
         var p = Social.Account.Get();
         var col = Ui.Col(12);
+        // 9.9: сверху меню — карточка игрока: баннер, аватар в рамке, титул и уровень (и у гостя тоже).
+        var all = Features.Achievements.All();
+        var (level, _, next) = Features.Achievements.Level(all);
+        var name = p.SignedIn ? p.Name ?? p.Email ?? "?" : I18n.T("acc.menu.guest");
+        var words = Ui.Col(3,
+            new TextBlock { Text = name, FontWeight = FontWeight.Bold, FontSize = 16, Foreground = Brushes.White, TextTrimming = TextTrimming.CharacterEllipsis },
+            ProfileKit.Title(size: 11),
+            new TextBlock { Text = p.SignedIn ? p.Email ?? "" : I18n.T("v99.acc.level", ("n", level)), FontSize = 11.5, Foreground = Ui.Hex("#D6D9E3"), TextTrimming = TextTrimming.CharacterEllipsis });
+        words.VerticalAlignment = VerticalAlignment.Center;
+        var bar = new ProgressBar { Minimum = 0, Maximum = 300, Value = 300 - next, Height = 4, Margin = new Thickness(14, 0, 14, 12), VerticalAlignment = VerticalAlignment.Bottom };
+        var cardGrid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*"), ColumnSpacing = 12, Margin = new Thickness(14, 16, 14, 22) };
+        cardGrid.Children.Add(ProfileKit.Avatar(p.SignedIn ? name : "?", 54, ring: 3));
+        Grid.SetColumn(words, 1);
+        cardGrid.Children.Add(words);
+        var card = new Border { CornerRadius = new CornerRadius(14), ClipToBounds = true, Height = 104, Margin = new Thickness(-4, -4, -4, 0), Child = new Panel { Children = { ProfileKit.Banner(), cardGrid, bar } }, Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand) };
+        StoreKit.OnClick(card, () => { CloseAccountPanel(); Navigate(() => new ProfilePage()); });
+        col.Children.Add(card);
+        col.Children.Add(MenuRow(I18n.T("v99.home.profile"), Icons.Trophy, () => Navigate(() => new ProfilePage())));
         if (p.SignedIn)
         {
-            var who = Ui.Col(2, Ui.Text(p.Name ?? "", "h3"), Ui.Text(p.Email ?? "", "small muted"));
-            who.VerticalAlignment = VerticalAlignment.Center;
-            col.Children.Add(Ui.Row(12, Ui.Thumb(null, p.Name ?? p.Email ?? "?", 48, 24, person: true), who));
-            col.Children.Add(new Border { Height = 1, Background = Ui.Res("Line"), Margin = new Thickness(0, 2) });
             col.Children.Add(MenuRow(I18n.T("acc.menu.account"), Icons.User, () => Navigate(() => new AccountPage())));
             col.Children.Add(MenuRow(I18n.T("acc.s.wallet"), Icons.Bag, () => Navigate(() => new MarketPage("wallet"))));
             col.Children.Add(MenuRow(I18n.T("acc.s.purchases"), Icons.Download, () => Navigate(() => new AccountPage("purchases"))));
@@ -113,10 +126,6 @@ public sealed partial class MainWindow
         }
         else
         {
-            var face = new Border { Width = 48, Height = 48, CornerRadius = new CornerRadius(24), Background = Ui.Res("Surface3"), Child = Ui.Icon(Icons.User, 22) };
-            var who = Ui.Text(I18n.T("acc.menu.guest"), "h3");
-            who.VerticalAlignment = VerticalAlignment.Center;
-            col.Children.Add(Ui.Row(12, face, who));
             col.Children.Add(Ui.Text(I18n.T("acc.menu.guest.text"), "small muted", wrap: true));
             var signIn = Ui.Button(I18n.T("acc.menu.signin"), () => { CloseAccountPanel(); Navigate(() => new AccountPage()); }, "primary", Icons.Lock);
             var signUp = Ui.Button(I18n.T("acc.menu.signup"), () => { CloseAccountPanel(); Navigate(() => new AccountPage()); }, "", Icons.User);

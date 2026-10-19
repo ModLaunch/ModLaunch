@@ -32,7 +32,7 @@ public static class V98Shots
         w.Navigate(() => new AiBuildsPage("mine"));
         s.Pump(900);
         s.Save("v98-2-ai-mine");
-        w.Navigate(() => new AiBuildsPage("player"));
+        w.Navigate(() => new ProfilePage());
         s.Pump(900);
         s.Save("v98-3-player");
     }

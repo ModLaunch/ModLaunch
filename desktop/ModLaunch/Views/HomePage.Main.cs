@@ -33,10 +33,10 @@ public sealed partial class HomePage
 
     void BuildMain()
     {
-        var mine = FeedGames();
+        var mine = MyGames();
         if (_featured is null && !_featuredLoading && mine.Count > 0) { _featuredLoading = true; Dispatcher.UIThread.Post(() => _ = LoadFeatured(mine)); }
-        if (!_feedExtrasLoading && (_feedHub is null || _feedMarket is null)) { _feedExtrasLoading = true; _ = LoadFeedExtras(); }
         CheckHealthLater(mine);
+        if (!Shown) Dispatcher.UIThread.Post(ProfilePage.AnnounceNew, DispatcherPriority.Background);
 
         var notices = Notices(mine);
         var col = StoreKit.Column(spacing: MainGap, top: 18);
@@ -44,9 +44,10 @@ public sealed partial class HomePage
         if (Starter(mine) is { } starter) col.Children.Add(Intro(starter, n++));
         col.Children.Add(Intro(Header(mine, notices), n++));
         col.Children.Add(Intro(Columns(MainGap, (7, AttentionCard(notices)), (5, ContinueCard(mine))), n++));
+        if (JumpBack(mine) is { } jump) col.Children.Add(Intro(jump, n++));
         col.Children.Add(Intro(ForYou(mine), n++));
         col.Children.Add(Intro(Columns(MainGap, (4, FriendsCard()), (4, new DownloadsTile()), (4, NewsCard())), n++));
-        col.Children.Add(Intro(Columns(MainGap, (5, TipCard()), (7, FeedTeaser(BestMods(mine)))), n++));
+        col.Children.Add(Intro(Columns(MainGap, (5, TipCard()), (7, NextRewards())), n++));
 
         if (Ads.Enabled)
         {
@@ -129,36 +130,31 @@ public sealed partial class HomePage
 
     Control Header(List<GameState> mine, List<Notice> notices)
     {
-        var accent = Gx.Accent;
-        var back = new Panel
+        // 9.9: фон шапки — надетый баннер профиля, слева — аватар в рамке с уровнем.
+        var back = ProfileKit.Banner();
+        var all = Achievements.All();
+        var (level, _, next) = Achievements.Level(all);
+        var logo = new Panel { Width = 72, Height = 72, VerticalAlignment = VerticalAlignment.Center, Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand), Children = { ProfileKit.Avatar(ProfileKit.PlayerName(), 72, ring: 4) } };
+        logo.Children.Add(new Border
         {
-            Children =
-            {
-                new Border { Background = Ui.Res("Surface") },
-                new Border { Background = new RadialGradientBrush { Center = new RelativePoint(0.04, 0.0, RelativeUnit.Relative), GradientOrigin = new RelativePoint(0.04, 0.0, RelativeUnit.Relative), RadiusX = new RelativeScalar(0.55, RelativeUnit.Relative), RadiusY = new RelativeScalar(1.6, RelativeUnit.Relative),
-                    GradientStops = { new GradientStop(Gx.Alpha(accent, 120), 0), new GradientStop(Gx.Alpha(accent, 0), 1) } } },
-                new Border { Background = new RadialGradientBrush { Center = new RelativePoint(1, 1, RelativeUnit.Relative), GradientOrigin = new RelativePoint(1, 1, RelativeUnit.Relative), RadiusX = new RelativeScalar(0.4, RelativeUnit.Relative), RadiusY = new RelativeScalar(1.4, RelativeUnit.Relative),
-                    GradientStops = { new GradientStop(Color.FromArgb(70, 255, 61, 129), 0), new GradientStop(Color.FromArgb(0, 255, 61, 129), 1) } } },
-            },
-        };
-        var logo = new Border
-        {
-            Width = 54, Height = 54, CornerRadius = new CornerRadius(16), Background = new SolidColorBrush(Color.FromArgb(34, 255, 255, 255)), VerticalAlignment = VerticalAlignment.Center,
-            BorderBrush = new SolidColorBrush(Color.FromArgb(60, 255, 255, 255)), BorderThickness = new Thickness(1),
-            Child = new Image { Source = Images.Asset("icon.png", 128), Width = 34, Height = 34 },
-        };
+            Background = ProfileKit.FrameBrush(Cosmetics.Equipped("frame")), CornerRadius = new CornerRadius(999), Padding = new Thickness(7, 1), BorderBrush = Ui.Res("Surface"), BorderThickness = new Thickness(2),
+            HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, -6),
+            Child = new TextBlock { Text = level.ToString(), FontSize = 11.5, FontWeight = FontWeight.Bold, Foreground = Brushes.White },
+        });
+        ToolTip.SetTip(logo, I18n.T("v98.level.next", ("n", next)));
+        StoreKit.OnClick(logo, () => MainWindow.Current?.Navigate(() => new ProfilePage()));
         var p = Social.Account.Get();
         var name = p.SignedIn ? p.Name ?? I18n.T("v93.feed.player") : I18n.T("v93.feed.player");
         var date = DateTime.Now.ToString("dddd, d MMMM", I18n.Culture);
-        var greet = new TextBlock { Text = Greeting() + ", " + name, FontFamily = Gx.Display, FontSize = 26, FontWeight = FontWeight.Bold, LetterSpacing = -0.6, TextTrimming = TextTrimming.CharacterEllipsis };
+        var greet = new TextBlock { Text = Greeting() + ", " + name, FontFamily = Gx.Display, FontSize = 30, FontWeight = FontWeight.Bold, LetterSpacing = -0.8, Foreground = Brushes.White, TextTrimming = TextTrimming.CharacterEllipsis };
 
         // Одна строка о главном: цветная точка — пункт; нажатие ведёт туда, где с ним разбираться.
         var line = new WrapPanel { Margin = new Thickness(0, 2, 0, 0) };
         void Part(IBrush dot, string text, Action? go = null)
         {
             var row = Ui.Row(7, new Border { Width = 8, Height = 8, CornerRadius = new CornerRadius(4), Background = dot, VerticalAlignment = VerticalAlignment.Center },
-                new TextBlock { Text = text, FontSize = 13, FontWeight = FontWeight.SemiBold, Foreground = Ui.Res("Text"), VerticalAlignment = VerticalAlignment.Center });
-            var chip = new Border { Classes = { "home-part" }, Padding = new Thickness(10, 4), CornerRadius = new CornerRadius(999), Margin = new Thickness(0, 0, 6, 4), Background = Soft(dot, 26), Child = row };
+                new TextBlock { Text = text, FontSize = 13, FontWeight = FontWeight.SemiBold, Foreground = Brushes.White, VerticalAlignment = VerticalAlignment.Center });
+            var chip = new Border { Classes = { "home-part" }, Padding = new Thickness(10, 4), CornerRadius = new CornerRadius(999), Margin = new Thickness(0, 0, 6, 4), Background = new SolidColorBrush(Color.FromArgb(70, 10, 10, 18)), BorderBrush = Soft(dot, 160), BorderThickness = new Thickness(1), Child = row };
             if (go is not null) { chip.Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand); StoreKit.OnClick(chip, go); }
             line.Children.Add(chip);
         }
@@ -172,29 +168,31 @@ public sealed partial class HomePage
         if (Setup.Updater.Available) Part(Yellow, I18n.T("h95.sub.app"), () => MainWindow.Current?.ShowUpdate());
         if (line.Children.Count == 0) Part(Ui.Res("Good"), I18n.T("h95.sub.calm"));
 
-        var words = Ui.Col(3, Gx.Eyebrow(date, Ui.Res("Muted"), 10.5), greet, line);
+        var title = ProfileKit.Title();
+        StoreKit.OnClick(title, () => MainWindow.Current?.Navigate(() => new ProfilePage("rewards")));
+        var words = Ui.Col(5, Ui.Row(10, Gx.Eyebrow(date, Ui.Hex("#D6D9E3"), 10.5), title), greet, line);
         words.VerticalAlignment = VerticalAlignment.Center;
 
         // Справа — три цифры и две кнопки.
         var hours = mine.Sum(g => Features.PlayTime.Get(g.Def.Id).TotalMs) / 3_600_000.0;
-        Control Stat(string value, string label) => Gx.Stat(value, label, null, 22);
-        Control Divider() => new Border { Width = 1, Height = 34, Background = Ui.Res("Line"), VerticalAlignment = VerticalAlignment.Center };
-        var stats = Ui.Row(18, Stat(mine.Count.ToString(), I18n.T("h95.stat.games")), Divider(), Stat(mine.Sum(g => g.ModCount).ToString(), I18n.T("h95.stat.mods")), Divider(), Stat(((int)hours).ToString(), I18n.T("h95.stat.hours")));
+        Control Stat(string value, string label) => Gx.Stat(value, label, Brushes.White, 24, Ui.Hex("#C9CFDB"));
+        Control Divider() => new Border { Width = 1, Height = 34, Background = new SolidColorBrush(Color.FromArgb(60, 255, 255, 255)), VerticalAlignment = VerticalAlignment.Center };
+        var stats = Ui.Row(18, Stat(mine.Count.ToString(), I18n.T("h95.stat.games")), Divider(), Stat(mine.Sum(g => g.ModCount).ToString(), I18n.T("h95.stat.mods")), Divider(), Stat(((int)hours).ToString(), I18n.T("h95.stat.hours")), Divider(), Stat($"{all.Count(a => a.Done)}/{all.Count}", I18n.T("v99.stat.ach")));
         stats.HorizontalAlignment = HorizontalAlignment.Right;
-        var feed = Ui.Button(I18n.T("v93.home.toFeed"), () => MainWindow.Current?.Navigate(() => new HomePage(feed: true)), "primary", Icons.Flame);
-        var add = Ui.Button(I18n.T("add.title"), () => MainWindow.Current?.Navigate(() => new AddGamePage()), "", Icons.Plus);
-        var buttons = Ui.Row(8, add, feed);
+        var profile = Ui.Button(I18n.T("v99.home.profile"), () => MainWindow.Current?.Navigate(() => new ProfilePage()), "primary", Icons.Trophy);
+        var add = Ui.Button(I18n.T("add.title"), () => MainWindow.Current?.Navigate(() => new AddGamePage()), "hero-ghost", Icons.Plus);
+        var buttons = Ui.Row(8, add, profile);
         buttons.HorizontalAlignment = HorizontalAlignment.Right;
         var right = Ui.Col(12, stats, buttons);
         right.VerticalAlignment = VerticalAlignment.Center;
 
-        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"), ColumnSpacing = 16, Margin = new Thickness(20, 16, 20, 16) };
+        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"), ColumnSpacing = 20, Margin = new Thickness(26, 30, 26, 24) };
         grid.Children.Add(logo);
         Grid.SetColumn(words, 1);
         grid.Children.Add(words);
         Grid.SetColumn(right, 2);
         grid.Children.Add(right);
-        return new Border { Classes = { "card", "home-card", "home-head" }, Padding = new Thickness(0), ClipToBounds = true, Child = new Panel { Children = { back, grid } } };
+        return new Border { Classes = { "card", "home-card", "home-head" }, Padding = new Thickness(0), ClipToBounds = true, Height = 196, Child = new Panel { Children = { back, grid } } };
     }
 
     // ---------------------------------------------------------------- «Важное»
@@ -348,7 +346,7 @@ public sealed partial class HomePage
         try
         {
             lock (_health) _health.Clear();
-            foreach (var g in FeedGames().Where(g => g.ModCount > 0 && !g.Def.IsMinecraft))
+            foreach (var g in MyGames().Where(g => g.ModCount > 0 && !g.Def.IsMinecraft))
                 try { await Features.ModUpdates.Check(g); } catch { }
             try { await Setup.Updater.Check(); } catch { }
         }
@@ -394,7 +392,7 @@ public sealed partial class HomePage
             Dispatcher.UIThread.Post(() =>
             {
                 _healthRunning = false;
-                if (changed && MainWindow.Current?.CurrentPage is HomePage { IsFeed: false } home) home.Build();
+                if (changed && MainWindow.Current?.CurrentPage is HomePage home) home.Build();
             });
         });
     }
@@ -477,7 +475,7 @@ public sealed partial class HomePage
             ? recs.Select(s => (s.Game, s.Mod, s.Reason)).ToList()
             : BestMods(mine).Take(8).Select(x => (x.Game, x.Mod, Reason: "")).ToList();
         var head = CardHead(personal ? I18n.T("h95.forYou") : I18n.T("h95.forYou.popular"), personal ? I18n.T("h95.forYou.sub") : items.Count > 0 ? I18n.T("h95.forYou.popular.sub") : null,
-            LinkButton(I18n.T("h95.forYou.more"), () => MainWindow.Current?.Navigate(() => new HomePage(feed: true))));
+            LinkButton(I18n.T("v99.forYou.ai"), () => MainWindow.Current?.Navigate(() => new AiBuildsPage())));
         Control body;
         if (items.Count == 0)
         {
@@ -635,51 +633,35 @@ public sealed partial class HomePage
         return new Border { Classes = { "card", "home-card" }, Padding = new Thickness(16, 10), Child = body, MinHeight = 108 };
     }
 
-    /// <summary>Вход в «Ленту»: яркая полоса со стопкой обложек модов.</summary>
-    static Control FeedTeaser(List<(GameState Game, ModInfo Mod, string Tag)> pool)
+    /// <summary>9.9: вместо входа в ленту — «Ближайшие награды»: три достижения, до которых ближе всего, и что за них дадут.</summary>
+    static Control NextRewards()
     {
-        var stack = new Canvas { Width = 150, Height = 54, VerticalAlignment = VerticalAlignment.Center };
-        var thumbs = pool.Skip(6).Take(5).ToList();
-        if (thumbs.Count < 3) thumbs = pool.Take(5).ToList();
-        for (var i = 0; i < thumbs.Count; i++)
+        var all = Achievements.All();
+        var close = all.Where(a => !a.Done && a.Reward is not null).OrderByDescending(a => a.Progress).ThenBy(a => a.Need).Take(3).ToList();
+        var rows = Ui.Col(8);
+        foreach (var a in close)
         {
-            var (g, m, _) = thumbs[i];
-            var t = new Border
-            {
-                Width = 50, Height = 50, CornerRadius = new CornerRadius(14), ClipToBounds = true, BorderBrush = new SolidColorBrush(Color.FromArgb(200, 255, 255, 255)), BorderThickness = new Thickness(2),
-                Child = Ui.Thumb(m.Icon, m.Name, 50, 0, 120), RenderTransform = new RotateTransform((i - 2) * 6),
-            };
-            Canvas.SetLeft(t, i * 24);
-            Canvas.SetTop(t, 2);
-            stack.Children.Add(t);
+            var color = ProfileKit.TierColor(a.Tier);
+            var pic = a.Set == Achievements.Main
+                ? (Control)new Border { Width = 34, Height = 34, CornerRadius = new CornerRadius(10), Background = Soft(Ui.Hex(color), 50), Child = Ui.Icon(typeof(Icons).GetField(a.Icon)?.GetValue(null) as string ?? Icons.Star, 17, Ui.Hex(color)) }
+                : new Border { Width = 34, Height = 34, CornerRadius = new CornerRadius(10), ClipToBounds = true, Child = Ui.GameImage(AppState.Game(a.Set).Def, 120, art: Images.Art.Cover) };
+            var bar = new ProgressBar { Minimum = 0, Maximum = 1, Value = a.Progress, Height = 4 };
+            var words = Ui.Col(3,
+                new DockPanel { Children = { new TextBlock { Text = $"{Math.Min(a.Have, a.Need)} / {a.Need}", FontSize = 11.5, Foreground = Ui.Res("Muted"), [DockPanel.DockProperty] = Dock.Right }, new TextBlock { Text = a.Title, FontWeight = FontWeight.SemiBold, FontSize = 13, TextTrimming = TextTrimming.CharacterEllipsis } } },
+                bar,
+                new TextBlock { Text = "★ " + Cosmetics.KindName(a.Reward!.Kind) + " «" + Cosmetics.Name(a.Reward) + "»", FontSize = 11.5, Foreground = Ui.Res("Brand2"), TextTrimming = TextTrimming.CharacterEllipsis });
+            var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*"), ColumnSpacing = 12 };
+            grid.Children.Add(pic);
+            Grid.SetColumn(words, 1);
+            grid.Children.Add(words);
+            var set = a.Set;
+            var row = new Border { Classes = { "home-row" }, Padding = new Thickness(8, 6), CornerRadius = new CornerRadius(12), Child = grid, Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand) };
+            StoreKit.OnClick(row, () => MainWindow.Current?.Navigate(() => new ProfilePage("achievements", set)));
+            rows.Children.Add(row);
         }
-        var words = Ui.Col(2,
-            Ui.Row(8, Ui.Icon(Icons.Flame, 18, Brushes.White), new TextBlock { Text = I18n.T("h95.feed"), FontFamily = Gx.Display, FontSize = 20, FontWeight = FontWeight.Bold, Foreground = Brushes.White }),
-            new TextBlock { Text = I18n.T("h95.feed.text"), FontSize = 12.5, Foreground = Ui.Hex("#EFEAFF"), TextTrimming = TextTrimming.CharacterEllipsis });
-        words.VerticalAlignment = VerticalAlignment.Center;
-        var go = new Border
-        {
-            Width = 40, Height = 40, CornerRadius = new CornerRadius(20), Background = Brushes.White, VerticalAlignment = VerticalAlignment.Center,
-            Child = Ui.Icon(Icons.ChevronRight, 18, new SolidColorBrush(Gx.Accent)),
-        };
-        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto,Auto"), ColumnSpacing = 18, Margin = new Thickness(20, 0, 16, 0) };
-        grid.Children.Add(words);
-        Grid.SetColumn(stack, 1);
-        grid.Children.Add(stack);
-        Grid.SetColumn(go, 2);
-        grid.Children.Add(go);
-        var accent = Gx.Accent;
-        var background = new Border
-        {
-            Background = new LinearGradientBrush
-            {
-                StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
-                GradientStops = { new GradientStop(Look.Mix(accent, Colors.Black, 0.15), 0), new GradientStop(Color.Parse("#E83E8C"), 1) },
-            },
-        };
-        var tile = Tile(new Panel { Children = { background, Gx.Scanlines(), grid } }, () => MainWindow.Current?.Navigate(() => new HomePage(feed: true)), "hero");
-        tile.MinHeight = 108;
-        return tile;
+        if (close.Count == 0) rows.Children.Add(Empty(Icons.Trophy, Yellow, I18n.T("v99.next.all"), I18n.T("v99.next.all.text")));
+        var head = CardHead(I18n.T("v99.next"), I18n.T("v99.next.sub"), LinkButton(I18n.T("v99.home.profile"), () => MainWindow.Current?.Navigate(() => new ProfilePage())));
+        return Card(head, rows, 108);
     }
 }
 

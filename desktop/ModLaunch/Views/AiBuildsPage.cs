@@ -52,8 +52,8 @@ public sealed class AiBuildsPage : Page
         col.Children.Add(Ui.TabBar(
             Tab("create", I18n.T("v98.tab.create"), Icons.Sparkles),
             Tab("mine", I18n.T("v98.tab.mine", ("n", AiBuilds.All().Count)), Icons.Layers),
-            Tab("player", I18n.T("v98.tab.player"), Icons.Trophy)));
-        col.Children.Add(_tab switch { "mine" => Mine(), "player" => Player(), _ => Create() });
+            Ui.Button(I18n.T("v98.tab.player"), () => MainWindow.Current?.Navigate(() => new ProfilePage()), "tab", Icons.Trophy)));
+        col.Children.Add(_tab switch { "mine" => Mine(), _ => Create() });
         Content = new ScrollViewer { Content = col, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
     }
 
@@ -388,65 +388,5 @@ public sealed class AiBuildsPage : Page
             thumbs, actions);
         body.Margin = new Thickness(14, 12, 14, 14);
         return new Border { Classes = { "card" }, Padding = new Thickness(0), ClipToBounds = true, Width = 300, Margin = new Thickness(0, 0, 16, 16), Child = Ui.Col(0, top, body) };
-    }
-
-    // ---------------------------------------------------------------- профиль игрока
-
-    Control Player()
-    {
-        var list = Achievements.All();
-        var (level, xp, next) = Achievements.Level(list);
-        var p0 = Social.Account.Get();
-        var acc = p0.SignedIn ? p0.Name ?? I18n.T("v93.feed.player") : I18n.T("v93.feed.player");
-        var ring = new Border
-        {
-            Width = 92, Height = 92, CornerRadius = new CornerRadius(46), BorderThickness = new Thickness(4), BorderBrush = Ui.Res("Brand"),
-            Background = Ui.Res("BrandSoft"), BoxShadow = Gx.Glow(90, 26),
-            Child = new TextBlock { Text = level.ToString(), FontFamily = Gx.Display, FontSize = 34, FontWeight = FontWeight.Bold, Foreground = Ui.Res("Brand2"), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
-        };
-        var done = list.Count(a => a.Done);
-        var info = Ui.Col(6,
-            Ui.Text(acc, "h2"),
-            Ui.Text(I18n.T("v98.level", ("n", level), ("xp", xp)), "muted"),
-            new ProgressBar { Minimum = 0, Maximum = 300, Value = 300 - next, Height = 6, Width = 320, HorizontalAlignment = HorizontalAlignment.Left },
-            Ui.Text(I18n.T("v98.level.next", ("n", next)) + " · " + I18n.T("v98.ach.count", ("done", done), ("all", list.Count)), "small muted"));
-        info.VerticalAlignment = VerticalAlignment.Center;
-        var head = Ui.Card(Ui.Row(22, ring, info), 24);
-
-        var grid = new UniformGrid { Columns = 3 };
-        foreach (var a in list.OrderByDescending(a => a.Done).ThenByDescending(a => a.Progress)) grid.Children.Add(AchCard(a));
-
-        var (hours, sessions, topGames) = Achievements.Replay();
-        var replay = Ui.Col(12, Ui.Row(8, Ui.Icon(Icons.Chart, 18, Ui.Res("Brand2")), Ui.Text(I18n.T("v98.replay"), "h2")),
-            Ui.Row(28, Gx.Stat(hours.ToString(), I18n.T("v98.replay.hours")), Gx.Stat(sessions.ToString(), I18n.T("v98.replay.sessions")), Gx.Stat(AiBuilds.All().Count.ToString(), I18n.T("v98.replay.builds"))));
-        if (topGames.Count == 0) replay.Children.Add(Ui.Text(I18n.T("v98.replay.empty"), "muted", wrap: true));
-        var max = Math.Max(1, topGames.Count > 0 ? topGames[0].Ms : 1);
-        foreach (var (g, ms) in topGames)
-        {
-            var bar = new Border { Height = 8, CornerRadius = new CornerRadius(4), Background = Ui.Res("Brand"), HorizontalAlignment = HorizontalAlignment.Left, Width = Math.Max(8, 420.0 * ms / max) };
-            replay.Children.Add(Ui.Col(4, Ui.Row(8, Ui.Text(g.Def.Name), Ui.Text(PlayTime.Format(ms), "small muted")), bar));
-        }
-        return Ui.Col(18, head, Ui.Text(I18n.T("v98.ach"), "h2"), grid, Ui.Card(replay, 24));
-    }
-
-    static Control AchCard(Achievement a)
-    {
-        var color = a.Tier switch { "epic" => "#F2B84B", "rare" => "#5AA9FF", _ => "#9AA3B2" };
-        var medal = new Border
-        {
-            Width = 48, Height = 48, CornerRadius = new CornerRadius(14),
-            Background = a.Done ? new SolidColorBrush(Color.FromArgb(50, Color.Parse(color).R, Color.Parse(color).G, Color.Parse(color).B)) : Ui.Res("Surface3"),
-            Child = Ui.Icon(IconOf(a.Icon), 24, a.Done ? Ui.Hex(color) : Ui.Res("Faint")),
-        };
-        var text = Ui.Col(4,
-            Ui.Text(I18n.T($"v98.ach.{a.Id}"), "h3"),
-            Ui.Text(I18n.T($"v98.ach.{a.Id}.d"), "small muted", wrap: true),
-            new ProgressBar { Minimum = 0, Maximum = 1, Value = a.Progress, Height = 4 },
-            Ui.Text(a.Done ? I18n.T("v98.ach.done") : $"{Math.Min(a.Have, a.Need)} / {a.Need}", "small muted"));
-        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*"), ColumnSpacing = 14 };
-        grid.Children.Add(medal);
-        Grid.SetColumn(text, 1);
-        grid.Children.Add(text);
-        return new Border { Classes = { "card" }, Padding = new Thickness(16), Margin = new Thickness(0, 0, 12, 12), Opacity = a.Done ? 1 : 0.75, Child = grid };
     }
 }

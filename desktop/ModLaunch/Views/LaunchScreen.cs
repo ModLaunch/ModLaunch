@@ -2,7 +2,7 @@
 using Avalonia.Animation;
 using Avalonia.Animation.Easings;
 using Avalonia.Controls;
-using Avalonia.Controls.Primitives;
+using Avalonia.Controls.Shapes;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Transformation;
@@ -13,8 +13,10 @@ using ModLaunch.Features;
 namespace ModLaunch.Views;
 
 /// <summary>
-/// Экран запуска игры: картинка игры на всё окно, шаги «моды → копия сохранений →
-/// запуск» с галочками и итог «Игра запущена!» с подсказкой про оверлей.
+/// 9.9: экран запуска игры «как в кино». Картинка игры во весь экран медленно наезжает,
+/// по ней один раз проходит блик; слева снизу — логотип, сведения об игре и дорожка из трёх
+/// шагов «моды → копия сохранений → запуск», справа — кольцо прогресса с кнопкой «Играть»
+/// в центре. В конце кольцо становится галочкой, экран вспыхивает цветом игры — «Игра запущена!».
 /// Игра стартует сразу на третьем шаге — анимация запуск не задерживает.
 /// </summary>
 public sealed class LaunchScreen : Panel
@@ -24,20 +26,30 @@ public sealed class LaunchScreen : Panel
 
     sealed class Step
     {
-        public readonly Border Mark = new() { Width = 28, Height = 28, CornerRadius = new CornerRadius(14), VerticalAlignment = VerticalAlignment.Center };
-        public readonly TextBlock Title = new() { FontSize = 15, FontWeight = FontWeight.SemiBold, Foreground = Brushes.White };
-        public readonly TextBlock Detail = new() { FontSize = 12.5, Foreground = Ui.Hex("#AAB2C2"), TextTrimming = TextTrimming.CharacterEllipsis };
+        public readonly Border Mark = new() { Width = 30, Height = 30, CornerRadius = new CornerRadius(15), HorizontalAlignment = HorizontalAlignment.Left };
+        public readonly Border Line = new() { Height = 3, CornerRadius = new CornerRadius(2), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(38, 0, 8, 0) };
+        public readonly Border Fill = new() { Height = 3, CornerRadius = new CornerRadius(2), HorizontalAlignment = HorizontalAlignment.Left, Width = 0 };
+        public readonly TextBlock Title = new() { FontSize = 14, FontWeight = FontWeight.SemiBold, Foreground = Brushes.White };
+        public readonly TextBlock Detail = new() { FontSize = 12, Foreground = Ui.Hex("#B8BFCC"), TextTrimming = TextTrimming.CharacterEllipsis };
         public State State;
     }
 
+    const double RingSize = 132, RingStroke = 6;
+
     readonly GameState _g;
+    readonly Color _accent;
     readonly Step[] _steps = [new(), new(), new()];
-    readonly ProgressBar _bar = new() { Minimum = 0, Maximum = 100, Height = 6, MinHeight = 6 };
-    readonly StackPanel _result = new() { Spacing = 14, IsVisible = false, HorizontalAlignment = HorizontalAlignment.Center };
-    readonly Border _art;
-    readonly DispatcherTimer _spin;
+    readonly Arc _arc;
+    readonly Border _core;
+    readonly Border _halo;
+    readonly TextBlock _percent = new() { FontSize = 12, FontWeight = FontWeight.Bold, Foreground = Ui.Hex("#D9DDE6"), HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 10, 0, 0) };
+    readonly StackPanel _result = new() { Spacing = 12, IsVisible = false };
+    readonly TextBlock _eyebrow;
+    readonly Border _art, _flash, _sweep;
+    readonly DispatcherTimer _tick;
     Control? _spinning;
-    double _angle;
+    double _angle, _pulse, _shown;
+    double _target;
     bool _closed;
 
     /// <summary>Экран закрыт (кнопкой, Esc или сам после запуска).</summary>
@@ -46,94 +58,178 @@ public sealed class LaunchScreen : Panel
     public LaunchScreen(GameState g)
     {
         _g = g;
-        Background = Brushes.Black;
-        // Крутилка у шага «идёт»: таймер нужен раньше первого SetStep.
-        _spin = new DispatcherTimer(TimeSpan.FromMilliseconds(16), DispatcherPriority.Render, (_, _) =>
-        {
-            if (_spinning is null) return;
-            _angle = (_angle + 7) % 360;
-            _spinning.RenderTransform = new RotateTransform(_angle);
-        });
-        _spin.Stop();
+        _accent = Color.TryParse(g.Def.Accent, out var c) ? c : Gx.Accent;
+        Background = Ui.Hex("#07080C");
+        ClipToBounds = true;
 
-        // Картинка игры: размыта и медленно приближается.
+        // Один таймер на всё: крутилка у шага «идёт», дыхание кольца и плавный бег процентов.
+        _tick = new DispatcherTimer(TimeSpan.FromMilliseconds(16), DispatcherPriority.Render, (_, _) => Tick());
+
+        // Картинка игры: чёткая, медленно приближается (Ken Burns).
         _art = new Border
         {
-            Child = Ui.GameImage(g.Def, 1400, art: Images.Art.Hero),
-            Effect = new BlurEffect { Radius = 18 },
-            RenderTransform = TransformOperations.Parse("scale(1.06)"),
-            Transitions = [new TransformOperationsTransition { Property = RenderTransformProperty, Duration = TimeSpan.FromSeconds(8), Easing = new SineEaseOut() }],
+            Child = Ui.GameImage(g.Def, 1600, art: Images.Art.Hero),
+            RenderTransform = TransformOperations.Parse("scale(1.02)"),
+            Transitions = [new TransformOperationsTransition { Property = RenderTransformProperty, Duration = TimeSpan.FromSeconds(12), Easing = new SineEaseOut() }],
         };
-        var shade = new Border
+        var shadeLeft = new Border { Background = Gx.ShadeLeft(0.75, 245) };
+        var shadeUp = new Border { Background = Gx.ShadeUp(0.35, 250) };
+        var glow = new Border
         {
-            Background = new LinearGradientBrush
+            Background = new RadialGradientBrush
             {
-                StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(0, 1, RelativeUnit.Relative),
-                GradientStops = { new GradientStop(Color.Parse("#B30F1116"), 0), new GradientStop(Color.Parse("#E60F1116"), 0.55), new GradientStop(Color.Parse("#FA0F1116"), 1) },
+                Center = new RelativePoint(0.1, 1.05, RelativeUnit.Relative), GradientOrigin = new RelativePoint(0.1, 1.05, RelativeUnit.Relative),
+                RadiusX = new RelativeScalar(0.7, RelativeUnit.Relative), RadiusY = new RelativeScalar(0.8, RelativeUnit.Relative),
+                GradientStops = { new GradientStop(Gx.Alpha(_accent, 120), 0), new GradientStop(Gx.Alpha(_accent, 0), 1) },
             },
         };
+        // Блик: светлая полоса наискосок один раз проходит через экран.
+        _sweep = new Border
+        {
+            Width = 260, HorizontalAlignment = HorizontalAlignment.Left, IsHitTestVisible = false,
+            Background = new LinearGradientBrush
+            {
+                StartPoint = new RelativePoint(0, 0.5, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 0.5, RelativeUnit.Relative),
+                GradientStops = { new GradientStop(Color.FromArgb(0, 255, 255, 255), 0), new GradientStop(Color.FromArgb(34, 255, 255, 255), 0.5), new GradientStop(Color.FromArgb(0, 255, 255, 255), 1) },
+            },
+            RenderTransform = TransformOperations.Parse("translateX(-400px) skewX(-18deg)"),
+            Transitions = [new TransformOperationsTransition { Property = RenderTransformProperty, Duration = TimeSpan.FromMilliseconds(1400), Easing = new CubicEaseInOut() }],
+        };
+        // Вспышка цветом игры в момент «Игра запущена».
+        _flash = new Border
+        {
+            Background = new RadialGradientBrush
+            {
+                Center = new RelativePoint(0.82, 0.78, RelativeUnit.Relative), GradientOrigin = new RelativePoint(0.82, 0.78, RelativeUnit.Relative),
+                RadiusX = new RelativeScalar(0.9, RelativeUnit.Relative), RadiusY = new RelativeScalar(1.1, RelativeUnit.Relative),
+                GradientStops = { new GradientStop(Gx.Alpha(_accent, 170), 0), new GradientStop(Gx.Alpha(_accent, 0), 1) },
+            },
+            Opacity = 0, IsHitTestVisible = false,
+            Transitions = [new DoubleTransition { Property = OpacityProperty, Duration = TimeSpan.FromMilliseconds(700), Easing = new CubicEaseOut() }],
+        };
 
-        // Логотип игры (как в шапке страницы игры) или название.
-        var logo = Images.GameAsset(g.Def, Images.Art.Logo, 640);
+        // Слева снизу: «Запуск», логотип, сведения об игре, дорожка шагов и итог.
+        _eyebrow = new TextBlock { Text = I18n.T("launch.via").ToUpperInvariant(), FontSize = 11.5, FontWeight = FontWeight.Bold, LetterSpacing = 2, Foreground = new SolidColorBrush(Look.Mix(_accent, Colors.White, 0.45)) };
+        var logo = Images.GameAsset(g.Def, Images.Art.Logo, 720);
         Control title = logo is null
-            ? new TextBlock { Text = g.Def.Name, FontSize = 38, FontWeight = FontWeight.Bold, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center, TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap }
-            : new Image { Source = logo, MaxHeight = 120, MaxWidth = 440, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Center };
+            ? new TextBlock { Text = g.Def.Name, FontFamily = Gx.Display, FontSize = 46, FontWeight = FontWeight.Bold, LetterSpacing = -1, Foreground = Brushes.White, TextWrapping = TextWrapping.Wrap, MaxWidth = 640 }
+            : new Image { Source = logo, MaxHeight = 140, MaxWidth = 480, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Left };
 
-        _bar.Foreground = Ui.Res("Brand");
-        _bar.Background = new SolidColorBrush(Color.FromArgb(40, 255, 255, 255));
-        _bar.Transitions = [new DoubleTransition { Property = RangeBase.ValueProperty, Duration = TimeSpan.FromMilliseconds(420), Easing = new CubicEaseOut() }];
+        var played = PlayTime.Get(g.Def.Id);
+        var meta = Ui.Row(8);
+        void Chip(string icon, string text) => meta.Children.Add(new Border
+        {
+            Background = new SolidColorBrush(Color.FromArgb(56, 255, 255, 255)), CornerRadius = new CornerRadius(999), Padding = new Thickness(10, 4),
+            Child = Ui.Row(6, Ui.Icon(icon, 13, Brushes.White), new TextBlock { Text = text, FontSize = 12.5, FontWeight = FontWeight.SemiBold, Foreground = Brushes.White }),
+        });
+        if (g.ModCount > 0) Chip(Icons.Package, I18n.T("v99.launch.mods", ("n", g.ModCount)));
+        if (played.TotalMs >= 60_000) Chip(Icons.Clock, PlayTime.Format(played.TotalMs));
+        if (played.LastPlayed is not null) Chip(Icons.Play, Ui.Ago(played.LastPlayed));
 
         var titles = new[] { I18n.T("launch.check"), I18n.T("launch.backup"), I18n.T("launch.start") };
-        var rows = Ui.Col(16);
+        var track = new Grid { ColumnDefinitions = new ColumnDefinitions("*,*,*"), Width = 660, HorizontalAlignment = HorizontalAlignment.Left };
         for (var i = 0; i < _steps.Length; i++)
         {
             var s = _steps[i];
             s.Title.Text = titles[i];
-            var words = Ui.Col(2, s.Title, s.Detail);
-            words.VerticalAlignment = VerticalAlignment.Center;
-            var row = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*"), ColumnSpacing = 14 };
-            row.Children.Add(s.Mark);
-            Grid.SetColumn(words, 1);
-            row.Children.Add(words);
-            rows.Children.Add(row);
+            s.Line.Background = new SolidColorBrush(Color.FromArgb(46, 255, 255, 255));
+            s.Line.IsVisible = i < _steps.Length - 1;
+            s.Fill.Background = new SolidColorBrush(_accent);
+            s.Fill.Transitions = [new DoubleTransition { Property = WidthProperty, Duration = TimeSpan.FromMilliseconds(520), Easing = new CubicEaseInOut() }];
+            s.Line.Child = s.Fill;
+            var top = new Panel { Height = 30, Children = { s.Line, s.Mark } };
+            var cell = Ui.Col(8, top, Ui.Col(2, s.Title, s.Detail));
+            Grid.SetColumn(cell, i);
+            track.Children.Add(cell);
             SetStep(i, State.Waiting, null);
         }
-        var card = new Border
+
+        var left = new StackPanel
         {
-            Background = new SolidColorBrush(Color.Parse("#B3171A21")), CornerRadius = new CornerRadius(18), Padding = new Thickness(22, 20),
-            Child = rows,
+            Spacing = 16, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(72, 0, 0, 64),
+            Children = { _eyebrow, title, meta, new Border { Height = 8 }, track, _result },
         };
 
-        var center = new StackPanel
+        // Справа снизу — кольцо прогресса с «Играть» в центре.
+        var trackRing = new Ellipse { Width = RingSize, Height = RingSize, Stroke = new SolidColorBrush(Color.FromArgb(40, 255, 255, 255)), StrokeThickness = RingStroke };
+        _arc = new Arc
         {
-            Spacing = 22, Width = 520, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
-            Children =
-            {
-                title,
-                new TextBlock { Text = I18n.T("launch.via"), FontSize = 13, Foreground = Ui.Hex("#AAB2C2"), HorizontalAlignment = HorizontalAlignment.Center },
-                _bar,
-                card,
-                _result,
-            },
+            Width = RingSize, Height = RingSize, StartAngle = -90, SweepAngle = 0, Stroke = new SolidColorBrush(_accent), StrokeThickness = RingStroke,
+            StrokeLineCap = PenLineCap.Round,
         };
+        _core = new Border
+        {
+            Width = RingSize - 34, Height = RingSize - 34, CornerRadius = new CornerRadius((RingSize - 34) / 2), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+            Background = new LinearGradientBrush
+            {
+                StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
+                GradientStops = { new GradientStop(Look.Mix(_accent, Colors.White, 0.2), 0), new GradientStop(Look.Mix(_accent, Colors.Black, 0.25), 1) },
+            },
+            Child = Ui.Icon(Icons.Play, 34, Brushes.White),
+            RenderTransformOrigin = RelativePoint.Center,
+        };
+        _halo = new Border
+        {
+            Width = RingSize + 60, Height = RingSize + 60, CornerRadius = new CornerRadius((RingSize + 60) / 2), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+            Background = new RadialGradientBrush { GradientStops = { new GradientStop(Gx.Alpha(_accent, 110), 0), new GradientStop(Gx.Alpha(_accent, 0), 1) } },
+            RenderTransformOrigin = RelativePoint.Center,
+        };
+        var ring = new Panel { Width = RingSize + 60, Height = RingSize + 60, Children = { _halo, new Panel { Width = RingSize, Height = RingSize, Children = { trackRing, _arc, _core } } } };
+        var right = new StackPanel { HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 60, 40), Children = { ring, _percent } };
 
         var close = Ui.Button("", Close, "icon ghost", Icons.Close);
         close.Foreground = Brushes.White;
         close.HorizontalAlignment = HorizontalAlignment.Right;
         close.VerticalAlignment = VerticalAlignment.Top;
         close.Margin = new Thickness(0, 20, 24, 0);
+        var brand = Ui.Row(8, new Image { Source = Images.Asset("icon.png", 64), Width = 20, Height = 20 }, new TextBlock { Text = "ModLaunch", FontWeight = FontWeight.SemiBold, FontSize = 13, Foreground = Ui.Hex("#D9DDE6") });
+        brand.Margin = new Thickness(28, 24, 0, 0);
+        brand.HorizontalAlignment = HorizontalAlignment.Left;
+        brand.VerticalAlignment = VerticalAlignment.Top;
 
         Children.Add(_art);
-        Children.Add(shade);
-        Children.Add(center);
+        Children.Add(shadeLeft);
+        Children.Add(shadeUp);
+        Children.Add(glow);
+        Children.Add(_sweep);
+        Children.Add(_flash);
+        Children.Add(left);
+        Children.Add(right);
+        Children.Add(brand);
         Children.Add(close);
 
         AttachedToVisualTree += (_, _) =>
         {
-            _art.RenderTransform = TransformOperations.Parse("scale(1.16)");
-            Animate.From(center, "translateY(24px)", 420);
+            _art.RenderTransform = TransformOperations.Parse("scale(1.12)");
+            _sweep.RenderTransform = TransformOperations.Parse("translateX(2200px) skewX(-18deg)");
+            Animate.From(left, "translateX(-40px)", 520, 0, new QuinticEaseOut());
+            Animate.From(right, "scale(0.7)", 560, 120, new BackEaseOut());
+            _tick.Start();
         };
-        DetachedFromVisualTree += (_, _) => _spin.Stop();
+        DetachedFromVisualTree += (_, _) => _tick.Stop();
+    }
+
+    void Tick()
+    {
+        // Шаги размечаются в конструкторе раньше, чем создано кольцо.
+        if (_arc is null || _halo is null) return;
+        if (_spinning is not null)
+        {
+            _angle = (_angle + 7) % 360;
+            _spinning.RenderTransform = new RotateTransform(_angle);
+        }
+        // «Дыхание» кольца, пока идёт запуск.
+        _pulse += 0.06;
+        var k = _steps.Any(s => s.State == State.Working) ? 1 + Math.Sin(_pulse) * 0.06 : 1;
+        _halo.RenderTransform = new ScaleTransform(k * 1.05, k * 1.05);
+        _halo.Opacity = 0.65 + Math.Sin(_pulse) * 0.25;
+        // Проценты и дуга догоняют цель плавно.
+        if (Math.Abs(_shown - _target) > 0.1)
+        {
+            _shown += (_target - _shown) * (Animate.On ? 0.12 : 1);
+            _arc.SweepAngle = 360 * _shown / 100;
+            _percent.Text = $"{Math.Round(_shown)}%";
+        }
     }
 
     /// <summary>Отметить шаг: ждёт, идёт (крутится), готов, предупреждение, ошибка или пропущен.</summary>
@@ -146,7 +242,7 @@ public sealed class LaunchScreen : Panel
         s.Title.Opacity = state == State.Waiting ? 0.5 : 1;
         var (back, icon, stroke) = state switch
         {
-            State.Working => ((IBrush)new SolidColorBrush(Color.FromArgb(90, 124, 92, 255)), Icons.Refresh, (IBrush)Brushes.White),
+            State.Working => ((IBrush)new SolidColorBrush(Gx.Alpha(_accent, 110)), Icons.Refresh, (IBrush)Brushes.White),
             State.Done => (Ui.Res("Good"), Icons.Check, Ui.Hex("#0F1116")),
             State.Warn => (Ui.Res("Warn"), Icons.Alert, Ui.Hex("#0F1116")),
             State.Failed => (Ui.Res("Bad"), Icons.Close, Brushes.White),
@@ -154,20 +250,20 @@ public sealed class LaunchScreen : Panel
             _ => (new SolidColorBrush(Color.FromArgb(38, 255, 255, 255)), (string?)null, Brushes.White),
         };
         s.Mark.Background = back;
+        s.Mark.BoxShadow = state == State.Working ? BoxShadows.Parse($"0 0 16 2 {Gx.Alpha(_accent, 160)}") : default;
         s.Mark.Child = icon is null ? Ui.Dot(Ui.Hex("#6B7385"), 6) : Ui.Icon(icon, 15, stroke);
-        if (state == State.Working)
+        if (state == State.Working) _spinning = s.Mark.Child;
+        else if (_steps.All(x => x.State != State.Working)) _spinning = null;
+        if (state is State.Done or State.Warn or State.Skipped)
         {
-            _spinning = s.Mark.Child;
-            if (!_spin.IsEnabled) _spin.Start();
+            // Линия к следующему шагу заполняется цветом игры.
+            s.Fill.Width = Math.Max(0, (660 / 3.0) - 46);
+            if (Animate.On) Animate.From(s.Mark, "scale(0.6)", 320, easing: new BackEaseOut());
         }
-        else if (_steps.All(x => x.State != State.Working))
-        {
-            _spinning = null;
-            _spin.Stop();
-        }
-        if (state is State.Done or State.Warn && Animate.On) Animate.From(s.Mark, "scale(0.6)", 320, easing: new BackEaseOut());
+        else s.Fill.Width = 0;
         var done = _steps.Count(x => x.State is State.Done or State.Warn or State.Skipped);
-        _bar.Value = Math.Min(100, done * 33.4 + (_steps.Any(x => x.State == State.Working) ? 12 : 0));
+        _target = Math.Min(100, done * 33.4 + (_steps.Any(x => x.State == State.Working) ? 12 : 0));
+        if (!Animate.On) Tick();
     }
 
     /// <summary>Пройти шаги по-настоящему: проверка модов, копия сохранений, запуск.</summary>
@@ -184,7 +280,7 @@ public sealed class LaunchScreen : Panel
             }
             catch { return (0, 0); }
         });
-        await Task.Delay(420);
+        await Task.Delay(520);
         if (_closed) return;
         SetStep(0, conflicts > 0 ? State.Warn : State.Done,
             mods == 0 ? I18n.T("launch.check.none")
@@ -193,7 +289,7 @@ public sealed class LaunchScreen : Panel
 
         var backups = Backups.OnLaunch;
         SetStep(1, backups ? State.Working : State.Skipped, backups ? null : I18n.T("launch.backup.off"));
-        if (backups) await Task.Delay(300);
+        await Task.Delay(backups ? 420 : 240);
         if (_closed) return; // закрыли до запуска — значит, передумали
         SetStep(2, State.Working, _g.Def.Name);
         var r = launch();
@@ -204,64 +300,63 @@ public sealed class LaunchScreen : Panel
             ShowFailure(r.Error);
             return;
         }
-        await Task.Delay(380);
+        await Task.Delay(480);
         SetStep(2, State.Done, _g.Def.Name);
         ShowSuccess();
-        await Task.Delay(2800);
+        await Task.Delay(3200);
         Close();
     }
 
-    /// <summary>«Игра запущена!»: большая галочка, подсказка про оверлей, «Свернуть» и «Готово».</summary>
+    /// <summary>«Игра запущена!»: кольцо — галочка, вспышка цветом игры, подсказка про оверлей, «Свернуть» и «Готово».</summary>
     public void ShowSuccess()
     {
-        _bar.Value = 100;
-        var check = new Border
-        {
-            Width = 68, Height = 68, CornerRadius = new CornerRadius(34), Background = Ui.Res("Good"), HorizontalAlignment = HorizontalAlignment.Center,
-            Child = Ui.Icon(Icons.Check, 32, Ui.Hex("#0F1116")),
-        };
+        _target = 100;
+        _arc.Stroke = Ui.Res("Good");
+        _core.Background = Ui.Res("Good");
+        _core.Child = Ui.Icon(Icons.Check, 40, Ui.Hex("#0F1116"));
+        _flash.Opacity = 1;
+        DispatcherTimer.RunOnce(() => _flash.Opacity = 0.35, TimeSpan.FromMilliseconds(Animate.On ? 650 : 0));
+        _eyebrow.Text = I18n.T("v99.launch.ready").ToUpperInvariant();
         _result.Children.Clear();
-        _result.Children.Add(check);
-        _result.Children.Add(new TextBlock { Text = I18n.T("launch.started"), FontSize = 28, FontWeight = FontWeight.Bold, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center });
+        _result.Children.Add(new TextBlock { Text = I18n.T("launch.started"), FontFamily = Gx.Display, FontSize = 34, FontWeight = FontWeight.Bold, LetterSpacing = -0.6, Foreground = Brushes.White });
         if (Settings.Data.Bool("overlay", true))
             _result.Children.Add(new TextBlock
             {
                 Text = I18n.T("launch.overlayHint", ("key", Hotkey.Display(Hotkey.KeyOf(Settings.Data.Str("overlayKey"))))),
-                FontSize = 14, Foreground = Ui.Hex("#C9CFDB"), HorizontalAlignment = HorizontalAlignment.Center,
+                FontSize = 14, Foreground = Ui.Hex("#C9CFDB"),
             });
-        var minimize = Ui.Button(I18n.T("launch.minimize"), () => { Close(); if (MainWindow.Current is { } w) w.WindowState = WindowState.Minimized; }, "", Icons.Minimize);
+        var minimize = Ui.Button(I18n.T("launch.minimize"), () => { Close(); if (MainWindow.Current is { } w) w.WindowState = WindowState.Minimized; }, "hero-ghost", Icons.Minimize);
         var done = Ui.Button(I18n.T("launch.done"), Close, "primary", Icons.Check);
-        var buttons = Ui.Row(10, minimize, done);
-        buttons.HorizontalAlignment = HorizontalAlignment.Center;
-        buttons.Margin = new Thickness(0, 6, 0, 0);
+        var buttons = Ui.Row(10, done, minimize);
+        buttons.Margin = new Thickness(0, 4, 0, 0);
         _result.Children.Add(buttons);
+        _result.Margin = new Thickness(0, 12, 0, 0);
         _result.IsVisible = true;
-        Animate.From(check, "scale(0.3)", 460, easing: new BackEaseOut());
-        Animate.From(_result, "translateY(16px)", 380);
+        Animate.From(_core, "scale(0.4)", 520, easing: new BackEaseOut());
+        Animate.From(_result, "translateY(18px)", 420);
+        if (!Animate.On) Tick();
     }
 
     void ShowFailure(string? error)
     {
+        _arc.Stroke = Ui.Res("Bad");
+        _core.Background = Ui.Res("Bad");
+        _core.Child = Ui.Icon(Icons.Close, 34, Brushes.White);
         _result.Children.Clear();
-        _result.Children.Add(new Border
-        {
-            Width = 68, Height = 68, CornerRadius = new CornerRadius(34), Background = Ui.Res("Bad"), HorizontalAlignment = HorizontalAlignment.Center,
-            Child = Ui.Icon(Icons.Close, 30, Brushes.White),
-        });
-        _result.Children.Add(new TextBlock { Text = I18n.T("launch.failed"), FontSize = 26, FontWeight = FontWeight.Bold, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center });
+        _result.Children.Add(new TextBlock { Text = I18n.T("launch.failed"), FontFamily = Gx.Display, FontSize = 30, FontWeight = FontWeight.Bold, Foreground = Brushes.White });
         if (!string.IsNullOrEmpty(error))
-            _result.Children.Add(new TextBlock { Text = error, FontSize = 13.5, Foreground = Ui.Hex("#C9CFDB"), TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center, MaxWidth = 500 });
-        var done = Ui.Button(I18n.T("launch.done"), Close, "primary");
-        done.HorizontalAlignment = HorizontalAlignment.Center;
-        _result.Children.Add(done);
+            _result.Children.Add(new TextBlock { Text = error, FontSize = 13.5, Foreground = Ui.Hex("#C9CFDB"), TextWrapping = TextWrapping.Wrap, MaxWidth = 620 });
+        _result.Children.Add(Ui.Button(I18n.T("launch.done"), Close, "primary"));
+        _result.Margin = new Thickness(0, 12, 0, 0);
         _result.IsVisible = true;
+        Animate.From(_result, "translateY(18px)", 420);
     }
 
     public void Close()
     {
         if (_closed) return;
         _closed = true;
-        _spin.Stop();
+        _tick.Stop();
         Closed?.Invoke();
     }
 

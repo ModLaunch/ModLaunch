@@ -12,9 +12,13 @@ public static class WhatsNew
 {
     static readonly (string Icon, string Key, Func<Page>? Open)[] Items =
     [
+        (Icons.Trophy, "new.v99.ach", () => new ProfilePage()),
+        (Icons.Home, "new.v99.home", () => new HomePage()),
+        (Icons.Play, "new.v99.launch", () => new LibraryPage()),
+        (Icons.Creator, "new.v99.creator", () => new CreatorPage()),
         (Icons.Zap, "new.v97.modscriptx", () => new CreatorPage("inject")),
         (Icons.Home, "new.v95.home", () => new HomePage()),
-        (Icons.Sparkles, "new.v95.forYou", () => new HomePage(feed: true)),
+        (Icons.Sparkles, "new.v95.forYou", () => new HomePage()),
         (Icons.Bag, "new.v95.wallet", () => new MarketPage("wallet")),
         (Icons.Creator, "new.v95.hub", () => new MarketPage()),
         (Icons.Cube, "new.v95.mcinto", () => new MinecraftPage("catalog")),
@@ -25,7 +29,6 @@ public static class WhatsNew
         (Icons.Gamepad, "new.v94.get", () => new LibraryPage()),
         (Icons.Check, "new.v94.fixes", null),
         (Icons.Home, "new.v93.home", () => new HomePage()),
-        (Icons.Flame, "new.v93.feed", () => new HomePage(feed: true)),
         (Icons.Bag, "new.v93.market", () => new MarketPage()),
         (Icons.Play, "new.v93.gamefx", () => new LibraryPage()),
         (Icons.Sidebar, "new.v93.rail", null),

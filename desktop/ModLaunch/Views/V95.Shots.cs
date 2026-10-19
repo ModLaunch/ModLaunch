@@ -28,7 +28,6 @@ public static class V95Shots
     {
         var w = s.Window;
         MarketData.Demo(Demo.Listings(), Demo.Hub());
-        HomePage.DemoFeed(Demo.Listings(), Demo.Hub());
 
         // Спокойная главная: нет обновлений, ошибок и друзей.
         w.Navigate(() => new HomePage());
@@ -86,18 +85,6 @@ public static class V95Shots
         w.Height = wasH;
         s.Pump(600);
 
-        // Лента: блок «Для вас» и плитки с причиной.
-        HomePage.DemoLayouts(false, "bigL4", "chips", "towersL", "bannerChips");
-        w.Navigate(() => new HomePage(feed: true));
-        s.Pump(1500);
-        s.Save("v95-4-feed");
-        foreach (var y in new[] { 900, 1800 })
-        {
-            if (Scroller(w.CurrentPage) is { } fv) fv.Offset = new Vector(0, y);
-            s.Pump(700);
-            s.Save($"v95-4-feed-{y}");
-        }
-        HomePage.DemoLayouts(false);
 
         Jobs.All.Remove(failed);
         Jobs.All.Remove(running);
