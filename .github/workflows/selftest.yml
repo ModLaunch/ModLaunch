@@ -9,6 +9,10 @@ on:
     paths: ['src/**', 'build/**', 'electron-builder.yml', 'tools/selftest.js', 'tools/installer-check.js', '.github/workflows/selftest.yml']
 permissions:
   contents: write
+# Новый пуш в ту же ветку отменяет старый прогон — очередь не копится.
+concurrency:
+  group: selftest-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   windows:
     runs-on: windows-latest
