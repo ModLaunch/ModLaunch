@@ -58,6 +58,23 @@ jobs:
           Get-Content selfcheck.txt | Where-Object { $_ -match '^\s*(FAIL|ERROR)' } | ForEach-Object { Write-Output "::error title=self-check::$_" }
           if ($p.ExitCode -ne 0) { throw "self-check failed" }
 
+      # 9.8: готовый установщик — та же программа с «Setup» в имени (открывает окно установки).
+      # Выкладывается сразу после самопроверки, не дожидаясь снимков экрана.
+      - name: Installer
+        id: setup
+        shell: pwsh
+        run: |
+          $v = ([xml](Get-Content desktop/ModLaunch/ModLaunch.csproj)).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item out/ModLaunch.exe "dist/ModLaunch-Setup-$v.exe"
+          "name=ModLaunch-Setup-$v" >> $env:GITHUB_OUTPUT
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.setup.outputs.name }}
+          path: dist/${{ steps.setup.outputs.name }}.exe
+          compression-level: 0
+
       - name: Catalog report (counts and top mods per game)
         continue-on-error: true
         shell: pwsh
@@ -73,11 +90,6 @@ jobs:
           $p = Start-Process -FilePath out/ModLaunch.exe -ArgumentList '--screenshot', 'shots' -PassThru -Wait -NoNewWindow
           if ($p.ExitCode -ne 0) { throw "exit $($p.ExitCode)" }
           Get-ChildItem shots
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ModLaunch-win-x64
-          path: out/ModLaunch.exe
 
       - uses: actions/upload-artifact@v4
         if: success() || failure()
