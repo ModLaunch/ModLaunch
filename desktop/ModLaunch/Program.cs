@@ -107,7 +107,9 @@ public static class Program
         void Save(string name)
         {
             Pump();
-            window.CaptureRenderedFrame()?.Save(Path.Combine(outDir, name + ".png"));
+            // Кадр — неуправляемая память Skia: освобождаем сразу, иначе за сотню снимков
+            // её копится столько, что кодировщик PNG падает (AccessViolation на CI).
+            using (var frame = window.CaptureRenderedFrame()) frame?.Save(Path.Combine(outDir, name + ".png"));
             Console.WriteLine("saved " + name);
         }
 

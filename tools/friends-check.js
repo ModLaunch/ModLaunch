@@ -6,7 +6,7 @@
  *   node tools/friends-check.js
  *
  * Сам поднимает эмуляторы Auth и Firestore (нужны firebase-tools и Java 21),
- * ставит правила из firebase/friends.rules и проходит весь путь: код друга,
+ * ставит правила из firebase/firestore.rules (с 9.5 — один файл на всё) и проходит весь путь: код друга,
  * запрос, «принять», «в игре», невидимка, «убрать из друзей», удаление
  * аккаунта. И проверяет то, чего правила пускать не должны: чужие запросы,
  * подделку отправителя, чтение чужих дружб, запись в чужой профиль.
@@ -21,11 +21,8 @@ const ROOT = path.join(__dirname, '..');
 
 if (!process.env.FIRESTORE_EMULATOR_HOST) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'modhub-firebase-'));
-  const rules = fs.readFileSync(path.join(ROOT, 'firebase', 'friends.rules'), 'utf8');
-  fs.writeFileSync(
-    path.join(dir, 'firestore.rules'),
-    `rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n${rules}\n  }\n}\n`
-  );
+  // 9.5: firebase/friends.rules влит в общий firestore.rules — берём его целиком.
+  fs.copyFileSync(path.join(ROOT, 'firebase', 'firestore.rules'), path.join(dir, 'firestore.rules'));
   fs.writeFileSync(
     path.join(dir, 'firebase.json'),
     JSON.stringify({
