@@ -20,7 +20,15 @@ public sealed partial class CreatorPage
     /// </summary>
     Control Home()
     {
-        var col = new StackPanel { Spacing = 30 };
+        if (_hub is null && !_hubLoading && !Program.Screenshot) _ = LoadHub();
+        if (_market is null && !_marketLoading && !Program.Screenshot) _ = LoadMarket();
+        var col = new StackPanel { Spacing = 26 };
+        // 9.9: сверху — «Студия автора» и быстрые инструменты.
+        var studio = StudioHeader();
+        var tools = Tools();
+        col.Children.Add(studio);
+        col.Children.Add(tools);
+        if (!Shown) { Animate.Rise(studio, 0); Animate.Rise(tools, 1); }
 
         // Верх по эскизу.
         var create = BigButton(Icons.Plus, I18n.T("v91.cr.create"), I18n.T("cr.home.create.text"), CreateNew, primary: true);
@@ -44,8 +52,6 @@ public sealed partial class CreatorPage
         }
         var left = Ui.Col(22, buttons, Section(I18n.T("v91.cr.myMods"), () => Go("mine"), mine));
 
-        if (_hub is null && !_hubLoading && !Program.Screenshot) _ = LoadHub();
-        if (_market is null && !_marketLoading && !Program.Screenshot) _ = LoadMarket();
         var hit = _hub is { Count: > 0 } ? Hub.Sort(_hub, "trending").FirstOrDefault() : null;
         var fresh = Market.Sort(_market ?? [], "new").FirstOrDefault();
         var right = Ui.Row(16,
@@ -58,7 +64,7 @@ public sealed partial class CreatorPage
         Grid.SetColumn(right, 1);
         top.Children.Add(right);
         col.Children.Add(top);
-        if (!Shown) { Animate.Rise(left, 0); Animate.Rise(right, 2); }
+        if (!Shown) { Animate.Rise(left, 2); Animate.Rise(right, 3); }
 
         // Ниже — как раньше: популярное в Hub, свежее в маркете, шаблоны.
         Control popular;

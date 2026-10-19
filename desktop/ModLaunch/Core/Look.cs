@@ -486,6 +486,8 @@ public static class Look
         var glow = BoxShadows.Parse($"0 0 0 1 {Hex(220)}, 0 18 42 -14 {Hex(150)}");
         Add(x => x.OfType<Avalonia.Controls.Border>().Class("store-tile").Class(":pointerover"),
             (Avalonia.Controls.Border.BoxShadowProperty, glow), (Avalonia.Controls.Border.BorderBrushProperty, new SolidColorBrush(Color.FromArgb(200, accent.R, accent.G, accent.B))));
+        // 9.9: строки на главной («Ближайшие награды», «Вернуться в игру») подсвечиваются при наведении.
+        Add(x => x.OfType<Avalonia.Controls.Border>().Class("home-row").Class(":pointerover"), (Avalonia.Controls.Border.BackgroundProperty, R("Surface2")));
         Add(x => x.OfType<Avalonia.Controls.Button>().Class("primary").Class(":pointerover").Template().OfType<Avalonia.Controls.Presenters.ContentPresenter>(),
             (Avalonia.Controls.Presenters.ContentPresenter.BoxShadowProperty, BoxShadows.Parse($"0 0 18 0 {Hex(150)}")));
         Add(x => x.OfType<Avalonia.Controls.Button>().Class("nav").Class("active"), (Avalonia.Controls.Primitives.TemplatedControl.BackgroundProperty, R("BrandSoft")));

@@ -395,15 +395,13 @@ public sealed partial class SetupWindow : Window
                     GradientStops = { new GradientStop(Accent, 0), new GradientStop(Color.Parse("#FFB36B"), 1) } },
             };
             if (Animate.On) _arc.Transitions = [new DoubleTransition { Property = Arc.SweepAngleProperty, Duration = TimeSpan.FromMilliseconds(380), Easing = new CubicEaseOut() }];
-            var spinner = new Arc { Width = size + 26, Height = size + 26, StartAngle = 0, SweepAngle = 70, StrokeThickness = 2, StrokeLineCap = PenLineCap.Round, Stroke = new SolidColorBrush(Alpha(Accent, 0x99)) };
-            var spin = new RotateTransform();
-            spinner.RenderTransform = spin;
-            Frames(spinner, t => spin.Angle = t * 140 % 360);
+            // 9.9: вместо кривого «спутника» вокруг кольца — мягко дышащее свечение по центру.
             var glow = new Border { Width = size * 0.72, Height = size * 0.72, CornerRadius = new CornerRadius(size), BoxShadow = new BoxShadows(new BoxShadow { Blur = 60, Spread = 6, Color = Alpha(Accent, 0x55) }) };
+            Frames(glow, t => glow.Opacity = 0.6 + Math.Sin(t * 2.4) * 0.4);
             View = new Panel
             {
                 Width = size + 30, Height = size + 30,
-                Children = { glow, spinner, track, _arc, new StackPanel { VerticalAlignment = VerticalAlignment.Center, Children = { _percent } } },
+                Children = { glow, track, _arc, new StackPanel { VerticalAlignment = VerticalAlignment.Center, Children = { _percent } } },
             };
             foreach (var c in View.Children) { c.HorizontalAlignment = HorizontalAlignment.Center; c.VerticalAlignment = VerticalAlignment.Center; }
         }
@@ -486,56 +484,113 @@ public sealed partial class SetupWindow : Window
 
     // ---------------------------------------------------------------- экран 3: готово
 
+    /// <summary>
+    /// 9.9: экран «Готово» по центру, как экран установки. Кольцо дорисовывается до конца и
+    /// становится зелёным кругом, в нём рисуется галочка, от круга расходятся две волны и
+    /// разлетаются конфетти. Ниже — заголовок, кнопки и обложки игр.
+    /// </summary>
     Control Done()
     {
         var launch = Ui.Button(T("done.launch"), () => { Installer.Launch(_result!.Exe); Close(); }, "primary", Icons.Play);
         launch.FontSize = 16;
         launch.Padding = new Thickness(30, 13);
         var glow = new Border { CornerRadius = new CornerRadius(12), BoxShadow = new BoxShadows(new BoxShadow { OffsetY = 10, Blur = 30, Spread = -6, Color = Alpha(Accent, 0xB0) }), Child = launch };
-        if (_launch && !Program.Screenshot) DispatcherTimer.RunOnce(() => { Installer.Launch(_result!.Exe); Close(); }, TimeSpan.FromSeconds(2.4));
+        if (_launch && !Program.Screenshot) DispatcherTimer.RunOnce(() => { Installer.Launch(_result!.Exe); Close(); }, TimeSpan.FromSeconds(2.8));
 
-        // Значок «готово» с «конфетти» вокруг: точки разлетаются из центра.
+        const double size = 150, circle = 104;
         var good = ((ISolidColorBrush)Ui.Res("Good")).Color;
-        var burst = new Canvas { Width = 150, Height = 150, IsHitTestVisible = false };
-        var colors = new[] { Accent, good, Color.Parse("#FFB36B"), Color.Parse("#8B7CFF") };
-        for (var i = 0; i < 14; i++)
+        var stage = new Panel { Width = size + 60, Height = size + 60, HorizontalAlignment = HorizontalAlignment.Center };
+
+        // Две волны расходятся от круга и тают.
+        for (var i = 0; i < 2; i++)
         {
-            var angle = i * Math.PI * 2 / 14 + (i % 2) * 0.2;
-            var radius = 62 + (i % 3) * 8;
-            var size = 5 + i % 3 * 2.0;
-            var dot = new Border { Width = size, Height = size, CornerRadius = new CornerRadius(size), Background = new SolidColorBrush(colors[i % colors.Length]) };
+            var wave = new Ellipse { Width = circle, Height = circle, Stroke = new SolidColorBrush(Alpha(good, 0xAA)), StrokeThickness = 2, RenderTransformOrigin = RelativePoint.Center };
+            var delay = i * 0.55;
+            Frames(wave, t =>
+            {
+                var k = ((t - delay) % 1.8 + 1.8) % 1.8 / 1.8;
+                wave.RenderTransform = new ScaleTransform(1 + k * 0.75, 1 + k * 0.75);
+                wave.Opacity = (1 - k) * 0.8;
+            });
+            if (Program.Screenshot) { wave.RenderTransform = new ScaleTransform(1.25 + i * 0.3, 1.25 + i * 0.3); wave.Opacity = 0.45 - i * 0.2; }
+            stage.Children.Add(wave);
+        }
+
+        // Конфетти — ровным кольцом вокруг круга, разлетаются из центра.
+        var burst = new Canvas { Width = size + 60, Height = size + 60, IsHitTestVisible = false };
+        var colors = new[] { Accent, good, Color.Parse("#FFB36B"), Color.Parse("#8B7CFF"), Color.Parse("#19D3F5") };
+        var mid = (size + 60) / 2;
+        for (var i = 0; i < 18; i++)
+        {
+            var angle = i * Math.PI * 2 / 18;
+            var radius = 84 + (i % 2) * 12;
+            var w = i % 3 == 0 ? 9.0 : 6.0;
+            var h = i % 3 == 0 ? 3.5 : 6.0;
+            var dot = new Border
+            {
+                Width = w, Height = h, CornerRadius = new CornerRadius(h / 2), Background = new SolidColorBrush(colors[i % colors.Length]),
+                RenderTransform = new RotateTransform(angle * 180 / Math.PI),
+            };
             var dx = Math.Cos(angle) * radius;
             var dy = Math.Sin(angle) * radius;
-            Canvas.SetLeft(dot, 75 + dx - size / 2);
-            Canvas.SetTop(dot, 75 + dy - size / 2);
+            Canvas.SetLeft(dot, mid + dx - w / 2);
+            Canvas.SetTop(dot, mid + dy - h / 2);
             burst.Children.Add(dot);
             var inv = System.Globalization.CultureInfo.InvariantCulture;
-            Animate.From(dot, $"translate({(-dx).ToString("0", inv)}px, {(-dy).ToString("0", inv)}px) scale(0.2)", 700, 180 + i * 12, new CubicEaseOut());
+            Animate.From(dot, $"translate({(-dx * 0.8).ToString("0", inv)}px, {(-dy * 0.8).ToString("0", inv)}px) scale(0.2)", 760, 260 + i * 10, new QuinticEaseOut());
         }
-        var check = new Border
+        stage.Children.Add(burst);
+
+        // Зелёный круг с объёмом и галочка, которая рисуется линией.
+        var disc = new Border
         {
-            Width = 92, Height = 92, CornerRadius = new CornerRadius(46), Background = new SolidColorBrush(Alpha(good, 0x2A)), BorderBrush = new SolidColorBrush(good), BorderThickness = new Thickness(2),
-            BoxShadow = new BoxShadows(new BoxShadow { Blur = 40, Color = Alpha(good, 0x66) }),
-            HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Child = Ui.Icon(Icons.Check, 42, new SolidColorBrush(good)),
+            Width = circle, Height = circle, CornerRadius = new CornerRadius(circle / 2),
+            Background = new LinearGradientBrush
+            {
+                StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
+                GradientStops = { new GradientStop(Look.Mix(good, Colors.White, 0.25), 0), new GradientStop(Look.Mix(good, Colors.Black, 0.15), 1) },
+            },
+            BoxShadow = new BoxShadows(new BoxShadow { Blur = 46, Spread = 4, Color = Alpha(good, 0x70) }),
         };
-        Animate.From(check, "scale(0.3)", 560, 60, new BackEaseOut());
-        var badge = new Panel { Width = 150, Height = 150, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(-28, -20, 0, -10), Children = { burst, check } };
+        var tick = new Avalonia.Controls.Shapes.Path
+        {
+            Data = Geometry.Parse("M 30,54 L 46,70 L 76,38"), Stroke = Brushes.White, StrokeThickness = 8,
+            StrokeLineCap = PenLineCap.Round, StrokeJoin = PenLineJoin.Round, Width = circle, Height = circle,
+            StrokeDashArray = [10, 10], StrokeDashOffset = Program.Screenshot ? 0 : 10,
+        };
+        var drawStart = 0.35;
+        Frames(tick, t =>
+        {
+            var k = Math.Clamp((t - drawStart) / 0.45, 0, 1);
+            tick.StrokeDashOffset = 10 * Math.Pow(1 - k, 3);
+        });
+        var mark = new Panel { Width = circle, Height = circle, Children = { disc, tick } };
+        Animate.From(mark, "scale(0.2)", 600, 40, new BackEaseOut());
+        stage.Children.Add(mark);
+        foreach (var c in stage.Children) { c.HorizontalAlignment = HorizontalAlignment.Center; c.VerticalAlignment = VerticalAlignment.Center; }
 
         var covers = Ui.Row(10);
+        covers.HorizontalAlignment = HorizontalAlignment.Center;
         var n = 0;
         foreach (var g in Games.GameCatalog.All.Where(g => g.SteamAppId > 0).Take(7))
         {
-            var cover = new Border { Width = 62, Height = 93, CornerRadius = new CornerRadius(10), ClipToBounds = true, Child = Ui.GameImage(g, 128, art: Images.Art.Cover) };
-            Animate.From(cover, "translateY(16px)", 420, 380 + n++ * 50, new CubicEaseOut());
+            var cover = new Border { Width = 56, Height = 84, CornerRadius = new CornerRadius(10), ClipToBounds = true, Child = Ui.GameImage(g, 128, art: Images.Art.Cover) };
+            Animate.From(cover, "translateY(16px)", 420, 500 + n++ * 50, new CubicEaseOut());
             covers.Children.Add(cover);
         }
-        var title = new TextBlock { Text = _result!.Updated ? T("done.titleUpdate", ("version", Http.Version)) : T("done.title"), FontSize = 34, FontWeight = FontWeight.ExtraBold, LetterSpacing = -0.8, TextWrapping = TextWrapping.Wrap };
-        return Ui.Col(16,
-            badge,
-            title,
-            Ui.Text(_desktop ? T("done.textDesktop") : T("done.textStart"), "muted", wrap: true),
-            Ui.Row(12, glow, Ui.Button(T("done.close"), Close, "ghost")),
-            Ui.Col(8, Ui.Text(T("done.games"), "small muted"), covers));
+        var title = new TextBlock { Text = _result!.Updated ? T("done.titleUpdate", ("version", Http.Version)) : T("done.title"), FontSize = 32, FontWeight = FontWeight.ExtraBold, LetterSpacing = -0.8, TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
+        var text = Ui.Text(_desktop ? T("done.textDesktop") : T("done.textStart"), "muted", wrap: true);
+        text.HorizontalAlignment = HorizontalAlignment.Center;
+        text.TextAlignment = TextAlignment.Center;
+        var buttons = Ui.Row(12, glow, Ui.Button(T("done.close"), Close, "ghost"));
+        buttons.HorizontalAlignment = HorizontalAlignment.Center;
+        var gamesText = Ui.Text(T("done.games"), "small muted");
+        gamesText.HorizontalAlignment = HorizontalAlignment.Center;
+        Animate.From(title, "translateY(14px)", 460, 220, new CubicEaseOut());
+        var view = Ui.Col(12, stage, title, text, new Border { Height = 4 }, buttons, new Border { Height = 6 }, Ui.Col(8, gamesText, covers));
+        view.HorizontalAlignment = HorizontalAlignment.Center;
+        view.VerticalAlignment = VerticalAlignment.Center;
+        return view;
     }
 
     // ---------------------------------------------------------------- удаление

@@ -39,56 +39,9 @@ public static class V93Shots
         w.Navigate(() => new HomePage());
         s.Pump(1200);
         s.Save("v93-0-home-wide");
-        w.Navigate(() => new HomePage(feed: true));
-        s.Pump(1200);
-        s.Save("v93-0-feed-wide");
         w.Width = wasW;
         w.Height = wasH;
         s.Pump(600);
-    }
-
-    [DemoShots]
-    static void Feed93Shots(Shots s)
-    {
-        var w = s.Window;
-        var listings = Demo.Listings();
-        var hub = Demo.Hub();
-        MarketData.Demo(listings, hub);
-        HomePage.DemoFeed(listings, hub);
-        w.Navigate(() => new HomePage(feed: true));
-        s.Pump(1500);
-        w.Navigate(() => new HomePage(feed: true));
-        s.Pump(1200);
-        s.Save("v93-1-feed");
-        foreach (var y in new[] { 900, 1900, 2900, 3900 })
-        {
-            if (Scroller(w.CurrentPage) is { } sv) sv.Offset = new Vector(0, y);
-            s.Pump(700);
-            s.Save($"v93-1-feed-{y}");
-        }
-        // Обложки модов, «чипы» для маленьких модов и раскрытый топ.
-        HomePage.DemoLayouts(true, "bannerChips", "topFold", "chips", "bigL4", "towersL");
-        w.Navigate(() => new HomePage(feed: true));
-        s.Pump(1200);
-        s.Save("v93-1-feed-new");
-        foreach (var y in new[] { 450, 1100, 1700 })
-        {
-            if (Scroller(w.CurrentPage) is { } sv) sv.Offset = new Vector(0, y);
-            s.Pump(700);
-            s.Save($"v93-1-feed-new-{y}");
-        }
-        HomePage.DemoLayouts(false);
-        foreach (var style in Look.Styles)
-        {
-            Look.SetStyle(style.Id);
-            w.Navigate(() => new HomePage(feed: true));
-            s.Pump(1000);
-            s.Save($"v93-2-{style.Id}-feed");
-            if (Scroller(w.CurrentPage) is { } sv) sv.Offset = new Vector(0, 1400);
-            s.Pump(700);
-            s.Save($"v93-2-{style.Id}-feed-down");
-        }
-        Look.SetStyle("dark");
     }
 
     [DemoShots]

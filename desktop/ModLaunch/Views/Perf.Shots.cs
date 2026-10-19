@@ -20,11 +20,9 @@ public static class PerfShots
     {
         var w = s.Window;
         MarketData.Demo(Demo.Listings(), Demo.Hub());
-        HomePage.DemoFeed(Demo.Listings(), Demo.Hub());
         var pages = new List<(string Name, Func<Page> Make)>
         {
             ("home", () => new HomePage()),
-            ("feed", () => new HomePage(feed: true)),
             ("library", () => new LibraryPage()),
             ("game-installed", () => new GamePage("subnautica", "installed")),
             ("game-catalog", () => new GamePage("subnautica", "catalog")),
@@ -91,7 +89,7 @@ public static class PerfShots
             Console.WriteLine($"perf {name,-20} nav={nav,7:0.0}ms rebuild={rebuild,7:0.0}ms (build {buildOnly,6:0.0}) visuals={count,5} notify={notify,6:0.0}ms{slow}");
         }
         // Прокрутка: 12 кадров с полной перерисовкой (как при прокрутке колесом) — главная, лента, каталог.
-        foreach (var (name, make) in new (string, Func<Page>)[] { ("home", () => new HomePage()), ("feed", () => new HomePage(feed: true)), ("game-catalog", () => new GamePage("subnautica", "catalog")), ("market", () => new MarketPage()) })
+        foreach (var (name, make) in new (string, Func<Page>)[] { ("home", () => new HomePage()), ("game-catalog", () => new GamePage("subnautica", "catalog")), ("market", () => new MarketPage()) })
         {
             w.Navigate(make);
             s.Pump(800);
