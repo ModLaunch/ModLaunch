@@ -12,6 +12,10 @@ on:
     tags: ['v*']
 permissions:
   contents: write
+env:
+  DOTNET_NOLOGO: '1'
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: '1'
 jobs:
   build:
     runs-on: windows-latest
@@ -21,6 +25,17 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+
+      # 9.8: быстрее на Windows — без проверки Defender на каждом файле сборки и с кешем NuGet.
+      - name: Speed up Windows runner
+        shell: pwsh
+        run: Set-MpPreference -DisableRealtimeMonitoring $true -ErrorAction SilentlyContinue
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('desktop/**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
       - id: v
         shell: pwsh
         run: |

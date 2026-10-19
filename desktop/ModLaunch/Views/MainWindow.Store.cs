@@ -404,7 +404,7 @@ public sealed partial class MainWindow
 
         // Разделы: выбранный — значком цвета акцента и полоской слева.
         SetNav(_homeButton, _current is HomePage { IsFeed: false } or SearchPage);
-        SetNav(_feedButton, _current is HomePage { IsFeed: true });
+        SetNav(_feedButton, _current is AiBuildsPage);
         // 9.3: «Игры» и «Моды» на панели — по желанию (Настройки → Внешний вид → Рамка окна);
         // без них их место занимает «Панель», и она подсвечена на страницах библиотеки и модов.
         var sections = Settings.Data.Bool("railGamesMods");

@@ -120,9 +120,9 @@ public sealed partial class MainWindow : Window
         _back = Ui.Button("", GoBack, "icon ghost", Icons.Back, I18n.T("nav.back"));
         _forward = Ui.Button("", GoForward, "icon ghost", Icons.Forward, I18n.T("nav.forward"));
         // 9.2 Store: разделы — подписанными пунктами на боковой панели, как в Microsoft Store.
-        // 9.3: первый пункт — логотип ModLaunch и «Главная», за ним — «Лента» рекомендаций.
+        // 9.3: первый пункт — логотип ModLaunch и «Главная». 9.8: за ним вместо «Ленты» — «ИИ-сборки».
         _homeButton = NavButton(LogoIcon, "v93.nav.home", () => Navigate(() => new HomePage()));
-        _feedButton = NavButton(Icons.Flame, "v93.nav.feed", () => Navigate(() => new HomePage(feed: true)));
+        _feedButton = NavButton(Icons.Sparkles, "v98.nav.ai", () => Navigate(() => new AiBuildsPage()));
         _libraryButton = NavButton(Icons.Gamepad, "v92.nav.games", () => Navigate(() => new LibraryPage()));
         _modsButton = NavButton(Icons.Package, "v92.nav.mods", () => Navigate(() => new ModsCenterPage()));
         _panelButton = NavButton(Icons.Grid, "v92.nav.panel", () => Navigate(() => new ControlPanelPage()));

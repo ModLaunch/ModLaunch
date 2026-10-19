@@ -986,6 +986,17 @@ public sealed partial class SettingsPage : Page
             Ui.Text(registered ? I18n.T("settings.nxm.yes") : I18n.T("settings.nxm.no"), "small", color: registered ? Ui.Res("Good") : Ui.Res("Muted"))));
         rows.Add(nxm);
 
+        // 9.8: ключ Claude для «ИИ-сборок» (без ключа работает встроенный подборщик).
+        var aiBox = new TextBox { Text = Settings.Data.Str("aiKey") ?? "", PasswordChar = '•', Watermark = "sk-ant-…", Width = 420 };
+        var aiSave = Ui.Button(I18n.T("v98.key.save"), () =>
+        {
+            var key = aiBox.Text?.Trim() ?? "";
+            Settings.Data["aiKey"] = key == "" ? null : key;
+            Settings.Save();
+            MainWindow.Current?.Toast(I18n.T(key == "" ? "v98.key.removed" : "v98.key.saved"));
+        }, "", Icons.Sparkles);
+        rows.Add(Ui.Col(6, Ui.Text(I18n.T("v98.key.title"), "h3"), Ui.Text(I18n.T("v98.key.text"), "small muted", wrap: true), Ui.Row(10, aiBox, aiSave)));
+
         // Кнопка Thunderstore «Install with Mod Manager» (ror2mm://) — по желанию: она заберёт её у r2modman.
         var r2 = Nxm.IsRegistered("ror2mm");
         var ror = new DockPanel();

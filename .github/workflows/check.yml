@@ -6,6 +6,10 @@ on:
   push:
     branches: ['**']
     paths: ['src/**', 'tools/**', 'firebase/**', '.github/workflows/check.yml']
+# Новый пуш в ту же ветку отменяет старый прогон — очередь не копится.
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   probe:
     runs-on: windows-latest
