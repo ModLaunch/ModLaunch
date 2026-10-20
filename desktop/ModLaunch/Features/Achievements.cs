@@ -51,6 +51,11 @@ public static class Achievements
         var builds = AiBuilds.All().Count;
         var favorites = Favorites.All().Count;
         var collections = GameCollections.Names().Count;
+        // 11.0: часы в одной сборке — самая обжитая и сколько сборок с часом и больше.
+        List<BuildPlay> plays = [];
+        try { plays = BuildTime.All(); } catch { }
+        var best = plays.Count == 0 ? 0 : (long)plays.Max(b => b.Hours);
+        var lived = plays.Count(b => b.Hours >= 1);
         return
         [
             new("first-game", "Gamepad", found.Count, 1, "common", Reward: new("frame", "bronze")),
@@ -67,6 +72,10 @@ public static class Achievements
             new("backup", "Save", backups, 1, "common", Reward: new("title", "keeper")),
             new("favorites-10", "Heart", favorites, 10, "rare", Reward: new("badge", "heart")),
             new("collector", "Bag", collections, 3, "rare", Reward: new("title", "collector")),
+            new("builds-3", "Layers", lived, 3, "common", Reward: new("title", "tuner")),
+            new("build-10", "Hourglass", best, 10, "rare", Reward: new("badge", "build")),
+            new("build-100", "Shield", best, 100, "epic", Reward: new("frame", "steel")),
+            new("build-500", "Trophy", best, 500, "legend", Reward: new("banner", "forge")),
         ];
     }
 

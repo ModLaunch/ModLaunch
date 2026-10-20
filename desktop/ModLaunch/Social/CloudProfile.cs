@@ -72,7 +72,7 @@ public static class CloudProfile
         }
         var now = DateTime.UtcNow.ToString("o");
         var devices = (cloud?["devices"] as JsonObject)?.DeepClone() as JsonObject ?? new JsonObject();
-        devices[DeviceId] = new JsonObject { ["name"] = Environment.MachineName, ["at"] = now, ["games"] = games };
+        devices[DeviceId] = new JsonObject { ["name"] = Environment.MachineName, ["at"] = now, ["games"] = games, ["builds"] = Features.BuildTime.Snapshot() };
         foreach (var old in devices.OrderByDescending(d => d.Value.Str("at")).Skip(6).Select(d => d.Key).ToList()) devices.Remove(old);
         return new JsonObject
         {
@@ -154,6 +154,9 @@ public static class CloudProfile
     /// <summary>Взять награды и дни игры из облака сразу (без вопросов: это только добавляет открытое).</summary>
     public static void TakeProfile(JsonObject cloud)
     {
+        // 11.0: часы по сборкам с других ПК — те, которых здесь ещё нет (новый ПК, переустановка).
+        foreach (var (id, node) in cloud["devices"] as JsonObject ?? [])
+            if (id != DeviceId && node?["builds"] is JsonObject builds) Features.BuildTime.Adopt(builds);
         if (cloud["profile"] is not JsonObject p) return;
         Settings.Data["profile"] = MergeProfile(p, Settings.Data.Obj("profile"));
         Settings.Save();

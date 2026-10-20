@@ -51,6 +51,9 @@ public static class McLaunch
                     await Task.Delay(3000, cts.Token);
                     if (FindGame(since) is { } game)
                     {
+                        var jars = 0;
+                        try { jars = Directory.Exists(Path.Combine(i.Dir, "mods")) ? Directory.GetFiles(Path.Combine(i.Dir, "mods"), "*.jar").Length : 0; } catch { }
+                        Features.BuildTime.Use(Mc.Def!.Id, Mc.Def!.Id + "|mc:" + i.Id, i.Name, jars);
                         Features.Launcher.Track(Mc.Def!, game);
                         // 9.4: время в игре — и у самой сборки.
                         var started = DateTime.Now;

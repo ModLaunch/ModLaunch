@@ -13,7 +13,7 @@ namespace ModLaunch.Views;
 /// Вкладки: «Достижения» (общий набор и набор каждой игры), «Награды» (что открыто и что надеть)
 /// и «Итоги» (как Steam Replay).
 /// </summary>
-public sealed class ProfilePage : Page
+public sealed partial class ProfilePage : Page
 {
     static string _tab = "achievements";
     static string _set = Achievements.Main;
@@ -34,9 +34,18 @@ public sealed class ProfilePage : Page
         col.Children.Add(Animated(Header(all, unlocked), 0));
         col.Children.Add(Ui.Row(6,
             Tab("achievements", I18n.T("v99.tab.ach"), Icons.Trophy),
+            Tab("builds", I18n.T("v11.bt.tab"), Icons.Hourglass),
             Tab("rewards", I18n.T("v99.tab.rewards", ("n", unlocked.Count)), Icons.Star),
             Tab("replay", I18n.T("v98.replay"), Icons.Chart)));
-        col.Children.Add(Animated(_tab switch { "rewards" => Rewards(all, unlocked), "replay" => Replay(), _ => AchievementsView(all) }, 1));
+        var save = Ui.Button(I18n.T("v11.bt.save"), () => _ = SaveAll(all), "", Icons.Save, I18n.T("v11.bt.save.tip"));
+        var tabs = (StackPanel)col.Children[^1];
+        col.Children.RemoveAt(col.Children.Count - 1);
+        var bar = new DockPanel();
+        DockPanel.SetDock(save, Dock.Right);
+        bar.Children.Add(save);
+        bar.Children.Add(tabs);
+        col.Children.Add(bar);
+        col.Children.Add(Animated(_tab switch { "rewards" => Rewards(all, unlocked), "replay" => Replay(), "builds" => BuildsView(), _ => AchievementsView(all) }, 1));
         Content = new ScrollViewer { Content = col, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
     }
 

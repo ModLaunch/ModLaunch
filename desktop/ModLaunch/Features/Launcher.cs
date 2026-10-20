@@ -105,7 +105,7 @@ public static partial class Launcher
             if (parked) try { Vanilla.Unpark(game); } catch { }
             throw;
         }
-        Watch(game, process, parked);
+        Watch(game, process, parked, vanilla);
         return backup;
     }
 
@@ -116,14 +116,16 @@ public static partial class Launcher
     public static void Track(GameDef game, Process process)
     {
         lock (Running) if (Running.ContainsKey(game.Id)) return;
-        Watch(game, process, false);
+        Watch(game, process, false, false);
         Avalonia.Threading.Dispatcher.UIThread.Post(AppState.Notify);
     }
 
-    static void Watch(GameDef game, Process process, bool parked)
+    static void Watch(GameDef game, Process process, bool parked, bool vanilla)
     {
         var track = PlayTime.Track;
         if (track) PlayTime.Start(game.Id);
+        // 11.0: и часы той сборки, с которой запущена игра.
+        if (track) try { BuildTime.Start(AppState.Game(game.Id), vanilla); } catch { }
         process.EnableRaisingEvents = true;
         lock (Running) { Running[game.Id] = (process, DateTime.UtcNow); StopRequested.Remove(game.Id); }
         process.Exited += (_, _) =>
@@ -139,6 +141,7 @@ public static partial class Launcher
                 Last[game.Id] = new ExitInfo(started, (long)ran.TotalMilliseconds, code, StopRequested.Remove(game.Id));
             }
             var (counted, ms) = track ? PlayTime.Stop(game.Id) : (false, 0L);
+            if (track) BuildTime.Stop(game.Id);
             if (parked) _ = Vanilla.RestoreAfterExit(game, ran);
             // 11.0: инжектор — снять инжекты и убрать за игрой (дождавшись перезапуска через Steam).
             if (!parked) _ = Inject.AfterExit(game, ran);

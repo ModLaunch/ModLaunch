@@ -18,6 +18,9 @@ public static class Profiles
     static JsonObject Game(string gameId) => File.Data.Obj("games").Obj(gameId);
     static JsonObject Active => File.Data.Obj("active");
 
+    /// <summary>Профиль, который сейчас стоит в игре (null — не выбран или удалён).</summary>
+    public static string? ActiveName(string gameId) => Active.Str(gameId) is { } n && Game(gameId).ContainsKey(n) ? n : null;
+
     public static string Clean(string? value)
     {
         var name = new string((value ?? "").Where(c => c >= ' ').ToArray()).Trim();
