@@ -77,6 +77,10 @@ public static class Look
         if (!Settings.Data.Bool("look11"))
         {
             Settings.Data["look11"] = true;
+            // Выбор оформления 9.2 больше не показываем: оформление теперь — конфиги в «Внешнем виде».
+            Settings.Data["stylePicked92"] = true;
+            // Классическая главная 9.x убрана из настроек — у всех главная 10.0+.
+            Settings.Data.Remove("homeStyle");
             var fresh = !Settings.Data.Bool("look92");
             var untouched = Settings.Data.Str("config") is null or "modlaunch" && Settings.Data.Str("theme") is null or "store" && Settings.Data.Str("accent") is null or "#7B5CFF";
             if (fresh || untouched)
