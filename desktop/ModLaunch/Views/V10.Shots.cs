@@ -3,7 +3,7 @@ using ModLaunch.Features;
 
 namespace ModLaunch.Views;
 
-/// <summary>Снимки 10.0: главная со сценой и виджетами, конфиги, автопилот, кейсы, запуск игры, Creator Hub.</summary>
+/// <summary>Снимки 10.0: главная со сценой и виджетами, конфиги, автопилот, запуск игры, Creator Hub, Minecraft.</summary>
 public static class V10Shots
 {
     [DemoShots]
@@ -29,30 +29,6 @@ public static class V10Shots
         w.Navigate(() => new AutopilotPage());
         s.Pump(1000);
         s.Save("v10-2-autopilot");
-    }
-
-    [DemoShots]
-    static void Ten2Cases(Shots s)
-    {
-        var w = s.Window;
-        // Неделя игры — один кейс, чтобы на снимке всегда было что открыть.
-        Cases.NoteWeek();
-        w.Navigate(() => new CasesPage());
-        s.Pump(1000);
-        s.Save("v10-3-cases");
-        if (w.CurrentPage is CasesPage page)
-        {
-            if (Animate.On)
-            {
-                // MODLAUNCH_ANIM=1: кадры открытия кейса.
-                page.DemoOpen();
-                // Save сам ждёт 600 мс: кадры примерно на 0,6 / 1,2 / 1,8 с.
-                for (var i = 1; i <= 3; i++) s.Save($"v10-3-open-{i}");
-            }
-            page.DemoShow(new Loot("cfg", "synthwave", "legend"), "legend");
-            s.Pump(700);
-            s.Save("v10-4-case-loot");
-        }
     }
 
     [DemoShots]
@@ -98,5 +74,30 @@ public static class V10Shots
         CloudFlow.DemoOffer();
         s.Save("v10-9-cloud");
         w.CloseDialog();
+    }
+
+    [DemoShots]
+    static void Ten6GamePages(Shots s)
+    {
+        var w = s.Window;
+        var g = AppState.Games.FirstOrDefault(x => x.Status == Detect.Found && !x.Def.IsMinecraft);
+        if (g is not null)
+        {
+            w.Navigate(() => new GamePage(g.Def.Id));
+            s.Pump(1000);
+            s.Save("v10-a-game");
+        }
+        w.Navigate(() => new MinecraftPage());
+        s.Pump(1000);
+        s.Save("v10-b-minecraft");
+        if (w.CurrentPage?.Content is Avalonia.Controls.ScrollViewer mc)
+        {
+            mc.Offset = new Avalonia.Vector(0, 560);
+            s.Pump(500);
+            s.Save("v10-b2-minecraft-lower");
+        }
+        w.Navigate(() => new MinecraftPage("mods"));
+        s.Pump(800);
+        s.Save("v10-c-minecraft-mods");
     }
 }

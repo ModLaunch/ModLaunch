@@ -68,11 +68,13 @@ public sealed partial class SettingsPage
         Avalonia.Threading.Dispatcher.UIThread.Post(() => name.Focus());
     }
 
+    /// <summary>Золотой акцент (в 10.0.0 был наградой из кейса) — теперь у всех.</summary>
+    const string GoldAccent = "#E8B84A";
+
     /// <summary>Карточка конфига: мини-экран (боковая панель, сцена, виджеты), название, «Применить».</summary>
     Control ConfigCard(UiConfig c)
     {
         var (p, accent, scan, radius) = Configs.Preview(c);
-        var locked = Configs.IsLocked(c);
         var on = Configs.CurrentId == c.Id;
         IBrush B(string key) => Ui.Hex(p.TryGetValue(key, out var v) ? v : "#000000");
         var r = radius == "sharp" ? 1 : radius == "round" ? 7 : 4;
@@ -116,26 +118,21 @@ public sealed partial class SettingsPage
             Box(33 + at[i].X * (cell + gap), top, cw * cell + (cw - 1) * gap, chh * ch + (chh - 1) * gap, B("Surface"));
         }
         if (scan) screen.Children.Add(new Border { Width = 228, Height = 132, Child = Gx.Scanlines(), Opacity = 0.9 });
-        if (locked) screen.Children.Add(new Border { Width = 228, Height = 132, Background = new SolidColorBrush(Color.FromArgb(150, 0, 0, 0)), Child = Ui.Icon(Icons.Lock, 26, Brushes.White) });
 
         var shot = new Border { CornerRadius = new CornerRadius(12), ClipToBounds = true, Child = screen, BorderBrush = Ui.Res("Line"), BorderThickness = new Thickness(1) };
         var title = Ui.Row(8, new TextBlock { Text = c.Name, FontWeight = FontWeight.SemiBold, FontSize = 14.5, TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = 160 });
         if (on) title.Children.Add(Gx.Tag(I18n.T("v10.set.on"), Ui.Res("BrandSoft"), Ui.Res("Brand2"), 11));
         var about = new TextBlock
         {
-            Text = locked ? I18n.T("v10.case.inCase") : c.About != "" ? c.About : c.Author != "" ? I18n.T("v10.set.by", ("name", c.Author)) : I18n.T("v10.set.own"),
+            Text = c.About != "" ? c.About : c.Author != "" ? I18n.T("v10.set.by", ("name", c.Author)) : I18n.T("v10.set.own"),
             FontSize = 12, Foreground = Ui.Res("Muted"), TextWrapping = TextWrapping.Wrap, MaxLines = 2, TextTrimming = TextTrimming.CharacterEllipsis, Height = 32,
         };
         var actions = Ui.Row(6);
-        if (locked) actions.Children.Add(Ui.Button(I18n.T("v10.case.title"), () => MainWindow.Current?.Navigate(() => new CasesPage()), "ghost", Icons.Cube));
-        else
+        actions.Children.Add(Ui.Button(on ? I18n.T("v10.set.reapply") : I18n.T("v10.set.apply"), () => { Configs.Apply(c); MainWindow.Current?.Toast(I18n.T("v10.cfg.applied", ("name", c.Name))); Build(); }, on ? "" : "primary", on ? Icons.Refresh : Icons.Check));
+        if (c.File is { } file)
         {
-            actions.Children.Add(Ui.Button(on ? I18n.T("v10.set.reapply") : I18n.T("v10.set.apply"), () => { Configs.Apply(c); MainWindow.Current?.Toast(I18n.T("v10.cfg.applied", ("name", c.Name))); Build(); }, on ? "" : "primary", on ? Icons.Refresh : Icons.Check));
-            if (c.File is { } file)
-            {
-                actions.Children.Add(Ui.Button("", () => Ui.OpenUrl(file), "icon ghost", Icons.Edit, I18n.T("v10.set.edit")));
-                actions.Children.Add(Ui.Button("", () => { Configs.Delete(c); Build(); }, "icon ghost", Icons.Trash, I18n.T("v10.set.delete")));
-            }
+            actions.Children.Add(Ui.Button("", () => Ui.OpenUrl(file), "icon ghost", Icons.Edit, I18n.T("v10.set.edit")));
+            actions.Children.Add(Ui.Button("", () => { Configs.Delete(c); Build(); }, "icon ghost", Icons.Trash, I18n.T("v10.set.delete")));
         }
         var card = new Border
         {
@@ -176,7 +173,7 @@ public sealed partial class SettingsPage
 
         var accents = new WrapPanel();
         var list = Look.Accents.Take(20).ToList();
-        if (Cases.Has("accent:gold")) list.Insert(0, Cases.GoldAccent);
+        list.Insert(0, GoldAccent);
         foreach (var hex in list.Distinct())
         {
             var h = hex;
@@ -186,7 +183,7 @@ public sealed partial class SettingsPage
                 Width = 30, Height = 30, CornerRadius = new CornerRadius(15), Background = Ui.Hex(hex), Margin = new Thickness(0, 0, 8, 8),
                 BorderBrush = on ? Ui.Res("Text") : Brushes.Transparent, BorderThickness = new Thickness(on ? 3 : 0), Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand),
             };
-            if (h == Cases.GoldAccent) ToolTip.SetTip(dot, I18n.T("v10.loot.accent.gold"));
+            if (h == GoldAccent) ToolTip.SetTip(dot, I18n.T("v10.accent.gold"));
             StoreKit.OnClick(dot, () => { Look.SetAccent(h); Settings.Data.Remove("config"); Settings.Save(); Build(); });
             accents.Children.Add(dot);
         }

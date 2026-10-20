@@ -174,18 +174,6 @@ public sealed partial class HomePage
                 if (wide) lines.Add(Small(steps.Count == 0 ? I18n.T("v10.w.ap.clean") : steps[0].Title, Ui.Res("Faint"), 1));
                 return Shell(Stack(Cap(Icons.Wand, I18n.T("v10.ap.short")), lines.ToArray()), () => Go(() => new AutopilotPage(g.Def.Id)));
             }
-            case "cases":
-            {
-                var ready = Cases.Ready();
-                var tier = ready.FirstOrDefault()?.Tier ?? "common";
-                var box = CaseKit.Small(wide ? 96 : 74, tier);
-                box.Opacity = ready.Count > 0 ? 1 : 0.45;
-                var text = ready.Count > 0 ? I18n.T("v10.w.cases.ready." + I18n.Plural(ready.Count, "one", "few", "many"), ("n", ready.Count)) : I18n.T("v10.w.cases.none");
-                Control body = wide
-                    ? Stack(Cap(Icons.Cube, I18n.T("v10.case.title")), Ui.Row(16, box, new Border { VerticalAlignment = VerticalAlignment.Center, Child = Ui.Col(4, Big(ready.Count.ToString(), 30), Small(text, lines: 2)) }))
-                    : Stack(Cap(Icons.Cube, I18n.T("v10.case.title")), new Border { HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(4, 0, 0, 6), Child = box }, Small(text, lines: 1));
-                return Shell(body, () => Go(() => new CasesPage()));
-            }
             case "continue":
             {
                 var g = _stage is { } s && mine.FirstOrDefault(x => x.Def.Id == s) is { } picked ? picked : mine.FirstOrDefault();
@@ -280,7 +268,7 @@ public sealed partial class HomePage
             }
             case "streak":
             {
-                var n = Cases.Streak();
+                var n = PlayStreak.Current();
                 return Shell(Stack(Cap(Icons.Flame, I18n.T("v10.w.streak"), Ui.Hex("#FF8A1F")), Big(n.ToString(), 40, Ui.Hex("#FF8A1F")), Small(I18n.T("v10.w.streak.days." + I18n.Plural(n, "one", "few", "many"), ("n", n)), lines: 1)), null);
             }
             case "random":
@@ -339,18 +327,15 @@ public sealed partial class HomePage
         return new Panel { Children = { w, outline, tools, remove } };
     }
 
-    /// <summary>«Добавить виджет»: все виды; закрытые из кейса — с замком.</summary>
+    /// <summary>«Добавить виджет»: все виды.</summary>
     Control Gallery(List<(string Id, string Size)> layout)
     {
         var row = new WrapPanel();
         foreach (var k in Widgets.Catalog)
         {
-            var locked = Widgets.IsLocked(k);
             var icon = typeof(Icons).GetField(k.Icon)?.GetValue(null) as string ?? Icons.Grid;
-            var b = Ui.Button(I18n.T("v10.w.name." + k.Id), () => { if (!locked) Widgets.Add(k.Id); }, locked ? "ghost" : "", locked ? Icons.Lock : icon,
-                locked ? I18n.T("v10.case.inCase") : I18n.T("v10.w.add.one"));
+            var b = Ui.Button(I18n.T("v10.w.name." + k.Id), () => Widgets.Add(k.Id), "", icon, I18n.T("v10.w.add.one"));
             b.Margin = new Thickness(0, 0, 8, 8);
-            if (locked) b.Opacity = 0.5;
             row.Children.Add(b);
         }
         var done = Ui.Button(I18n.T("v10.w.done"), () => { _editWidgets = false; Build(); }, "primary", Icons.Check);

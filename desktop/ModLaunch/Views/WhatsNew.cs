@@ -12,10 +12,11 @@ public static class WhatsNew
 {
     static readonly (string Icon, string Key, Func<Page>? Open)[] Items =
     [
+        (Icons.Cube, "new.v101.mc", () => new MinecraftPage()),
+        (Icons.Check, "new.v101.cases", () => new SettingsPage("configs")),
         (Icons.Home, "new.v10.home", () => new HomePage()),
         (Icons.Sliders, "new.v10.configs", () => new SettingsPage("configs")),
         (Icons.Shield, "new.v10.autopilot", () => new AutopilotPage()),
-        (Icons.Cube, "new.v10.cases", () => new CasesPage()),
         (Icons.Download, "new.v10.cloud", () => new SettingsPage("backups")),
         (Icons.Sparkles, "new.v10.clean", () => new SettingsPage("launch")),
         (Icons.Play, "new.v10.motion", () => new SettingsPage("configs")),

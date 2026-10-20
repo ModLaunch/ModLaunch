@@ -6,9 +6,8 @@ namespace ModLaunch.Core;
 
 /// <summary>
 /// Конфиг оформления: имя, автор и команды «ключ значение», как autoexec.cfg в CS2.
-/// Lock — id награды из кейса, без которой встроенный конфиг закрыт.
 /// </summary>
-public sealed record UiConfig(string Id, string Name, string Author, string About, List<(string Key, string Value)> Lines, bool BuiltIn, string? File = null, string? Lock = null)
+public sealed record UiConfig(string Id, string Name, string Author, string About, List<(string Key, string Value)> Lines, bool BuiltIn, string? File = null)
 {
     public string? Get(string key) => Lines.LastOrDefault(l => l.Key == key).Value;
     public List<(string Id, string Size)> Widgets() => Lines.Where(l => l.Key == "widget")
@@ -22,7 +21,7 @@ public sealed record UiConfig(string Id, string Name, string Author, string Abou
 /// углы, эффекты «экрана» (строки ЭЛТ, виньетка), анимации и раскладка виджетов главной.
 /// Свои конфиги лежат в папке configs (её можно открыть из настроек и положить туда чужие файлы);
 /// файл можно и перетащить в окно. Встроенные — «ModLaunch», «Ретро», «Минимал», «Неон», «Бумага»
-/// и два из кейсов («Терминал», «Синтвейв»).
+/// «Терминал» и «Синтвейв».
 /// </summary>
 public static class Configs
 {
@@ -37,10 +36,10 @@ public static class Configs
 
     // ---------------------------------------------------------------- встроенные
 
-    static UiConfig Make(string id, string author, string text, string? lockId = null)
+    static UiConfig Make(string id, string author, string text)
     {
         var c = Parse(text, id);
-        return c with { Id = id, Name = I18n.T($"v10.cfg.{id}"), About = I18n.T($"v10.cfg.{id}.d"), Author = author, BuiltIn = true, Lock = lockId };
+        return c with { Id = id, Name = I18n.T($"v10.cfg.{id}"), About = I18n.T($"v10.cfg.{id}.d"), Author = author, BuiltIn = true };
     }
 
     public static List<UiConfig> BuiltIn() =>
@@ -59,7 +58,7 @@ public static class Configs
             widget clock s
             widget level s
             widget autopilot s
-            widget cases s
+            widget streak s
             widget friends m
             widget tip m
             """),
@@ -90,7 +89,7 @@ public static class Configs
             widget level s
             widget tip m
             widget autopilot s
-            widget cases s
+            widget streak s
             """),
         Make("minimal", "ModLaunch", """
             // Ничего лишнего: графит, один белый акцент, без картинки на главной.
@@ -121,7 +120,7 @@ public static class Configs
             home_hero stage
             widget continue l
             widget level s
-            widget cases s
+            widget streak s
             widget friends m
             widget clock s
             widget playtime s
@@ -144,7 +143,7 @@ public static class Configs
             widget autopilot s
             """),
         Make("terminal", "ModLaunch", """
-            // Из кейса: зелёный терминал.
+            // Зелёный терминал.
             theme custom
             color_bg "#020803"
             color_rail "#010502"
@@ -169,9 +168,9 @@ public static class Configs
             widget playtime s
             widget continue m
             widget tip m
-            """, "cfg:terminal"),
+            """),
         Make("synthwave", "ModLaunch", """
-            // Из кейса: закат восьмидесятых.
+            // Закат восьмидесятых.
             theme custom
             color_bg "#120A1F"
             color_rail "#0E0718"
@@ -193,10 +192,10 @@ public static class Configs
             home_hero stage
             widget continue l
             widget clock s
-            widget cases s
+            widget streak s
             widget level s
             widget playtime s
-            """, "cfg:synthwave"),
+            """),
     ];
 
     /// <summary>Встроенные и из папки configs (свои и чужие файлы).</summary>
@@ -212,7 +211,6 @@ public static class Configs
         return list;
     }
 
-    public static bool IsLocked(UiConfig c) => c.Lock is { } l && !Features.Cases.Has(l);
 
     // ---------------------------------------------------------------- файл
 

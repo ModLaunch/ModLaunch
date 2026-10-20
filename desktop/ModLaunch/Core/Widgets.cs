@@ -5,11 +5,10 @@ namespace ModLaunch.Core;
 /// <summary>
 /// 10.0: виджеты главной, как на iPhone и Mac: s — квадрат, m — широкий (2×1), l — большой (2×2).
 /// Раскладка — список «id размер» в settings.widgets; её же пишет и читает конфиг (widget clock m).
-/// Lock — награда из кейса, без которой виджет закрыт.
 /// </summary>
 public static class Widgets
 {
-    public sealed record Kind(string Id, string Icon, string[] Sizes, string? Lock = null);
+    public sealed record Kind(string Id, string Icon, string[] Sizes);
 
     public static readonly Kind[] Catalog =
     [
@@ -17,27 +16,24 @@ public static class Widgets
         new("clock", "Clock", ["s", "m"]),
         new("level", "Trophy", ["s", "m"]),
         new("autopilot", "Wand", ["s", "m"]),
-        new("cases", "Cube", ["s", "m"]),
         new("friends", "Users", ["m", "l"]),
         new("tip", "Sparkles", ["m"]),
         new("playtime", "Chart", ["s", "m"]),
         new("downloads", "Download", ["m", "l"]),
         new("library", "Grid", ["m", "l"]),
         new("attention", "Bell", ["s", "m"]),
-        new("streak", "Flame", ["s"], "widget:streak"),
-        new("random", "Shuffle", ["s", "m"], "widget:random"),
+        new("streak", "Flame", ["s"]),
+        new("random", "Shuffle", ["s", "m"]),
     ];
 
     public static readonly (string Id, string Size)[] Default =
     [
         ("continue", "m"), ("clock", "s"), ("level", "s"),
-        ("autopilot", "s"), ("cases", "s"), ("friends", "m"),
+        ("autopilot", "s"), ("streak", "s"), ("friends", "m"),
         ("tip", "m"), ("playtime", "s"), ("attention", "s"),
     ];
 
     public static Kind? Find(string id) => Catalog.FirstOrDefault(k => k.Id == id);
-
-    public static bool IsLocked(Kind k) => k.Lock is { } l && !Features.Cases.Has(l);
 
     /// <summary>Сколько клеток занимает размер: (ширина, высота).</summary>
     public static (int W, int H) Cells(string size) => size switch { "l" => (2, 2), "m" => (2, 1), _ => (1, 1) };
@@ -49,7 +45,7 @@ public static class Widgets
         foreach (var n in list)
         {
             var parts = (n?.ToString() ?? "").Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length == 0 || Find(parts[0]) is not { } k || IsLocked(k)) continue;
+            if (parts.Length == 0 || Find(parts[0]) is not { } k) continue;
             var size = parts.Length > 1 && k.Sizes.Contains(parts[1]) ? parts[1] : k.Sizes[0];
             result.Add((k.Id, size));
         }

@@ -167,8 +167,6 @@ public static class Cosmetics
         all ??= Achievements.All();
         var set = Starter.Select(r => r.Key).ToHashSet();
         foreach (var a in all) if (a.Done && a.Reward is { } r) set.Add(r.Key);
-        // 10.0: косметика из кейсов.
-        foreach (var key in Cases.Unlocked()) set.Add(key);
         return set;
     }
 
@@ -178,7 +176,6 @@ public static class Cosmetics
         all ??= Achievements.All();
         var list = Starter.Select(r => (r, (Achievement?)null)).ToList();
         foreach (var a in all) if (a.Reward is { } r) list.Add((r, a));
-        foreach (var r in Cases.Cosmetic()) list.Add((r, null));
         return list;
     }
 

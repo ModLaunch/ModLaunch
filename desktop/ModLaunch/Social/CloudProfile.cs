@@ -14,7 +14,7 @@ public sealed record CloudDiff(List<(GameState Game, bool NeedLoader, List<Setup
 
 /// <summary>
 /// 10.0: профиль в облаке. Аккаунт ModLaunch хранит ваши сборки (какие моды стоят в каждой игре,
-/// с версиями), награды, кейсы и стиль. На другом компьютере при входе ModLaunch сравнивает облако
+/// с версиями), награды, дни игры и стиль. На другом компьютере при входе ModLaunch сравнивает облако
 /// с тем, что стоит здесь, и предлагает доустановить загрузчики и моды (и взять стиль).
 /// Один документ cloud/&lt;uid&gt;, читать и писать его может только хозяин (firebase/firestore.rules).
 /// Сборки каждого ПК хранятся отдельно, так что отправка с одного компьютера не стирает сборки другого.
@@ -90,7 +90,7 @@ public static class CloudProfile
         (cloud["devices"] as JsonObject ?? []).Where(d => d.Key != DeviceId && d.Value is JsonObject)
             .OrderByDescending(d => d.Value.Str("at")).Select(d => ((string, JsonObject)?)(d.Key, (JsonObject)d.Value!)).FirstOrDefault();
 
-    /// <summary>Награды и кейсы — объединение двух ПК: открытое на любом остаётся открытым везде.</summary>
+    /// <summary>Награды и дни игры — объединение двух ПК: открытое на любом остаётся открытым везде.</summary>
     public static JsonObject MergeProfile(JsonObject? a, JsonObject b)
     {
         var result = (b.DeepClone() as JsonObject)!;
@@ -106,12 +106,8 @@ public static class CloudProfile
             into[key] = mine.DeepClone();
         }
         Union(result, a, "seen");
-        if (a["cases"] is JsonObject ac)
-        {
-            var rc = result["cases"] as JsonObject ?? new JsonObject();
-            foreach (var key in new[] { "opened", "unlocked", "weeks", "days" }) Union(rc, ac, key);
-            result["cases"] = rc;
-        }
+        Union(result, a, "days");
+        result.Remove("cases");
         return result;
     }
 
@@ -155,7 +151,7 @@ public static class CloudProfile
         Settings.Save();
     }
 
-    /// <summary>Взять награды и кейсы из облака сразу (без вопросов: это только добавляет открытое).</summary>
+    /// <summary>Взять награды и дни игры из облака сразу (без вопросов: это только добавляет открытое).</summary>
     public static void TakeProfile(JsonObject cloud)
     {
         if (cloud["profile"] is not JsonObject p) return;
@@ -174,11 +170,11 @@ public static class CloudProfile
     [SelfTest]
     static string CloudProfileMergesRewards()
     {
-        var a = JsonNode.Parse("""{"frame":"gold","seen":["x"],"cases":{"opened":["a:1"],"unlocked":["cfg:terminal"]}}""") as JsonObject;
-        var b = JsonNode.Parse("""{"seen":["y"],"cases":{"opened":["a:2"]}}""") as JsonObject;
+        var a = JsonNode.Parse("""{"frame":"gold","seen":["x"],"days":["2026-10-19"]}""") as JsonObject;
+        var b = JsonNode.Parse("""{"seen":["y"],"days":["2026-10-20"],"cases":{"opened":["a:2"]}}""") as JsonObject;
         var m = MergeProfile(a, b!);
         if (m.Str("frame") != "gold") throw new Exception("frame lost");
-        if (m.Arr("seen").Count != 2 || (m["cases"] as JsonObject).Arr("opened").Count != 2 || (m["cases"] as JsonObject).Arr("unlocked").Count != 1) throw new Exception(m.ToJsonString());
-        return "rewards and cases from both PCs are kept";
+        if (m.Arr("seen").Count != 2 || m.Arr("days").Count != 2 || m.ContainsKey("cases")) throw new Exception(m.ToJsonString());
+        return "rewards and play days from both PCs are kept";
     }
 }

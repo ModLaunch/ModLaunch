@@ -35,8 +35,7 @@ public sealed class ProfilePage : Page
         col.Children.Add(Ui.Row(6,
             Tab("achievements", I18n.T("v99.tab.ach"), Icons.Trophy),
             Tab("rewards", I18n.T("v99.tab.rewards", ("n", unlocked.Count)), Icons.Star),
-            Tab("replay", I18n.T("v98.replay"), Icons.Chart),
-            Ui.Button(I18n.T("v10.case.tab", ("n", Cases.Ready(all).Count)), () => MainWindow.Current?.Navigate(() => new CasesPage()), "tab", Icons.Cube)));
+            Tab("replay", I18n.T("v98.replay"), Icons.Chart)));
         col.Children.Add(Animated(_tab switch { "rewards" => Rewards(all, unlocked), "replay" => Replay(), _ => AchievementsView(all) }, 1));
         Content = new ScrollViewer { Content = col, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
     }
@@ -201,8 +200,7 @@ public sealed class ProfilePage : Page
         var title = new TextBlock { Text = Cosmetics.Name(r), FontWeight = FontWeight.SemiBold, FontSize = 13.5, TextTrimming = TextTrimming.CharacterEllipsis, HorizontalAlignment = HorizontalAlignment.Center };
         var sub = new TextBlock
         {
-            Text = Cases.Cosmetic().Any(c => c.Key == r.Key) ? I18n.T(have ? "v10.case.fromCase" : "v10.case.inCase")
-                : have ? (from is null ? I18n.T("v99.rewards.starter") : from.Title) : I18n.T("v99.rewards.locked", ("ach", from?.Title ?? "")),
+            Text = have ? (from is null ? I18n.T("v99.rewards.starter") : from.Title) : I18n.T("v99.rewards.locked", ("ach", from?.Title ?? "")),
             FontSize = 11.5, Foreground = Ui.Res("Muted"), TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap, MaxLines = 2, TextTrimming = TextTrimming.CharacterEllipsis,
         };
         Control action = have

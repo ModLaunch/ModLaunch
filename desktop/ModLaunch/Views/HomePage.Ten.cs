@@ -30,7 +30,6 @@ public sealed partial class HomePage
         {
             _widgetsHooked = true;
             Widgets.Changed += () => { if (MainWindow.Current?.CurrentPage is HomePage hp) hp.Build(); };
-            Cases.Changed += () => { if (MainWindow.Current?.CurrentPage is HomePage hp) hp.Build(); };
         }
         var mine = MyGames();
         if (_featured is null && !_featuredLoading && mine.Count > 0) { _featuredLoading = true; Dispatcher.UIThread.Post(() => _ = LoadFeatured(mine)); }

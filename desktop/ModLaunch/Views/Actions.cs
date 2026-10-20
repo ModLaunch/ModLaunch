@@ -377,7 +377,7 @@ public static partial class Actions
             if (!vanilla && CleanBoot.On)
                 try { if (CleanBoot.Run(g) is { Any: true } c) note = I18n.T("v10.clean.note", ("n", c.Files + c.Quarantined)); } catch { }
             var backup = Launcher.Launch(g.Def, g.Path!, vanilla);
-            try { Cases.NoteWeek(); } catch { }
+            try { PlayStreak.Note(); } catch { }
             CloudFlow.PushSoon();
             if (g.Registry is not null) try { Social.PlayLog.NoteLaunch(g.Def, g.Registry); } catch { }
             Social.Friends.SetActivity("playing", g.Def.Id, g.Def.Name);
