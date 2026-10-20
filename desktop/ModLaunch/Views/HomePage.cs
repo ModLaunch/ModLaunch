@@ -27,7 +27,8 @@ public sealed partial class HomePage : Page
     public override void Build()
     {
         // 9.9: в дизайне Store — только «Главная» (HomePage.Main.cs); лента убрана совсем.
-        if (Look.Store) { BuildMain(); return; }
+        // 10.0: главная со сценой и виджетами; прежняя сводка 9.9 — по желанию (Настройки → Интерфейс).
+        if (Look.Store) { if (Settings.Data.Str("homeStyle") == "classic") BuildMain(); else BuildTen(); return; }
         var content = new StackPanel { Spacing = 30, Margin = new Thickness(32, 26, 32, 32), MaxWidth = 1680 };
 
         // Новичку: три шага «найти игру, поставить мод, играть».

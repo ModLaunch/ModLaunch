@@ -321,6 +321,8 @@ public sealed partial class MainWindow
         layers.Children.Add(_launchLayer);
         layers.Children.Add(_toasts);
         layers.Children.Add(_overlay);
+        // 10.0: строки ЭЛТ и виньетка из конфига — поверх всего, нажатия проходят насквозь.
+        layers.Children.Add(new ScreenFx());
         if (Splash.Enabled)
         {
             _splash = new Splash();

@@ -43,6 +43,15 @@ public sealed partial class MainWindow
         ShowDropHint(false);
         var paths = Dropped(e);
         if (paths.Count == 0) return;
+        // 10.0: файл стиля (.mlstyle) — применить сразу, а не ставить как мод.
+        var styles = paths.Where(p => p.EndsWith(Configs.Ext, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (styles.Count > 0)
+        {
+            var applied = styles.Select(Configs.Import).LastOrDefault(c => c is not null);
+            Toast(applied is null ? I18n.T("v10.cfg.bad") : I18n.T("v10.cfg.applied", ("name", applied.Name)), bad: applied is null);
+            paths = paths.Except(styles).ToList();
+            if (paths.Count == 0) return;
+        }
         if (PageGame() is { } g) Actions.InstallLocal(g, paths);
         else AskGameFor(paths);
     }

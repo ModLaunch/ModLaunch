@@ -28,6 +28,8 @@ public enum GameFx
     Wipe = 7,
     /// <summary>«Створки» — прежний экран раскрывается двумя створками от середины.</summary>
     Doors = 8,
+    /// <summary>10.0: «Спокойная» — прежний экран тает и чуть отступает, игра проступает из глубины. Треть секунды.</summary>
+    Calm = 9,
 }
 
 /// <summary>
@@ -38,8 +40,15 @@ public enum GameFx
 /// </summary>
 public static class GameOpenFx
 {
-    public static bool Enabled => Animate.On && Settings.Data.Bool("gameOpenFx", true);
-    public static readonly GameFx[] All = Enum.GetValues<GameFx>();
+    public static bool Enabled => Animate.On && Style != "off";
+    /// <summary>Яркие анимации 9.3 (случайная из восьми); «Спокойная» в их число не входит.</summary>
+    public static readonly GameFx[] All = Enum.GetValues<GameFx>().Where(k => k != GameFx.Calm).ToArray();
+
+    /// <summary>
+    /// 10.0: какие анимации открытия игры: calm — одна спокойная (по умолчанию), classic — яркие 9.3,
+    /// off — без анимации. Старый переключатель «gameOpenFx» = выкл. тоже значит off.
+    /// </summary>
+    public static string Style => Settings.Data.Str("gameOpenStyle") is { } s && s is "calm" or "classic" or "off" ? s : Settings.Data.Bool("gameOpenFx", true) ? "calm" : "off";
 
     static readonly Random Rng = new();
     static GameFx? _last;
@@ -79,7 +88,7 @@ public static class GameOpenFx
     {
         if (shot is null || (force is null && !Enabled)) { if (shot is not null) DispatcherTimer.RunOnce(shot.Dispose, TimeSpan.FromSeconds(1)); Animate.PageIn(page); return null; }
         _active?.Finish();
-        var run = new GameOpenRun(w, page, shot, force ?? Next(), origin, from, game);
+        var run = new GameOpenRun(w, page, shot, force ?? (Style == "classic" ? Next() : GameFx.Calm), origin, from, game);
         if (force is null)
         {
             _active = run;
@@ -161,6 +170,7 @@ public sealed class GameOpenRun
             case GameFx.Warp: Warp(); break;
             case GameFx.Expand: Expand(from, game); break;
             case GameFx.Wipe: Wipe(); break;
+            case GameFx.Calm: Calm(); break;
             default: Doors(); break;
         }
         Seek(0);
@@ -530,6 +540,26 @@ public sealed class GameOpenRun
             Canvas.SetTop(glow, -20);
             band.Opacity = glow.Opacity = k is > 0 and < 1 ? 1 : 0;
             ps.ScaleX = ps.ScaleY = 1.03 - 0.03 * k;
+        };
+    }
+
+    // ---------------------------------------------------------------- 9. Спокойная (10.0)
+
+    void Calm()
+    {
+        Length = 380;
+        OpaquePage();
+        var old = Whole(_stage);
+        old.RenderTransformOrigin = RelativePoint.Center;
+        var shrink = new ScaleTransform();
+        old.RenderTransform = shrink;
+        var (ps, _) = PageTransform();
+        _frame = ms =>
+        {
+            var k = CubicOut(Phase(ms, 0, 340));
+            old.Opacity = 1 - k;
+            shrink.ScaleX = shrink.ScaleY = 1 - 0.015 * k;
+            ps.ScaleX = ps.ScaleY = 1.02 - 0.02 * CubicOut(Phase(ms, 0, 380));
         };
     }
 

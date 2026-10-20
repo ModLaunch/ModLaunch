@@ -323,17 +323,19 @@ public static partial class Actions
         // «Обновлять перед игрой» (Настройки → Обновления): сначала свежие версии модов.
         if (!vanilla && !skipUpdate && ModUpdates.BeforePlay && !Program.Demo && g.Registry is not null) { _ = UpdateThenPlay(g, animate); return; }
         var visible = W.IsVisible && W.WindowState != WindowState.Minimized;
+        // 10.0: автопилот перед запуском — включить нужное, выключить дубли (молча, со снимком).
+        if (!vanilla && Autopilot.BeforePlay) try { if (Autopilot.QuickFix(g) is > 0 and var n) W.Toast(I18n.T("v10.ap.quick", ("n", n))); } catch { }
         // Перед запуском — быстрая проверка игры: не хватает зависимостей, выключена нужная библиотека…
         if (!vanilla && !skipCheck && visible && Health.BeforePlay && Health.Blockers(g) is { Count: > 0 } blockers)
         {
             PlayGate(g, blockers, animate);
             return;
         }
-        if (!animate || !Animate.On || !visible)
+        if (!animate || !Animate.On || !visible || Settings.Data.Str("launchFx") == "off")
         {
             var r = StartGame(g, vanilla);
             if (!r.Ok) { W.Toast(r.Error ?? "", bad: true); return; }
-            W.Toast(I18n.T(vanilla ? "vanilla.launched" : "toast.launched") + (r.Backup is null ? "" : " · " + I18n.T("bak.created")));
+            W.Toast(I18n.T(vanilla ? "vanilla.launched" : "toast.launched") + (r.Backup is null ? "" : " · " + I18n.T("bak.created")) + (r.Note is null ? "" : " · " + r.Note));
             AfterLaunch();
             return;
         }
@@ -370,13 +372,19 @@ public static partial class Actions
     {
         try
         {
+            // 10.0: чистая загрузка — прибрать кэш и мусор загрузчика перед запуском.
+            string? note = null;
+            if (!vanilla && CleanBoot.On)
+                try { if (CleanBoot.Run(g) is { Any: true } c) note = I18n.T("v10.clean.note", ("n", c.Files + c.Quarantined)); } catch { }
             var backup = Launcher.Launch(g.Def, g.Path!, vanilla);
+            try { Cases.NoteWeek(); } catch { }
+            CloudFlow.PushSoon();
             if (g.Registry is not null) try { Social.PlayLog.NoteLaunch(g.Def, g.Registry); } catch { }
             Social.Friends.SetActivity("playing", g.Def.Id, g.Def.Name);
             OverlayWindow.OnGameStarted(g.Def.Id);
             GameHintWindow.ShowFor(g.Def.Name);
             AppState.Notify();
-            return new LaunchScreen.Result(true, backup, null);
+            return new LaunchScreen.Result(true, backup, null, note);
         }
         catch (Exception e) { return new LaunchScreen.Result(false, null, Jobs.Explain(e)); }
     }
