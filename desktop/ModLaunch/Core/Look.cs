@@ -10,7 +10,7 @@ namespace ModLaunch.Core;
 /// </summary>
 public static class Look
 {
-    public static readonly string[] Themes = ["store", "snow", "jet", "ink", "graphite", "paper", "dark", "black", "light", "midnight", "nord", "forest", "grape", "mocha", "sand", "contrast"];
+    public static readonly string[] Themes = ["slate", "store", "snow", "jet", "ink", "graphite", "paper", "dark", "black", "light", "midnight", "nord", "forest", "grape", "mocha", "sand", "contrast"];
     public static readonly string[] Designs = ["store", "vitrina", "studio", "aurora"];
 
     /// <summary>
@@ -73,6 +73,21 @@ public static class Look
     /// <summary>Первый запуск 8.3: включить «Студию» и её тему, если оформление не меняли.</summary>
     static void Migrate()
     {
+        // 11.0: «взрослый» вид по умолчанию — конфиг «Строгий», если оформление не меняли (стандартный конфиг 10.0 или ничего).
+        if (!Settings.Data.Bool("look11"))
+        {
+            Settings.Data["look11"] = true;
+            var fresh = !Settings.Data.Bool("look92");
+            var untouched = Settings.Data.Str("config") is null or "modlaunch" && Settings.Data.Str("theme") is null or "store" && Settings.Data.Str("accent") is null or "#7B5CFF";
+            if (fresh || untouched)
+            {
+                Settings.Data["look92"] = true;
+                Settings.Data["look9"] = true;
+                Settings.Data["showBrand"] = false;
+                Configs.Apply(Configs.BuiltIn().First(c => c.Id == "pro"), apply: false);
+                return;
+            }
+        }
         // 9.2: всем — дизайн Store. Тёмные темы прошлых версий и их акцент меняем на «Тёмное» оформление Store.
         if (!Settings.Data.Bool("look92"))
         {
@@ -108,6 +123,12 @@ public static class Look
     /// <summary>Шрифт интерфейса (Inter встроен, остальные — из Windows).</summary>
     public static string Font => Fonts.Contains(Settings.Data.Str("font")) ? Settings.Data.Str("font")! : "Onest";
     /// <summary>Встроенные шрифты: Onest (текст) и Unbounded (крупные заголовки «Витрины»).</summary>
+    /// <summary>11.0: заголовки — широким Unbounded (как в 9.x) или тем же шрифтом, что и текст («Строгий»).</summary>
+    public static bool WideHeadings => Settings.Data.Str("headings") != "ui";
+    public static FontFamily HeadingFont => WideHeadings ? Unbounded : UiFont;
+    /// <summary>«Строгий» вид: обычные заголовки, меньше скруглений, без свечения у кнопок и пунктов меню.</summary>
+    public static bool Calm => !WideHeadings;
+
     public static readonly FontFamily Onest = new("avares://ModLaunch/Assets/fonts#Onest");
     public static readonly FontFamily Unbounded = new("avares://ModLaunch/Assets/fonts#Unbounded");
     /// <summary>Шрифт крупных заголовков: в «Витрине» — Unbounded, иначе — шрифт интерфейса.</summary>
@@ -218,6 +239,12 @@ public static class Look
 
     static readonly Dictionary<string, Dictionary<string, string>> Palettes = new()
     {
+        // 11.0 «Строгий»: холодный графит без фиолетового оттенка — спокойный фон, на котором работают арты игр и один акцент.
+        ["slate"] = new()
+        {
+            ["Bg"] = "#111315", ["Rail"] = "#111315", ["Layer"] = "#16191C", ["Surface"] = "#1C2024", ["Surface2"] = "#23282D", ["Surface3"] = "#2C3238",
+            ["Line"] = "#272C32", ["Text"] = "#EDEFF2", ["Muted"] = "#A2AAB4", ["Faint"] = "#6D7680",
+        },
         // 9.2 Store. Bg — шапка и боковая панель, Layer — «лист» с содержимым, Surface — карточки.
         ["store"] = new()
         {

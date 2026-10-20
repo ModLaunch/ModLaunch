@@ -16,7 +16,7 @@ public sealed partial class CreatorPage
         _mxLog.Clear();
         _mxLog.AddRange(Inject(_mxFile, game));
         _mxLog.AddRange(Inspect(_mxFile, game));
-        s.Window.Navigate(() => new CreatorPage("inject"));
+        s.Window.Navigate(() => new CreatorPage("mxdev"));
         s.Pump(700);
         s.Save("creator-modscriptx");
     }

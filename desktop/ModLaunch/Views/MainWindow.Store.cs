@@ -101,7 +101,7 @@ public sealed partial class MainWindow
         {
             Width = 3, Height = active ? 20 : 0, CornerRadius = new CornerRadius(2), Background = Ui.Res("Brand"),
             HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center,
-            BoxShadow = active ? new BoxShadows(new BoxShadow { Blur = 10, Spread = 1, Color = WithAlpha(Ui.Res("Brand"), 200) }) : default,
+            BoxShadow = active && !Look.Calm ? new BoxShadows(new BoxShadow { Blur = 10, Spread = 1, Color = WithAlpha(Ui.Res("Brand"), 200) }) : default,
         };
         return new Panel { Children = { col, pip } };
     }
@@ -136,7 +136,8 @@ public sealed partial class MainWindow
         var bottom = new StackPanel { Spacing = 2, Margin = new Thickness(0, 4, 0, 10), HorizontalAlignment = HorizontalAlignment.Center };
         bottom.Children.Add(RailLine(new Thickness(0, 4, 0, 6)));
         // 9.3: второстепенное — значками без подписей (подсказка при наведении), чтобы панель не шумела.
-        foreach (var b in new[] { _friendsButton, _statsButton, _donateButton, _settingsButton }) { _secondary.Add(b); bottom.Children.Add(b); }
+        // 11.0: «Поддержать» — в «О программе» и меню «…», не на панели.
+        foreach (var b in new[] { _friendsButton, _statsButton, _settingsButton }) { _secondary.Add(b); bottom.Children.Add(b); }
         // Аккаунт — самым нижним пунктом: аватар с точкой «в сети».
         _accountButton.Classes.Clear();
         _accountButton.Classes.Add("nav");
@@ -292,7 +293,12 @@ public sealed partial class MainWindow
             UpdateAdVisibility();
         };
 
-        var root = new Grid { RowDefinitions = new RowDefinitions($"{TitleHeight.ToString(System.Globalization.CultureInfo.InvariantCulture)},*"), ColumnDefinitions = new ColumnDefinitions("Auto,*") };
+        var root = new Grid { RowDefinitions = new RowDefinitions($"{TitleHeight.ToString(System.Globalization.CultureInfo.InvariantCulture)},*,Auto"), ColumnDefinitions = new ColumnDefinitions("Auto,*") };
+        // 11.0: строка состояния — сеть, инжектор, бэкап.
+        var status = new StatusBar();
+        Grid.SetRow(status, 2);
+        Grid.SetColumnSpan(status, 2);
+        root.Children.Add(status);
         Grid.SetColumnSpan(titlebar, 2);
         root.Children.Add(titlebar);
         Grid.SetRow(railBorder, 1);

@@ -107,7 +107,7 @@ public static class PlayControls
         return new Border
         {
             CornerRadius = new CornerRadius(12),
-            BoxShadow = new BoxShadows(new BoxShadow { OffsetY = 10, Blur = 30, Spread = -6, Color = Color.FromArgb(0xB3, accent.R, accent.G, accent.B) }),
+            BoxShadow = Look.Calm ? default : new BoxShadows(new BoxShadow { OffsetY = 10, Blur = 30, Spread = -6, Color = Color.FromArgb(0xB3, accent.R, accent.G, accent.B) }),
             VerticalAlignment = VerticalAlignment.Bottom,
             Child = body,
         };

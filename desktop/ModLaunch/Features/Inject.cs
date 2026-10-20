@@ -146,6 +146,20 @@ public static class Inject
         Notify();
     }
 
+    /// <summary>Для снимков экрана: купленный инжект и свой .modx (обычным путём — с автомодерацией и шифрованием).</summary>
+    public static void Demo()
+    {
+        var game = AppState.Games.FirstOrDefault(g => g.Status == Detect.Found && !g.Def.IsMinecraft)?.Def.Id ?? "";
+        var dir = Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "modlaunch-shots-injects")).FullName;
+        var bought = Path.Combine(dir, "arena.modx");
+        File.WriteAllText(bought, Views.CreatorPage.ArenaExample());
+        AddPurchase(new Listing("demo-arena", "seller", "Mira", "Arena waves", "", "", "script", game, 9900, "personal", "1.0.0", "", [], [],
+            0, "", 1, "arena.modx", "active", 12, DateTime.UtcNow.AddDays(-4), DateTime.UtcNow), bought);
+        var own = Path.Combine(dir, "gold.modx");
+        File.WriteAllText(own, "mod \"Gold boost\"\nversion 1.0.0\n\nhook start {\n  gold += 500\n  say \"+500 gold\"\n}\n");
+        AddLocal(own, game);
+    }
+
     /// <summary>Содержимое инжекта: купленный — расшифровать, свой — прочитать с диска.</summary>
     static byte[] Load(InjectItem i) => i.Sealed ? Vault.Open(File.ReadAllBytes(BlobPath(i.Id))) : File.ReadAllBytes(i.LocalPath!);
 

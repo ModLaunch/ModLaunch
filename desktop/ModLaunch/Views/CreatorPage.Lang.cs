@@ -36,6 +36,22 @@ public sealed partial class CreatorPage
         return r.ReadToEnd();
     }
 
+    /// <summary>Пример «Арена» — для нового файла и снимков экрана.</summary>
+    internal static string ArenaExample() => Example("arena");
+
+    /// <summary>Для снимков экрана: пример, запуск в песочнице и проверка автомодерацией.</summary>
+    internal static void DemoLang(string pane = "run")
+    {
+        _lxPath = null;
+        _lxText = Example("arena");
+        _lxVars = "gold = 100\nstreak = 0";
+        _lxTicks = 3;
+        _lxPane = pane;
+        _lxEngine = "renpy";
+        _lxResult = MX.Sandbox.Run(MX.ModxDoc.Parse(_lxText), MX.Sandbox.ParseVars(_lxVars), _lxTicks);
+        _lxVerdict = Moderation.CheckModx(_lxText);
+    }
+
     static string ScriptsDir()
     {
         var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
@@ -100,7 +116,7 @@ public sealed partial class CreatorPage
     /// <summary>Песочница: переменные игры, сколько тиков, «Запустить» и вывод.</summary>
     Control RunPane()
     {
-        var vars = new TextBox { Text = _lxVars, AcceptsReturn = true, FontFamily = Mono, FontSize = 12.5, MinHeight = 84, Watermark = "gold = 100" };
+        var vars = new TextBox { Text = _lxVars, AcceptsReturn = true, FontFamily = Mono, FontSize = 12.5, MinHeight = 84, Watermark = "gold = 100", VerticalContentAlignment = VerticalAlignment.Top };
         vars.TextChanged += (_, _) => _lxVars = vars.Text ?? "";
         var ticks = new NumericUpDown { Value = _lxTicks, Minimum = 0, Maximum = 1000, Increment = 1, Width = 120, FormatString = "0" };
         ticks.ValueChanged += (_, _) => _lxTicks = (int)(ticks.Value ?? 3);
@@ -337,7 +353,7 @@ public sealed partial class CreatorPage
             if (strikes > 0) tags.Children.Add(Gx.Tag(I18n.T("v11.inj.strikes", ("n", strikes)), Ui.Res("Warn"), Ui.Res("OnBrand"), 11));
             var words = Ui.Col(4, Ui.Row(8, Ui.Text(i.Title, "h3"), tags),
                 Ui.Text(i.Changes == "" ? I18n.T("v11.inj.noSource") : i.Changes, "small muted", wrap: true),
-                Ui.Text(i.Sealed ? I18n.T("v11.inj.sealed", ("seller", i.Seller)) : i.LocalPath ?? "", "small faint"));
+                Ui.Text(i.Sealed ? I18n.T("v11.inj.sealed", ("seller", i.Seller)) : i.LocalPath ?? "", "small muted"));
             var right = Ui.Row(10, game, on, Ui.Button("", () => { Features.Inject.Remove(item.Id); Build(); }, "icon ghost", Icons.Trash, I18n.T("common.remove")));
             right.VerticalAlignment = VerticalAlignment.Center;
             var row = new DockPanel();

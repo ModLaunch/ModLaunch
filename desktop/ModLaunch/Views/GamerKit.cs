@@ -14,7 +14,7 @@ namespace ModLaunch.Views;
 public static class Gx
 {
     /// <summary>Заголовочный шрифт ленты и рынка — широкий Unbounded (встроен в программу).</summary>
-    public static FontFamily Display => Look.Unbounded;
+    public static FontFamily Display => Look.HeadingFont;
 
     public static Color Accent => Ui.Res("Brand") is ISolidColorBrush b ? b.Color : Color.Parse(Look.Accent);
 
@@ -66,9 +66,9 @@ public static class Gx
         };
     }
 
-    /// <summary>Мягкое свечение цветом акцента вокруг элемента.</summary>
+    /// <summary>Мягкое свечение цветом акцента вокруг элемента. 11.0: в «Строгом» виде свечения нет.</summary>
     public static BoxShadows Glow(byte alpha = 120, double blur = 24, double spread = 0) =>
-        new(new BoxShadow { Blur = blur, Spread = spread, Color = Alpha(Accent, alpha) });
+        Look.Calm ? default : new(new BoxShadow { Blur = blur, Spread = spread, Color = Alpha(Accent, alpha) });
 
     /// <summary>Затемнение снизу вверх — чтобы белый текст читался на любой картинке.</summary>
     public static IBrush ShadeUp(double from = 0.35, byte alpha = 235) => new LinearGradientBrush
