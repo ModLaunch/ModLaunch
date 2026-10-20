@@ -1,8 +1,8 @@
 rules_version = '2';
 
 // ═══════════════════════════════════════════════════════════════════════════
-// ModLaunch 9.5 — ПОЛНЫЙ файл правил Firestore (друзья, ModLaunch Hub, отзывы,
-// рынок Creator Hub и кошельки). Серверных функций не нужно — всё, включая
+// ModLaunch 10.0 — ПОЛНЫЙ файл правил Firestore (друзья, ModLaunch Hub, отзывы,
+// рынок Creator Hub, кошельки и профиль в облаке). Серверных функций не нужно — всё, включая
 // деньги, проверяют эти правила (бесплатный тариф Spark подходит).
 //
 // Как поставить:
@@ -504,6 +504,17 @@ service cloud.firestore {
           || (request.resource.data.status == 'done' && mEntryIs(resource.data.uid, 'topup', tid)));
     }
     // ── конец правил рынка ───────────────────────────────────────────────
+
+    // ── Профиль в облаке (10.0) ──────────────────────────────────────────
+    // Один документ на аккаунт: сборки каждого ПК, награды, кейсы и стиль одной
+    // JSON-строкой. Читать и писать может только хозяин.
+    match /cloud/{uid} {
+      allow get, delete: if friendsMember() && request.auth.uid == uid;
+      allow create, update: if friendsMember() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['data', 'device'])
+        && request.resource.data.data is string && request.resource.data.data.size() <= 900000
+        && request.resource.data.device is string && request.resource.data.device.size() <= 32;
+    }
 
     // Всё остальное закрыто.
   }

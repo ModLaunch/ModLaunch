@@ -22,19 +22,16 @@ public sealed partial class CreatorPage
     {
         if (_hub is null && !_hubLoading && !Program.Screenshot) _ = LoadHub();
         if (_market is null && !_marketLoading && !Program.Screenshot) _ = LoadMarket();
-        var col = new StackPanel { Spacing = 26 };
-        // 9.9: сверху — «Студия автора» и быстрые инструменты.
+        var col = new StackPanel { Spacing = 24 };
+        // Сверху — «Студия автора» и быстрые инструменты.
         var studio = StudioHeader();
         var tools = Tools();
         col.Children.Add(studio);
         col.Children.Add(tools);
         if (!Shown) { Animate.Rise(studio, 0); Animate.Rise(tools, 1); }
 
-        // Верх по эскизу.
-        var create = BigButton(Icons.Plus, I18n.T("v91.cr.create"), I18n.T("cr.home.create.text"), CreateNew, primary: true);
-        var publish = BigButton(Icons.Upload, I18n.T("v91.cr.publish"), I18n.T("cr.home.publish.text"), PublishArchive, primary: false);
-        var buttons = new UniformGrid { Columns = 2, Children = { create, publish } };
-
+        // 10.0: без больших цветных кнопок и высоких карточек — «Создать» уже в шапке,
+        // «Опубликовать» — тихой кнопкой у «Моих модов».
         var recent = Projects.List().OrderByDescending(p => p.Updated).Take(4).ToList();
         Control mine;
         if (recent.Count > 0)
@@ -45,26 +42,15 @@ public sealed partial class CreatorPage
         }
         else
         {
-            var empty = Ui.Card(Ui.Row(14,
-                new Border { Width = 44, Height = 44, CornerRadius = new CornerRadius(22), Background = Ui.Res("BrandSoft"), Child = Ui.Icon(Icons.Edit, 20, Ui.Res("Brand2")) },
-                Ui.Text(I18n.T("v91.cr.myMods.empty"), "muted", wrap: true)), 20);
-            mine = empty;
+            mine = Ui.Card(Ui.Row(14,
+                new Border { Width = 40, Height = 40, CornerRadius = new CornerRadius(20), Background = Ui.Res("Surface2"), Child = Ui.Icon(Icons.Edit, 18, Ui.Res("Muted")) },
+                Ui.Text(I18n.T("v91.cr.myMods.empty"), "muted", wrap: true)), 18);
         }
-        var left = Ui.Col(22, buttons, Section(I18n.T("v91.cr.myMods"), () => Go("mine"), mine));
-
-        var hit = _hub is { Count: > 0 } ? Hub.Sort(_hub, "trending").FirstOrDefault() : null;
-        var fresh = Market.Sort(_market ?? [], "new").FirstOrDefault();
-        var right = Ui.Row(16,
-            hit is not null ? TallHub(hit) : TallPromo(Icons.Wand, I18n.T("v91.cr.tpl.card"), I18n.T("v91.cr.tpl.card.text"), "#7C5CFF", () => Go("examples")),
-            fresh is not null ? TallListing(fresh) : TallPromo(Icons.Book, I18n.T("v91.cr.docs.card"), I18n.T("v91.cr.docs.card.text"), "#EC4899", () => Go("docs")));
-        right.VerticalAlignment = VerticalAlignment.Top;
-
-        var top = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), ColumnSpacing = 28 };
-        top.Children.Add(left);
-        Grid.SetColumn(right, 1);
-        top.Children.Add(right);
-        col.Children.Add(top);
-        if (!Shown) { Animate.Rise(left, 2); Animate.Rise(right, 3); }
+        var publish = Ui.Button(I18n.T("v91.cr.publish"), PublishArchive, "ghost", Icons.Upload);
+        publish.Padding = new Thickness(10, 4);
+        var mineSection = Section(I18n.T("v91.cr.myMods"), () => Go("mine"), mine, publish);
+        col.Children.Add(mineSection);
+        if (!Shown) Animate.Rise(mineSection, 2);
 
         // Ниже — как раньше: популярное в Hub, свежее в маркете, шаблоны.
         Control popular;
@@ -198,15 +184,21 @@ public sealed partial class CreatorPage
     }
 
     /// <summary>Заголовок раздела со ссылкой «Все» справа (если есть куда вести).</summary>
-    static Control Section(string title, Action? all, Control body)
+    static Control Section(string title, Action? all, Control body, Control? extra = null)
     {
         var head = new DockPanel();
+        var actions = Ui.Row(4);
+        if (extra is not null) actions.Children.Add(extra);
         if (all is not null)
         {
             var more = Ui.Button(I18n.T("home.all"), all, "ghost");
             more.Padding = new Thickness(8, 4);
-            DockPanel.SetDock(more, Dock.Right);
-            head.Children.Add(more);
+            actions.Children.Add(more);
+        }
+        if (actions.Children.Count > 0)
+        {
+            DockPanel.SetDock(actions, Dock.Right);
+            head.Children.Add(actions);
         }
         head.Children.Add(Ui.Text(title, "h2"));
         return Ui.Col(14, head, body);

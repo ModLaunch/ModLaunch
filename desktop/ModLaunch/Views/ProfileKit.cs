@@ -35,6 +35,7 @@ public static class ProfileKit
             "gold" => Grad("#FFF1B0", "#FFC93C", "#C27C0E"),
             "neon" => Grad("#19D3F5", "#7C5CFF", "#FF3D81"),
             "flame" => Grad("#FFE066", "#FF8A1F", "#E8290B"),
+            "holo" => Grad("#9BF6FF", "#BDB2FF", "#FFC6FF", "#CAFFBF"),
             "game" => Grad(Lighter(GameAccent(game)), GameAccent(game), Look.Mix(Color.Parse(GameAccent(game)), Colors.Black, 0.35).ToString()),
             _ => Ui.Res("Brand"),
         };
@@ -44,7 +45,7 @@ public static class ProfileKit
     static BoxShadows FrameGlow(string id)
     {
         var (key, game) = Cosmetics.Split(id);
-        var hex = key switch { "gold" => "#FFC93C", "neon" => "#7C5CFF", "flame" => "#FF8A1F", "game" => GameAccent(game), _ => null };
+        var hex = key switch { "holo" => "#BDB2FF", "gold" => "#FFC93C", "neon" => "#7C5CFF", "flame" => "#FF8A1F", "game" => GameAccent(game), _ => null };
         return hex is null ? default : BoxShadows.Parse($"0 0 22 2 {Gx.Alpha(Color.Parse(hex), 150)}");
     }
 
@@ -78,6 +79,7 @@ public static class ProfileKit
             "aurora" => Grad("#0B3D3A", "#1FB58F", "#5A3BD6"),
             "sunset" => Grad("#FF7A59", "#E83E8C", "#3B1D6E"),
             "midnight" => Grad("#0A0F2C", "#1B2A6B", "#0B0D17"),
+            "vault" => Grad("#1A1430", "#3B2A7A", "#0C0A14"),
             _ => new LinearGradientBrush
             {
                 StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
@@ -97,6 +99,7 @@ public static class ProfileKit
             "master" => (Grad("#FFE08A", "#E0A21B"), Ui.Hex("#2A1A00")),
             "game" => (Grad(GameAccent(game), Lighter(GameAccent(game))), (IBrush)Brushes.White),
             "newbie" => ((IBrush)new SolidColorBrush(Color.FromArgb(46, 255, 255, 255)), (IBrush)Brushes.White),
+            "opener" => (Grad("#2A2140", "#7B5CFF"), (IBrush)Brushes.White),
             _ => (Grad("#7C5CFF", "#FF3D81"), (IBrush)Brushes.White),
         };
         return new Border
@@ -116,8 +119,8 @@ public static class ProfileKit
         else
             face = new Border
             {
-                CornerRadius = new CornerRadius(size / 2), Background = key == "heart" ? Grad("#FF7AA8", "#E83E8C") : Grad("#5AA9FF", "#2D5BD8"),
-                Child = Ui.Icon(key == "heart" ? Icons.Heart : Icons.Clock, size * 0.46, Brushes.White),
+                CornerRadius = new CornerRadius(size / 2), Background = key == "heart" ? Grad("#FF7AA8", "#E83E8C") : key == "case" ? Grad("#9B82FF", "#4A2FD0") : Grad("#5AA9FF", "#2D5BD8"),
+                Child = Ui.Icon(key == "heart" ? Icons.Heart : key == "case" ? Icons.Cube : Icons.Clock, size * 0.46, Brushes.White),
             };
         var medal = new Border
         {

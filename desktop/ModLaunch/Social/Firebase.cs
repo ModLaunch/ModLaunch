@@ -124,10 +124,13 @@ public static class Firebase
     public static string Explain(string service, Exception e)
     {
         if (e is not ServiceError s) return Jobs.Explain(e);
+        // 10.0: настройка сервера (правила, база, ключ) — дело владельца; остальным — без подробностей.
+        if (!Account.Owner && s.Code is "DENIED" or "AUTH_DISABLED" or "NO_DATABASE" or "NOT_ENABLED" or "BAD_KEY" or "NOT_CONFIGURED" or "SERVER")
+            return I18n.T("v10.svc.down");
         var key = $"err.{service}.{s.Code}";
         var text = I18n.Has(key) ? I18n.T(key, ("reason", s.Message)) : I18n.T($"err.{service}.SERVER", ("reason", s.Message));
         // «Временно недоступно» само по себе причину не называет — добавляем ответ сервера, чтобы её было видно.
-        if (s.Code is "NOT_ENABLED" or "BUSY" or "BAD_KEY" && !string.IsNullOrWhiteSpace(s.Message) && s.Message != s.Code && !text.Contains(s.Message))
+        if (Account.Owner && s.Code is "NOT_ENABLED" or "BUSY" or "BAD_KEY" && !string.IsNullOrWhiteSpace(s.Message) && s.Message != s.Code && !text.Contains(s.Message))
             text = text.TrimEnd() + " (" + s.Message.Trim() + ")";
         return text;
     }

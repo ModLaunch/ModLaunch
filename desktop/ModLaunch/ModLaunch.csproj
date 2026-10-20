@@ -15,7 +15,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <AssemblyName>ModLaunch</AssemblyName>
     <RootNamespace>ModLaunch</RootNamespace>
-    <Version>9.9.0</Version>
+    <Version>10.0.1</Version>
     <Product>ModLaunch</Product>
     <Company>ModLaunch</Company>
     <Copyright>ModLaunch</Copyright>

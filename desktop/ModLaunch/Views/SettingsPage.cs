@@ -21,14 +21,19 @@ public sealed partial class SettingsPage : Page
     DateTime _versionAt;
     string? _dxvkApi;
 
-    public SettingsPage(string tab = "look") => _tab = tab;
+    public SettingsPage(string tab = "look") => _tab = tab == "services" && !Social.Account.Owner ? "look" : tab;
 
     public override string Title => I18n.T("nav.settings");
 
     /// <summary>Разделы настроек по группам: id, название, иконка, цвет значка.</summary>
-    static readonly (string Group, (string Id, string Key, string Icon, string Color)[] Items)[] Groups =
+    /// <summary>10.0: «Состояние сервисов» (сервер, правила, консоль Firebase) — только владельцу.</summary>
+    static (string Group, (string Id, string Key, string Icon, string Color)[] Items)[] Groups =>
+        Social.Account.Owner ? AllGroups : AllGroups.Select(g => (g.Group, g.Items.Where(i => i.Id != "services").ToArray())).ToArray();
+
+    static readonly (string Group, (string Id, string Key, string Icon, string Color)[] Items)[] AllGroups =
     [
         ("set.g.personal", [
+            ("configs", "v10.set.tab", Icons.Sliders, "#F472B6"),
             ("look", "settings.tab.look", Icons.Palette, "#A78BFA"),
             ("interface", "look.tab.interface", Icons.Layers, "#60A5FA"),
         ]),
@@ -146,7 +151,8 @@ public sealed partial class SettingsPage : Page
             "about" => AboutTab(),
             "interface" => InterfaceTab(),
             "system" => SystemTab(),
-            "services" => ServicesTab(),
+            "services" when Social.Account.Owner => ServicesTab(),
+            "configs" => ConfigsTab(),
             _ => LookTab(),
         };
         // На широком окне разделы встают в две колонки «кирпичиками».
@@ -424,7 +430,9 @@ public sealed partial class SettingsPage : Page
             Toggle(I18n.T("v91.set.splash"), I18n.T("v91.set.splash.hint"), Settings.Data.Bool("splash", true), v => Settings.Data["splash"] = v),
             Toggle(I18n.T("v91.set.fx"), I18n.T("v91.set.fx.hint"), Settings.Data.Bool("installFx", true), v => Settings.Data["installFx"] = v),
             Toggle(I18n.T("v92.set.openfx"), I18n.T("v92.set.openfx.hint"), Settings.Data.Bool("modOpenFx", true), v => Settings.Data["modOpenFx"] = v),
-            Toggle(I18n.T("v93.set.gamefx"), I18n.T("v93.set.gamefx.hint"), Settings.Data.Bool("gameOpenFx", true), v => Settings.Data["gameOpenFx"] = v),
+            Toggle(I18n.T("v93.set.gamefx"), I18n.T("v10.set.gamefx.hint"), GameOpenFx.Style != "off", v => { Settings.Data["gameOpenFx"] = v; Settings.Data["gameOpenStyle"] = v ? "calm" : "off"; }),
+            Toggle(I18n.T("v10.motion.launch"), I18n.T("v10.motion.launch.hint"), Settings.Data.Str("launchFx") != "off", v => Settings.Data["launchFx"] = v ? "calm" : "off"),
+            Toggle(I18n.T("v10.set.classicHome"), I18n.T("v10.set.classicHome.hint"), Settings.Data.Str("homeStyle") == "classic", v => Settings.Data["homeStyle"] = v ? "classic" : "ten"),
             Toggle(I18n.T("v94.set.officialArt"), I18n.T("v94.set.officialArt.hint"), Settings.Data.Bool("officialArt", true), v => { Settings.Data["officialArt"] = v; if (v) OfficialArt.Refresh(); }),
             Toggle(I18n.T("v4.continue"), I18n.T("v4.continue.text"), Settings.Data.Bool("homeContinue", true), v => Settings.Data["homeContinue"] = v),
             Toggle(I18n.T("home.favorites"), I18n.T("home.favorites.text"), Settings.Data.Bool("homeFavorites", true), v => Settings.Data["homeFavorites"] = v),
@@ -549,12 +557,13 @@ public sealed partial class SettingsPage : Page
     /// <summary>Какие настройки в каком разделе — для поиска.</summary>
     static readonly (string Tab, string[] Keys)[] SearchMap =
         [
+            ("configs", ["v10.set.tab", "v10.set.configs", "v10.set.custom", "v10.set.colors", "v10.set.fx", "v10.set.motion"]),
             ("look", ["settings.language", "look.theme", "look.accent", "look.scale", "look.anim", "look.compact", "look.font", "look.radius", "look.bg", "look.glow", "look.presets"]),
             ("interface", ["look.start", "look.chrome", "look.home", "look.games", "look.brand", "look.rail"]),
             ("system", ["sys.tray", "sys.autostart", "sys.toast", "sys.transfer", "sys.confirm"]),
             ("games", ["settings.games", "games.deep"]),
-            ("launch", ["settings.tab.launch", "ov.title", "launch.args", "launch.time"]),
-            ("backups", ["settings.tab.backups", "bak.keep"]),
+            ("launch", ["settings.tab.launch", "ov.title", "launch.args", "launch.time", "v10.clean.title", "v10.clean.on"]),
+            ("backups", ["settings.tab.backups", "bak.keep", "v10.cloud.section", "v10.cloud.on"]),
             ("downloads", ["v4.archive", "dl.parallel", "dl.pieces", "dl.limit"]),
             ("graphics", ["settings.tab.graphics"]),
             ("updates", ["settings.tab.updates", "upd.auto", "upd.beforePlay"]),
@@ -609,6 +618,52 @@ public sealed partial class SettingsPage : Page
 
     // ---------------------------------------------------------------- запуск и игровое время
 
+    /// <summary>10.0: «Чистая загрузка» — включается здесь, по умолчанию выключена.</summary>
+    /// <summary>10.0: профиль в облаке — сборки, награды и стиль с аккаунтом.</summary>
+    Control CloudSection()
+    {
+        var signed = Social.Account.SignedIn;
+        var last = Social.CloudProfile.LastSync is { } at && DateTime.TryParse(at, null, System.Globalization.DateTimeStyles.RoundtripKind, out var t) ? Ui.Ago(t) : null;
+        var state = Ui.Text(!signed ? I18n.T("v10.cloud.signIn") : last is null ? I18n.T("v10.cloud.never") : I18n.T("v10.cloud.last", ("ago", last)), "small muted", wrap: true);
+        var row = Ui.Row(8, Ui.Button(I18n.T("v10.cloud.now"), () => { _ = Task.Run(() => CloudFlow.Check(manual: true)); }, "", Icons.Refresh));
+        row.IsEnabled = signed;
+        return Section(I18n.T("v10.cloud.section"), I18n.T("v10.cloud.hint"),
+            Toggle(I18n.T("v10.cloud.on"), I18n.T("v10.cloud.on.hint"), Social.CloudProfile.On, v => Settings.Data["cloudSync"] = v),
+            state, row);
+    }
+
+    Control CleanBootSection()
+    {
+        var w = MainWindow.Current!;
+        var games = AppState.Games.Where(g => g.Status == Detect.Found && !g.Def.IsMinecraft && g.Path is not null).ToList();
+        var now = Ui.Button(I18n.T("v10.clean.now"), () =>
+        {
+            int files = 0, q = 0;
+            long bytes = 0;
+            foreach (var g in games)
+            {
+                if (Launcher.IsRunning(g.Def.Id)) continue;
+                try { var r = CleanBoot.Run(g); files += r.Files; q += r.Quarantined; bytes += r.Bytes; } catch { }
+            }
+            w.Toast(files + q == 0 ? I18n.T("v10.clean.nothing") : I18n.T("v10.clean.done", ("n", files + q), ("size", GamePage.Size(bytes))));
+            Build();
+        }, "", Icons.Sparkles);
+        var row = Ui.Row(8, now);
+        var held = games.Sum(g => CleanBoot.Quarantined(g.Def.Id).Count);
+        if (held > 0)
+            row.Children.Add(Ui.Button(I18n.T("v10.clean.restore", ("n", held)), () =>
+            {
+                var n = games.Sum(CleanBoot.Restore);
+                w.Toast(I18n.T("v10.clean.restored", ("n", n)));
+                AppState.Notify();
+                Build();
+            }, "ghost", Icons.Undo));
+        return Section(I18n.T("v10.clean.title"), I18n.T("v10.clean.hint"),
+            Toggle(I18n.T("v10.clean.on"), I18n.T("v10.clean.on.hint"), CleanBoot.On, v => Settings.Data["cleanBoot"] = v),
+            Toggle(I18n.T("v10.clean.unknown"), I18n.T("v10.clean.unknown.hint"), CleanBoot.Quarantine, v => Settings.Data["cleanBootUnknown"] = v),
+            row);
+    }
+
     Control LaunchTab()
     {
         var col = new StackPanel { Spacing = 16 };
@@ -627,7 +682,9 @@ public sealed partial class SettingsPage : Page
         rows.Add(Toggle(I18n.T("launch.track"), I18n.T("launch.track.hint"), PlayTime.Track, v => Settings.Data["trackPlaytime"] = v));
         rows.Add(Toggle(I18n.T("crash.setting"), I18n.T("crash.setting.hint"), Settings.Data.Bool("crashHelper", true), v => Settings.Data["crashHelper"] = v));
         rows.Add(Toggle(I18n.T("set.checkBeforePlay"), I18n.T("set.checkBeforePlay.hint"), Health.BeforePlay, v => Settings.Data["checkBeforePlay"] = v));
+        rows.Add(Toggle(I18n.T("v10.ap.before"), I18n.T("v10.ap.before.hint"), Autopilot.BeforePlay, v => Settings.Data["autopilotBeforePlay"] = v));
         col.Children.Add(Section(I18n.T("settings.tab.launch"), null, rows.ToArray()));
+        col.Children.Add(CleanBootSection());
 
         // Оверлей в игре.
         var key = new ComboBox { Width = 200 };
@@ -712,6 +769,7 @@ public sealed partial class SettingsPage : Page
     Control BackupsTab()
     {
         var col = new StackPanel { Spacing = 16 };
+        col.Children.Add(CloudSection());
         var keep = new NumericUpDown { Minimum = 1, Maximum = 200, Value = Backups.Keep, Width = 140, FormatString = "0" };
         keep.ValueChanged += (_, _) => { Settings.Data["backupKeep"] = (int)(keep.Value ?? 10); Settings.Save(); };
         var keepRow = new DockPanel();

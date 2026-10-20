@@ -125,26 +125,25 @@ public sealed partial class CreatorPage : Page
             "studio" => "studio",
             _ => "projects",
         };
-        content.Children.Add(HubNav.Header(hubTab, sold: () => { _ = LoadMarket(force: true); _studio = null; }));
-        // Внутри «Проектов» — свои вкладки: обзор, все мои, коды, модели.
+        // Внутри «Проектов» — свои вкладки (обзор, все мои, коды, модели, ModScript X) в той же линии.
+        List<Control>? sub = null;
+        Control? create = null;
         if (hubTab == "projects")
         {
-            var tabs = new List<Control>();
-            foreach (var (id, key, icon) in MainTabs.Where(t => t.Id != "examples"))
+            sub = [];
+            foreach (var (id, key, _) in MainTabs.Where(t => t.Id != "examples"))
             {
                 var tab = id;
-                var b = Ui.Button(I18n.T(key), () => Go(tab), "tab", icon);
-                if (_tab == id) b.Classes.Add("active");
-                tabs.Add(b);
+                var b = Ui.Button(I18n.T(key), () => Go(tab), "pivot");
+                b.Padding = new Thickness(10, 6);
+                b.FontSize = 13;
+                b.VerticalAlignment = VerticalAlignment.Center;
+                if (_tab == id) { b.Classes.Add("active"); b.Background = Ui.Res("Surface2"); }
+                sub.Add(b);
             }
-            var create = Ui.Button(I18n.T("v95.hub.newProject"), CreateNew, "primary", Icons.Plus);
-            create.VerticalAlignment = VerticalAlignment.Center;
-            var bar = new DockPanel();
-            DockPanel.SetDock(create, Dock.Right);
-            bar.Children.Add(create);
-            bar.Children.Add(Ui.TabBar(tabs.ToArray()));
-            content.Children.Add(bar);
+            create = Ui.Button(I18n.T("v95.hub.newProject"), CreateNew, "primary", Icons.Plus);
         }
+        content.Children.Add(HubNav.Header(hubTab, sold: () => { _ = LoadMarket(force: true); _studio = null; }, sub: sub, action: create));
 
         content.Children.Add(_tab switch
         {

@@ -91,6 +91,13 @@ public static partial class Account
 
     // ---------------------------------------------------------------- кто сейчас
 
+    /// <summary>
+    /// 10.0: владелец ModLaunch — только он видит служебное: «Состояние сервисов», правила базы,
+    /// консоль Firebase и подробные ответы сервера. Это админ (почта в admins/, подтверждена)
+    /// или ПК с переменной MODLAUNCH_OWNER=1. Остальные видят просто «сервис недоступен».
+    /// </summary>
+    public static bool Owner => Program.Screenshot || Environment.GetEnvironmentVariable("MODLAUNCH_OWNER") == "1" || Get().Admin;
+
     public static Profile Get()
     {
         var user = Slot("user");

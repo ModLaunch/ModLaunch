@@ -805,10 +805,12 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    bool _started;
+
     async Task StartUp()
     {
         Setup.Updater.Changed += () => Dispatcher.UIThread.Post(RenderRail);
-        Social.Account.Changed += () => Dispatcher.UIThread.Post(() => { RenderRail(); _current?.Build(); });
+        Social.Account.Changed += () => Dispatcher.UIThread.Post(() => { RenderRail(); _current?.Build(); if (_started) CloudFlow.OnAccount(); });
         _ = Task.Run(async () =>
         {
             try { await Setup.Updater.Check(); } catch { }
@@ -848,11 +850,13 @@ public sealed partial class MainWindow : Window
         _splash?.Step(I18n.T("v91.splash.games"), 0.45);
         try { await AppState.DetectAll(); }
         finally { _splash?.Finish(() => _splash = null); }
+        _started = true;
         _ = Task.Run(async () =>
         {
             try { await Features.Tracking.Check(); } catch { }
             try { await Creator.Hub.All(); } catch { }
             Dispatcher.UIThread.Post(RenderBell);
+            await CloudFlow.Check();
         });
         if (Program.StartupLink is string link) OnExternal(link);
         if (Features.ModUpdates.OnStart)

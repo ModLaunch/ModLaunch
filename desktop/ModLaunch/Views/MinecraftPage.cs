@@ -12,6 +12,7 @@ namespace ModLaunch.Views;
 /// <summary>
 /// Страница Minecraft (8.5): шапка с выбором сборки и «Играть», вкладки «Моды» (содержимое сборки),
 /// «Каталог» (Modrinth под версию и загрузчик), «Сборки», «Настройки» и «Ещё» (миры, скриншоты, лог).
+/// В стиле «Store» (10.0.1) страница устроена как у остальных игр — см. MinecraftPage.Store.cs.
 /// </summary>
 public sealed partial class MinecraftPage : Page
 {
@@ -22,7 +23,8 @@ public sealed partial class MinecraftPage : Page
     {
         _tab = tab switch
         {
-            "" or "installed" => Mc.Active is null ? "builds" : "mods",
+            "" or "overview" when Look.Store => "overview",
+            "" or "installed" or "overview" => Mc.Active is null ? "builds" : "mods",
             "catalog" or "mods" or "builds" or "settings" or "worlds" or "servers" or "shots" or "log" => tab,
             "saves" => "worlds",
             "config" or "tools" => "settings",
@@ -31,7 +33,7 @@ public sealed partial class MinecraftPage : Page
         };
         _query = query;
         if (_tab == "catalog") _ = LoadCatalog(reset: true);
-        if (_tab == "mods" && Mc.Active is { } a && !Program.Screenshot) _ = Refresh(a);
+        if (_tab is "mods" or "overview" && Mc.Active is { } a && !Program.Screenshot) _ = Refresh(a);
     }
 
     public override string Title => "Minecraft";
@@ -53,6 +55,7 @@ public sealed partial class MinecraftPage : Page
 
     static string TabName(string tab) => tab switch
     {
+        "overview" => I18n.T("v92.tab.overview"),
         "catalog" => I18n.T("mine.tab.catalog"),
         "builds" => I18n.T("mine.tab.builds"),
         "settings" => I18n.T("mine.tab.settings"),
@@ -85,6 +88,7 @@ public sealed partial class MinecraftPage : Page
 
     public override void Build()
     {
+        if (Look.Store) { BuildStore(); return; }
         var content = StoreKit.Fit(new StackPanel { Spacing = 24, Margin = new Thickness(40, 26, 40, 40), MaxWidth = 1640 });
         content.Children.Add(Header());
         if (G.Status == Detect.Found)
@@ -195,14 +199,15 @@ public sealed partial class MinecraftPage : Page
     }
 
     /// <summary>Выбор сборки в шапке: значок загрузчика, название, стрелка; в меню — все сборки и «Новая сборка».</summary>
-    Control BuildSwitcher()
+    Control BuildSwitcher(string look = "glass")
     {
         var a = Mc.Active;
         var words = Ui.Col(0,
             new TextBlock { Text = a?.Name ?? I18n.T("mine.build.none"), FontWeight = FontWeight.SemiBold, MaxWidth = 210, TextTrimming = TextTrimming.CharacterEllipsis },
             Ui.Text(a?.Label ?? I18n.T("mine.build.create"), "tiny muted"));
         words.VerticalAlignment = VerticalAlignment.Center;
-        var button = new Button { Classes = { "glass" }, Padding = new Thickness(10, 7, 12, 7), Content = Ui.Row(10, a is null ? LoaderBadge("vanilla", 32) : InstanceIcon(a, 32, 9), words, Ui.Icon(Icons.ChevronDown, 14)) };
+        var button = new Button { Padding = new Thickness(10, 7, 12, 7), Content = Ui.Row(10, a is null ? LoaderBadge("vanilla", 32) : InstanceIcon(a, 32, 9), words, Ui.Icon(Icons.ChevronDown, 14)) };
+        if (look != "") button.Classes.Add(look);
         button.Click += (_, _) =>
         {
             var items = Mc.Instances().Select(i => (object?)Ctx.Item((i.Id == a?.Id ? "✓  " : "") + i.Name + "  ·  " + i.Label, LoaderIcon(i.Loader), () => { Mc.Active = i; Mc.Notify(); })).ToList();

@@ -123,7 +123,7 @@ public static class Look
     /// <summary>Сила цветного свечения фона, 0…1.</summary>
     public static double Glow => Settings.Data["glow"] is { } g && double.TryParse(g.ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v) ? Math.Clamp(v, 0, 1) : 1;
     /// <summary>Светлые темы (для подсветки кода и иконок).</summary>
-    public static bool IsLight => Theme is "light" or "sand" or "paper" or "snow";
+    public static bool IsLight => Theme == "custom" ? Luma(Color.Parse(Current["Bg"])) > 0.55 : Theme is "light" or "sand" or "paper" or "snow";
 
     public static void SetFont(string font) { Settings.Data["font"] = font; Settings.Save(); Apply(); }
     public static void SetRadius(string radius) { Settings.Data["radius"] = radius; Settings.Save(); Apply(); }
@@ -163,13 +163,50 @@ public static class Look
     /// <summary>Сбросить оформление к стандартному.</summary>
     public static void Reset()
     {
-        foreach (var key in new[] { "theme", "accent", "font", "radius", "glow", "uiScale", "animations", "backdrop" }) Settings.Data.Remove(key);
+        foreach (var key in new[] { "theme", "accent", "font", "radius", "glow", "uiScale", "animations", "backdrop", "customPalette", "customBase", "fxScanlines", "fxVignette", "config" }) Settings.Data.Remove(key);
         Settings.Save();
         Apply();
     }
     public static readonly double[] Scales = [0.85, 0.9, 1.0, 1.1, 1.25];
 
-    public static string Theme => Themes.Contains(Settings.Data.Str("theme")) ? Settings.Data.Str("theme")! : "store";
+    public static string Theme => Settings.Data.Str("theme") == "custom" && Custom() is not null ? "custom" : Themes.Contains(Settings.Data.Str("theme")) ? Settings.Data.Str("theme")! : "store";
+
+    /// <summary>10.0: ключи цветов темы — их можно задать по одному в конфиге (color_bg, color_text…).</summary>
+    public static readonly string[] ColorKeys = ["Bg", "Rail", "Layer", "Surface", "Surface2", "Surface3", "Line", "Text", "Muted", "Faint"];
+
+    /// <summary>10.0: своя тема из конфига — все цвета заданы вручную (settings.customPalette).</summary>
+    public static Dictionary<string, string>? Custom()
+    {
+        if (Settings.Data["customPalette"] is not System.Text.Json.Nodes.JsonObject o) return null;
+        var basis = Palette(Settings.Data.Str("customBase") is { } b && Palettes.ContainsKey(b) ? b : "store");
+        var p = new Dictionary<string, string>(basis);
+        foreach (var key in ColorKeys)
+            if (o.Str(key) is { } hex && Color.TryParse(hex, out _)) p[key] = hex;
+        return p;
+    }
+
+    /// <summary>Цвета, которые сейчас на экране (своя тема или встроенная).</summary>
+    public static IReadOnlyDictionary<string, string> Current => Theme == "custom" ? Custom()! : Palette(Theme);
+
+    /// <summary>Поменять один цвет: тема становится своей, остальные цвета берутся из текущей.</summary>
+    public static void SetColor(string key, string hex)
+    {
+        if (!ColorKeys.Contains(key) || !Color.TryParse(hex, out _)) return;
+        var now = Current;
+        var o = new System.Text.Json.Nodes.JsonObject();
+        foreach (var k in ColorKeys) o[k] = now.TryGetValue(k, out var v) ? v : null;
+        o[key] = hex;
+        if (Theme != "custom") Settings.Data["customBase"] = Theme;
+        Settings.Data["customPalette"] = o;
+        Settings.Data["theme"] = "custom";
+        Settings.Save();
+        Apply();
+    }
+
+    /// <summary>10.0: эффекты «экрана» поверх окна — строки развёртки (как у ЭЛТ) и затемнение по краям.</summary>
+    public static bool Scanlines => Settings.Data.Bool("fxScanlines");
+    public static bool Vignette => Settings.Data.Bool("fxVignette");
+    public static void SetEffect(string key, bool on) { Settings.Data[key] = on; Settings.Save(); Changed?.Invoke(); }
     public static string Accent => Settings.Data.Str("accent") is string a && a.StartsWith('#') && a.Length == 7 ? a : Accents[0];
     /// <summary>«Авто»: на широких мониторах интерфейс крупнее, чтобы не было пустых полей.</summary>
     public static bool AutoScale => Settings.Data["uiScale"] is null || Settings.Data.Str("uiScale") == "auto";
@@ -269,6 +306,7 @@ public static class Look
     /// <summary>Все цвета темы (для образцов оформления): Bg, Layer, Surface…, Text, Muted.</summary>
     public static IReadOnlyDictionary<string, string> Palette(string theme)
     {
+        if (theme == "custom" && Custom() is { } own) return own;
         var p = Palettes.TryGetValue(theme, out var found) ? found : Palettes["store"];
         var copy = new Dictionary<string, string>(p);
         copy.TryAdd("Layer", p["Bg"]);
@@ -307,7 +345,7 @@ public static class Look
         // Стекло (8.1): карточки чуть прозрачные, с тонким светлым контуром — фон мягко просвечивает.
         if (!Studio && Backdrop != "plain")
         {
-            var surface = Color.Parse(Palettes[Theme]["Surface"]);
+            var surface = Color.Parse(Current["Surface"]);
             var glass = new SolidColorBrush(Color.FromArgb((byte)(IsLight ? 225 : 205), surface.R, surface.G, surface.B));
             var edge = new SolidColorBrush(IsLight ? Color.FromArgb(22, 0, 0, 0) : Color.FromArgb(18, 255, 255, 255));
             foreach (var selector in new Func<Selector?, Selector>[]
@@ -511,7 +549,7 @@ public static class Look
     {
         var app = Application.Current;
         if (app is null) return;
-        var palette = Palettes[Theme];
+        var palette = Current;
         foreach (var (key, hex) in palette) Set(app, key, Color.Parse(hex));
         // «Лист» с содержимым есть только у тем Store; у остальных — цвет окна.
         if (!palette.ContainsKey("Layer")) Set(app, "Layer", Color.Parse(palette["Bg"]));
