@@ -158,6 +158,12 @@ public sealed partial class MarketPage : Page
 
     static Control Offline(string error)
     {
+        // 10.0: как подключить сервер, видит только владелец; остальным — просто «временно недоступен».
+        if (!Social.Account.Owner)
+            return Ui.Card(Ui.Col(12,
+                Gx.Title(I18n.T("v10.mk.down"), 22, Ui.Res("Text")),
+                Ui.Text(I18n.T("v10.mk.down.text"), "muted", wrap: true),
+                Ui.Row(10, Ui.Button(I18n.T("cr.refresh"), MarketData.Reload, "", Icons.Refresh))), 28);
         var steps = Ui.Col(6,
             Ui.Text(I18n.T("v93.mk.offline.1"), "small", wrap: true),
             Ui.Text(I18n.T("v93.mk.offline.2"), "small", wrap: true),

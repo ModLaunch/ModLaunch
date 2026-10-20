@@ -21,12 +21,16 @@ public sealed partial class SettingsPage : Page
     DateTime _versionAt;
     string? _dxvkApi;
 
-    public SettingsPage(string tab = "look") => _tab = tab;
+    public SettingsPage(string tab = "look") => _tab = tab == "services" && !Social.Account.Owner ? "look" : tab;
 
     public override string Title => I18n.T("nav.settings");
 
     /// <summary>Разделы настроек по группам: id, название, иконка, цвет значка.</summary>
-    static readonly (string Group, (string Id, string Key, string Icon, string Color)[] Items)[] Groups =
+    /// <summary>10.0: «Состояние сервисов» (сервер, правила, консоль Firebase) — только владельцу.</summary>
+    static (string Group, (string Id, string Key, string Icon, string Color)[] Items)[] Groups =>
+        Social.Account.Owner ? AllGroups : AllGroups.Select(g => (g.Group, g.Items.Where(i => i.Id != "services").ToArray())).ToArray();
+
+    static readonly (string Group, (string Id, string Key, string Icon, string Color)[] Items)[] AllGroups =
     [
         ("set.g.personal", [
             ("configs", "v10.set.tab", Icons.Sliders, "#F472B6"),
@@ -147,7 +151,7 @@ public sealed partial class SettingsPage : Page
             "about" => AboutTab(),
             "interface" => InterfaceTab(),
             "system" => SystemTab(),
-            "services" => ServicesTab(),
+            "services" when Social.Account.Owner => ServicesTab(),
             "configs" => ConfigsTab(),
             _ => LookTab(),
         };

@@ -273,7 +273,10 @@
     "new.v10.creator": "Creator Hub тише",
     "new.v10.creator.text": "Одна линия вкладок вместо трёх, спокойная студия автора и плитки без кислотных градиентов.",
     "set.d.configs": "Конфиги, цвета, эффекты, анимации",
-    "set.d.configs.long": "Конфиги стиля как в CS2, любые цвета, ретро-эффекты экрана, сцена на главной и анимации запуска."
+    "set.d.configs.long": "Конфиги стиля как в CS2, любые цвета, ретро-эффекты экрана, сцена на главной и анимации запуска.",
+    "v10.svc.down": "Сервис сейчас недоступен. Попробуйте чуть позже.",
+    "v10.mk.down": "Маркет временно недоступен",
+    "v10.mk.down.text": "Витрина скоро вернётся. Ваши покупки и кошелёк в сохранности — попробуйте обновить через пару минут."
   },
   "en": {
     "v10.ap.title": "Autopilot",
@@ -549,6 +552,9 @@
     "new.v10.creator": "A quieter Creator Hub",
     "new.v10.creator.text": "One row of tabs instead of three, a calm author studio and tiles without loud gradients.",
     "set.d.configs": "Configs, colors, effects, motion",
-    "set.d.configs.long": "CS2-style configs, any colors, retro screen effects, the home stage and launch animations."
+    "set.d.configs.long": "CS2-style configs, any colors, retro screen effects, the home stage and launch animations.",
+    "v10.svc.down": "This service is unavailable right now. Please try again a bit later.",
+    "v10.mk.down": "The market is temporarily unavailable",
+    "v10.mk.down.text": "The storefront will be back soon. Your purchases and wallet are safe; try refreshing in a couple of minutes."
   }
 }
