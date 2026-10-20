@@ -23,7 +23,7 @@ public static class ListingWizard
     /// <summary>Для снимков: открыть сразу на нужном шаге (0–2).</summary>
     internal static int ShotStep = -1;
 
-    public static void Show(Listing? l, Action? done = null)
+    public static void Show(Listing? l, Action? done = null, string? presetFile = null, string? presetKind = null)
     {
         var w = MainWindow.Current;
         if (w is null) return;
@@ -62,7 +62,7 @@ public static class ListingWizard
         gameIds.AddRange(AppState.Games.Select(g => g.Def.Id));
         var game = new ComboBox { ItemsSource = new[] { I18n.T("mk.anyGame") }.Concat(AppState.Games.Select(g => g.Def.Name)).ToList(), SelectedIndex = Math.Max(0, gameIds.IndexOf(l?.Game ?? "")), MinWidth = 260 };
         var hidden = new CheckBox { Content = I18n.T("mk.f.hidden"), IsChecked = l is { Active: false } };
-        var kind = l?.Kind ?? "model";
+        var kind = l?.Kind ?? presetKind ?? "model";
         var license = l?.License ?? "personal";
         string? file = null;
         var chosen = new HashSet<string>(l?.Tags ?? []);
@@ -124,6 +124,12 @@ public static class ListingWizard
             fileName.Text = $"{Path.GetFileName(f)} · {GamePage.Size(size)}";
             fileName.Foreground = size > Market.MaxFile ? Ui.Res("Bad") : Ui.Res("Text");
         }
+        if (presetFile is not null && File.Exists(presetFile))
+        {
+            SetFile(presetFile);
+            if (l is null && presetFile.EndsWith(ModScriptX.ModxDoc.Extension, StringComparison.OrdinalIgnoreCase))
+                try { title.Text = ModScriptX.ModxDoc.Parse(File.ReadAllText(presetFile)).Name; } catch (IOException) { }
+        }
         var pick = Ui.Button(I18n.T("mk.f.pick"), async () => { if (await Pickers.AnyFile(w, I18n.T("mk.f.pick")) is { } f) SetFile(f); }, "", Icons.FilePlus);
         var drop = new Border
         {
@@ -153,7 +159,7 @@ public static class ListingWizard
             Field(I18n.T("mk.f.description"), description),
             Field(I18n.T("hub.f.images"), images, I18n.T("lw.images.hint")),
             Field(I18n.T("hub.f.tags"), tags),
-            Field(I18n.T("mk.f.preview"), preview));
+            Field(I18n.T("mk.f.preview"), preview, I18n.T("v11.lw.preview.sealed")));
 
         // ---- шаг 3: цена и публикация
         var net = new TextBlock { FontFamily = Gx.Display, FontSize = 24, FontWeight = FontWeight.Bold, Foreground = Ui.Res("Good") };
@@ -268,6 +274,21 @@ public static class ListingWizard
                 Preview = preview.Text ?? "", Tags = [.. chosen], Hidden = hidden.IsChecked == true, File = file,
                 Images = (images.Text ?? "").Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList(),
             };
+            // 11.0: файл проходит автомодерацию до загрузки. Код, скрипт и сборка продаются инжектом:
+            // вместо исходника покупатель видит, что мод меняет в игре.
+            if (file is not null)
+            {
+                var v = Moderation.Check(Path.GetFileName(file), await File.ReadAllBytesAsync(file));
+                Moderation.Note("lw_" + Path.GetFileName(file), d.Title, v, "publish");
+                if (!v.Ok)
+                {
+                    problems.Children.Clear();
+                    problems.Children.Add(CreatorPage.VerdictView(v));
+                    return;
+                }
+                if (Moderation.Sealed(d.Kind, d.License)) d.Preview = Moderation.Mark + v.Changes;
+            }
+            else if (Moderation.Sealed(d.Kind, d.License) && l is null) d.Preview = "";
             nextButton.IsEnabled = back.IsEnabled = false;
             bar.IsVisible = true;
             try

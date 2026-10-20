@@ -1,0 +1,44 @@
+# ModScript X 2 example: functions, loops and built-ins.
+mod "Arena Rewards"
+version 2.0.0
+author "ModLaunch"
+about "Every wave pays more gold; a lucky streak doubles it"
+
+let base = 50
+let waves = [1, 2, 3]
+
+# Own function: called from hooks and from other functions.
+fn reward(wave) {
+    let pay = base * wave
+    if wave >= 3 {
+        pay += 25
+    } else if wave == 2 {
+        pay += 10
+    }
+    return clamp(pay, 0, 500)
+}
+
+hook start {
+    let total = 0
+    for w in waves {
+        total += reward(w)
+    }
+    set gold = gold + total
+    say "Arena: +{total} gold for {len(waves)} waves"
+}
+
+hook tick {
+    let n = 0
+    while n < 3 {
+        n += 1
+        if n == 2 {
+            continue
+        }
+        add streak 1
+    }
+    if streak >= 6 {
+        set gold = gold * 2
+        log "lucky streak: gold doubled to {gold}"
+        set streak = 0
+    }
+}

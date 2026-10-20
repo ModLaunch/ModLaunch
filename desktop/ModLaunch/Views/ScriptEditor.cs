@@ -231,7 +231,7 @@ public sealed partial class ScriptEditor : UserControl
         static readonly IBrush Keyword = B("#C792EA"), Str = B("#C3E88D"), Var = B("#82AAFF"), Num = B("#F78C6C"),
             Comment = B("#6B7385"), Section = B("#FFCB6B"), Op = B("#89DDFF"), Word = B("#E8EBF2"), Func = B("#7FDBCA");
         static readonly IBrush ErrorBg = new SolidColorBrush(Color.FromArgb(46, 255, 107, 107));
-        static readonly HashSet<string> Words = new(ModScript.Keywords.Concat(["to", "from", "in"]), StringComparer.OrdinalIgnoreCase);
+        static readonly HashSet<string> Words = new(ModScript.Keywords.Concat(ModScriptX.ModxDoc.Keywords).Concat(["to", "from", "in", "mod", "version", "engine", "var"]), StringComparer.OrdinalIgnoreCase);
 
         protected override void ColorizeLine(DocumentLine line)
         {

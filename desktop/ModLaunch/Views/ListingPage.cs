@@ -88,7 +88,8 @@ public sealed class ListingPage : Page
         var body = new Grid { ColumnDefinitions = new ColumnDefinitions("2*,*"), ColumnSpacing = 18 };
         var left = Ui.Col(22);
         left.Children.Add(Ui.Col(10, Section(I18n.T("v93.mk.about")), new SelectableTextBlock { Text = l.Description == "" ? l.Summary : l.Description, TextWrapping = TextWrapping.Wrap, FontSize = 14, LineHeight = 22, Foreground = Ui.Res("Text") }));
-        if (l.Preview != "") left.Children.Add(Ui.Col(10, Section(I18n.T("mk.preview")), Code(l.Preview)));
+        if (Moderation.Sealed(l)) left.Children.Add(MarketViews.SealedNote(l));
+        else if (l.Preview != "") left.Children.Add(Ui.Col(10, Section(I18n.T("mk.preview")), Code(l.Preview)));
         left.Children.Add(Reviews(l));
         body.Children.Add(left);
         var right = Ui.Col(16, Contents(l), AuthorBox(l), Similar(l));
@@ -119,7 +120,7 @@ public sealed class ListingPage : Page
         var items = new List<(string Kind, string? Url)>();
         foreach (var u in l.Images) items.Add(("image", u));
         if (items.Count == 0) items.Add(("art", null));
-        if (l.Preview != "") items.Add(("code", null));
+        if (l.Preview != "" && !Moderation.Sealed(l)) items.Add(("code", null));
         _media = Math.Clamp(_media, 0, items.Count - 1);
         var (kind, url) = items[_media];
         Control main = kind switch
@@ -194,9 +195,9 @@ public sealed class ListingPage : Page
     Control BuyBox(Listing l)
     {
         var heading = Gx.Title(Owned ? I18n.T("v93.mk.yours", ("title", l.Title)) : l.Free ? I18n.T("v93.mk.get", ("title", l.Title)) : I18n.T("v93.mk.buyTitle", ("title", l.Title)), 19, Ui.Res("Text"), 1);
-        var note = Ui.Text(Owned ? I18n.T("v93.mk.yours.text") : l.Free ? I18n.T("v93.mk.free.text") : I18n.T("mk.feeNote", ("fee", Market.FeePercent)), "small muted", wrap: true);
+        var note = Ui.Text(Owned ? I18n.T(Moderation.Sealed(l) ? "v11.inj.yours" : "v93.mk.yours.text") : l.Free ? I18n.T("v93.mk.free.text") : I18n.T("mk.feeNote", ("fee", Market.FeePercent)), "small muted", wrap: true);
         Button main;
-        if (Owned) main = Ui.Button(I18n.T("mk.download"), () => MarketViews.Download(l), "primary", Icons.Download);
+        if (Owned) main = MarketViews.OwnedAction(l);
         else main = Ui.Button(l.Free ? I18n.T("mk.getFree") : I18n.T("v93.mk.buyNow"), Buy, "primary", l.Free ? Icons.Download : Icons.Bag);
         main.Padding = new Thickness(26, 12);
         main.IsEnabled = !_busy && _owned is not null;
@@ -231,6 +232,7 @@ public sealed class ListingPage : Page
             w.Toast(I18n.T("mk.bought", ("title", _l.Title)));
             // Купили — та же анимация «получено», что и у установки мода.
             InstallFx.Play(new FxCard(_l.Title, I18n.T("v93.mk.fx.bought"), _l.Images.FirstOrDefault(), GameCatalog.ById(_l.Game), Icons.Bag), null, null);
+            if (Moderation.Sealed(_l)) MarketViews.Connect(_l);
             MarketData.Reload();
         }
         catch (Exception e)

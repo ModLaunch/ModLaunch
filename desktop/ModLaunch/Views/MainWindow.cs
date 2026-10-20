@@ -851,6 +851,9 @@ public sealed partial class MainWindow : Window
         try { await AppState.DetectAll(); }
         finally { _splash?.Finish(() => _splash = null); }
         _started = true;
+        // 11.0: инжекты, оставшиеся от ModLaunch, закрытого посреди игры, — снять; сеть — под присмотром (авто-офлайн).
+        try { Features.Inject.Recover(); } catch { }
+        Offline.StartWatching();
         _ = Task.Run(async () =>
         {
             try { await Features.Tracking.Check(); } catch { }

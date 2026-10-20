@@ -201,7 +201,7 @@ public static class Vanilla
         });
     }
 
-    static bool GameProcessRunning(GameDef game)
+    internal static bool GameProcessRunning(GameDef game)
     {
         // Только exe этой игры: Stardew загрузчик не откладывает, а её процесс держал бы чужие игры «без модов».
         foreach (var exe in game.Executables)

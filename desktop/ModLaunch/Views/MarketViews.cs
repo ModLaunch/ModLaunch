@@ -96,7 +96,8 @@ public static class MarketViews
             (GameCatalog.ById(l.Game) is { } g ? " · " + g.Name : ""), "small muted"));
         if (l.Summary != "") info.Children.Add(Ui.Text(l.Summary, "", wrap: true));
         if (l.Description != "") info.Children.Add(Ui.Text(l.Description, "small muted", wrap: true));
-        if (l.Preview != "")
+        if (Moderation.Sealed(l)) info.Children.Add(SealedNote(l));
+        else if (l.Preview != "")
             info.Children.Add(Ui.Col(6, Ui.Text(I18n.T("mk.preview"), "h3"), new Border
             {
                 Classes = { "card" }, Padding = new Thickness(12), MaxHeight = 260,
@@ -117,7 +118,7 @@ public static class MarketViews
         if (l.Mine)
             actions.Add(Ui.Button(I18n.T("mk.edit"), () => { w.CloseDialog(); Editor(l, changed); }, "", Icons.Edit));
         if (owned || l.Mine)
-            actions.Add(Ui.Button(I18n.T("mk.download"), () => Download(l), "primary", Icons.Download));
+            actions.Add(OwnedAction(l, w.CloseDialog));
         else
             actions.Add(Ui.Button(l.Free ? I18n.T("mk.getFree") : I18n.T("mk.buy", ("price", Market.Money(l.Price))), () => Buy(l, changed), "primary", Icons.Bag));
 
@@ -154,7 +155,8 @@ public static class MarketViews
             await Market.Buy(l);
             w.Toast(I18n.T("mk.bought", ("title", l.Title)));
             changed?.Invoke();
-            Open(l, changed);
+            if (Moderation.Sealed(l)) Connect(l);
+            else Open(l, changed);
         }
         catch (Exception e)
         {
@@ -177,6 +179,47 @@ public static class MarketViews
             Actions.OpenFolder(Path.GetDirectoryName(file)!);
         }
         catch (Exception e) { w.Toast(Market.Explain(e), bad: true); }
+    }
+
+    /// <summary>
+    /// 11.0: кнопка купленного лота. Код, скрипт и сборка подключаются к игре инжектом (исходник не скачивается),
+    /// остальное (модели, ассеты, открытая лицензия) — скачивается файлом, как раньше.
+    /// </summary>
+    public static Button OwnedAction(Listing l, Action? before = null)
+    {
+        if (!Moderation.Sealed(l)) return Ui.Button(I18n.T("mk.download"), () => { before?.Invoke(); Download(l); }, "primary", Icons.Download);
+        if (Features.Inject.Get("mk_" + l.Id) is not null)
+            return Ui.Button(I18n.T("v11.inj.open"), () => { before?.Invoke(); MainWindow.Current?.Navigate(() => new CreatorPage("injects")); }, "primary", Icons.Zap);
+        return Ui.Button(I18n.T("v11.inj.connect"), () => { before?.Invoke(); Connect(l); }, "primary", Icons.Zap);
+    }
+
+    /// <summary>Скачать купленное, проверить автомодерацией и положить в библиотеку инжектов (зашифрованным).</summary>
+    public static async void Connect(Listing l)
+    {
+        var w = MainWindow.Current!;
+        w.Toast(I18n.T("v11.inj.connecting", ("title", l.Title)));
+        try
+        {
+            var (item, v) = Features.Inject.AddPurchase(l, await Market.Download(l));
+            if (item is null)
+            {
+                w.Dialog(I18n.T("v11.inj.rejected"), CreatorPage.VerdictView(v), Ui.Button(I18n.T("common.close"), w.CloseDialog));
+                return;
+            }
+            if (GameCatalog.ById(item.Game) is { } g) w.Toast(I18n.T("v11.inj.connected", ("title", l.Title), ("game", g.Name)));
+            else { w.Toast(I18n.T("v11.inj.pickGame", ("title", l.Title))); w.Navigate(() => new CreatorPage("injects")); }
+        }
+        catch (Exception e) { w.Toast(Market.Explain(e), bad: true); }
+    }
+
+    /// <summary>Вместо кода: «подключается инжектом» и что мод меняет в игре (по автомодерации).</summary>
+    public static Control SealedNote(Listing l)
+    {
+        var col = Ui.Col(8, Ui.Row(8, Ui.Icon(Icons.Shield, 16, Ui.Res("Brand2")), Ui.Text(I18n.T("v11.inj.sealedTitle"), "h3")),
+            Ui.Text(I18n.T("v11.inj.sealedText"), "small muted", wrap: true));
+        if (l.Preview.StartsWith(Moderation.Mark))
+            col.Children.Add(Ui.Text(I18n.T("v11.inj.changes") + " " + l.Preview[Moderation.Mark.Length..], "small", wrap: true));
+        return new Border { Classes = { "card" }, Padding = new Thickness(16, 14), Child = col };
     }
 
     // ---------------------------------------------------------------- редактор лота

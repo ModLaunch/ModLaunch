@@ -48,6 +48,9 @@ public abstract class Lang
                 var start = i;
                 while (i < src.Length && (char.IsLetterOrDigit(src[i]) || src[i] is '_' or '.')) i++;
                 var w = src[start..i];
+                // 2.0: встроенные функции (len, rand, clamp…) — через mx_…, их определяет пролог каждого движка.
+                var call = i < src.Length && src.AsSpan(i).TrimStart().StartsWith("(");
+                if (call && ModxDoc.Builtins.Contains(w)) { sb.Append("mx_").Append(w); continue; }
                 sb.Append(w switch { "and" => And, "or" => Or, "not" => Not, "true" => True, "false" => False, "null" => Null, _ => w });
                 if (w == "not") while (i < src.Length && src[i] == ' ') i++;
             }

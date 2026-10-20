@@ -88,12 +88,13 @@ public sealed partial class CreatorPage : Page
     public static readonly (string Id, string Key, string Icon)[] MainTabs =
     [
         ("home", "cr.tab.home", Icons.Home), ("mine", "v91.cr.tab.my", Icons.Edit), ("codes", "v91.cr.tab.codes", Icons.Code),
-        ("models", "v91.cr.tab.models", Icons.Cube), ("inject", "v97.cr.tab.inject", Icons.Zap), ("examples", "v91.cr.tab.templates", Icons.Wand),
+        ("models", "v91.cr.tab.models", Icons.Cube), ("inject", "v11.cr.tab.lang", Icons.Code), ("examples", "v91.cr.tab.templates", Icons.Wand),
     ];
 
     public static readonly (string Id, string Key, string Icon)[] MoreTabs =
     [
         ("hub", "hub.tab", Icons.Globe), ("market", "mk.tab", Icons.Bag), ("studio", "st.tab", Icons.Chart), ("docs", "cr.tab.docs", Icons.Book),
+        ("injects", "v11.hub.injects", Icons.Zap), ("mxdev", "v97.cr.tab.inject", Icons.Zap),
     ];
 
     public string Tab => _tab;
@@ -123,6 +124,8 @@ public sealed partial class CreatorPage : Page
             "hub" => "workshop",
             "market" => "store",
             "studio" => "studio",
+            "inject" or "mxdev" => "lang",
+            "injects" => "injects",
             _ => "projects",
         };
         // Внутри «Проектов» — свои вкладки (обзор, все мои, коды, модели, ModScript X) в той же линии.
@@ -131,7 +134,7 @@ public sealed partial class CreatorPage : Page
         if (hubTab == "projects")
         {
             sub = [];
-            foreach (var (id, key, _) in MainTabs.Where(t => t.Id != "examples"))
+            foreach (var (id, key, _) in MainTabs.Where(t => t.Id is not ("examples" or "inject")))
             {
                 var tab = id;
                 var b = Ui.Button(I18n.T(key), () => Go(tab), "pivot");
@@ -155,7 +158,9 @@ public sealed partial class CreatorPage : Page
             "market" => MarketView(),
             "studio" => Studio(),
             "docs" => Docs(),
-            "inject" => Injector(),
+            "inject" => Lang(),
+            "mxdev" => Injector(),
+            "injects" => Injects(),
             _ => _open is null ? Mine() : Editor(),
         });
         Content = new ScrollViewer { Content = content, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };

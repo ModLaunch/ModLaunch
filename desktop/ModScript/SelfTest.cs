@@ -38,6 +38,39 @@ static class SelfTest
             Has(Lang.For("gdscript").Expr("\"{a}%\""), "\"%s%%\" % [a]");
         });
 
+        var arena = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Examples", "arena.modx"));
+        Check("language 2.0: functions, loops, else if", () =>
+        {
+            var d = ModxDoc.Parse(arena);
+            if (!d.Ok) throw new Exception(string.Join("; ", d.Diags.Select(x => x.Line + " " + x.Message)));
+            if (d.Functions.Count != 1 || d.Functions[0].Params.Single() != "wave") throw new Exception("fn reward");
+            var kinds = string.Join(" ", d.Hooks.SelectMany(h => h.Body).Select(s => s.Kind));
+            Has(kinds, "let for add end set say", "while add if continue end add end if set log set end");
+        });
+        Check("sandbox runs the language", () =>
+        {
+            var r = Sandbox.Run(ModxDoc.Parse(arena), new Dictionary<string, object?> { ["gold"] = 100d, ["streak"] = 0d }, ticks: 3);
+            if (!r.Ok) throw new Exception(string.Join("; ", r.Errors.Select(e => e.Line + " " + e.Message)));
+            // 50 + (100 + 10) + (150 + 25) = 335; три тика по 2 = streak 6 → золото ×2.
+            if (Sandbox.Text(r.Vars["gold"]) != "870" || Sandbox.Text(r.Vars["streak"]) != "0") throw new Exception($"gold {Sandbox.Text(r.Vars["gold"])}, streak {Sandbox.Text(r.Vars["streak"])}");
+            Has(string.Join("\n", r.Output), "[start] 💬 Arena: +335 gold for 3 waves", "[tick 3] lucky streak: gold doubled to 870");
+        });
+        Check("sandbox stops endless loops", () =>
+        {
+            var r = Sandbox.Run(ModxDoc.Parse("mod \"Loop\"\nhook start {\n  while true {\n    add x 1\n  }\n}\n"), maxSteps: 5000);
+            if (r.Ok || !r.Errors.Any(e => e.Message.Contains("endless"))) throw new Exception("no step limit");
+        });
+        Check("translation 2.0", () =>
+        {
+            var d = ModxDoc.Parse(arena);
+            string Emit(string t) => string.Concat(Target.Find(t)!.Emit(ModxDoc.Parse(arena), null).Select(f => f.Bytes is null ? f.Text : ""));
+            Has(Emit("renpy"), "def reward(wave):", "    pay = base * wave", "    elif wave == 2:", "    return mx_clamp(pay, 0, 500)", "def mx_clamp(x, lo, hi)", "    for w in waves:", "            continue");
+            Has(Emit("rpgmaker"), "function reward(wave) {", "let pay = base * wave;", "} else if (wave === 2) {", "for (const w of waves) {", "const mx_len = x =>");
+            Has(Emit("unity"), "dynamic reward(dynamic wave)", "dynamic pay = base * wave;", "foreach (var w in waves) {", "static dynamic mx_clamp(");
+            var lua = Emit("lua");
+            Has(lua, "local reward", "reward = function(wave)", "local pay = base * wave", "elseif wave == 2 then", "do return mx_clamp(pay, 0, 500) end", "for _, w in ipairs(waves) do", "goto mx_continue_1", "::mx_continue_1::");
+            if (d.Functions.Count != 1) throw new Exception("fn");
+        });
         var root = Path.Combine(Path.GetTempPath(), "modscript-selftest-" + Guid.NewGuid().ToString("N")[..8]);
         string Game(string name, params string[] files)
         {

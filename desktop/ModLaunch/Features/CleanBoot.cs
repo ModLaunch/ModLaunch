@@ -68,7 +68,7 @@ public static class CleanBoot
         System.IO.Path.GetFullPath(path).StartsWith(System.IO.Path.GetFullPath(root).TrimEnd(System.IO.Path.DirectorySeparatorChar) + System.IO.Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Почистить игру. Ошибки отдельных файлов (занят, нет прав) пропускаются — запуск из-за них не срывается.</summary>
-    public static CleanResult Run(GameState g)
+    public static CleanResult Run(GameState g, bool quarantine = true)
     {
         if (g.Path is not { } root) return new(0, 0, 0);
         int files = 0, quarantined = 0;
@@ -92,7 +92,7 @@ public static class CleanBoot
             }
             catch { }
         }
-        if (Quarantine && g.Registry is { } registry && Directory.Exists(registry.ModsDir))
+        if (quarantine && Quarantine && g.Registry is { } registry && Directory.Exists(registry.ModsDir))
         {
             var target = System.IO.Path.Combine(QuarantineDir(g.Def.Id), DateTime.UtcNow.ToString("yyyyMMdd-HHmmss"));
             foreach (var name in registry.Unmanaged())

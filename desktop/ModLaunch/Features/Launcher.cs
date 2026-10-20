@@ -73,7 +73,7 @@ public static partial class Launcher
     public static string? Launch(GameDef game, string gamePath, bool vanilla = false)
     {
         // Загрузчик, отложенный «на один запуск без модов», возвращаем перед обычным запуском.
-        if (!vanilla && Vanilla.Mode(game.Id) == "temp") try { Vanilla.Unpark(game); } catch { }
+        if (!vanilla && Vanilla.Mode(game.Id) is "temp" or "inject") try { Vanilla.Unpark(game); } catch { }
         var exe = vanilla ? Vanilla.Exe(game, gamePath) : game.LaunchExe(gamePath);
         if (!File.Exists(exe))
         {
@@ -140,6 +140,8 @@ public static partial class Launcher
             }
             var (counted, ms) = track ? PlayTime.Stop(game.Id) : (false, 0L);
             if (parked) _ = Vanilla.RestoreAfterExit(game, ran);
+            // 11.0: инжектор — снять инжекты и убрать за игрой (дождавшись перезапуска через Steam).
+            if (!parked) _ = Inject.AfterExit(game, ran);
             Avalonia.Threading.Dispatcher.UIThread.Post(() => Exited?.Invoke(game.Id, counted, ms));
         };
         // Процесс мог закончиться раньше, чем подписались на Exited.
