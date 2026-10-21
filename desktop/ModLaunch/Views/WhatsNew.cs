@@ -12,6 +12,8 @@ public static class WhatsNew
 {
     static readonly (string Icon, string Key, Func<Page>? Open)[] Items =
     [
+        (Icons.Gamepad, "new.v12.games", () => new AddGamePage()),
+        (Icons.Creator, "new.v12.hub", () => new CreatorPage("mine")),
         (Icons.Grid, "new.v12.widgets", () => new HomePage()),
         (Icons.Zap, "new.v12.fast", null),
         (Icons.Code, "new.v11.lang", () => new CreatorPage("inject")),
