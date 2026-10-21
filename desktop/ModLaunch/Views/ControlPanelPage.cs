@@ -57,7 +57,7 @@ public sealed class ControlPanelPage : Page
         new("newmod", Icons.Plus, "cp.t.newmod", () => W.Navigate(() => new CreatorPage("mine"))),
         new("account", Icons.User, "acc.page", () => W.Navigate(() => new AccountPage())),
         new("wallet", Icons.Bag, "acc.s.wallet", () => W.Navigate(() => new MarketPage("wallet"))),
-        new("friends", Icons.Users, "friends.title", () => W.Navigate(() => new FriendsPage())),
+        new("friends", Icons.Users, "friends.title", () => W.Navigate(() => new CommunityPage())),
         new("look", Icons.Palette, "look.title", () => W.Navigate(() => new SettingsPage("look"))),
         new("settings", Icons.Settings, "nav.settings", () => W.Navigate(() => new SettingsPage())),
         new("addgame", Icons.Plus, "add.title", () => W.Navigate(() => new AddGamePage())),

@@ -428,7 +428,7 @@ public sealed partial class HomePage
         var online = view.Friends.Count(f => f.State != "offline") + view.Incoming.Count;
         yield return (Icons.Layers, I18n.T("lib.title"), 0, () => new LibraryPage());
         yield return (Icons.Package, I18n.T("mc.title"), updates, () => new ModsCenterPage());
-        yield return (Icons.Users, I18n.T("v91.home.friends"), online, () => new FriendsPage());
+        yield return (Icons.Users, I18n.T("v91.home.friends"), online, () => new CommunityPage());
     }
 
     static Control Circle(string icon, string text, int badge, Func<Page> open, double size = 58)

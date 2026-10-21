@@ -17,6 +17,8 @@ public static class WhatsNew
         (Icons.Shield, "new.v11.moderation", () => new CreatorPage("injects")),
         (Icons.WifiOff, "new.v11.offline", () => new SettingsPage("general")),
         (Icons.Hourglass, "new.v11.builds", () => new ProfilePage("builds")),
+        (Icons.Shield, "new.v11.backup", () => new SettingsPage("backups")),
+        (Icons.Server, "new.v11.servers", () => new CommunityPage("servers")),
         (Icons.Settings, "new.v11.settings", () => new SettingsPage("general")),
         (Icons.Palette, "new.v11.look", () => new SettingsPage("look")),
         (Icons.Cube, "new.v101.mc", () => new MinecraftPage()),

@@ -127,7 +127,7 @@ public sealed partial class MainWindow : Window
         _modsButton = NavButton(Icons.Package, "v92.nav.mods", () => Navigate(() => new ModsCenterPage()));
         _panelButton = NavButton(Icons.Grid, "v92.nav.panel", () => Navigate(() => new ControlPanelPage()));
         _settingsButton = NavButton(Icons.Settings, "v92.nav.settings", () => Navigate(() => new SettingsPage()));
-        _friendsButton = NavButton(Icons.Users, "v92.nav.friends", () => Navigate(() => new FriendsPage()));
+        _friendsButton = NavButton(Icons.Users, "v11.cm.nav", () => Navigate(() => new CommunityPage()));
         _statsButton = NavButton(Icons.Chart, "v92.nav.stats", () => Navigate(() => new StatsPage()));
         _donateButton = NavButton(Icons.Coffee, "v92.nav.donate", () => Navigate(() => new DonatePage()));
         // 9.3: Creator Hub снова на боковой панели — это рынок креаторов (MarketPage).
@@ -572,7 +572,7 @@ public sealed partial class MainWindow : Window
             (I18n.T("add.title"), Icons.Plus, () => Navigate(() => new AddGamePage())),
             (I18n.T("nav.settings"), Icons.Settings, () => Navigate(() => new SettingsPage())),
             (I18n.T("look.title"), Icons.Palette, () => Navigate(() => new SettingsPage("look"))),
-            (I18n.T("friends.title"), Icons.Users, () => Navigate(() => new FriendsPage())),
+            (I18n.T("v11.cm.title"), Icons.Users, () => Navigate(() => new CommunityPage())),
             (I18n.T("acc.page"), Icons.User, () => Navigate(() => new AccountPage())),
             (I18n.T("mk.tab"), Icons.Bag, () => Navigate(() => new MarketPage())),
             ("Minecraft", Icons.Cube, () => Navigate(() => new MinecraftPage())),

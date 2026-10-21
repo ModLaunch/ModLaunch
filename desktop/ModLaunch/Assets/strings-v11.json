@@ -209,7 +209,16 @@
     "new.v11.settings": "Настройки пересобраны",
     "new.v11.settings.text": "Девять понятных разделов вместо тринадцати: оформление больше не разбросано по трём местам, анимации — одним выбором, устаревшие пункты убраны.",
     "new.v11.look": "Строгий вид",
-    "new.v11.look.text": "Новый вид по умолчанию: спокойный графит, синий акцент, обычные заголовки, без свечения и игровых счётчиков, строка состояния внизу. Прежний — конфиг «ModLaunch»."
+    "new.v11.look.text": "Новый вид по умолчанию: спокойный графит, синий акцент, обычные заголовки, без свечения и игровых счётчиков, строка состояния внизу. Прежний — конфиг «ModLaunch».",
+    "v11.sb.backup.running": "Идёт бэкап…",
+    "v11.sb.backup.ago": "Бэкап {ago}",
+    "v11.sb.backup.fail": "Бэкап не удался",
+    "v11.bk.saves.title": "Копии сохранений игр",
+    "v11.cm.nav": "Сообщество",
+    "new.v11.backup": "Бэкап в один клик",
+    "new.v11.backup.text": "Настройки, профили модов, часы, сборки и проекты — одним архивом в папку, OneDrive, Google Диск, Dropbox, Яндекс Диск, MEGA, iCloud или облако ModLaunch. Ключи и вход в аккаунт в бэкап не попадают.",
+    "new.v11.servers": "Сообщество: друзья и серверы",
+    "new.v11.servers.text": "Один список друзей на все игры, доска серверов (свои, друзей и открытые) с входом в один клик — нужная сборка ставится сама — и свой сервер Minecraft прямо на этом ПК."
   },
   "en": {
     "v11.mod.big": "The file is over {kb} KB — too much code for an inject",
@@ -421,6 +430,15 @@
     "new.v11.settings": "Settings rebuilt",
     "new.v11.settings.text": "Nine clear sections instead of thirteen: appearance is no longer spread across three places, motion is one choice, outdated options are gone.",
     "new.v11.look": "Strict look",
-    "new.v11.look.text": "The new default look: calm graphite, a blue accent, plain headings, no glow or game counters, a status bar at the bottom. The old one is the ModLaunch config."
+    "new.v11.look.text": "The new default look: calm graphite, a blue accent, plain headings, no glow or game counters, a status bar at the bottom. The old one is the ModLaunch config.",
+    "v11.sb.backup.running": "Backing up…",
+    "v11.sb.backup.ago": "Backup {ago}",
+    "v11.sb.backup.fail": "Backup failed",
+    "v11.bk.saves.title": "Game save copies",
+    "v11.cm.nav": "Community",
+    "new.v11.backup": "One-click backup",
+    "new.v11.backup.text": "Settings, mod profiles, hours, builds and projects in one archive: to a folder, OneDrive, Google Drive, Dropbox, Yandex Disk, MEGA, iCloud or the ModLaunch cloud. Keys and sign-in never go into a backup.",
+    "new.v11.servers": "Community: friends and servers",
+    "new.v11.servers.text": "One friends list for every game, a server board (yours, your friends' and public ones) with one-click join that installs the right build first, and your own Minecraft server right on this PC."
   }
 }

@@ -50,6 +50,8 @@ public static class Program
 
         // Один экземпляр: второй запуск (в том числе по ссылке nxm://) передаёт ссылку первому.
         if (!Features.Nxm.Claim(args)) return 0;
+        // 11.0: восстановление из бэкапа отложило JSON-файлы до перезапуска — подменяем до первого чтения настроек.
+        Features.OneClickBackup.ApplyPending();
         Autostarted = args.Contains("--autostart");
         StartupLink = args.FirstOrDefault(Features.Nxm.IsLink);
         try { if (!Features.Nxm.IsRegistered()) Features.Nxm.Register(); } catch { }
@@ -196,7 +198,7 @@ public static class Program
         Save("7d-backups");
         window.Navigate(() => new ModPage("subnautica", Core.Demo.Many(Games.GameCatalog.ById("subnautica")!, ["2800"])[0]));
         Save("9a-mod");
-        window.Navigate(() => new FriendsPage());
+        window.Navigate(() => new CommunityPage());
         Save("9b-friends");
         window.Navigate(() => new SettingsPage("accounts"));
         Save("9c-account");

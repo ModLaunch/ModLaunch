@@ -212,7 +212,7 @@ public sealed partial class HomePage
                 DockPanel.SetDock(count, Dock.Right);
                 top.Children.Add(count);
                 top.Children.Add(Cap(Icons.Users, I18n.T("h95.friends")));
-                return Shell(Stack(top, col), () => Go(() => v.SignedIn ? new FriendsPage() : new SettingsPage("accounts")));
+                return Shell(Stack(top, col), () => Go(() => v.SignedIn ? new CommunityPage() : new SettingsPage("accounts")));
             }
             case "tip":
             {

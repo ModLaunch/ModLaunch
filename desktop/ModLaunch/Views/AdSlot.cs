@@ -32,7 +32,7 @@ public static class AdSlot
             {
                 case "hub": w.Navigate(() => new MarketPage("workshop")); return;
                 case "creator": w.Navigate(() => new CreatorPage()); return;
-                case "friends": w.Navigate(() => new FriendsPage()); return;
+                case "friends": w.Navigate(() => new CommunityPage()); return;
             }
         }
         if (ad.Url is not null) Ui.OpenUrl(ad.Url);

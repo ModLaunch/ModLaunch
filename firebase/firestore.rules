@@ -516,6 +516,65 @@ service cloud.firestore {
         && request.resource.data.device is string && request.resource.data.device.size() <= 32;
     }
 
+    // ── Бэкап в облаке ModLaunch (11.0) ──────────────────────────────────
+    // Последний бэкап аккаунта: описание backups/<uid> (когда, размер, sha256,
+    // сколько частей, с какого ПК, версия) и части архива files/0…15 — base64
+    // до 700 000 знаков каждая (всего до 8 МБ). Читать и писать может только хозяин.
+    match /backups/{uid} {
+      allow get, delete: if friendsMember() && request.auth.uid == uid;
+      allow create, update: if friendsMember() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['at', 'size', 'sha256', 'chunks', 'device', 'version'])
+        && request.resource.data.at is timestamp
+        && request.resource.data.size is int && request.resource.data.size > 0 && request.resource.data.size <= 8388608
+        && request.resource.data.sha256 is string && request.resource.data.sha256.matches('^[0-9a-f]{64}$')
+        && request.resource.data.chunks is int && request.resource.data.chunks >= 1 && request.resource.data.chunks <= 16
+        && request.resource.data.device is string && request.resource.data.device.size() <= 64
+        && request.resource.data.version is string && request.resource.data.version.size() <= 32;
+
+      match /files/{n} {
+        allow get, delete: if friendsMember() && request.auth.uid == uid;
+        allow create, update: if friendsMember() && request.auth.uid == uid
+          && n.matches('^([0-9]|1[0-5])$')
+          && request.resource.data.keys().hasOnly(['data'])
+          && request.resource.data.data is string && request.resource.data.data.size() <= 700000;
+      }
+    }
+
+    // ── Доска серверов (11.0) ────────────────────────────────────────────
+    // Серверы для игры вместе: читать может любой вошедший с почтой, создать, поправить
+    // и удалить запись — только её хозяин. «Только друзьям» (visibility = 'friends') —
+    // это «не в общем списке» (отсеивает программа), а не секрет: паролей здесь нет.
+    // updated — отметка «сервер жив» (время запроса), created не меняется.
+    match /servers/{id} {
+      function serverValid(d) {
+        return d.keys().hasOnly(['owner', 'ownerName', 'name', 'game', 'address', 'build', 'mods', 'visibility', 'players', 'max', 'version', 'created', 'updated'])
+          && d.keys().hasAll(['owner', 'ownerName', 'name', 'game', 'address', 'build', 'mods', 'visibility', 'players', 'max', 'version', 'created', 'updated'])
+          && d.owner == request.auth.uid
+          && friendsName(d.ownerName)
+          && d.name is string && d.name.size() > 0 && d.name.size() <= 40
+          && d.game is string && d.game.size() > 0 && d.game.size() <= 40
+          && d.address is string && d.address.size() <= 100
+          && d.build is string && d.build.size() <= 64
+          && d.mods is int && d.mods >= 0 && d.mods <= 5000
+          && d.visibility in ['friends', 'public']
+          && d.players is int && d.players >= 0 && d.players <= 1000
+          && d.max is int && d.max >= 1 && d.max <= 1000
+          && d.version is string && d.version.size() <= 24
+          && d.created is timestamp
+          && d.updated == request.time;
+      }
+      allow get, list: if friendsMember();
+      allow create: if friendsMember()
+        && id.matches('^[A-Za-z0-9]{20}$')
+        && serverValid(request.resource.data)
+        && request.resource.data.created == request.time;
+      allow update: if friendsMember()
+        && resource.data.owner == request.auth.uid
+        && serverValid(request.resource.data)
+        && request.resource.data.created == resource.data.created;
+      allow delete: if friendsMember() && resource.data.owner == request.auth.uid;
+    }
+
     // Всё остальное закрыто.
   }
 }

@@ -15,10 +15,6 @@ namespace ModLaunch.Views;
 /// </summary>
 public sealed class StatusBar : Border
 {
-    /// <summary>Бэкап в один клик (подключает модуль бэкапа): текст «когда был последний» и действие.</summary>
-    public static Func<string?>? BackupLine;
-    public static Action? BackupNow;
-
     readonly StackPanel _left = Ui.Row(4);
     readonly StackPanel _right = Ui.Row(4);
     readonly DispatcherTimer _tick = new() { Interval = TimeSpan.FromSeconds(30) };
@@ -41,6 +37,7 @@ public sealed class StatusBar : Border
         {
             Offline.Changed += Later;
             Inject.Changed += Later;
+            OneClickBackup.Changed += Later;
             AppState.Changed += Later;
             I18n.Changed += Later;
             _tick.Start();
@@ -50,6 +47,7 @@ public sealed class StatusBar : Border
         {
             Offline.Changed -= Later;
             Inject.Changed -= Later;
+            OneClickBackup.Changed -= Later;
             AppState.Changed -= Later;
             I18n.Changed -= Later;
             _tick.Stop();
@@ -104,17 +102,19 @@ public sealed class StatusBar : Border
         _left.Children.Add(Item(Icons.Zap, injText, injTint, () => w?.Navigate(() => new CreatorPage("injects")), I18n.T("v11.sb.inj.tip")));
 
         // Бэкап в один клик.
-        if (BackupLine is not null)
+        _left.Children.Add(Dot());
+        var last = OneClickBackup.Last;
+        var (bkText, bkTint) = OneClickBackup.Running ? (I18n.T("v11.sb.backup.running"), Ui.Res("Brand2"))
+            : last is null ? (I18n.T("v11.sb.backup.never"), Ui.Res("Faint"))
+            : last.Ok ? (I18n.T("v11.sb.backup.ago", ("ago", Ui.Ago(last.At))), Ui.Res("Good"))
+            : (I18n.T("v11.sb.backup.fail"), Ui.Res("Warn"));
+        _left.Children.Add(Item(Icons.Shield, bkText, bkTint, () => w?.Navigate(() => new SettingsPage("backups"))));
+        if (!OneClickBackup.Running)
         {
-            _left.Children.Add(Dot());
-            _left.Children.Add(Item(Icons.Shield, BackupLine() ?? I18n.T("v11.sb.backup.never"), Ui.Res("Muted"), () => w?.Navigate(() => new SettingsPage("backups"))));
-            if (BackupNow is { } now)
-            {
-                var b = new Button { Classes = { "ghost" }, Padding = new Thickness(8, 2), Height = 24, MinHeight = 0, VerticalAlignment = VerticalAlignment.Center,
-                    Content = new TextBlock { Text = I18n.T("v11.sb.backup.now"), FontSize = 11.5, FontWeight = FontWeight.SemiBold, Foreground = Ui.Res("Brand2") } };
-                b.Click += (_, _) => now();
-                _left.Children.Add(b);
-            }
+            var b = new Button { Classes = { "ghost" }, Padding = new Thickness(8, 2), Height = 24, MinHeight = 0, VerticalAlignment = VerticalAlignment.Center,
+                Content = new TextBlock { Text = I18n.T("v11.sb.backup.now"), FontSize = 11.5, FontWeight = FontWeight.SemiBold, Foreground = Ui.Res("Brand2") } };
+            b.Click += (_, _) => BackupPanel.Quick();
+            _left.Children.Add(b);
         }
 
         _right.Children.Add(Item(Icons.Info, "ModLaunch " + Http.Version, Ui.Res("Faint"), () => w?.Navigate(() => new SettingsPage("about"))));

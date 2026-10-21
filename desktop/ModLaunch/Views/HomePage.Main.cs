@@ -164,7 +164,7 @@ public sealed partial class HomePage
         if (problems > 0) Part(Ui.Res("Bad"), I18n.T("h95.sub.problems", ("n", problems)));
         if (updates > 0) Part(Pink, I18n.T("h95.sub.updates", ("n", updates)));
         if (Jobs.ActiveCount > 0) Part(Ui.Res("Brand2"), I18n.T("h95.sub.downloads", ("n", Jobs.ActiveCount)), () => MainWindow.Current?.OpenDownloads());
-        if (friends > 0) Part(Ui.Res("Good"), I18n.T("h95.sub.friends", ("n", friends)), () => MainWindow.Current?.Navigate(() => new FriendsPage()));
+        if (friends > 0) Part(Ui.Res("Good"), I18n.T("h95.sub.friends", ("n", friends)), () => MainWindow.Current?.Navigate(() => new CommunityPage()));
         if (Setup.Updater.Available) Part(Yellow, I18n.T("h95.sub.app"), () => MainWindow.Current?.ShowUpdate());
         if (line.Children.Count == 0) Part(Ui.Res("Good"), I18n.T("h95.sub.calm"));
 
@@ -270,7 +270,7 @@ public sealed partial class HomePage
         {
             var uid = r.Uid;
             list.Add(new("request", Icons.Users, Ui.Res("Brand2"), I18n.T("h95.a.request", ("name", r.Name)), I18n.T("h95.a.request.text"),
-                I18n.T("h95.a.request.go"), () => _ = AcceptFriend(uid), () => Go(() => new FriendsPage())));
+                I18n.T("h95.a.request.go"), () => _ = AcceptFriend(uid), () => Go(() => new CommunityPage())));
         }
         return list;
     }
@@ -551,7 +551,7 @@ public sealed partial class HomePage
     static Control FriendsCard()
     {
         var v = Social.Friends.View();
-        void Open() => MainWindow.Current?.Navigate(() => new FriendsPage());
+        void Open() => MainWindow.Current?.Navigate(() => new CommunityPage());
         Control body;
         if (!v.SignedIn)
             body = Empty(Icons.Users, Ui.Res("Brand2"), I18n.T("h95.friends.signin"), I18n.T("h95.friends.signinText"),

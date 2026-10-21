@@ -41,7 +41,7 @@ public sealed class FriendsDock : Panel
         addRow.Children.Add(addButton);
         addRow.Children.Add(_add);
 
-        var all = Ui.Button(I18n.T("dock.all"), () => { Toggle(false); MainWindow.Current?.Navigate(() => new FriendsPage()); }, "ghost", Icons.External);
+        var all = Ui.Button(I18n.T("dock.all"), () => { Toggle(false); MainWindow.Current?.Navigate(() => new CommunityPage()); }, "ghost", Icons.External);
         var head = new DockPanel();
         DockPanel.SetDock(all, Dock.Right);
         head.Children.Add(all);

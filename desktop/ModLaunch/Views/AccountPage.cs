@@ -219,7 +219,7 @@ public sealed class AccountPage : Page
             Ui.Row(8, rename, Ui.Button(I18n.T("common.save"), () => Call(() => Account.Rename(rename.Text ?? ""), I18n.T("acc.renamed"), reload: false), "primary"))));
 
         col.Children.Add(Card(I18n.T("acc.quick"), null, Ui.Row(10,
-            Ui.Button(I18n.T("acc.menu.friends"), () => MainWindow.Current?.Navigate(() => new FriendsPage()), "", Icons.Users),
+            Ui.Button(I18n.T("acc.menu.friends"), () => MainWindow.Current?.Navigate(() => new CommunityPage()), "", Icons.Users),
             Ui.Button("Creator Hub", () => MainWindow.Current?.Navigate(() => new CreatorPage()), "", Icons.Creator),
             Ui.Button(I18n.T("mk.tab"), () => MainWindow.Current?.Navigate(() => new MarketPage()), "", Icons.Bag),
             Ui.Button(I18n.T("st.tab"), () => MainWindow.Current?.Navigate(() => new MarketPage("studio")), "", Icons.Chart))));

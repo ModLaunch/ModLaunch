@@ -422,6 +422,8 @@ public sealed partial class SettingsPage : Page
     Control BackupsTab()
     {
         var col = new StackPanel { Spacing = 16 };
+        // 11.0: сначала бэкап в один клик (всё сразу, в папку, облачный сервис или облако ModLaunch), ниже — копии сохранений игр.
+        col.Children.Add(BackupPanel.Build(Build));
         col.Children.Add(CloudSection());
         var keep = new NumericUpDown { Minimum = 1, Maximum = 200, Value = Backups.Keep, Width = 140, FormatString = "0" };
         keep.ValueChanged += (_, _) => { Settings.Data["backupKeep"] = (int)(keep.Value ?? 10); Settings.Save(); };
@@ -429,7 +431,7 @@ public sealed partial class SettingsPage : Page
         DockPanel.SetDock(keep, Dock.Right);
         keepRow.Children.Add(keep);
         keepRow.Children.Add(Ui.Col(3, Ui.Text(I18n.T("bak.keep"), "h3"), Ui.Text(I18n.T("bak.keep.hint"), "small muted")));
-        col.Children.Add(Section(I18n.T("settings.tab.backups"), null,
+        col.Children.Add(Section(I18n.T("v11.bk.saves.title"), null,
             Toggle(I18n.T("bak.onLaunch"), I18n.T("bak.onLaunch.hint"), Backups.OnLaunch, v => Settings.Data["backupOnLaunch"] = v),
             keepRow,
             Ui.Row(10, Ui.Text(I18n.T("bak.folder") + ": " + Backups.Root, "small muted"), Ui.Button("", () => { Directory.CreateDirectory(Backups.Root); Actions.OpenFolder(Backups.Root); }, "icon ghost", Icons.Folder))));

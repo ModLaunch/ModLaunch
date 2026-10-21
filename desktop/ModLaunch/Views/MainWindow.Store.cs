@@ -424,7 +424,7 @@ public sealed partial class MainWindow
         var view = Social.Friends.View();
         _friendsBadge.IsVisible = view.Incoming.Count > 0 || view.Friends.Any(f => f.State != "offline");
         _friendsBadge.Background = view.Incoming.Count > 0 ? Ui.Res("Warn") : Ui.Res("Good");
-        SetNav(_friendsButton, _current is FriendsPage, _friendsBadge);
+        SetNav(_friendsButton, _current is FriendsPage or CommunityPage, _friendsBadge);
         SetNav(_statsButton, _current is StatsPage);
         SetNav(_donateButton, _current is DonatePage);
         SetNav(_settingsButton, _current is SettingsPage);

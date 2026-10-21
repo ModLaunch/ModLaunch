@@ -47,7 +47,7 @@ public static class PerfShots
             ("panel", () => new ControlPanelPage()),
             ("account", () => new AccountPage()),
             ("account-wallet", () => new AccountPage("wallet")),
-            ("friends", () => new FriendsPage()),
+            ("friends", () => new CommunityPage()),
             ("settings-look", () => new SettingsPage("look")),
             ("settings-games", () => new SettingsPage("games")),
             ("settings-downloads", () => new SettingsPage("downloads")),
