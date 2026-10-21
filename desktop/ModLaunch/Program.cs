@@ -34,6 +34,8 @@ public static class Program
     public static int Main(string[] args)
     {
         if (args.Contains("--catalog-report")) return CatalogReport.Run().GetAwaiter().GetResult();
+        // 12.0: справочник игр из живых списков → снимок Assets/gamedir.config.json (CI: gamedir.yml).
+        if (args.Contains("--gen-directory")) return Games.GameDirectory.Generate(args).GetAwaiter().GetResult();
         if (args.Contains("--selfcheck")) return SelfCheck.Run().GetAwaiter().GetResult();
         if (args.Contains("--selftest")) { Hooks.PrepareSelfTest(); StartHeadless(); return Hooks.SelfTest(); }
         var shot = Array.IndexOf(args, "--screenshot");

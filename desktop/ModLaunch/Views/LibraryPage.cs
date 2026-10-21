@@ -43,7 +43,7 @@ public sealed partial class LibraryPage : Page
     public override void Build()
     {
         // 9.2: в дизайне Store — библиотека как в Microsoft Store (LibraryPage.Store.cs).
-        if (Look.Store) { BuildStore(); return; }
+        if (Look.Store) { BuildStore(); AddSupportedLink(); return; }
         var content = new StackPanel { Spacing = 20, Margin = new Thickness(32, 26, 32, 32), MaxWidth = 1760 };
         bool Match(GameState g) => (_query == "" || g.Def.Name.Contains(_query, StringComparison.OrdinalIgnoreCase)) && InCollection(g);
         var all = MainWindow.OrderedGames().ToList();
@@ -94,6 +94,7 @@ public sealed partial class LibraryPage : Page
         if (_collection == "all") grid.Children.Add(Intro(GameCard.AddCover(136), n++));
         if (installed.Count == 0 && _collection != "all") content.Children.Add(Ui.Text(I18n.T("lib.emptyCollection"), "muted", wrap: true));
         content.Children.Add(grid);
+        if (_collection == "all" && SupportedLink() is { } link) content.Children.Add(link);
 
         if (other.Count > 0)
         {
@@ -119,6 +120,39 @@ public sealed partial class LibraryPage : Page
             }
         }
         Content = new ScrollViewer { Content = content, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+    }
+
+    /// <summary>
+    /// 12.0: «+ N поддерживаемых игр» — ссылка на справочник в «Добавить игру». С набранным поиском —
+    /// туда же с тем же текстом: игры нет в библиотеке, но она может быть в справочнике.
+    /// </summary>
+    Control? SupportedLink()
+    {
+        var more = Games.CustomGames.MoreSupported;
+        if (more <= 0) return null;
+        var query = _query;
+        var title = query != ""
+            ? I18n.T("v12g.lib.find", ("query", query))
+            : I18n.T("v12g.lib.more." + I18n.Plural(more, "one", "few", "many"), ("n", more.ToString("N0", I18n.Culture)));
+        var icon = new Border { Width = 34, Height = 34, CornerRadius = new CornerRadius(17), Background = Ui.Res("Surface3"), Child = Ui.Icon(query != "" ? Icons.Search : Icons.Plus, 16, Ui.Res("Brand2")) };
+        var button = new Button
+        {
+            // Отступ влево — значок встаёт по краю обложек, а подсветка кнопки остаётся вокруг него.
+            Classes = { "ghost" }, HorizontalAlignment = HorizontalAlignment.Left, Padding = new Thickness(10, 8, 16, 8), Margin = new Thickness(-10, 0, 0, 0),
+            Content = Ui.Row(12, icon, Ui.Col(1, Ui.Text(title, "h3"), Ui.Text(I18n.T("v12g.lib.more.hint"), "small muted")), Ui.Icon(Icons.ChevronRight, 16, Ui.Res("Muted"))),
+        };
+        button.Click += (_, _) => MainWindow.Current?.Navigate(() => new AddGamePage(query));
+        return button;
+    }
+
+    /// <summary>
+    /// В дизайне Store ссылка встаёт под играми с компьютера: разметку строит LibraryPage.Store.cs,
+    /// здесь — только вставка в готовую колонку (шапка, фильтры, найденные игры — первые три строки).
+    /// </summary>
+    void AddSupportedLink()
+    {
+        if (_collection is not ("all" or "found") || Content is not ScrollViewer { Content: Panel col } || SupportedLink() is not { } link) return;
+        col.Children.Insert(Math.Min(3, col.Children.Count), link);
     }
 
     string ChipTitle() => _collection switch

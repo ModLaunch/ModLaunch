@@ -33,8 +33,12 @@ public static class BepInEx
     public static async Task<string> Install(GameDef game, string gamePath, IProgress<InstallStep> progress, CancellationToken ct)
     {
         progress.Report(new InstallStep("loader.lookup", "BepInEx"));
-        var (version, url) = game.ThunderstoreCommunity is not null && game.ThunderstorePackage is not null
-            ? await Thunderstore.Latest(game.ThunderstoreCommunity, game.ThunderstorePackage, ct)
+        var fromPack = game.ThunderstoreCommunity is not null && game.ThunderstorePackage is not null;
+        // 12.0: BepInEx 5 с GitHub — только для Mono. В игру на IL2CPP он встанет, но не загрузится ни один мод:
+        // такой игре нужен набор из справочника (BepInExPack_IL2CPP и т. п.), без него — понятный отказ.
+        if (!fromPack && IsIl2Cpp(game, gamePath)) throw new InvalidOperationException(I18n.T("v12g.err.il2cpp", ("game", game.Name)));
+        var (version, url) = fromPack
+            ? await Thunderstore.Latest(game.ThunderstoreCommunity!, game.ThunderstorePackage!, ct)
             : await FromGitHub(Path.Combine(gamePath, game.Executables[0]), ct);
         var label = $"BepInEx {version}";
         var archive = await Http.Download(url, "BepInExPack.zip", new Progress<double>(r => progress.Report(new InstallStep("loader.download", label, Ratio: r))), ct: ct);
@@ -60,6 +64,43 @@ public static class BepInEx
         var asset = release.Arr("assets").FirstOrDefault(a => (a.Str("name") ?? "").Contains(arch, StringComparison.OrdinalIgnoreCase) && (a.Str("name") ?? "").EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
             ?? throw new InvalidOperationException("BepInEx: " + arch);
         return ((release.Str("tag_name") ?? "").TrimStart('v'), asset.Str("browser_download_url")!);
+    }
+
+    /// <summary>Unity на IL2CPP: так помечен движок своей игры, или рядом с exe лежит GameAssembly.dll.</summary>
+    public static bool IsIl2Cpp(GameDef game, string gamePath)
+    {
+        if (game.Engine == "unity-il2cpp") return true;
+        try { return File.Exists(Path.Combine(gamePath, "GameAssembly.dll")); } catch { return false; }
+    }
+
+    /// <summary>Игра на IL2CPP без набора из справочника: отказ до любой загрузки, а не BepInEx 5 с GitHub.</summary>
+    [SelfTest]
+    static string BepInExRefusesGitHubForIl2Cpp()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "modlaunch-il2cpp-test-" + Environment.ProcessId);
+        try
+        {
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(Path.Combine(dir, "GameAssembly.dll"), "");
+            GameDef Def(string? community, string? pack, string engine) => new()
+            {
+                Id = "custom-il2cpp-probe", Name = "Probe", ShortName = "Probe", SteamAppId = 0, FolderNames = [], Accent = "#7C5CFF", Engine = engine,
+                Loader = LoaderKind.Bepinex, LoaderName = "BepInEx", LoaderSite = "", ThunderstoreCommunity = community, ThunderstorePackage = pack,
+                Catalog = CatalogKind.None, BrowseUrl = "", Sections = [], Executables = ["Probe.exe"], ModMarker = "dll",
+            };
+            var steps = new Progress<InstallStep>(_ => { });
+            try
+            {
+                Install(Def(null, null, "unity"), dir, steps, new CancellationToken(true)).GetAwaiter().GetResult();
+                throw new Exception("IL2CPP game got BepInEx 5 from GitHub");
+            }
+            catch (InvalidOperationException) { }
+            if (!IsIl2Cpp(Def(null, null, "unity-il2cpp"), Path.GetTempPath())) throw new Exception("engine flag ignored");
+            File.Delete(Path.Combine(dir, "GameAssembly.dll"));
+            if (IsIl2Cpp(Def(null, null, "unity"), dir)) throw new Exception("mono game taken for IL2CPP");
+            return "IL2CPP without a pack refused before any download";
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
     }
 
     /// <summary>Машина в заголовке PE: 0x14c — 32 бита.</summary>

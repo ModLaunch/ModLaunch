@@ -5,6 +5,9 @@ namespace ModLaunch.Games;
 
 public sealed record Located(string Path, string Source);
 
+/// <summary>Игра из манифеста Steam: номер, имя, папка в steamapps/common и полный путь к ней.</summary>
+public sealed record SteamApp(int AppId, string Name, string InstallDir, string Path);
+
 /// <summary>
 /// Поиск игры на диске: Steam (реестр → libraryfolders.vdf → appmanifest),
 /// Epic (манифесты лаунчера), GOG (реестр) и, наконец, обход правдоподобных
@@ -96,6 +99,49 @@ public static class Locator
             catch { }
         }
         return null;
+    }
+
+    /// <summary>
+    /// 12.0: все appmanifest_*.acf всех библиотек — одним проходом. Раньше каждая игра искала свой
+    /// манифест в каждой библиотеке; со справочником на тысячу игр это сотни лишних чтений за поиск.
+    /// Один номер в двух библиотеках (старая копия манифеста) — берём тот, чья папка есть на диске.
+    /// </summary>
+    public static List<SteamApp> SteamApps(IEnumerable<string>? libraries = null)
+    {
+        var result = new List<SteamApp>();
+        var at = new Dictionary<int, int>();
+        foreach (var library in libraries ?? SteamLibraries())
+        {
+            List<string> files;
+            try { files = Directory.EnumerateFiles(Path.Combine(library, "steamapps"), "appmanifest_*.acf").ToList(); } catch { continue; }
+            foreach (var file in files)
+            {
+                try
+                {
+                    var acf = Vdf.Parse(File.ReadAllText(file));
+                    if (Vdf.Get(acf, "AppState", "installdir") is not string dir || dir == "") continue;
+                    if (!int.TryParse(Vdf.Get(acf, "AppState", "appid") as string, out var appId))
+                        int.TryParse(Path.GetFileNameWithoutExtension(file)["appmanifest_".Length..], out appId);
+                    var app = new SteamApp(appId, Vdf.Get(acf, "AppState", "name") as string ?? dir, dir, Path.Combine(library, "steamapps", "common", dir));
+                    if (appId > 0 && at.TryGetValue(appId, out var i))
+                    {
+                        if (!Directory.Exists(result[i].Path) && Directory.Exists(app.Path)) result[i] = app;
+                        continue;
+                    }
+                    if (appId > 0) at[appId] = result.Count;
+                    result.Add(app);
+                }
+                catch { }
+            }
+        }
+        return result;
+    }
+
+    /// <summary>Путь игры Steam по номеру из уже прочитанных манифестов (null — нет или папки нет).</summary>
+    static Func<int, string?> SteamLookup(List<string> libraries)
+    {
+        var apps = SteamApps(libraries).Where(a => a.AppId > 0).ToDictionary(a => a.AppId, a => a.Path);
+        return id => apps.TryGetValue(id, out var p) && Directory.Exists(p) ? p : null;
     }
 
     static string Norm(string s) => new(s.ToLowerInvariant().Where(c => !char.IsWhiteSpace(c)).ToArray());
@@ -216,10 +262,10 @@ public static class Locator
     }
 
     /// <summary>Быстрые способы: Minecraft, манифест Steam, папка в библиотеке Steam, Epic, GOG — без обхода дисков.</summary>
-    static Located? Quick(GameDef game, List<string> libraries)
+    static Located? Quick(GameDef game, List<string> libraries, Func<int, string?>? steamPath = null)
     {
         if (game.IsMinecraft) return Minecraft.Mc.Locate() is string mc ? new Located(mc, "minecraft") : null;
-        if (game.SteamAppId > 0 && FindSteamApp(game.SteamAppId, libraries) is string steam) return new Located(steam, "steam");
+        if (game.SteamAppId > 0 && (steamPath is null ? FindSteamApp(game.SteamAppId, libraries) : steamPath(game.SteamAppId)) is string steam) return new Located(steam, "steam");
         foreach (var library in libraries)
         foreach (var folder in game.FolderNames)
         {
@@ -252,12 +298,14 @@ public static class Locator
         {
             var result = new Dictionary<GameDef, Located>();
             var libraries = SteamLibraries();
+            // Манифесты Steam читаются один раз на весь поиск, а не по разу на каждую игру.
+            var steamPath = SteamLookup(libraries);
             var pending = new List<GameDef>();
             foreach (var game in games)
             {
                 if (ct.IsCancellationRequested) break;
                 Located? quick = null;
-                try { quick = Quick(game, libraries); } catch { }
+                try { quick = Quick(game, libraries, steamPath); } catch { }
                 if (quick is not null) { result[game] = quick; onFound?.Invoke(game, quick); }
                 else if (!game.IsMinecraft) pending.Add(game);
             }
