@@ -85,7 +85,7 @@ public sealed class LaunchScreen : Panel
         };
 
         // 12.0: лор игры — стадия по прохождению (сохранение, достижения или часы) и её название.
-        var depth = Lore.Of(g.Def);
+        var depth = Lore.Enabled ? Lore.Of(g.Def) : new Lore.Depth(0, "none");
         var lore = new TextBlock
         {
             Text = I18n.T("lore.line", ("stage", Lore.StageName(g.Def, depth.Stage)), ("n", depth.Stage + 1)) + "  ·  " + I18n.T("lore.src." + depth.Source),

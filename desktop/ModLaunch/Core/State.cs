@@ -1,4 +1,4 @@
-﻿using ModLaunch.Games;
+using ModLaunch.Games;
 using ModLaunch.Loaders;
 using ModLaunch.Mods;
 
@@ -81,8 +81,10 @@ public static class AppState
             else if (g.Status == Detect.Found && force) g.Status = Detect.Unknown;
         }
         Notify();
+        // 12.0: стадии лора (сохранения игр) — заранее, чтобы запуск и открытие игры не ждали диск:
+        // сначала игры с сохранённым путём, после поиска — найденные (уже прочитанные Warm пропускает).
+        if (!Program.Screenshot) _ = Task.Run(Lore.Warm);
         await DetectMany(Games.Where(g => g.Status != Detect.Found).ToList());
-        // 12.0: стадии лора (сохранения игр) — заранее, чтобы запуск и открытие игры не ждали диск.
         if (!Program.Screenshot) _ = Task.Run(Lore.Warm);
     }
 

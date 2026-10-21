@@ -176,36 +176,88 @@ public static class Lore
     // ---------------------------------------------------------------- глубина
 
     static readonly Dictionary<string, (DateTime At, Depth D)> Cache = [];
+    /// <summary>Игры, чьи сохранения читаются прямо сейчас (под lock (Cache)): одно чтение на игру за раз.</summary>
+    static readonly HashSet<string> Reading = [];
+    /// <summary>Сколько стадия из сохранений считается свежей.</summary>
+    static readonly TimeSpan Fresh = TimeSpan.FromMinutes(1);
     /// <summary>Для снимков экрана: стадия игры задана вручную.</summary>
     public static readonly Dictionary<string, int> Forced = [];
 
-    /// <summary>Насколько далеко игрок зашёл в игру (сохранения читаются не чаще раза в минуту).</summary>
+    /// <summary>
+    /// Насколько далеко игрок зашёл в игру. Не ждёт диск: в первый раз — прикидка по часам и достижениям,
+    /// сохранения читаются в фоне (не чаще раза в минуту); сменилась стадия — окно перерисуется.
+    /// </summary>
     public static Depth Of(GameDef def)
     {
         if (Forced.TryGetValue(def.Id, out var shot)) return new(shot, "save");
         if (Environment.GetEnvironmentVariable("MODLAUNCH_LORE") is { } forced && int.TryParse(forced, out var f)) return new(Math.Clamp(f, 0, 3), "save");
         lock (Cache)
-            if (Cache.TryGetValue(def.Id, out var c))
+            if (Cache.TryGetValue(def.Id, out var old))
             {
                 // Устарело — отдаём прежнее сразу, а сохранения перечитываем в фоне: интерфейс не ждёт диск.
-                if (DateTime.UtcNow - c.At >= TimeSpan.FromMinutes(1)) { Cache[def.Id] = (DateTime.UtcNow, c.D); Task.Run(() => Refresh(def)); }
-                return c.D;
+                if (DateTime.UtcNow - old.At >= Fresh) Background(def);
+                return old.D;
             }
-        return Refresh(def);
+        // Снимки экрана — как раньше, сразу с диска: кадр не меняется под камерой.
+        if (Program.Screenshot) return Refresh(def, out _);
+        var rough = Rough(def);
+        lock (Cache)
+        {
+            if (Cache.TryGetValue(def.Id, out var got)) return got.D;
+            // Прикидка сразу устаревшая (MinValue): следующий Of не примет её за прочитанную с диска.
+            Cache[def.Id] = (DateTime.MinValue, rough);
+            Background(def);
+        }
+        return rough;
     }
 
-    static Depth Refresh(GameDef def)
+    /// <summary>Прочитать сохранения и запомнить стадию; changed — стадия не та, что была запомнена.</summary>
+    static Depth Refresh(GameDef def, out bool changed)
     {
         var d = Compute(def);
-        lock (Cache) Cache[def.Id] = (DateTime.UtcNow, d);
+        lock (Cache)
+        {
+            changed = Cache.TryGetValue(def.Id, out var was) && was.D.Stage != d.Stage;
+            Cache[def.Id] = (DateTime.UtcNow, d);
+        }
         return d;
     }
 
-    /// <summary>Прочитать сохранения всех найденных игр заранее (в фоне при запуске программы).</summary>
+    /// <summary>Перечитать сохранения в фоне, если их уже не читают. Вызывать под lock (Cache).</summary>
+    static void Background(GameDef def)
+    {
+        if (Reading.Add(def.Id)) Task.Run(() => Reread(def));
+    }
+
+    /// <summary>Перечитать сохранения (игра уже занята в Reading) и освободить её; сменилась стадия — перерисовать окно.</summary>
+    static void Reread(GameDef def)
+    {
+        try
+        {
+            Refresh(def, out var changed);
+            if (changed) Redraw();
+        }
+        catch { }
+        finally { lock (Cache) Reading.Remove(def.Id); }
+    }
+
+    /// <summary>Перерисовать окно из фона. В --selfcheck окна нет, в снимках кадр не трогаем.</summary>
+    static void Redraw()
+    {
+        if (Program.Screenshot) return;
+        try { Avalonia.Threading.Dispatcher.UIThread.Post(() => AppState.Notify()); } catch { }
+    }
+
+    /// <summary>Прочитать сохранения всех найденных игр заранее (в фоне при запуске программы); свежие и уже читаемые — пропустить.</summary>
     public static void Warm()
     {
+        if (!Enabled) return;
         foreach (var g in AppState.Games.Where(g => g.Status == Detect.Found).ToList())
-            try { Refresh(g.Def); } catch { }
+        {
+            lock (Cache)
+                if ((Cache.TryGetValue(g.Def.Id, out var had) && DateTime.UtcNow - had.At < Fresh) || !Reading.Add(g.Def.Id)) continue;
+            Reread(g.Def);
+        }
     }
 
     static Depth Compute(GameDef def)
@@ -224,7 +276,12 @@ public static class Lore
         }
         catch { }
         if (save is int s) return new(s, "save");
+        return Rough(def);
+    }
 
+    /// <summary>Прикидка без сохранений игры: по часам в ModLaunch и достижениям.</summary>
+    static Depth Rough(GameDef def)
+    {
         var played = PlayTime.Get(def.Id);
         var h = For(def).Hours ?? [1, 8, 25];
         var hours = played.TotalMs / 3_600_000.0;

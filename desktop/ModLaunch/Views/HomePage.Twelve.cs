@@ -14,8 +14,8 @@ namespace ModLaunch.Views;
 /// </summary>
 public sealed partial class HomePage
 {
-    /// <summary>Игра, выбранная на сцене главной (для Ctrl+Enter).</summary>
-    public static string? StageGame => _stage;
+    /// <summary>Игра на сцене этой главной (для Ctrl+Enter); null — сцены сейчас нет.</summary>
+    public string? ShownStageGame => _stageHost?.Parent is not null ? _stage : null;
 
     /// <summary>Следующая/предыдущая игра на сцене (стрелки). false — сцены нет.</summary>
     public bool StepStage(int delta)

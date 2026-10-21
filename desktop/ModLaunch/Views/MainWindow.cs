@@ -1,4 +1,4 @@
-﻿using Avalonia;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
@@ -204,6 +204,15 @@ public sealed partial class MainWindow : Window
         SmoothScroll.Attach(this);
         // Где нажали в последний раз — отсюда «вырастает» страница мода.
         AddHandler(PointerPressedEvent, (_, e) => { _lastPress = e.GetPosition(this); _pointerDown = true; }, Avalonia.Interactivity.RoutingStrategies.Tunnel, handledEventsToo: true);
+        // 12.0: Ctrl+Enter — до того, как нажатая раньше кнопка (фокус остаётся на ней) примет Enter за клик.
+        // В полях ввода не срабатывает; пока идёт экран запуска — тоже (иначе игра запустится дважды).
+        AddHandler(KeyDownEvent, (_, e) =>
+        {
+            if (e.KeyModifiers != KeyModifiers.Control || e.Key != Key.Enter || FocusManager?.GetFocusedElement() is TextBox) return;
+            if (_overlay.IsVisible || _launchLayer.IsVisible || CurrentGame() is not { } playing) return;
+            e.Handled = true;
+            Actions.Play(playing);
+        }, Avalonia.Interactivity.RoutingStrategies.Tunnel);
         // 12.0: боковые кнопки мыши — назад и вперёд, как в браузере.
         AddHandler(PointerReleasedEvent, (_, e) =>
         {
@@ -672,6 +681,8 @@ public sealed partial class MainWindow : Window
         if (page is GamePage gp && gp.GameId == Minecraft.Mc.Id) page = new MinecraftPage(gp.Tab, gp.Query);
         var previous = _current;
         var same = page.SameScreenAs(previous);
+        // 12.0: лор открытой игры не должен дорисовываться поверх следующей страницы.
+        if (!same) GameOpenFx.Cancel();
         if (same) page.Classes.Add("quiet");
         // Открываем игру с другого экрана — снимок прежнего экрана и нажатая обложка (до замены страницы).
         var gameFx = !same && previous is not null && page is GamePage or MinecraftPage && (force is not null || GameOpenFx.Enabled);
@@ -782,13 +793,16 @@ public sealed partial class MainWindow : Window
 
     public void RefreshFriendsDock() => _friendsDock?.Render();
 
-    /// <summary>n-я игра для Ctrl+1…9: найденные, в порядке, как в боковой панели.</summary>
-    static GameState? QuickGame(int n) => OrderedGames().Where(g => g.Status == Detect.Found && !Features.GameCollections.IsHidden(g.Def.Id)).Skip(n).FirstOrDefault();
+    /// <summary>n-я игра для Ctrl+1…9: найденные, как на боковой панели — недавно запущенные сверху.</summary>
+    static GameState? QuickGame(int n) => OrderedGames()
+        .Where(g => g.Status == Detect.Found && !Settings.Data.Arr("hiddenGames").Any(x => x?.ToString() == g.Def.Id))
+        .OrderByDescending(g => Features.PlayTime.Get(g.Def.Id).LastPlayed ?? DateTime.MinValue)
+        .Skip(n).FirstOrDefault();
 
     /// <summary>Игра «на экране»: открытая страница игры или выбранная на сцене главной.</summary>
     GameState? CurrentGame()
     {
-        var id = _current?.GameId ?? (_current is HomePage ? HomePage.StageGame : null);
+        var id = _current?.GameId ?? (_current as HomePage)?.ShownStageGame;
         return id is null ? null : AppState.Games.FirstOrDefault(g => g.Def.Id == id && g.Status == Detect.Found);
     }
 
@@ -811,9 +825,8 @@ public sealed partial class MainWindow : Window
         else if (e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift) && e.Key == Key.P) Navigate(() => new ControlPanelPage());
         else if (e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift) && e.Key == Key.M) Navigate(() => new MinecraftPage());
         else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.H) Navigate(() => new HomePage());
-        // 12.0: Ctrl+1…9 — открыть свою игру по порядку, Ctrl+Enter — играть в открытую (или выбранную на главной).
+        // 12.0: Ctrl+1…9 — открыть свою игру по порядку, как на боковой панели (Ctrl+Enter — в обработчике выше).
         else if (e.KeyModifiers == KeyModifiers.Control && e.Key is >= Key.D1 and <= Key.D9 && QuickGame(e.Key - Key.D1) is { } quick) Navigate(() => new GamePage(quick.Def.Id));
-        else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.Enter && CurrentGame() is { } playing) Actions.Play(playing);
         else if (e.KeyModifiers == KeyModifiers.None && e.Key is Key.Left or Key.Right && _current is HomePage home && FocusManager?.GetFocusedElement() is not TextBox && home.StepStage(e.Key == Key.Right ? 1 : -1)) { }
         else if (e.Key == Key.F5 && e.KeyModifiers == KeyModifiers.None) _current?.Build();
         else if (e.Key == Key.F1) Shortcuts();

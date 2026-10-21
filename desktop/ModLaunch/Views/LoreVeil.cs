@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
+using Avalonia.Media.Immutable;
 using Avalonia.Threading;
 using ModLaunch.Core;
 
@@ -9,8 +10,9 @@ namespace ModLaunch.Views;
 /// <summary>
 /// 12.0: «лор» игры поверх арта — щупальца, частицы, лучи, помехи (слои Lore.Theme для стадии игрока).
 /// Рисуется вручную в Render: никаких элементов и раскладки, только линии и круги, ~30 кадров в секунду,
-/// пока виден. Всё медленное и полупрозрачное — спокойно, без вспышек. Fade — общая прозрачность
-/// (для анимации открытия игры). Без анимаций — один неподвижный кадр.
+/// пока виден. Всё медленное и полупрозрачное — спокойно, без вспышек. Strength — общая прозрачность
+/// (для анимации открытия игры). Без анимаций — один неподвижный кадр. Кисти и перья неизменяемые:
+/// изменяемые за кадр становились сотнями ресурсов композитора.
 /// </summary>
 public sealed class LoreVeil : Control
 {
@@ -20,12 +22,14 @@ public sealed class LoreVeil : Control
     readonly double _scale;
     readonly int _seed;
 
-    /// <summary>Сила слоёв 0…1 (умножается на Amount каждого слоя).</summary>
+    /// <summary>Общая прозрачность слоёв 0…1: гасит всё, включая постоянную часть яркости.</summary>
     public double Strength { get; set; } = 1;
     /// <summary>Слои «растут» к своей силе за это время (щупальца выползают из краёв).</summary>
     public double GrowMs { get; set; } = 1400;
     /// <summary>Время для неподвижного кадра (снимки экрана, анимации выключены).</summary>
     public double StillMs { get; set; } = 2600;
+    /// <summary>Время кадра в мс от внешних часов (анимация открытия игры); null — свои часы с подключения.</summary>
+    public double? Time { get; set; }
 
     public LoreVeil(Games.GameDef def, int stage, double scale = 1)
     {
@@ -34,7 +38,14 @@ public sealed class LoreVeil : Control
         _seed = def.Id.Aggregate(17, (h, ch) => h * 31 + ch);
         IsHitTestVisible = false;
         ClipToBounds = true;
-        _tick = new DispatcherTimer(TimeSpan.FromMilliseconds(33), DispatcherPriority.Render, (_, _) => InvalidateVisual());
+        // Конструктор с обработчиком сам запускает таймер — поэтому без него: старт только при подключении.
+        _tick = new DispatcherTimer(DispatcherPriority.Render) { Interval = TimeSpan.FromMilliseconds(33) };
+        _tick.Tick += (_, _) =>
+        {
+            // Окно свёрнуто, скрыто или не в фокусе (идёт игра), слой не виден — кадр не нужен.
+            if (TopLevel.GetTopLevel(this) is not Window { IsVisible: true, IsActive: true, WindowState: not WindowState.Minimized } || !IsEffectivelyVisible) return;
+            InvalidateVisual();
+        };
         AttachedToVisualTree += (_, _) =>
         {
             _clock.Restart();
@@ -45,7 +56,7 @@ public sealed class LoreVeil : Control
 
     public static LoreVeil For(Games.GameDef def, double scale = 1) => new(def, Lore.Of(def).Stage, scale);
 
-    double Now => Animate.On ? _clock.Elapsed.TotalMilliseconds : StillMs;
+    double Now => Time ?? (Animate.On ? _clock.Elapsed.TotalMilliseconds : StillMs);
 
     public override void Render(DrawingContext dc)
     {
@@ -55,31 +66,34 @@ public sealed class LoreVeil : Control
         var ms = Now;
         var t = ms / 1000;
         var grow = GrowMs <= 0 ? 1 : 1 - Math.Pow(1 - Math.Clamp(ms / GrowMs, 0, 1), 3);
-        for (var i = 0; i < _layers.Length; i++)
-        {
-            var l = _layers[i];
-            var c = Color.TryParse(l.Color, out var cc) ? cc : Colors.White;
-            Color? c2 = l.Color2 is { } s2 && Color.TryParse(s2, out var x2) ? x2 : null;
-            var a = Math.Clamp(l.Amount * Strength, 0, 1);
-            var rng = new Random(_seed + i * 7919);
-            switch (l.Kind)
+        // Strength — прозрачностью поверх всех слоёв: у щупалец, нитей, дождя и помех есть постоянная
+        // часть яркости, которую множитель Amount не гасил.
+        using (dc.PushOpacity(Math.Clamp(Strength, 0, 1)))
+            for (var i = 0; i < _layers.Length; i++)
             {
-                case "motes": Motes(dc, rng, w, h, t, c, a * grow, up: true, square: false); break;
-                case "pixels": Motes(dc, rng, w, h, t, c, a * grow, up: true, square: true); break;
-                case "snow": Fall(dc, rng, w, h, t, c, a * grow, leaf: false); break;
-                case "leaves": Fall(dc, rng, w, h, t, c, a * grow, leaf: true); break;
-                case "rain": Rain(dc, rng, w, h, t, c, a * grow); break;
-                case "bubbles": Bubbles(dc, rng, w, h, t, c, a * grow); break;
-                case "tendrils": Tendrils(dc, rng, w, h, t, c, c2, a, grow); break;
-                case "threads": Threads(dc, rng, w, h, t, c, c2, a, grow); break;
-                case "rays": Rays(dc, rng, w, h, t, c, a * grow); break;
-                case "aurora": Aurora(dc, w, h, t, c, c2 ?? c, a * grow); break;
-                case "scan": Scan(dc, rng, w, h, t, c, a * grow); break;
-                case "ring": Ring(dc, w, h, t, c, c2, a * grow); break;
-                case "stars": Stars(dc, rng, w, h, t, c, a * grow); break;
-                case "vignette": Vignette(dc, w, h, c, a * grow); break;
+                var l = _layers[i];
+                var c = Color.TryParse(l.Color, out var cc) ? cc : Colors.White;
+                Color? c2 = l.Color2 is { } s2 && Color.TryParse(s2, out var x2) ? x2 : null;
+                var a = Math.Clamp(l.Amount, 0, 1);
+                var rng = new Random(_seed + i * 7919);
+                switch (l.Kind)
+                {
+                    case "motes": Motes(dc, rng, w, h, t, c, a * grow, up: true, square: false); break;
+                    case "pixels": Motes(dc, rng, w, h, t, c, a * grow, up: true, square: true); break;
+                    case "snow": Fall(dc, rng, w, h, t, c, a * grow, leaf: false); break;
+                    case "leaves": Fall(dc, rng, w, h, t, c, a * grow, leaf: true); break;
+                    case "rain": Rain(dc, rng, w, h, t, c, a * grow); break;
+                    case "bubbles": Bubbles(dc, rng, w, h, t, c, a * grow); break;
+                    case "tendrils": Tendrils(dc, rng, w, h, t, c, c2, a, grow); break;
+                    case "threads": Threads(dc, rng, w, h, t, c, c2, a, grow); break;
+                    case "rays": Rays(dc, rng, w, h, t, c, a * grow); break;
+                    case "aurora": Aurora(dc, w, h, t, c, c2 ?? c, a * grow); break;
+                    case "scan": Scan(dc, rng, w, h, t, c, a * grow); break;
+                    case "ring": Ring(dc, w, h, t, c, c2, a * grow); break;
+                    case "stars": Stars(dc, rng, w, h, t, c, a * grow); break;
+                    case "vignette": Vignette(dc, w, h, c, a * grow); break;
+                }
             }
-        }
     }
 
     static Color A(Color c, double a) => Color.FromArgb((byte)Math.Clamp(a * 255, 0, 255), c.R, c.G, c.B);
@@ -106,12 +120,12 @@ public sealed class LoreVeil : Control
             if (alpha < 0.02) continue;
             if (square)
             {
-                dc.FillRectangle(new SolidColorBrush(A(c, alpha * 0.85)), new Rect(Math.Round(x), Math.Round(y), size, size));
+                dc.FillRectangle(new ImmutableSolidColorBrush(A(c, alpha * 0.85)), new Rect(Math.Round(x), Math.Round(y), size, size));
             }
             else
             {
-                dc.DrawEllipse(new SolidColorBrush(A(c, alpha * 0.18)), null, new Point(x, y), size * 3.2, size * 3.2);
-                dc.DrawEllipse(new SolidColorBrush(A(c, alpha * 0.9)), null, new Point(x, y), size, size);
+                dc.DrawEllipse(new ImmutableSolidColorBrush(A(c, alpha * 0.18)), null, new Point(x, y), size * 3.2, size * 3.2);
+                dc.DrawEllipse(new ImmutableSolidColorBrush(A(c, alpha * 0.9)), null, new Point(x, y), size, size);
             }
         }
     }
@@ -132,16 +146,16 @@ public sealed class LoreVeil : Control
             if (leaf)
             {
                 using (dc.PushTransform(Matrix.CreateRotation(t * 0.8 + phase) * Matrix.CreateTranslation(x, y)))
-                    dc.DrawEllipse(new SolidColorBrush(A(c, alpha)), null, new Point(0, 0), size * 1.7, size * 0.7);
+                    dc.DrawEllipse(new ImmutableSolidColorBrush(A(c, alpha)), null, new Point(0, 0), size * 1.7, size * 0.7);
             }
-            else dc.DrawEllipse(new SolidColorBrush(A(c, alpha)), null, new Point(x, y), size, size);
+            else dc.DrawEllipse(new ImmutableSolidColorBrush(A(c, alpha)), null, new Point(x, y), size, size);
         }
     }
 
     void Rain(DrawingContext dc, Random rng, double w, double h, double t, Color c, double a)
     {
         var n = (int)(20 + 80 * a);
-        var pen = new Pen(new SolidColorBrush(A(c, 0.25 + 0.3 * a)), 1 * _scale);
+        var pen = new ImmutablePen(new ImmutableSolidColorBrush(A(c, 0.25 + 0.3 * a)), 1 * _scale);
         for (var i = 0; i < n; i++)
         {
             var x0 = rng.NextDouble() * w;
@@ -167,7 +181,7 @@ public sealed class LoreVeil : Control
             var y = Wrap(y0 - t * speed, h + 20) - 10;
             var x = x0 + Math.Sin(t * 1.6 + phase) * 4 * _scale;
             var alpha = a * Math.Sin(Math.Clamp(y / h, 0, 1) * Math.PI);
-            dc.DrawEllipse(new SolidColorBrush(A(c, alpha * 0.12)), new Pen(new SolidColorBrush(A(c, alpha * 0.7)), 0.9 * _scale), new Point(x, y), r, r);
+            dc.DrawEllipse(new ImmutableSolidColorBrush(A(c, alpha * 0.12)), new ImmutablePen(new ImmutableSolidColorBrush(A(c, alpha * 0.7)), 0.9 * _scale), new Point(x, y), r, r);
         }
     }
 
@@ -181,7 +195,7 @@ public sealed class LoreVeil : Control
             var r = (0.6 + rng.NextDouble() * 1.4) * _scale;
             var tw = 0.5 + 0.5 * Math.Sin(t * (0.6 + rng.NextDouble()) + rng.NextDouble() * 6.28);
             var alpha = a * (0.25 + 0.75 * tw);
-            dc.DrawEllipse(new SolidColorBrush(A(c, alpha)), null, new Point(x, y), r, r);
+            dc.DrawEllipse(new ImmutableSolidColorBrush(A(c, alpha)), null, new Point(x, y), r, r);
         }
     }
 
@@ -227,13 +241,14 @@ public sealed class LoreVeil : Control
                 {
                     var k = (double)s / segs;
                     var th = width * Math.Pow(1 - k * 0.94, 1.4) + 4 * _scale;
-                    dc.DrawLine(new Pen(new SolidColorBrush(A(r, 0.55 * a * (1 - k * 0.5))), th, lineCap: PenLineCap.Round), pts[s - 1], pts[s]);
+                    dc.DrawLine(new ImmutablePen(new ImmutableSolidColorBrush(A(r, 0.55 * a * (1 - k * 0.5))), th, lineCap: PenLineCap.Round), pts[s - 1], pts[s]);
                 }
+            var body = new ImmutableSolidColorBrush(A(c, Math.Min(1, 0.55 + 0.45 * a)));
             for (var s = 1; s <= segs; s++)
             {
                 var k = (double)s / segs;
                 var th = width * Math.Pow(1 - k * 0.94, 1.4);
-                dc.DrawLine(new Pen(new SolidColorBrush(A(c, Math.Min(1, 0.55 + 0.45 * a))), th, lineCap: PenLineCap.Round), pts[s - 1], pts[s]);
+                dc.DrawLine(new ImmutablePen(body, th, lineCap: PenLineCap.Round), pts[s - 1], pts[s]);
             }
         }
     }
@@ -259,8 +274,8 @@ public sealed class LoreVeil : Control
                 ctx.EndFigure(false);
             }
             var th = (0.8 + rng.NextDouble() * 1.6) * _scale;
-            if (rim is Color r) dc.DrawGeometry(null, new Pen(new SolidColorBrush(A(r, 0.22 * a)), th + 2.5 * _scale), g);
-            dc.DrawGeometry(null, new Pen(new SolidColorBrush(A(c, 0.35 + 0.5 * a)), th), g);
+            if (rim is Color r) dc.DrawGeometry(null, new ImmutablePen(new ImmutableSolidColorBrush(A(r, 0.22 * a)), th + 2.5 * _scale), g);
+            dc.DrawGeometry(null, new ImmutablePen(new ImmutableSolidColorBrush(A(c, 0.35 + 0.5 * a)), th), g);
         }
     }
 
@@ -284,11 +299,9 @@ public sealed class LoreVeil : Control
                 ctx.LineTo(new Point(x + lean - spread, h * 0.95));
                 ctx.EndFigure(true);
             }
-            var brush = new LinearGradientBrush
-            {
-                StartPoint = new RelativePoint(0.5, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(0.5, 1, RelativeUnit.Relative),
-                GradientStops = { new GradientStop(A(c, alpha), 0), new GradientStop(A(c, 0), 1) },
-            };
+            var brush = new ImmutableLinearGradientBrush(
+                new ImmutableGradientStop[] { new(0, A(c, alpha)), new(1, A(c, 0)) },
+                startPoint: new RelativePoint(0.5, 0, RelativeUnit.Relative), endPoint: new RelativePoint(0.5, 1, RelativeUnit.Relative));
             dc.DrawGeometry(brush, null, g);
         }
     }
@@ -309,11 +322,9 @@ public sealed class LoreVeil : Control
                 for (var s = steps; s >= 0; s--) ctx.LineTo(P(s, thick));
                 ctx.EndFigure(true);
             }
-            var brush = new LinearGradientBrush
-            {
-                StartPoint = new RelativePoint(0, 0.5, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 0.5, RelativeUnit.Relative),
-                GradientStops = { new GradientStop(A(c1, 0), 0), new GradientStop(A(c1, a * 0.28), 0.35), new GradientStop(A(c2, a * 0.22), 0.7), new GradientStop(A(c2, 0), 1) },
-            };
+            var brush = new ImmutableLinearGradientBrush(
+                new ImmutableGradientStop[] { new(0, A(c1, 0)), new(0.35, A(c1, a * 0.28)), new(0.7, A(c2, a * 0.22)), new(1, A(c2, 0)) },
+                startPoint: new RelativePoint(0, 0.5, RelativeUnit.Relative), endPoint: new RelativePoint(1, 0.5, RelativeUnit.Relative));
             dc.DrawGeometry(brush, null, g);
         }
     }
@@ -323,43 +334,40 @@ public sealed class LoreVeil : Control
     /// <summary>Как кадр с камеры: тонкие строки, медленная светлая полоса и редкие сдвиги.</summary>
     void Scan(DrawingContext dc, Random rng, double w, double h, double t, Color c, double a)
     {
-        var line = new SolidColorBrush(A(Colors.Black, 0.10 + 0.12 * a));
+        var line = new ImmutableSolidColorBrush(A(Colors.Black, 0.10 + 0.12 * a));
         for (var y = 0.0; y < h; y += 3 * _scale) dc.FillRectangle(line, new Rect(0, y, w, 1));
         var bandY = Wrap(t * 60 * _scale, h + 120) - 60;
-        dc.FillRectangle(new LinearGradientBrush
-        {
-            StartPoint = new RelativePoint(0.5, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(0.5, 1, RelativeUnit.Relative),
-            GradientStops = { new GradientStop(A(c, 0), 0), new GradientStop(A(c, 0.07 * a + 0.02), 0.5), new GradientStop(A(c, 0), 1) },
-        }, new Rect(0, bandY, w, 60 * _scale));
+        dc.FillRectangle(new ImmutableLinearGradientBrush(
+            new ImmutableGradientStop[] { new(0, A(c, 0)), new(0.5, A(c, 0.07 * a + 0.02)), new(1, A(c, 0)) },
+            startPoint: new RelativePoint(0.5, 0, RelativeUnit.Relative), endPoint: new RelativePoint(0.5, 1, RelativeUnit.Relative)),
+            new Rect(0, bandY, w, 60 * _scale));
         // Пара «сбитых» полосок раз в несколько секунд — коротко и тускло.
         var slot = Math.Floor(t / 2.7);
         var r = new Random(_seed ^ (int)slot);
         if (Wrap(t, 2.7) < 0.12)
             for (var i = 0; i < 2; i++)
-                dc.FillRectangle(new SolidColorBrush(A(c, 0.08 * a + 0.03)), new Rect(r.NextDouble() * w * 0.3, r.NextDouble() * h, w * (0.3 + r.NextDouble() * 0.5), (2 + r.NextDouble() * 5) * _scale));
+                dc.FillRectangle(new ImmutableSolidColorBrush(A(c, 0.08 * a + 0.03)), new Rect(r.NextDouble() * w * 0.3, r.NextDouble() * h, w * (0.3 + r.NextDouble() * 0.5), (2 + r.NextDouble() * 5) * _scale));
     }
 
     void Ring(DrawingContext dc, double w, double h, double t, Color c, Color? c2, double a)
     {
         var center = new Point(w * 0.72, h * 0.42);
         var r = Math.Min(w, h) * (0.22 + 0.01 * Math.Sin(t * 0.8));
-        dc.DrawEllipse(null, new Pen(new SolidColorBrush(A(c, 0.12 * a)), 18 * _scale), center, r, r);
-        dc.DrawEllipse(null, new Pen(new SolidColorBrush(A(c, 0.55 * a)), 1.6 * _scale), center, r, r);
+        dc.DrawEllipse(null, new ImmutablePen(new ImmutableSolidColorBrush(A(c, 0.12 * a)), 18 * _scale), center, r, r);
+        dc.DrawEllipse(null, new ImmutablePen(new ImmutableSolidColorBrush(A(c, 0.55 * a)), 1.6 * _scale), center, r, r);
         if (c2 is Color k)
         {
             var r2 = r * (1.18 + 0.04 * Math.Sin(t * 0.5));
-            dc.DrawEllipse(null, new Pen(new SolidColorBrush(A(k, 0.35 * a)), 1 * _scale, new DashStyle([2, 6], t * 4)), center, r2, r2);
+            dc.DrawEllipse(null, new ImmutablePen(new ImmutableSolidColorBrush(A(k, 0.35 * a)), 1 * _scale, new ImmutableDashStyle([2, 6], t * 4)), center, r2, r2);
         }
     }
 
     void Vignette(DrawingContext dc, double w, double h, Color c, double a)
     {
-        var brush = new RadialGradientBrush
-        {
-            Center = new RelativePoint(0.5, 0.45, RelativeUnit.Relative), GradientOrigin = new RelativePoint(0.5, 0.45, RelativeUnit.Relative),
-            RadiusX = new RelativeScalar(0.75, RelativeUnit.Relative), RadiusY = new RelativeScalar(0.75, RelativeUnit.Relative),
-            GradientStops = { new GradientStop(A(c, 0), 0.45), new GradientStop(A(c, a * 0.85), 1) },
-        };
+        var brush = new ImmutableRadialGradientBrush(
+            new ImmutableGradientStop[] { new(0.45, A(c, 0)), new(1, A(c, a * 0.85)) },
+            center: new RelativePoint(0.5, 0.45, RelativeUnit.Relative), gradientOrigin: new RelativePoint(0.5, 0.45, RelativeUnit.Relative),
+            radiusX: new RelativeScalar(0.75, RelativeUnit.Relative), radiusY: new RelativeScalar(0.75, RelativeUnit.Relative));
         dc.FillRectangle(brush, new Rect(0, 0, w, h));
     }
 }

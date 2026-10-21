@@ -1,4 +1,4 @@
-﻿using Avalonia;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
@@ -97,6 +97,9 @@ public static class GameOpenFx
         }
         return run;
     }
+
+    /// <summary>Досрочно завершить идущую анимацию открытия игры (ушли на другую страницу).</summary>
+    public static void Cancel() => _active?.Finish();
 
     [SelfTest]
     static string NeverThreeInARow()
@@ -571,6 +574,8 @@ public sealed class GameOpenRun
             ps.ScaleX = ps.ScaleY = 1.02 - 0.02 * CubicOut(Phase(ms, 0, 380));
             if (veil is not null)
             {
+                // Часы слоя — часы анимации: свои шли с подключения, и щупальца успевали вырасти невидимыми.
+                veil.Time = ms;
                 veil.Strength = Phase(ms, 0, 160) * (1 - CubicInOut(Phase(ms, 620, 480)));
                 veil.InvalidateVisual();
             }

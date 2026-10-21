@@ -1,4 +1,4 @@
-﻿using System.Text.Json.Nodes;
+using System.Text.Json.Nodes;
 
 namespace ModLaunch.Core;
 
@@ -70,6 +70,7 @@ public static class Widgets
     {
         if (Find(id) is not { } k) return;
         var l = Layout();
+        if (l.Count >= 24) return; // больше не помещается: вставка вытеснила бы последний виджет
         var item = (id, size is not null && k.Sizes.Contains(size) ? size : k.Sizes[0]);
         if (at >= 0 && at <= l.Count) l.Insert(at, item); else l.Add(item);
         Set(l);

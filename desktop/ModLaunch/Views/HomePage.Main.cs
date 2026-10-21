@@ -33,6 +33,7 @@ public sealed partial class HomePage
 
     void BuildMain()
     {
+        _stageHost = null;
         var mine = MyGames();
         if (_featured is null && !_featuredLoading && mine.Count > 0) { _featuredLoading = true; Dispatcher.UIThread.Post(() => _ = LoadFeatured(mine)); }
         CheckHealthLater(mine);

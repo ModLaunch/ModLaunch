@@ -1,4 +1,4 @@
-﻿using Avalonia;
+using Avalonia;
 using Avalonia.Animation;
 using Avalonia.Animation.Easings;
 using Avalonia.Controls;
@@ -26,6 +26,7 @@ public sealed partial class HomePage
 
     void BuildTen()
     {
+        _stageHost = null;
         if (!_widgetsHooked)
         {
             _widgetsHooked = true;
@@ -108,7 +109,7 @@ public sealed partial class HomePage
         var when = running ? I18n.T("time.running") : played.LastPlayed is not null ? I18n.T("time.last", ("when", Ui.Ago(played.LastPlayed))) : I18n.T("v93.home.notPlayed");
         var meta = new TextBlock { Text = string.Join("  ·  ", new[] { when, g.ModCount > 0 ? StoreKit.Mods(g.ModCount) : null, played.TotalMs >= 3_600_000 ? I18n.T("v93.home.hours", ("n", played.TotalMs / 3_600_000)) : null }.OfType<string>()), FontSize = 13.5, Foreground = Ui.Hex("#D5D9E2") };
         // 12.0: стадия лора игры — маленькой плашкой над логотипом; сам лор едва заметно живёт на арте.
-        var depth = Lore.Of(g.Def);
+        var depth = Lore.Enabled ? Lore.Of(g.Def) : new Lore.Depth(0, "none");
         var accent = Color.TryParse(g.Def.Accent, out var ac) ? ac : Gx.Accent;
         var loreChip = new Border
         {
@@ -170,17 +171,14 @@ public sealed partial class HomePage
                 shelf,
             },
         };
-        if (Lore.Enabled) stage.Children.Insert(3, new LoreVeil(g.Def, depth.Stage) { Strength = 0.6 });
+        if (Lore.Enabled) stage.Children.Insert(3, new LoreVeil(g.Def, depth.Stage) { Strength = 0.5 });
 
-        var frame = new Border
-        {
-            CornerRadius = new CornerRadius(Look.Radius == "sharp" ? 4 : 22), ClipToBounds = true, Child = stage, ContextFlyout = GameCard.Menu(g),
-            // Мягкое свечение цветом игры под сценой.
-            BoxShadow = new BoxShadows(new BoxShadow { OffsetY = 18, Blur = 60, Spread = -18, Color = Color.FromArgb(110, accent.R, accent.G, accent.B) }),
-        };
+        var radius = new CornerRadius(Look.Radius == "sharp" ? 4 : 22);
+        var frame = new Border { CornerRadius = radius, ClipToBounds = true, Child = stage, ContextFlyout = GameCard.Menu(g) };
         // Если места мало, полка прячется — сцена не налезает сама на себя.
         frame.SizeChanged += (_, e) => shelf.IsVisible = e.NewSize.Width > 1080;
-        return frame;
+        // 12.0: мягкое свечение цветом игры под сценой — на обёртке: у Border с ClipToBounds тень обрезается.
+        return new Border { CornerRadius = radius, Child = frame, BoxShadow = new BoxShadows(new BoxShadow { OffsetY = 18, Blur = 60, Spread = -18, Color = Color.FromArgb(110, accent.R, accent.G, accent.B) }) };
     }
 
     Control StageCover(GameState g, bool on, bool compact)
