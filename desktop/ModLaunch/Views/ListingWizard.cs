@@ -266,38 +266,41 @@ public static class ListingWizard
 
         async Task Publish()
         {
-            var p = Market.ParseMoney(price.Text)!.Value;
-            var d = new ListingDraft
-            {
-                Title = title.Text ?? "", Summary = summary.Text ?? "", Description = description.Text ?? "",
-                Kind = kind, License = license, Game = gameIds[Math.Max(0, game.SelectedIndex)], Price = p, Version = (version.Text ?? "").Trim(),
-                Preview = preview.Text ?? "", Tags = [.. chosen], Hidden = hidden.IsChecked == true, File = file,
-                Images = (images.Text ?? "").Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList(),
-            };
-            // 11.0: файл проходит автомодерацию до загрузки. Код, скрипт и сборка продаются инжектом:
-            // вместо исходника покупатель видит, что мод меняет в игре.
-            if (file is not null)
-            {
-                var v = Moderation.Check(Path.GetFileName(file), await File.ReadAllBytesAsync(file));
-                Moderation.Note("lw_" + Path.GetFileName(file), d.Title, v, "publish");
-                if (!v.Ok)
-                {
-                    problems.Children.Clear();
-                    problems.Children.Add(CreatorPage.VerdictView(v));
-                    return;
-                }
-                if (Moderation.Sealed(d.Kind, d.License)) d.Preview = Moderation.Mark + v.Changes;
-            }
-            else if (Moderation.Sealed(d.Kind, d.License) && l is null) d.Preview = "";
+            // Кнопки — сразу, до первого await: пока читается файл и идёт проверка, второй щелчок создал бы второе объявление.
             nextButton.IsEnabled = back.IsEnabled = false;
-            bar.IsVisible = true;
             try
             {
+                var p = Market.ParseMoney(price.Text)!.Value;
+                var d = new ListingDraft
+                {
+                    Title = title.Text ?? "", Summary = summary.Text ?? "", Description = description.Text ?? "",
+                    Kind = kind, License = license, Game = gameIds[Math.Max(0, game.SelectedIndex)], Price = p, Version = (version.Text ?? "").Trim(),
+                    Preview = preview.Text ?? "", Tags = [.. chosen], Hidden = hidden.IsChecked == true, File = file,
+                    Images = (images.Text ?? "").Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList(),
+                };
+                // 11.0: файл проходит автомодерацию до загрузки. Код, скрипт и сборка продаются инжектом:
+                // вместо исходника покупатель видит, что мод меняет в игре.
+                if (file is not null)
+                {
+                    var v = Moderation.Check(Path.GetFileName(file), await File.ReadAllBytesAsync(file));
+                    Moderation.Note("lw_" + Path.GetFileName(file), d.Title, v, "publish");
+                    if (!v.Ok)
+                    {
+                        problems.Children.Clear();
+                        problems.Children.Add(CreatorPage.VerdictView(v));
+                        nextButton.IsEnabled = back.IsEnabled = true;
+                        return;
+                    }
+                    if (Moderation.Sealed(d.Kind, d.License)) d.Preview = Moderation.Mark + v.Changes;
+                }
+                else if (Moderation.Sealed(d.Kind, d.License) && l is null) d.Preview = "";
+                bar.IsVisible = true;
                 await Market.Save(d, l, new Progress<double>(r => bar.Value = r));
                 w.CloseDialog();
                 w.Toast(I18n.T(l is null ? "mk.published" : "mk.saved", ("title", d.Title)));
                 done?.Invoke();
             }
+            // Файл переместили или он занят — тоже сюда: раньше ошибка чтения терялась в «_ = Publish()».
             catch (Exception e) { w.Toast(Market.Explain(e), bad: true); nextButton.IsEnabled = back.IsEnabled = true; bar.IsVisible = false; }
         }
 

@@ -311,7 +311,6 @@ public sealed partial class MainWindow
         // Меню аккаунта — рядом с аватаром внизу боковой панели.
         _accountPanel.HorizontalAlignment = HorizontalAlignment.Left;
         _accountPanel.VerticalAlignment = VerticalAlignment.Bottom;
-        _accountPanel.Margin = new Thickness(RailWidth + 8, 0, 0, 12);
 
         var layers = new Panel();
         _layers = layers;
@@ -320,8 +319,19 @@ public sealed partial class MainWindow
         layers.Children.Add(_downloadsPanel);
         layers.Children.Add(_bellPanel);
         layers.Children.Add(_accountPanel);
-        _friendsDock = new FriendsDock();
-        layers.Children.Add(_friendsDock);
+        var dock = new FriendsDock();
+        _friendsDock = dock;
+        layers.Children.Add(dock);
+        // 11.0: низ окна занимает строка состояния — друзья, уведомления и меню аккаунта встают над ней, а не на ссылку «О программе».
+        void AboveStatus()
+        {
+            var h = status.IsVisible ? status.Height : 0;
+            _accountPanel.Margin = new Thickness(RailWidth + 8, 0, 0, 12 + h);
+            _toasts.Margin = new Thickness(0, 0, 24, 24 + h);
+            dock.Margin = new Thickness(0, 0, 18, 16 + h);
+        }
+        AboveStatus();
+        status.PropertyChanged += (_, e) => { if (e.Property == IsVisibleProperty) AboveStatus(); };
         // Анимация «Скачать» — поверх страницы и панелей, но под экраном запуска и окнами.
         layers.Children.Add(_fxLayer);
         layers.Children.Add(_launchLayer);

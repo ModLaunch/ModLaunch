@@ -27,8 +27,16 @@ public sealed partial class SettingsPage
         _ => tab,
     };
 
-    /// <summary>Подпись раздела: у пересобранных в 11.0 — новая (v11.set.d.*), у остальных — прежняя.</summary>
-    static string Desc(string id, string suffix = "") => I18n.Has($"v11.set.d.{id}{suffix}") ? I18n.T($"v11.set.d.{id}{suffix}") : I18n.T($"set.d.{id}{suffix}");
+    /// <summary>
+    /// Подпись раздела: у пересобранных в 11.0 — новая (v11.set.d.*), у остальных — прежняя.
+    /// Новой нет на языке интерфейса — прежняя на нём же, а если нет и её — новая по-английски (не ключ «set.d.general»).
+    /// </summary>
+    static string Desc(string id, string suffix = "")
+    {
+        string key = $"v11.set.d.{id}{suffix}", old = $"set.d.{id}{suffix}";
+        var v11 = I18n.Has(key) || !I18n.Has(old) && (I18n.Raw("en", key) ?? I18n.Raw("ru", key)) is not null;
+        return I18n.T(v11 ? key : old);
+    }
 
     /// <summary>Строка «название, пояснение — элемент справа».</summary>
     static DockPanel Line(string title, string hint, Control right)
@@ -209,25 +217,77 @@ public sealed partial class SettingsPage
     /// </summary>
     Control MotionSection()
     {
-        var d = Settings.Data;
-        var current = !Look.Animations ? "off" : GameOpenFx.Style == "classic" ? "bright" : "calm";
-        var motion = Segments([("calm", I18n.T("v11.set.motion.calm")), ("bright", I18n.T("v11.set.motion.bright")), ("off", I18n.T("v11.set.motion.off"))], current, v =>
+        // Смесь (например, своя заставка из 10.0) — ничего не выбрано, и нажатие на любой вариант его применит.
+        var motion = Segments([("calm", I18n.T("v11.set.motion.calm")), ("bright", I18n.T("v11.set.motion.bright")), ("off", I18n.T("v11.set.motion.off"))], Motion() ?? "", v =>
         {
-            var on = v != "off";
-            d["animations"] = on;
-            d["gameOpenStyle"] = v == "bright" ? "classic" : on ? "calm" : "off";
-            d["gameOpenFx"] = on;
-            d["launchFx"] = v == "bright" ? "calm" : "off";
-            d["installFx"] = on;
-            d["modOpenFx"] = v == "bright";
-            d["splash"] = v == "bright";
-            d.Remove("config");
-            Settings.Save();
+            SetMotion(v);
             MainWindow.Current?.Refresh();
             Build();
         });
         return Section(I18n.T("v10.set.motion"), I18n.T("v11.set.motion.hint"), motion,
             Toggle(I18n.T("look.smooth"), I18n.T("look.smooth.hint"), SmoothScroll.On, v => Settings.Data["smoothScroll"] = v));
+    }
+
+    static readonly string[] MotionModes = ["calm", "bright", "off"];
+
+    /// <summary>Записать режим движения: все шесть ключей анимаций.</summary>
+    static void SetMotion(string v)
+    {
+        var d = Settings.Data;
+        var on = v != "off";
+        d["animations"] = on;
+        d["gameOpenStyle"] = v == "bright" ? "classic" : on ? "calm" : "off";
+        d["gameOpenFx"] = on;
+        d["launchFx"] = v == "bright" ? "calm" : "off";
+        d["installFx"] = on;
+        d["modOpenFx"] = v == "bright";
+        d["splash"] = v == "bright";
+        d.Remove("config");
+        Settings.Save();
+    }
+
+    /// <summary>
+    /// Какой режим движения сейчас — по тому, что на деле играет (заставка, открытие игры и мода, запуск, установка);
+    /// null — не совпадает ни с одним.
+    /// </summary>
+    static string? Motion()
+    {
+        var d = Settings.Data;
+        var anim = Look.Animations;
+        var now = (anim, Open: anim ? GameOpenFx.Style : "off", Launch: anim && d.Str("launchFx") != "off", Install: anim && d.Bool("installFx", true),
+            ModOpen: anim && d.Bool("modOpenFx", true), Splash: d.Bool("splash", true));
+        foreach (var v in MotionModes)
+        {
+            var on = v != "off";
+            if (now == (on, v == "bright" ? "classic" : on ? "calm" : "off", v == "bright", on, v == "bright", v == "bright")) return v;
+        }
+        return null;
+    }
+
+    [SelfTest]
+    static string MotionModeMatchesWhatPlays()
+    {
+        var keys = new[] { "animations", "gameOpenStyle", "gameOpenFx", "launchFx", "installFx", "modOpenFx", "splash", "config" };
+        var was = keys.ToDictionary(k => k, k => Settings.Data[k]?.DeepClone());
+        try
+        {
+            foreach (var v in MotionModes)
+            {
+                SetMotion(v);
+                if (Motion() != v) throw new Exception($"{v} reads back as {Motion() ?? "none"}");
+            }
+            // «Спокойно», но заставка своя (включена) — это уже не «Спокойно».
+            SetMotion("calm");
+            Settings.Data["splash"] = true;
+            if (Motion() is not null) throw new Exception("calm with splash reads as " + Motion());
+            return "motion mode read from all six keys";
+        }
+        finally
+        {
+            foreach (var (k, v) in was)
+                if (v is null) Settings.Data.Remove(k); else Settings.Data[k] = v;
+            Settings.Save();
+        }
     }
 
     /// <summary>Главная и боковая панель: что показывать.</summary>
@@ -295,7 +355,8 @@ public sealed partial class SettingsPage
             Ui.Col(8, Ui.Text(I18n.T("look.bg"), "h3"), backdrops),
             Toggle(I18n.T("v10.fx.scan"), I18n.T("v10.fx.scan.hint"), Look.Scanlines, v => { Look.SetEffect("fxScanlines", v); Settings.Data.Remove("config"); }),
             Toggle(I18n.T("v10.fx.vignette"), I18n.T("v10.fx.vignette.hint"), Look.Vignette, v => { Look.SetEffect("fxVignette", v); Settings.Data.Remove("config"); }),
-            Ui.Button(I18n.T("look.reset"), () => { Configs.Apply(Configs.BuiltIn()[0]); Build(); }, "ghost", Icons.Undo));
+            // Только оформление: раскладка главной, картинка на ней и анимации остаются свои.
+            Ui.Button(I18n.T("look.reset"), () => { Configs.Apply(Look.Pro("widget", "home_hero", "anim_open", "anim_launch")); Build(); }, "ghost", Icons.Undo));
         var expander = new Expander
         {
             Header = Ui.Col(2, Ui.Text(I18n.T("v11.set.fine"), "h3"), Ui.Text(I18n.T("v11.set.fine.hint"), "small muted", wrap: true)),

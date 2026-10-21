@@ -81,14 +81,17 @@ public static class Look
             Settings.Data["stylePicked92"] = true;
             // Классическая главная 9.x убрана из настроек — у всех главная 10.0+.
             Settings.Data.Remove("homeStyle");
-            var fresh = !Settings.Data.Bool("look92");
-            var untouched = Settings.Data.Str("config") is null or "modlaunch" && Settings.Data.Str("theme") is null or "store" && Settings.Data.Str("accent") is null or "#7B5CFF";
-            if (fresh || untouched)
+            // Свои тема, шрифт, углы, свечение или анимации остаются как были (вид 10.0: широкие заголовки и свечение — по умолчанию).
+            if (LookUntouched())
             {
                 Settings.Data["look92"] = true;
                 Settings.Data["look9"] = true;
                 Settings.Data["showBrand"] = false;
-                Configs.Apply(Configs.BuiltIn().First(c => c.Id == "pro"), apply: false);
+                // «Спокойное» движение целиком: без заставки и эффекта открытия мода, если их не выбирали сами.
+                if (Settings.Data["splash"] is null) Settings.Data["splash"] = false;
+                if (Settings.Data["modOpenFx"] is null) Settings.Data["modOpenFx"] = false;
+                // Раскладку главной не трогаем: без неё и так стандартная раскладка 11.0, а свою не стираем.
+                Configs.Apply(Pro("widget"), apply: false);
                 return;
             }
         }
@@ -114,6 +117,79 @@ public static class Look
         if (Settings.Data.Str("font") is null or "Inter") Settings.Data["font"] = "Onest";
         Settings.Data["showBrand"] = false;
         Settings.Save();
+    }
+
+    /// <summary>
+    /// 11.0: оформление не меняли — каждый ключ, который пишет «Строгий», не задан или стоит как в 10.0.
+    /// До 9.2 стандартными считаются и тема, акцент и шрифт прошлых версий: их всё равно сменил бы переход 9.2.
+    /// </summary>
+    static bool LookUntouched()
+    {
+        var d = Settings.Data;
+        var old = !d.Bool("look92");
+        return d.Str("config") is null or "modlaunch"
+            && (d.Str("theme") is null or "store" || old && d.Str("theme") is "ink" or "dark" or "graphite")
+            && (d.Str("accent")?.ToUpperInvariant() is null or "#7B5CFF" || old && d.Str("accent")?.ToUpperInvariant() is "#6E4BFF" or "#7C5CFF" or "#F2483A")
+            && (d.Str("font") is null or "Onest" || old && d.Str("font") == "Inter")
+            && d.Str("radius") is null or "normal"
+            && d.Str("headings") is null or "ui"
+            && Glow >= 1
+            && !d.Bool("fxScanlines") && !d.Bool("fxVignette")
+            && d.Str("gameOpenStyle") is null or "calm" && d.Bool("gameOpenFx", true)
+            && d.Str("launchFx") is null or "calm"
+            && d.Str("homeHero") is null or "stage";
+    }
+
+    /// <summary>Конфиг «Строгий» без части строк (widget, home_hero…) — чтобы не трогать то, что к оформлению не относится.</summary>
+    public static UiConfig Pro(params string[] skip)
+    {
+        var pro = Configs.BuiltIn().First(c => c.Id == "pro");
+        return pro with { Lines = pro.Lines.Where(l => !skip.Contains(l.Key)).ToList() };
+    }
+
+    [SelfTest]
+    static string Look11KeepsCustomizations()
+    {
+        var saved = (System.Text.Json.Nodes.JsonObject)Settings.Data.DeepClone();
+        string? Run(Action<System.Text.Json.Nodes.JsonObject> setup, Func<System.Text.Json.Nodes.JsonObject, bool> ok)
+        {
+            Settings.Data.Clear();
+            setup(Settings.Data);
+            Migrate();
+            return ok(Settings.Data) ? null : Settings.Data.ToJsonString();
+        }
+        try
+        {
+            var widgets = new System.Text.Json.Nodes.JsonArray("clock m", "level s");
+            var fails = new[]
+            {
+                // Первый запуск: «Строгий» и «Спокойное» движение, раскладка главной — стандартная 11.0.
+                ("fresh", Run(_ => { }, d => d.Str("theme") == "slate" && d.Str("headings") == "ui" && d["widgets"] is null && !d.Bool("splash", true))),
+                // 10.0 со стандартным видом, но своей раскладкой главной: вид меняется, раскладка — нет.
+                ("widgets", Run(d => { d["look92"] = true; d["look9"] = true; d["config"] = "modlaunch"; d["widgets"] = widgets.DeepClone(); },
+                    d => d.Str("theme") == "slate" && d["widgets"]?.ToJsonString() == widgets.ToJsonString())),
+                // Свой шрифт или анимация в 10.0 — «Строгий» не включается.
+                ("font", Run(d => { d["look92"] = true; d["look9"] = true; d["theme"] = "store"; d["font"] = "Segoe UI"; }, d => d.Str("theme") == "store" && d.Str("font") == "Segoe UI" && d["headings"] is null)),
+                ("anim", Run(d => { d["look92"] = true; d["look9"] = true; d["gameOpenStyle"] = "classic"; }, d => d["theme"] is null && d.Str("gameOpenStyle") == "classic")),
+                // 9.1 со своей темой и акцентом — их сохраняет переход 9.2, а не заменяет 11.0.
+                ("9.1 custom", Run(d => { d["look9"] = true; d["theme"] = "light"; d["accent"] = "#22C55E"; }, d => d.Str("theme") == "light" && d.Str("accent") == "#22C55E")),
+                // 9.1 со стандартным видом 9.0 — «Строгий».
+                ("9.1 default", Run(d => { d["look9"] = true; d["theme"] = "ink"; d["accent"] = "#6E4BFF"; d["font"] = "Onest"; }, d => d.Str("theme") == "slate")),
+            }.Where(f => f.Item2 is not null).ToList();
+            if (fails.Count > 0) throw new Exception(string.Join("; ", fails.Select(f => $"{f.Item1}: {f.Item2}")));
+            return "look11 switches only untouched looks, keeps widgets";
+        }
+        finally
+        {
+            Settings.Data.Clear();
+            foreach (var key in saved.Select(kv => kv.Key).ToList())
+            {
+                var v = saved[key];
+                saved.Remove(key);
+                Settings.Data[key] = v;
+            }
+            Settings.Save();
+        }
     }
 
     public static readonly string[] Accents = ["#7B5CFF", "#D7262E", "#2BD46F", "#6E4BFF", "#F2483A", "#7C5CFF","#3B82F6", "#14B8A6", "#22C55E", "#EAB308", "#F97316", "#EF4444", "#EC4899", "#06B6D4", "#A3E635", "#F43F5E", "#8B5CF6", "#1BD96A", "#0078D4", "#FFFFFF"];

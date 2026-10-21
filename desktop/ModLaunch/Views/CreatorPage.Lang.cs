@@ -60,11 +60,14 @@ public sealed partial class CreatorPage
 
     Control Lang()
     {
-        _lxPath ??= Settings.Data.Str("lxFile");
+        // Файл из настроек — только при первом открытии: после «Нового» путь пустой, иначе сохранение записало бы пример поверх своего мода.
         if (_lxText is null)
         {
-            try { _lxText = _lxPath is not null && File.Exists(_lxPath) ? File.ReadAllText(_lxPath) : Example("arena"); }
-            catch (IOException) { _lxText = Example("arena"); }
+            _lxPath ??= Settings.Data.Str("lxFile");
+            try { _lxText = _lxPath is not null && File.Exists(_lxPath) ? File.ReadAllText(_lxPath) : null; }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException) { _lxText = null; }
+            // Файла нет или он не читается — новый документ, а не пример под старым именем.
+            if (_lxText is null) { _lxPath = null; _lxText = Example("arena"); }
         }
         var doc = MX.ModxDoc.Parse(_lxText);
 
@@ -90,7 +93,7 @@ public sealed partial class CreatorPage
         var problems = doc.Diags.Count == 0
             ? Ui.Row(6, Ui.Icon(Icons.Check, 14, Ui.Res("Good")), Ui.Text(I18n.T("v11.lx.ok", ("hooks", doc.Hooks.Count), ("fns", doc.Functions.Count)), "small muted"))
             : Ui.Col(4, doc.Diags.Take(4).Select(d => (Control)Ui.Row(6, Ui.Icon(Icons.Alert, 14, d.Warning ? Ui.Res("Warn") : Ui.Res("Bad")),
-                Ui.Text((d.Line > 0 ? I18n.T("v11.lx.line", ("n", d.Line)) + " · " : "") + d.Message, "small", color: d.Warning ? Ui.Res("Warn") : Ui.Res("Bad")))).ToArray());
+                Ui.Text((d.Line > 0 ? I18n.T("v11.lx.line", ("n", d.Line)) + " · " : "") + LxMsg(d), "small", color: d.Warning ? Ui.Res("Warn") : Ui.Res("Bad")))).ToArray());
         var editorCard = Ui.Card(Ui.Col(10, Ui.Row(8, Ui.Icon(Icons.Code, 15, Ui.Res("Muted")), Ui.Text(fileName, "small muted")), _lxEditor, problems), 14);
 
         // ---- правая панель: песочница, код движка, справка
@@ -136,7 +139,7 @@ public sealed partial class CreatorPage
                 Ui.Text(I18n.T(r.Ok ? "v11.lx.ran" : "v11.lx.failed", ("steps", r.Steps)), "small", color: r.Ok ? Ui.Res("Good") : Ui.Res("Bad"))));
             col.Children.Add(new Border { Background = Ui.Res("Surface2"), CornerRadius = new CornerRadius(8), Padding = new Thickness(12, 10), Child = new ScrollViewer { MaxHeight = 200, Content = output } });
             foreach (var e in r.Errors.Take(5))
-                col.Children.Add(Ui.Text(I18n.T("v11.lx.line", ("n", e.Line)) + " · " + e.Message, "small", color: e.Warning ? Ui.Res("Warn") : Ui.Res("Bad"), wrap: true));
+                col.Children.Add(Ui.Text(I18n.T("v11.lx.line", ("n", e.Line)) + " · " + LxMsg(e), "small", color: e.Warning ? Ui.Res("Warn") : Ui.Res("Bad"), wrap: true));
             var table = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*"), ColumnSpacing = 14, RowSpacing = 4 };
             var row = 0;
             foreach (var (name, value) in r.Vars.Take(24))
@@ -167,8 +170,16 @@ public sealed partial class CreatorPage
         var errors = new List<Diag>();
         var vars = MX.Sandbox.ParseVars(_lxVars, errors);
         _lxResult = MX.Sandbox.Run(doc, vars, _lxTicks);
-        foreach (var e in errors) _lxResult.Errors.Add(new Diag(e.Line, I18n.T("v11.lx.varsBad") + ": " + e.Message, true));
+        foreach (var e in errors) _lxResult.Errors.Add(new Diag(e.Line, I18n.T("v11.lx.varsBad") + ": " + LxMsg(e), true));
         Build();
+    }
+
+    /// <summary>Сообщение ModScript X: ключи err.* — переводом (cr.err.*, как в редакторе), остальное и непереведённое — как есть.</summary>
+    static string LxMsg(Diag d)
+    {
+        if (!d.Message.StartsWith("err.")) return d.Message;
+        var text = Msg(d);
+        return text.StartsWith("cr.err.") ? d.Message : text;
     }
 
     /// <summary>Во что переведётся мод: код выбранного движка.</summary>
@@ -307,7 +318,7 @@ public sealed partial class CreatorPage
         _lxText = text;
         try
         {
-            _lxPath ??= Path.Combine(ScriptsDir(), MX.ModxDoc.Parse(text).Id.ToLowerInvariant() + MX.ModxDoc.Extension);
+            _lxPath ??= FreeModxPath(ScriptsDir(), MX.ModxDoc.Parse(text).Id.ToLowerInvariant());
             File.WriteAllText(_lxPath, text);
             Settings.Data["lxFile"] = _lxPath;
             Settings.Save();
@@ -320,6 +331,36 @@ public sealed partial class CreatorPage
             MainWindow.Current?.Toast(e.Message, bad: true);
             return false;
         }
+    }
+
+    /// <summary>Свободное имя для нового .modx: arena.modx, arena-2.modx… — другой файл с тем же именем мода не затираем.</summary>
+    internal static string FreeModxPath(string dir, string id)
+    {
+        var path = Path.Combine(dir, id + MX.ModxDoc.Extension);
+        for (var n = 2; File.Exists(path); n++) path = Path.Combine(dir, $"{id}-{n}{MX.ModxDoc.Extension}");
+        return path;
+    }
+
+    [SelfTest]
+    static string NewModxNeverOverwrites()
+    {
+        var dir = Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "modlaunch-modx-" + Guid.NewGuid().ToString("N"))).FullName;
+        try
+        {
+            var first = FreeModxPath(dir, "arena");
+            if (Path.GetFileName(first) != "arena.modx") throw new Exception("first: " + first);
+            File.WriteAllText(first, "mine");
+            var second = FreeModxPath(dir, "arena");
+            if (Path.GetFileName(second) != "arena-2.modx") throw new Exception("second: " + second);
+            File.WriteAllText(second, "mine too");
+            if (Path.GetFileName(FreeModxPath(dir, "arena")) != "arena-3.modx") throw new Exception("third");
+            // Ключи разбора — переводом (если словари загружены: в --selfcheck их нет), обычный текст — как есть.
+            var translated = I18n.T("cr.err.openBrace") != "cr.err.openBrace";
+            if (translated && LxMsg(new Diag(7, "err.openBrace")) == "err.openBrace" || LxMsg(new Diag(1, "err.noSuchKey")) != "err.noSuchKey" || LxMsg(new Diag(1, "a | b")) != "a | b")
+                throw new Exception("diag text");
+            return "new .modx gets a free name, diag keys translated";
+        }
+        finally { try { Directory.Delete(dir, true); } catch (IOException) { } }
     }
 
     // ---------------------------------------------------------------- «Инжекты»: библиотека и журнал автомодерации
@@ -354,7 +395,7 @@ public sealed partial class CreatorPage
             var words = Ui.Col(4, Ui.Row(8, Ui.Text(i.Title, "h3"), tags),
                 Ui.Text(i.Changes == "" ? I18n.T("v11.inj.noSource") : i.Changes, "small muted", wrap: true),
                 Ui.Text(i.Sealed ? I18n.T("v11.inj.sealed", ("seller", i.Seller)) : i.LocalPath ?? "", "small muted"));
-            var right = Ui.Row(10, game, on, Ui.Button("", () => { Features.Inject.Remove(item.Id); Build(); }, "icon ghost", Icons.Trash, I18n.T("common.remove")));
+            var right = Ui.Row(10, game, on, Ui.Button("", () => { Features.Inject.Remove(item.Id); Build(); }, "icon ghost", Icons.Trash, I18n.T("ctx.delete")));
             right.VerticalAlignment = VerticalAlignment.Center;
             var row = new DockPanel();
             DockPanel.SetDock(right, Dock.Right);
