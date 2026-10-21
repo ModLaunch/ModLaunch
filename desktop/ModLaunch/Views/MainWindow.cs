@@ -928,6 +928,8 @@ public sealed partial class MainWindow : Window
                 try
                 {
                     await Setup.Updater.Fetch(new Progress<double>(r => bar.Value = r));
+                    // Установщик закрывает ModLaunch вместе с дочерними процессами: свои серверы Minecraft — сначала сохранить и остановить.
+                    await Task.Run(Minecraft.McHost.StopAll);
                     Setup.Updater.Launch();
                     Close();
                 }

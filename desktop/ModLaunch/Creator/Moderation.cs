@@ -93,6 +93,15 @@ public static class Moderation
     static readonly HashSet<string> Executables = new(StringComparer.OrdinalIgnoreCase)
     { ".exe", ".com", ".scr", ".bat", ".cmd", ".ps1", ".psm1", ".vbs", ".vbe", ".wsf", ".hta", ".msi", ".msp", ".reg", ".lnk", ".cpl", ".sys", ".inf" };
 
+    /// <summary>Текст ошибки разбора: ключ err.* (с подстановкой после «|») — из словаря cr.*, остальное как есть.</summary>
+    static string Explain(string message)
+    {
+        if (!message.StartsWith("err.", StringComparison.Ordinal)) return message;
+        var parts = message.Split('|', 2);
+        var text = I18n.T("cr." + parts[0], ("x", parts.Length > 1 ? parts[1] : ""));
+        return text == "cr." + parts[0] ? message : text;
+    }
+
     /// <summary>Проверить .modx: разбор, native-блоки, песочница.</summary>
     public static Verdict CheckModx(string source)
     {
@@ -100,7 +109,7 @@ public static class Moderation
         if (Encoding.UTF8.GetByteCount(source) > MaxSource) found.Add(new("block", I18n.T("v11.mod.big", ("kb", MaxSource / 1024))));
         var doc = MX.ModxDoc.Parse(source);
         foreach (var d in doc.Diags.Where(d => !d.Warning).Take(3))
-            found.Add(new("block", I18n.T("v11.mod.parse", ("line", d.Line), ("text", d.Message))));
+            found.Add(new("block", I18n.T("v11.mod.parse", ("line", d.Line), ("text", Explain(d.Message)))));
         foreach (var n in doc.Natives)
         {
             if (!Forbidden.TryGetValue(n.Lang, out var rules)) continue;
@@ -308,8 +317,8 @@ public static class Moderation
         if (!api.Ok) throw new Exception("game API call blocked: " + string.Join("; ", api.Findings.Select(f => f.Text)));
         var loop = CheckModx("mod \"Loop\"\nhook tick {\n  while true {\n    add x 1\n  }\n}\n");
         if (loop.Ok) throw new Exception("endless loop passed");
-        // 1.2: мод, роняющий песочницу (rand без второго аргумента → кривые границы), блокируется, а не пропускается.
-        if (CheckModx("mod \"Crash\"\nhook start {\n  set x = rand(5, missing)\n}\n").Ok) throw new Exception("sandbox crash passed");
+        // 1.2: то, что роняло песочницу (rand с перепутанными границами, список внутри себя), больше не роняет и проверку.
+        CheckModx("mod \"Crash\"\nhook start {\n  set x = rand(5, missing)\n  let a = [0]\n  a[0] = a\n  log a\n}\n");
         using var ms = new MemoryStream();
         using (var zip = new ZipArchive(ms, ZipArchiveMode.Create, true))
         {
@@ -320,6 +329,6 @@ public static class Moderation
         }
         var pkg = CheckPackage(ms.ToArray());
         if (pkg.Ok || pkg.Findings.Count(f => f.Level == "block") < 3) throw new Exception("zip slip, .bat or trailing-dot .bat passed");
-        return "clean .modx passes; os/eval/import, hook-body RCE, sandbox crashes, endless loops, ../ and .bat are blocked";
+        return "clean .modx passes; os/eval/import, hook-body RCE, endless loops, ../ and .bat are blocked; sandbox crashes are gone";
     }
 }
