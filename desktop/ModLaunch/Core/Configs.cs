@@ -44,6 +44,27 @@ public static class Configs
 
     public static List<UiConfig> BuiltIn() =>
     [
+        // 11.0: по умолчанию — спокойный «взрослый» лаунчер: графит, синий акцент, обычные заголовки, без свечения и игровых счётчиков.
+        Make("pro", "ModLaunch", """
+            theme slate
+            accent "#3B82F6"
+            font Inter
+            headings ui
+            radius normal
+            glow 0
+            fx_scanlines 0
+            fx_vignette 0
+            anim_open calm
+            anim_launch off
+            home_hero stage
+            widget continue m
+            widget builds s
+            widget playtime s
+            widget friends m
+            widget attention s
+            widget autopilot s
+            widget downloads m
+            """),
         Make("modlaunch", "ModLaunch", """
             theme store
             accent "#7B5CFF"
@@ -263,7 +284,7 @@ public static class Configs
     // ---------------------------------------------------------------- применить и снять
 
     /// <summary>Применить конфиг: неизвестные команды пропускаются, всё остальное — сразу на экране.</summary>
-    public static void Apply(UiConfig c)
+    public static void Apply(UiConfig c, bool apply = true)
     {
         var d = Settings.Data;
         var palette = new JsonObject();
@@ -284,6 +305,8 @@ public static class Configs
                 case "anim_open" when value is "calm" or "classic" or "off": d["gameOpenStyle"] = value; break;
                 case "anim_launch" when value is "calm" or "off": d["launchFx"] = value; break;
                 case "home_hero" when value is "stage" or "compact" or "off": d["homeHero"] = value; break;
+                case "headings" when value is "ui" or "wide": d["headings"] = value; break;
+                case "glow" when double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var g) && g is >= 0 and <= 1: d["glow"] = g; break;
                 default:
                     if (ColorCommand.FirstOrDefault(x => x.Value == key).Key is { } color && Avalonia.Media.Color.TryParse(value, out _)) palette[color] = value;
                     break;
@@ -295,11 +318,15 @@ public static class Configs
             d["customPalette"] = palette;
             d["theme"] = "custom";
         }
+        // Конфиги 10.0 не знают заголовков и свечения — у них вид 10.0 (широкие заголовки, свечение).
+        if (c.Get("headings") is null) d["headings"] = "wide";
+        if (c.Get("glow") is null) d["glow"] = 1;
         var widgets = c.Widgets();
         if (widgets.Count > 0) Widgets.Set(widgets);
         d["design"] = "store";
         d["config"] = c.Id;
         Settings.Save();
+        if (!apply) return;
         Look.Apply();
         Widgets.Notify();
     }
@@ -330,6 +357,8 @@ public static class Configs
         sb.AppendLine("anim_open " + (d.Str("gameOpenStyle") ?? "calm"));
         sb.AppendLine("anim_launch " + (d.Str("launchFx") ?? "calm"));
         sb.AppendLine("home_hero " + (d.Str("homeHero") ?? "stage"));
+        sb.AppendLine("headings " + (Look.WideHeadings ? "wide" : "ui"));
+        sb.AppendLine("glow " + Look.Glow.ToString(CultureInfo.InvariantCulture));
         foreach (var (id, size) in Widgets.Layout()) sb.AppendLine($"widget {id} {size}");
         return sb.ToString();
     }

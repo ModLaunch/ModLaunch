@@ -101,7 +101,7 @@ public sealed partial class MainWindow
         {
             Width = 3, Height = active ? 20 : 0, CornerRadius = new CornerRadius(2), Background = Ui.Res("Brand"),
             HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center,
-            BoxShadow = active ? new BoxShadows(new BoxShadow { Blur = 10, Spread = 1, Color = WithAlpha(Ui.Res("Brand"), 200) }) : default,
+            BoxShadow = active && !Look.Calm ? new BoxShadows(new BoxShadow { Blur = 10, Spread = 1, Color = WithAlpha(Ui.Res("Brand"), 200) }) : default,
         };
         return new Panel { Children = { col, pip } };
     }
@@ -136,7 +136,8 @@ public sealed partial class MainWindow
         var bottom = new StackPanel { Spacing = 2, Margin = new Thickness(0, 4, 0, 10), HorizontalAlignment = HorizontalAlignment.Center };
         bottom.Children.Add(RailLine(new Thickness(0, 4, 0, 6)));
         // 9.3: второстепенное — значками без подписей (подсказка при наведении), чтобы панель не шумела.
-        foreach (var b in new[] { _friendsButton, _statsButton, _donateButton, _settingsButton }) { _secondary.Add(b); bottom.Children.Add(b); }
+        // 11.0: «Поддержать» — в «О программе» и меню «…», не на панели.
+        foreach (var b in new[] { _friendsButton, _statsButton, _settingsButton }) { _secondary.Add(b); bottom.Children.Add(b); }
         // Аккаунт — самым нижним пунктом: аватар с точкой «в сети».
         _accountButton.Classes.Clear();
         _accountButton.Classes.Add("nav");
@@ -292,7 +293,12 @@ public sealed partial class MainWindow
             UpdateAdVisibility();
         };
 
-        var root = new Grid { RowDefinitions = new RowDefinitions($"{TitleHeight.ToString(System.Globalization.CultureInfo.InvariantCulture)},*"), ColumnDefinitions = new ColumnDefinitions("Auto,*") };
+        var root = new Grid { RowDefinitions = new RowDefinitions($"{TitleHeight.ToString(System.Globalization.CultureInfo.InvariantCulture)},*,Auto"), ColumnDefinitions = new ColumnDefinitions("Auto,*") };
+        // 11.0: строка состояния — сеть, инжектор, бэкап.
+        var status = new StatusBar();
+        Grid.SetRow(status, 2);
+        Grid.SetColumnSpan(status, 2);
+        root.Children.Add(status);
         Grid.SetColumnSpan(titlebar, 2);
         root.Children.Add(titlebar);
         Grid.SetRow(railBorder, 1);
@@ -305,7 +311,6 @@ public sealed partial class MainWindow
         // Меню аккаунта — рядом с аватаром внизу боковой панели.
         _accountPanel.HorizontalAlignment = HorizontalAlignment.Left;
         _accountPanel.VerticalAlignment = VerticalAlignment.Bottom;
-        _accountPanel.Margin = new Thickness(RailWidth + 8, 0, 0, 12);
 
         var layers = new Panel();
         _layers = layers;
@@ -314,8 +319,19 @@ public sealed partial class MainWindow
         layers.Children.Add(_downloadsPanel);
         layers.Children.Add(_bellPanel);
         layers.Children.Add(_accountPanel);
-        _friendsDock = new FriendsDock();
-        layers.Children.Add(_friendsDock);
+        var dock = new FriendsDock();
+        _friendsDock = dock;
+        layers.Children.Add(dock);
+        // 11.0: низ окна занимает строка состояния — друзья, уведомления и меню аккаунта встают над ней, а не на ссылку «О программе».
+        void AboveStatus()
+        {
+            var h = status.IsVisible ? status.Height : 0;
+            _accountPanel.Margin = new Thickness(RailWidth + 8, 0, 0, 12 + h);
+            _toasts.Margin = new Thickness(0, 0, 24, 24 + h);
+            dock.Margin = new Thickness(0, 0, 18, 16 + h);
+        }
+        AboveStatus();
+        status.PropertyChanged += (_, e) => { if (e.Property == IsVisibleProperty) AboveStatus(); };
         // Анимация «Скачать» — поверх страницы и панелей, но под экраном запуска и окнами.
         layers.Children.Add(_fxLayer);
         layers.Children.Add(_launchLayer);
@@ -418,7 +434,7 @@ public sealed partial class MainWindow
         var view = Social.Friends.View();
         _friendsBadge.IsVisible = view.Incoming.Count > 0 || view.Friends.Any(f => f.State != "offline");
         _friendsBadge.Background = view.Incoming.Count > 0 ? Ui.Res("Warn") : Ui.Res("Good");
-        SetNav(_friendsButton, _current is FriendsPage, _friendsBadge);
+        SetNav(_friendsButton, _current is FriendsPage or CommunityPage, _friendsBadge);
         SetNav(_statsButton, _current is StatsPage);
         SetNav(_donateButton, _current is DonatePage);
         SetNav(_settingsButton, _current is SettingsPage);

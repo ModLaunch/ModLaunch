@@ -37,7 +37,10 @@ public static class Injector
         var doc = ModxDoc.Parse(source);
         var t = Resolve(doc, null, targetId, doc.Diags);
         if (t == null || !doc.Ok) return new Result(doc, t, [], null);
-        var files = Write(t.Emit(doc, null), outDir);
+        var outFiles = t.Emit(doc, null);
+        // Emit проверяет имена под язык движка (base в C#, end в Lua): с ошибкой файлы не пишем.
+        if (!doc.Ok) return new Result(doc, t, [], null);
+        var files = Write(outFiles, outDir);
         return new Result(doc, t, files, null);
     }
 
@@ -53,6 +56,7 @@ public static class Injector
         var t = Resolve(doc, gameDir, targetId, doc.Diags);
         if (t == null || !doc.Ok) return new Result(doc, t, [], null);
         var outFiles = t.Emit(doc, gameDir);
+        if (!doc.Ok) return new Result(doc, t, [], null);
         var files = Write(outFiles, gameDir);
         var note = t.AfterInstall(doc, gameDir);
         Remember(gameDir, doc.Id, t.Id, outFiles.Select(f => f.Path).ToList());

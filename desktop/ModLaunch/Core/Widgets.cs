@@ -19,6 +19,7 @@ public static class Widgets
         new("friends", "Users", ["m", "l"]),
         new("tip", "Sparkles", ["m"]),
         new("playtime", "Chart", ["s", "m"]),
+        new("builds", "Hourglass", ["s", "m"]),
         new("downloads", "Download", ["m", "l"]),
         new("library", "Grid", ["m", "l"]),
         new("attention", "Bell", ["s", "m"]),
@@ -26,11 +27,12 @@ public static class Widgets
         new("random", "Shuffle", ["s", "m"]),
     ];
 
+    /// <summary>11.0: по умолчанию — дело, а не счётчики: продолжить, часы по сборкам, друзья, что требует внимания.</summary>
     public static readonly (string Id, string Size)[] Default =
     [
-        ("continue", "m"), ("clock", "s"), ("level", "s"),
-        ("autopilot", "s"), ("streak", "s"), ("friends", "m"),
-        ("tip", "m"), ("playtime", "s"), ("attention", "s"),
+        ("continue", "m"), ("builds", "s"), ("playtime", "s"),
+        ("friends", "m"), ("attention", "s"), ("autopilot", "s"),
+        ("downloads", "m"),
     ];
 
     public static Kind? Find(string id) => Catalog.FirstOrDefault(k => k.Id == id);

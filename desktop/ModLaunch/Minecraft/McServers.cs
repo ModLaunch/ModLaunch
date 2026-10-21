@@ -100,7 +100,8 @@ public static partial class McServers
         cts.CancelAfter(TimeSpan.FromSeconds(6));
         try
         {
-            if (Offline.On) throw new OfflineException();
+            // Свой сервер и серверы домашней сети пингуются и без интернета.
+            if (Offline.On && !Offline.IsLocal(host)) throw new OfflineException();
             using var tcp = new TcpClient { NoDelay = true };
             var watch = Stopwatch.StartNew();
             await tcp.ConnectAsync(host, port, cts.Token);

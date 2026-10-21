@@ -13,13 +13,15 @@ public static partial class Actions
     /// <summary>
     /// Поставить сборку из кода как у друга: те же версии модов (другие версии заменяются),
     /// по желанию — выключить лишние и взять настройки. Перед этим — снимок «как было».
+    /// 11.0: задача завершается, когда сборка встала (true) или не встала — так «Подключиться» к серверу
+    /// друга запускает игру только после установки.
     /// </summary>
-    public static void InstallCode(GameState g, CodeProfile profile, bool withConfig, bool disableOthers)
+    public static Task<bool> InstallCode(GameState g, CodeProfile profile, bool withConfig, bool disableOthers)
     {
-        if (g.Registry is null || NeedLoader(g)) return;
+        if (g.Registry is null || NeedLoader(g)) return Task.FromResult(false);
         var registry = g.Registry;
         var community = g.Def.ThunderstoreCommunity!;
-        Jobs.Run(profile.Name, g.Def.Name, async (_, progress, ct) =>
+        var job = Jobs.Run(profile.Name, g.Def.Name, async (_, progress, ct) =>
         {
             Snapshots.Take(g, "code");
             var mods = profile.Mods.Where(m => !Installer.IsLoader(g.Def, m.Id)).ToList();
@@ -55,6 +57,15 @@ public static partial class Actions
             Dispatcher.UIThread.Post(AppState.Notify);
             if (failed.Count > 0) throw new InvalidOperationException(I18n.T("code.failedSome", ("list", string.Join(", ", failed.Take(8)))));
         });
+        var done = new TaskCompletionSource<bool>();
+        void OnFinished(Job j)
+        {
+            if (j != job) return;
+            Jobs.Finished -= OnFinished;
+            done.TrySetResult(j.Status == JobStatus.Done);
+        }
+        Jobs.Finished += OnFinished;
+        return done.Task;
     }
 
     /// <summary>Поставить недостающие моды и нужные версии: из архива загрузок, с Thunderstore точной версии, с Nexus — последней.</summary>

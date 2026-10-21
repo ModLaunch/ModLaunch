@@ -14,13 +14,6 @@ namespace ModLaunch.Views;
 /// </summary>
 public sealed partial class SettingsPage
 {
-    Control ConfigsTab()
-    {
-        var col = Ui.Col(16, ConfigsSection(), CustomSection(), MotionSection());
-        // Без «кирпичиков»: карточкам конфигов нужна вся ширина.
-        return new Border { Child = col };
-    }
-
     Control ConfigsSection()
     {
         var w = MainWindow.Current!;
@@ -141,90 +134,6 @@ public sealed partial class SettingsPage
             Child = Ui.Col(10, shot, Ui.Col(3, title, about), actions),
         };
         return card;
-    }
-
-    /// <summary>Полная кастомизация: каждый цвет, акцент, шрифт, углы, эффекты и главная.</summary>
-    Control CustomSection()
-    {
-        var colors = new WrapPanel();
-        var now = Look.Current;
-        foreach (var key in Look.ColorKeys)
-        {
-            var k = key;
-            var swatch = new Border { Width = 26, Height = 26, CornerRadius = new CornerRadius(8), Background = Ui.Hex(now[key]), BorderBrush = Ui.Res("Line"), BorderThickness = new Thickness(1) };
-            var box = new TextBox { Text = now[key], Width = 92, FontFamily = new FontFamily("Consolas, monospace"), FontSize = 12.5 };
-            void Commit()
-            {
-                var hex = (box.Text ?? "").Trim();
-                if (!hex.StartsWith('#')) hex = "#" + hex;
-                if (hex.Length != 7 || !Color.TryParse(hex, out _)) { box.Text = Look.Current[k]; return; }
-                if (hex.Equals(Look.Current[k], StringComparison.OrdinalIgnoreCase)) return;
-                Look.SetColor(k, hex.ToUpperInvariant());
-                Settings.Data.Remove("config");
-                Build();
-            }
-            box.LostFocus += (_, _) => Commit();
-            box.KeyDown += (_, e) => { if (e.Key == Avalonia.Input.Key.Enter) Commit(); };
-            var cell = Ui.Row(8, swatch, Ui.Col(2, new TextBlock { Text = I18n.T("v10.color." + key.ToLowerInvariant()), FontSize = 12, Foreground = Ui.Res("Muted") }, box));
-            cell.Margin = new Thickness(0, 0, 18, 12);
-            cell.Width = 196;
-            colors.Children.Add(cell);
-        }
-
-        var accents = new WrapPanel();
-        var list = Look.Accents.Take(20).ToList();
-        list.Insert(0, GoldAccent);
-        foreach (var hex in list.Distinct())
-        {
-            var h = hex;
-            var on = Look.Accent.Equals(hex, StringComparison.OrdinalIgnoreCase);
-            var dot = new Border
-            {
-                Width = 30, Height = 30, CornerRadius = new CornerRadius(15), Background = Ui.Hex(hex), Margin = new Thickness(0, 0, 8, 8),
-                BorderBrush = on ? Ui.Res("Text") : Brushes.Transparent, BorderThickness = new Thickness(on ? 3 : 0), Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand),
-            };
-            if (h == GoldAccent) ToolTip.SetTip(dot, I18n.T("v10.accent.gold"));
-            StoreKit.OnClick(dot, () => { Look.SetAccent(h); Settings.Data.Remove("config"); Settings.Save(); Build(); });
-            accents.Children.Add(dot);
-        }
-        var accentBox = new TextBox { Text = Look.Accent, Width = 100, FontFamily = new FontFamily("Consolas, monospace"), VerticalAlignment = VerticalAlignment.Top };
-        accentBox.LostFocus += (_, _) =>
-        {
-            var hex = (accentBox.Text ?? "").Trim();
-            if (!hex.StartsWith('#')) hex = "#" + hex;
-            if (hex.Length == 7 && Color.TryParse(hex, out _) && !hex.Equals(Look.Accent, StringComparison.OrdinalIgnoreCase)) { Look.SetAccent(hex.ToUpperInvariant()); Settings.Data.Remove("config"); Settings.Save(); Build(); }
-        };
-        accents.Children.Add(accentBox);
-
-        var font = new ComboBox { Width = 240, ItemsSource = Look.Fonts, SelectedItem = Look.Font };
-        font.SelectionChanged += (_, _) => { if (font.SelectedItem is string f && f != Look.Font) { Look.SetFont(f); Settings.Data.Remove("config"); Settings.Save(); } };
-        var radius = Segments(Look.Radii.Select(x => (x, I18n.T("v10.radius." + x))).ToArray(), Look.Radius, v => { Look.SetRadius(v); Settings.Data.Remove("config"); Settings.Save(); Build(); });
-        var hero = Segments([("stage", I18n.T("v10.hero.stage")), ("compact", I18n.T("v10.hero.compact")), ("off", I18n.T("v10.hero.off"))], Settings.Data.Str("homeHero") ?? "stage",
-            v => { Settings.Data["homeHero"] = v; Settings.Data.Remove("config"); Settings.Save(); Build(); });
-        var widgets = Ui.Button(I18n.T("v10.set.widgets"), () => { HomePage.EditWidgets(); MainWindow.Current?.Navigate(() => new HomePage()); }, "", Icons.Grid);
-        var reset = Ui.Button(I18n.T("look.reset"), () => { Look.Reset(); Widgets.Reset(); Build(); }, "ghost", Icons.Undo);
-
-        Control Labeled(string title, Control c) => Ui.Col(8, Ui.Text(title, "h3"), c);
-        return Section(I18n.T("v10.set.custom"), I18n.T("v10.set.custom.hint"),
-            Labeled(I18n.T("v10.set.colors"), colors),
-            Labeled(I18n.T("look.accent"), accents),
-            Ui.Row(28, Labeled(I18n.T("look.font"), font), Labeled(I18n.T("look.radius"), radius)),
-            Toggle(I18n.T("v10.fx.scan"), I18n.T("v10.fx.scan.hint"), Look.Scanlines, v => { Look.SetEffect("fxScanlines", v); Settings.Data.Remove("config"); }),
-            Toggle(I18n.T("v10.fx.vignette"), I18n.T("v10.fx.vignette.hint"), Look.Vignette, v => { Look.SetEffect("fxVignette", v); Settings.Data.Remove("config"); }),
-            Labeled(I18n.T("v10.set.hero"), hero),
-            Ui.Row(8, widgets, reset));
-    }
-
-    /// <summary>Анимации открытия и запуска игр.</summary>
-    Control MotionSection()
-    {
-        var open = Segments([("calm", I18n.T("v10.motion.calm")), ("classic", I18n.T("v10.motion.classic")), ("off", I18n.T("v10.motion.off"))], GameOpenFx.Style,
-            v => { Settings.Data["gameOpenStyle"] = v; Settings.Data["gameOpenFx"] = v != "off"; Settings.Save(); Build(); });
-        var launch = Segments([("calm", I18n.T("v10.motion.calm")), ("off", I18n.T("v10.motion.off"))], Settings.Data.Str("launchFx") ?? "calm",
-            v => { Settings.Data["launchFx"] = v; Settings.Save(); Build(); });
-        return Section(I18n.T("v10.set.motion"), I18n.T("v10.set.motion.hint"),
-            Ui.Col(8, Ui.Text(I18n.T("v10.motion.open"), "h3"), Ui.Text(I18n.T("v10.motion.open.hint"), "small muted", wrap: true), open),
-            Ui.Col(8, Ui.Text(I18n.T("v10.motion.launch"), "h3"), Ui.Text(I18n.T("v10.motion.launch.hint"), "small muted", wrap: true), launch));
     }
 
     /// <summary>Переключатель-сегменты: выбранный — акцентом.</summary>

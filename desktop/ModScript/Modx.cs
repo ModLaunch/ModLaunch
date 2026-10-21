@@ -4,10 +4,16 @@ using ModLaunch.Creator;
 
 namespace ModScriptX;
 
-/// <summary>Оператор нейтрального хука: set, add, say, log, if, else, end, call.</summary>
+/// <summary>
+/// Оператор нейтрального хука: set, add, say, log, call, if, elseif, else, end; с 2.0 — ещё let, while,
+/// for, return, break, continue. Блоки (if, while, for) закрываются оператором end.
+/// </summary>
 public sealed record Stmt(string Kind, string Target, string Expr, int Line);
 
 public sealed record Hook(string Event, List<Stmt> Body, int Line);
+
+/// <summary>2.0: своя функция — fn name(a, b) { … }. Вызывается из хуков и других функций, переводится в каждый язык.</summary>
+public sealed record Function(string Name, List<string> Params, List<Stmt> Body, int Line);
 
 /// <summary>Вставка на родном языке движка: попадает только в свой язык.</summary>
 public sealed record Native(string Lang, string Code, int Line);
@@ -31,6 +37,7 @@ public sealed partial class ModxDoc
     /// <summary>Общие переменные (let верхнего уровня) — попадают в каждый язык.</summary>
     public readonly List<(string Name, JsonNode? Value)> Shared = [];
     public readonly List<Hook> Hooks = [];
+    public readonly List<Function> Functions = [];
     public readonly List<Native> Natives = [];
     public readonly List<Diag> Diags = [];
 
@@ -50,6 +57,12 @@ public sealed partial class ModxDoc
     [GeneratedRegex(@"^(\s*)(hook|native)\s+([\p{L}\w]+)\s*\{\s*$")]
     private static partial Regex BlockStart();
 
+    [GeneratedRegex(@"^(\s*)fn\s+([\p{L}_][\p{L}\w]*)\s*\(([^)]*)\)\s*\{\s*$")]
+    private static partial Regex FnStart();
+
+    /// <summary>Встроенные функции языка: одинаково работают в песочнице и в каждом движке (через mx_…).</summary>
+    public static readonly string[] Builtins = ["len", "str", "int", "num", "rand", "chance", "min", "max", "abs", "round", "clamp", "range", "contains", "upper", "lower"];
+
     [GeneratedRegex(@"^\s*engine\s+([\p{L}\w-]+)\s*(#.*)?$")]
     private static partial Regex EngineLine();
 
@@ -65,6 +78,22 @@ public sealed partial class ModxDoc
         for (var i = 0; i < lines.Length; i++)
         {
             rest[i] = "";
+            var f = FnStart().Match(lines[i]);
+            if (f.Success)
+            {
+                var indent = f.Groups[1].Value.Length;
+                var end = i + 1;
+                while (end < lines.Length && !(lines[end].Trim() == "}" && Indent(lines[end]) <= indent)) end++;
+                if (end >= lines.Length) doc.Diags.Add(new Diag(i + 1, "err.openBrace"));
+                var name = f.Groups[2].Value;
+                var pars = f.Groups[3].Value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+                if (pars.Any(p => !Regex.IsMatch(p, @"^[\p{L}_][\p{L}\w]*$"))) doc.Diags.Add(new Diag(i + 1, $"bad parameters in fn {name}: use fn {name}(a, b)"));
+                if (Builtins.Contains(name) || Events.Contains(name)) doc.Diags.Add(new Diag(i + 1, $"'{name}' is a built-in name: pick another function name"));
+                else if (doc.Functions.Any(x => x.Name == name)) doc.Diags.Add(new Diag(i + 1, $"fn {name} is defined twice"));
+                doc.Functions.Add(new Function(name, pars, ParseHook(lines[(i + 1)..Math.Min(end, lines.Length)], i + 2, doc.Diags), i + 1));
+                i = end;
+                continue;
+            }
             var m = BlockStart().Match(lines[i]);
             if (m.Success)
             {
@@ -122,10 +151,18 @@ public sealed partial class ModxDoc
         _ => null,
     };
 
+    public static readonly string[] Keywords = ["set", "add", "say", "log", "call", "if", "elif", "else", "while", "for", "in", "let", "return", "break", "continue", "fn", "hook", "native", "and", "or", "not", "true", "false", "null"];
+
+    /// <summary>
+    /// Тело хука или функции. 2.0 — полноценный язык: let, присваивание (=, +=, -=), if / else if / else,
+    /// while, for … in, return, break, continue и вызов функции отдельной строкой. Блоки закрываются «}».
+    /// </summary>
     static List<Stmt> ParseHook(string[] body, int firstLine, List<Diag> diags)
     {
         var list = new List<Stmt>();
-        var depth = 0;
+        // Что открыто: if, else (у if уже был else) или loop — break и continue можно только внутри цикла.
+        var open = new Stack<string>();
+        var name = @"[\p{L}_][\p{L}\w.\[\]]*";
         for (var k = 0; k < body.Length; k++)
         {
             var no = firstLine + k;
@@ -134,20 +171,61 @@ public sealed partial class ModxDoc
             if (s.StartsWith('}'))
             {
                 var after = s[1..].Trim();
-                if (Regex.IsMatch(after, @"^else\s*\{$")) { list.Add(new Stmt("else", "", "", no)); continue; }
-                if (depth == 0) diags.Add(new Diag(no, "err.extraBrace"));
-                else { depth--; list.Add(new Stmt("end", "", "", no)); }
+                Match em;
+                // Второй else или else if после else дают неверный код в каждом движке.
+                if (Regex.IsMatch(after, @"^else\s*\{$"))
+                {
+                    if (open.Count > 0 && open.Peek() == "else") diags.Add(new Diag(no, "else after else"));
+                    else if (open.Count == 0 || open.Peek() != "if") diags.Add(new Diag(no, "else without if"));
+                    else { open.Pop(); open.Push("else"); }
+                    list.Add(new Stmt("else", "", "", no));
+                    continue;
+                }
+                if ((em = Regex.Match(after, @"^else\s+if\s+(.+?)\s*\{$")).Success)
+                {
+                    if (open.Count > 0 && open.Peek() == "else") diags.Add(new Diag(no, "else if after else"));
+                    else if (open.Count == 0 || open.Peek() != "if") diags.Add(new Diag(no, "else if without if"));
+                    list.Add(new Stmt("elseif", "", em.Groups[1].Value, no));
+                    continue;
+                }
+                if (open.Count == 0) diags.Add(new Diag(no, "err.extraBrace"));
+                else { open.Pop(); list.Add(new Stmt("end", "", "", no)); }
                 if (after != "") diags.Add(new Diag(no, $"unexpected '{after}' after '}}'"));
                 continue;
             }
             Match m;
-            if ((m = Regex.Match(s, @"^if\s+(.+?)\s*\{$")).Success) { depth++; list.Add(new Stmt("if", "", m.Groups[1].Value, no)); }
-            else if ((m = Regex.Match(s, @"^set\s+([\p{L}_][\p{L}\w.\[\]]*)\s*=\s*(.+)$")).Success) list.Add(new Stmt("set", m.Groups[1].Value, m.Groups[2].Value, no));
-            else if ((m = Regex.Match(s, @"^add\s+([\p{L}_][\p{L}\w.\[\]]*)\s+(.+)$")).Success) list.Add(new Stmt("add", m.Groups[1].Value, m.Groups[2].Value, no));
+            if ((m = Regex.Match(s, @"^if\s+(.+?)\s*\{$")).Success) { open.Push("if"); list.Add(new Stmt("if", "", m.Groups[1].Value, no)); }
+            else if ((m = Regex.Match(s, @"^while\s+(.+?)\s*\{$")).Success) { open.Push("loop"); list.Add(new Stmt("while", "", m.Groups[1].Value, no)); }
+            else if ((m = Regex.Match(s, @"^for\s+([\p{L}_][\p{L}\w]*)\s+in\s+(.+?)\s*\{$")).Success)
+            {
+                open.Push("loop");
+                var src = m.Groups[2].Value;
+                // for i in 1..10 — числа от и до (включительно), как range(1, 11).
+                var dots = Regex.Match(src, @"^(.+?)\.\.(.+)$");
+                if (dots.Success && !src.Contains('"')) src = $"range({dots.Groups[1].Value.Trim()}, ({dots.Groups[2].Value.Trim()}) + 1)";
+                list.Add(new Stmt("for", m.Groups[1].Value, src, no));
+            }
+            else if ((m = Regex.Match(s, @"^(?:let|var)\s+([\p{L}_][\p{L}\w]*)\s*=\s*(.+)$")).Success) list.Add(new Stmt("let", m.Groups[1].Value, m.Groups[2].Value, no));
+            else if ((m = Regex.Match(s, @"^set\s+(" + name + @")\s*=\s*(.+)$")).Success) list.Add(new Stmt("set", m.Groups[1].Value, m.Groups[2].Value, no));
+            else if ((m = Regex.Match(s, @"^add\s+(" + name + @")\s+(.+)$")).Success) list.Add(new Stmt("add", m.Groups[1].Value, m.Groups[2].Value, no));
             else if ((m = Regex.Match(s, @"^(say|log|call)\s+(.+)$")).Success) list.Add(new Stmt(m.Groups[1].Value, "", m.Groups[2].Value, no));
-            else diags.Add(new Diag(no, $"unknown statement '{s}' (use set, add, say, log, call, if)"));
+            else if ((m = Regex.Match(s, @"^return(?:\s+(.+))?$")).Success) list.Add(new Stmt("return", "", m.Groups[1].Success ? m.Groups[1].Value : "", no));
+            else if (s is "break" or "continue")
+            {
+                if (!open.Contains("loop")) diags.Add(new Diag(no, $"'{s}' outside of a loop"));
+                list.Add(new Stmt(s, "", "", no));
+            }
+            else if ((m = Regex.Match(s, @"^(" + name + @")\s*(\+=|-=|\*=|/=)\s*(.+)$")).Success)
+            {
+                var op = m.Groups[2].Value;
+                list.Add(op == "+=" ? new Stmt("add", m.Groups[1].Value, m.Groups[3].Value, no)
+                    : new Stmt("set", m.Groups[1].Value, $"{m.Groups[1].Value} {op[0]} ({m.Groups[3].Value})", no));
+            }
+            else if ((m = Regex.Match(s, @"^(" + name + @")\s*=\s*(.+)$")).Success && !Keywords.Contains(m.Groups[1].Value)) list.Add(new Stmt("set", m.Groups[1].Value, m.Groups[2].Value, no));
+            else if (Regex.IsMatch(s, @"^[\p{L}_][\p{L}\w.]*\s*\(.*\)$")) list.Add(new Stmt("call", "", s, no));
+            else diags.Add(new Diag(no, $"unknown statement '{s}' (use let, set, add, say, log, if, while, for, return or a function call)"));
         }
-        for (; depth > 0; depth--) list.Add(new Stmt("end", "", "", firstLine + body.Length));
+        for (; open.Count > 0; open.Pop()) list.Add(new Stmt("end", "", "", firstLine + body.Length));
         return list;
     }
 

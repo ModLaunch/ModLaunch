@@ -23,7 +23,7 @@ public static class ListingWizard
     /// <summary>Для снимков: открыть сразу на нужном шаге (0–2).</summary>
     internal static int ShotStep = -1;
 
-    public static void Show(Listing? l, Action? done = null)
+    public static void Show(Listing? l, Action? done = null, string? presetFile = null, string? presetKind = null)
     {
         var w = MainWindow.Current;
         if (w is null) return;
@@ -62,7 +62,7 @@ public static class ListingWizard
         gameIds.AddRange(AppState.Games.Select(g => g.Def.Id));
         var game = new ComboBox { ItemsSource = new[] { I18n.T("mk.anyGame") }.Concat(AppState.Games.Select(g => g.Def.Name)).ToList(), SelectedIndex = Math.Max(0, gameIds.IndexOf(l?.Game ?? "")), MinWidth = 260 };
         var hidden = new CheckBox { Content = I18n.T("mk.f.hidden"), IsChecked = l is { Active: false } };
-        var kind = l?.Kind ?? "model";
+        var kind = l?.Kind ?? presetKind ?? "model";
         var license = l?.License ?? "personal";
         string? file = null;
         var chosen = new HashSet<string>(l?.Tags ?? []);
@@ -124,6 +124,12 @@ public static class ListingWizard
             fileName.Text = $"{Path.GetFileName(f)} · {GamePage.Size(size)}";
             fileName.Foreground = size > Market.MaxFile ? Ui.Res("Bad") : Ui.Res("Text");
         }
+        if (presetFile is not null && File.Exists(presetFile))
+        {
+            SetFile(presetFile);
+            if (l is null && presetFile.EndsWith(ModScriptX.ModxDoc.Extension, StringComparison.OrdinalIgnoreCase))
+                try { title.Text = ModScriptX.ModxDoc.Parse(File.ReadAllText(presetFile)).Name; } catch (IOException) { }
+        }
         var pick = Ui.Button(I18n.T("mk.f.pick"), async () => { if (await Pickers.AnyFile(w, I18n.T("mk.f.pick")) is { } f) SetFile(f); }, "", Icons.FilePlus);
         var drop = new Border
         {
@@ -153,7 +159,7 @@ public static class ListingWizard
             Field(I18n.T("mk.f.description"), description),
             Field(I18n.T("hub.f.images"), images, I18n.T("lw.images.hint")),
             Field(I18n.T("hub.f.tags"), tags),
-            Field(I18n.T("mk.f.preview"), preview));
+            Field(I18n.T("mk.f.preview"), preview, I18n.T("v11.lw.preview.sealed")));
 
         // ---- шаг 3: цена и публикация
         var net = new TextBlock { FontFamily = Gx.Display, FontSize = 24, FontWeight = FontWeight.Bold, Foreground = Ui.Res("Good") };
@@ -260,23 +266,41 @@ public static class ListingWizard
 
         async Task Publish()
         {
-            var p = Market.ParseMoney(price.Text)!.Value;
-            var d = new ListingDraft
-            {
-                Title = title.Text ?? "", Summary = summary.Text ?? "", Description = description.Text ?? "",
-                Kind = kind, License = license, Game = gameIds[Math.Max(0, game.SelectedIndex)], Price = p, Version = (version.Text ?? "").Trim(),
-                Preview = preview.Text ?? "", Tags = [.. chosen], Hidden = hidden.IsChecked == true, File = file,
-                Images = (images.Text ?? "").Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList(),
-            };
+            // Кнопки — сразу, до первого await: пока читается файл и идёт проверка, второй щелчок создал бы второе объявление.
             nextButton.IsEnabled = back.IsEnabled = false;
-            bar.IsVisible = true;
             try
             {
+                var p = Market.ParseMoney(price.Text)!.Value;
+                var d = new ListingDraft
+                {
+                    Title = title.Text ?? "", Summary = summary.Text ?? "", Description = description.Text ?? "",
+                    Kind = kind, License = license, Game = gameIds[Math.Max(0, game.SelectedIndex)], Price = p, Version = (version.Text ?? "").Trim(),
+                    Preview = preview.Text ?? "", Tags = [.. chosen], Hidden = hidden.IsChecked == true, File = file,
+                    Images = (images.Text ?? "").Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList(),
+                };
+                // 11.0: файл проходит автомодерацию до загрузки. Код, скрипт и сборка продаются инжектом:
+                // вместо исходника покупатель видит, что мод меняет в игре.
+                if (file is not null)
+                {
+                    var v = Moderation.Check(Path.GetFileName(file), await File.ReadAllBytesAsync(file));
+                    Moderation.Note("lw_" + Path.GetFileName(file), d.Title, v, "publish");
+                    if (!v.Ok)
+                    {
+                        problems.Children.Clear();
+                        problems.Children.Add(CreatorPage.VerdictView(v));
+                        nextButton.IsEnabled = back.IsEnabled = true;
+                        return;
+                    }
+                    if (Moderation.Sealed(d.Kind, d.License)) d.Preview = Moderation.Mark + v.Changes;
+                }
+                else if (Moderation.Sealed(d.Kind, d.License) && l is null) d.Preview = "";
+                bar.IsVisible = true;
                 await Market.Save(d, l, new Progress<double>(r => bar.Value = r));
                 w.CloseDialog();
                 w.Toast(I18n.T(l is null ? "mk.published" : "mk.saved", ("title", d.Title)));
                 done?.Invoke();
             }
+            // Файл переместили или он занят — тоже сюда: раньше ошибка чтения терялась в «_ = Publish()».
             catch (Exception e) { w.Toast(Market.Explain(e), bad: true); nextButton.IsEnabled = back.IsEnabled = true; bar.IsVisible = false; }
         }
 

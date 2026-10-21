@@ -9,12 +9,14 @@ return exitCode;
 static class Cli
 {
     const string Usage = """
-        ModScript X 1.0 — one .modx script, every game scripting language.
+        ModScript X 2.0 — one .modx script, every game scripting language.
 
           modscript inspect <gameDir>                       detect the engine and show the game's scripts and variables
           modscript inject  <file.modx> --game <gameDir>    translate and install into the game
           modscript watch   <file.modx> --game <gameDir>    re-inject on every save (live editing)
           modscript build   <file.modx> [--out dir]         translate only, without touching a game
+          modscript run     <file.modx> [--ticks n] [--set "gold=100; hp=50"]
+                                                            run the mod in the sandbox, without a game
           modscript eject   <modId> --game <gameDir>        remove a mod installed by ModScript X
           modscript list    <gameDir>                       mods installed by ModScript X
           modscript targets                                 supported engines
@@ -50,6 +52,18 @@ static class Cli
                 }
                 case "build" when arg != null:
                     return Report(Injector.Build(File.ReadAllText(arg), Opt("--out") ?? Path.Combine(Path.GetDirectoryName(Path.GetFullPath(arg))!, "build"), target));
+                case "run" when arg != null:
+                {
+                    var doc = ModxDoc.Parse(File.ReadAllText(arg));
+                    foreach (var d in doc.Diags) Console.WriteLine($"{(d.Warning ? "warning" : "error")}{(d.Line > 0 ? " line " + d.Line : "")}: {Explain(d.Message)}");
+                    if (!doc.Ok) return 1;
+                    var vars = Sandbox.ParseVars((Opt("--set") ?? "").Replace(';', '\n'));
+                    var r = Sandbox.Run(doc, vars, int.TryParse(Opt("--ticks"), out var n) ? n : 3);
+                    r.Output.ForEach(Console.WriteLine);
+                    foreach (var e in r.Errors) Console.WriteLine($"{(e.Warning ? "warning" : "error")} line {e.Line}: {e.Message}");
+                    Console.WriteLine("vars: " + string.Join(", ", r.Vars.Select(kv => $"{kv.Key} = {Sandbox.Show(kv.Value)}")));
+                    return r.Ok ? 0 : 1;
+                }
                 case "inject" when arg != null && game != null:
                     return Report(Injector.Inject(File.ReadAllText(arg), game, target));
                 case "watch" when arg != null && game != null:

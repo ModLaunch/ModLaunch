@@ -335,3 +335,65 @@ test('лоты: продавец создаёт свой; чужое и «про
   await assertFails(setDoc(doc(db(OTHER), 'market', `${SELLER.uid}_new2`), l));
   await assertFails(updateDoc(doc(db(OTHER), 'market', LOT), { sales: increment(1) }));
 });
+
+// ---------------------------------------------------------------- 11.0: бэкап в облаке и доска серверов
+
+const SHA = 'a'.repeat(64);
+const backupMeta = (over = {}) => ({ at: serverTimestamp(), size: 1024, sha256: SHA, chunks: 1, device: 'PC', version: '11.0.0', ...over });
+
+test('бэкап: свой пишет и читает только хозяин; чужой — нельзя', async () => {
+  await assertSucceeds(setDoc(doc(db(BUYER), 'backups', BUYER.uid), backupMeta()));
+  await assertSucceeds(setDoc(doc(db(BUYER), 'backups', BUYER.uid, 'files', '0'), { data: 'UEsDBA==' }));
+  await assertSucceeds(getDoc(doc(db(BUYER), 'backups', BUYER.uid, 'files', '0')));
+  // Вторая половина частей: новый бэкап пишется туда, описание переключается последним.
+  await assertSucceeds(setDoc(doc(db(BUYER), 'backups', BUYER.uid, 'files', '16'), { data: 'UEsDBA==' }));
+  await assertSucceeds(setDoc(doc(db(BUYER), 'backups', BUYER.uid, 'files', '31'), { data: 'UEsDBA==' }));
+  await assertSucceeds(setDoc(doc(db(BUYER), 'backups', BUYER.uid), backupMeta({ base: 16 })));
+  await assertSucceeds(setDoc(doc(db(BUYER), 'backups', BUYER.uid), backupMeta({ base: 0 })));
+  await assertFails(setDoc(doc(db(OTHER), 'backups', BUYER.uid, 'files', '16'), { data: 'x' }));
+  await assertFails(getDoc(doc(db(OTHER), 'backups', BUYER.uid)));
+  await assertFails(getDoc(doc(db(OTHER), 'backups', BUYER.uid, 'files', '0')));
+  await assertFails(setDoc(doc(db(OTHER), 'backups', BUYER.uid), backupMeta()));
+  await assertFails(setDoc(doc(anon('anon3'), 'backups', 'anon3'), backupMeta()));
+});
+
+test('бэкап: лишние поля, больше 8 МБ, 17 частей, неверный base, часть за files/31 или часть больше 700 000 знаков — отказ', async () => {
+  await assertFails(setDoc(doc(db(BUYER), 'backups', BUYER.uid), backupMeta({ token: 'x' })));
+  await assertFails(setDoc(doc(db(BUYER), 'backups', BUYER.uid), backupMeta({ size: 8388609 })));
+  await assertFails(setDoc(doc(db(BUYER), 'backups', BUYER.uid), backupMeta({ chunks: 17 })));
+  await assertFails(setDoc(doc(db(BUYER), 'backups', BUYER.uid), backupMeta({ sha256: 'xyz' })));
+  await assertFails(setDoc(doc(db(BUYER), 'backups', BUYER.uid), backupMeta({ base: 8 })));
+  await assertFails(setDoc(doc(db(BUYER), 'backups', BUYER.uid), backupMeta({ base: '16' })));
+  await assertFails(setDoc(doc(db(BUYER), 'backups', BUYER.uid, 'files', '32'), { data: 'x' }));
+  await assertFails(setDoc(doc(db(BUYER), 'backups', BUYER.uid, 'files', '016'), { data: 'x' }));
+  await assertFails(setDoc(doc(db(BUYER), 'backups', BUYER.uid, 'files', '0'), { data: 'x'.repeat(700001) }));
+  await assertFails(setDoc(doc(db(BUYER), 'backups', BUYER.uid, 'files', '0'), { data: 'x', extra: 1 }));
+});
+
+const SRV = 'AbCdEfGhIjKlMnOpQrSt';
+const server = (who, over = {}) => ({
+  owner: who.uid, ownerName: 'Me', name: 'Выживание', game: 'minecraft', address: 'mc.example.org', build: '', mods: 0,
+  visibility: 'friends', players: 0, max: 10, version: '1.21.1', created: serverTimestamp(), updated: serverTimestamp(), ...over,
+});
+
+test('серверы: хозяин создаёт, правит и удаляет свой; чужой — только читает', async () => {
+  await assertSucceeds(setDoc(doc(db(BUYER), 'servers', SRV), server(BUYER)));
+  await assertSucceeds(getDoc(doc(db(OTHER), 'servers', SRV)));
+  await assertSucceeds(getDocs(collection(db(OTHER), 'servers')));
+  await assertSucceeds(updateDoc(doc(db(BUYER), 'servers', SRV), { players: 3, updated: serverTimestamp() }));
+  await assertFails(updateDoc(doc(db(OTHER), 'servers', SRV), { players: 3, updated: serverTimestamp() }));
+  await assertFails(deleteDoc(doc(db(OTHER), 'servers', SRV)));
+  await assertSucceeds(deleteDoc(doc(db(BUYER), 'servers', SRV)));
+});
+
+test('серверы: чужой owner, неверный id, «created» не сервером, лишнее поле, без почты — отказ', async () => {
+  await assertFails(setDoc(doc(db(BUYER), 'servers', SRV), server(OTHER)));
+  await assertFails(setDoc(doc(db(BUYER), 'servers', 'short'), server(BUYER)));
+  await assertFails(setDoc(doc(db(BUYER), 'servers', SRV), server(BUYER, { created: new Date(2020, 0, 1) })));
+  await assertFails(setDoc(doc(db(BUYER), 'servers', SRV), server(BUYER, { password: 'x' })));
+  await assertFails(setDoc(doc(db(BUYER), 'servers', SRV), server(BUYER, { visibility: 'secret' })));
+  await assertFails(setDoc(doc(anon('anon4'), 'servers', SRV), server({ uid: 'anon4' })));
+  await assertSucceeds(setDoc(doc(db(BUYER), 'servers', SRV), server(BUYER)));
+  await assertFails(updateDoc(doc(db(BUYER), 'servers', SRV), { created: serverTimestamp(), updated: serverTimestamp() }));
+  await assertFails(updateDoc(doc(db(BUYER), 'servers', SRV), { players: 1 }));
+});

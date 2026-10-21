@@ -1,0 +1,12 @@
+{
+  "ru": {
+    "v11fix.mod.stmt": "Строка {line}: вызов {name} запрещён в хуках — попадёт в код игры",
+    "v11fix.mod.crash": "Инжект уронил песочницу при проверке — не пускаем",
+    "v11fix.inj.buildFailed": "«{title}»: не удалось собрать код (нет .NET SDK или BepInEx?) — инжект не поставлен"
+  },
+  "en": {
+    "v11fix.mod.stmt": "Line {line}: call to {name} is not allowed in hooks — it would reach the game code",
+    "v11fix.mod.crash": "The inject crashed the sandbox during the check — not allowed",
+    "v11fix.inj.buildFailed": "“{title}”: could not build the code (no .NET SDK or BepInEx?) — inject not applied"
+  }
+}

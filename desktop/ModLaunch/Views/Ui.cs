@@ -97,6 +97,11 @@ public static class Icons
     public const string Sliders = "M4 21v-7 M4 10V3 M12 21v-9 M12 8V3 M20 21v-5 M20 12V3 M1 14h6 M9 8h6 M17 16h6";
     public const string Server = "M2 3h20v7H2z M2 14h20v7H2z M6 6.5h.01 M6 17.5h.01";
     public const string Zap = "M13 2L3 14h9l-1 8 10-12h-9l1-8z";
+    // 11.0: облако (бэкап), сеть и её отсутствие (авто-офлайн), песочные часы (часы в сборках).
+    public const string Cloud = "M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z";
+    public const string Wifi = "M5 12.55a11 11 0 0 1 14.08 0 M1.42 9a16 16 0 0 1 21.16 0 M8.53 16.11a6 6 0 0 1 6.95 0 M12 20h.01";
+    public const string WifiOff = "M1 1l22 22 M16.72 11.06A10.94 10.94 0 0 1 19 12.55 M5 12.55a10.94 10.94 0 0 1 5.17-2.39 M10.71 5.05A16 16 0 0 1 22.58 9 M1.42 9a15.91 15.91 0 0 1 4.7-2.88 M8.53 16.11a6 6 0 0 1 6.95 0 M12 20h.01";
+    public const string Hourglass = "M6 2h12 M6 22h12 M7 2v4l5 6-5 6v4 M17 2v4l-5 6 5 6v4";
     public const string Bug = "M8 2l1.9 1.9 M16 2l-1.9 1.9 M9 7.1V6a3 3 0 1 1 6 0v1.1 M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6z M12 20v-9 M6.5 13H3 M21 13h-3.5 M6 17l-3 2 M18 17l3 2 M6 9L3 7 M18 9l3-2";
     public const string Undo = "M3 7v6h6 M21 17a9 9 0 0 0-15-6.7L3 13";
     public const string Cube = "M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z M3.3 7L12 12l8.7-5 M12 22V12";

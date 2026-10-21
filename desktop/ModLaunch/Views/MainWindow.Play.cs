@@ -114,7 +114,7 @@ public sealed partial class MainWindow
             col.Children.Add(MenuRow(I18n.T("acc.s.wallet"), Icons.Bag, () => Navigate(() => new MarketPage("wallet"))));
             col.Children.Add(MenuRow(I18n.T("acc.s.purchases"), Icons.Download, () => Navigate(() => new AccountPage("purchases"))));
             col.Children.Add(MenuRow(I18n.T("st.tab"), Icons.Chart, () => Navigate(() => new MarketPage("studio"))));
-            col.Children.Add(MenuRow(I18n.T("acc.menu.friends"), Icons.Users, () => Navigate(() => new FriendsPage())));
+            col.Children.Add(MenuRow(I18n.T("acc.menu.friends"), Icons.Users, () => Navigate(() => new CommunityPage())));
             var signOut = MenuRow(I18n.T("acc.menu.signout"), Icons.Power, () =>
             {
                 Social.Account.SignOut();

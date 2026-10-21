@@ -373,9 +373,16 @@ public static partial class Actions
         try
         {
             // 10.0: чистая загрузка — прибрать кэш и мусор загрузчика перед запуском.
+            // 11.0: в режиме инжектора уборка — после игры, а перед запуском только инжект (миллисекунды).
             string? note = null;
-            if (!vanilla && CleanBoot.On)
+            if (!vanilla && CleanBoot.On && !Inject.On)
                 try { if (CleanBoot.Run(g) is { Any: true } c) note = I18n.T("v10.clean.note", ("n", c.Files + c.Quarantined)); } catch { }
+            if (!vanilla && Inject.On)
+            {
+                var r = Inject.Prepare(g);
+                note = r.Applied > 0 ? I18n.T("v11.inj.note.n", ("ms", r.Ms), ("n", r.Applied)) : I18n.T("v11.inj.note", ("ms", r.Ms));
+                if (r.Notes.Count > 0) note += " · " + string.Join(" · ", r.Notes);
+            }
             var backup = Launcher.Launch(g.Def, g.Path!, vanilla);
             try { PlayStreak.Note(); } catch { }
             CloudFlow.PushSoon();
@@ -386,7 +393,12 @@ public static partial class Actions
             AppState.Notify();
             return new LaunchScreen.Result(true, backup, null, note);
         }
-        catch (Exception e) { return new LaunchScreen.Result(false, null, Jobs.Explain(e)); }
+        catch (Exception e)
+        {
+            // Игра не запустилась — инжекты не должны остаться в папке.
+            if (!vanilla && Inject.On) try { Inject.Cleanup(g.Def.Id); } catch { }
+            return new LaunchScreen.Result(false, null, Jobs.Explain(e));
+        }
     }
 
     static void AfterLaunch()

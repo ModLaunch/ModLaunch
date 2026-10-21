@@ -37,6 +37,7 @@ public sealed partial class MainWindow
             Ctx.Item(I18n.T("cmd.title"), Icons.Search, CommandPalette, gesture: "Ctrl+P"),
             Ctx.Item(I18n.T("keys.title"), Icons.Keyboard, Shortcuts, gesture: "F1"),
             Ctx.Item(I18n.T("new.title"), Icons.Sparkles, WhatsNew.Show),
+            Ctx.Item(I18n.T("v92.nav.donate"), Icons.Coffee, () => Navigate(() => new DonatePage())),
             "-",
             Social.Account.Owner ? Ctx.Item(I18n.T("svc.title"), Icons.Server, () => Navigate(() => new SettingsPage("services"))) : null,
             Ctx.Item(I18n.T("nav.settings"), Icons.Settings, () => Navigate(() => new SettingsPage()), gesture: "Ctrl+OemComma"));

@@ -29,9 +29,11 @@ public static class HubNav
         new("queue", "v93.mk.tab.queue", Icons.Shuffle, Group.Shop),
         new("library", "v93.mk.tab.library", Icons.Layers, Group.Mine),
         new("wishlist", "v93.mk.tab.wishlist", Icons.Heart, Group.Mine),
+        new("injects", "v11.hub.injects", Icons.Zap, Group.Mine),
         new("wallet", "v93.mk.tab.wallet", Icons.Bag, Group.Mine),
         new("studio", "v93.mk.tab.studio", Icons.Chart, Group.Author),
         new("projects", "v95.hub.projects", Icons.Edit, Group.Author),
+        new("lang", "v11.hub.lang", Icons.Code, Group.Author),
         new("templates", "v91.cr.tab.templates", Icons.Wand, Group.Author),
         new("docs", "cr.tab.docs", Icons.Book, Group.Author),
     ];
@@ -54,6 +56,8 @@ public static class HubNav
         {
             "templates" => new CreatorPage("examples"),
             "docs" => new CreatorPage("docs"),
+            "injects" => new CreatorPage("injects"),
+            "lang" => new CreatorPage("inject"),
             _ => new CreatorPage("home"),
         });
     }

@@ -94,7 +94,7 @@ public sealed partial class HomePage
     {
         var b = new Border
         {
-            Classes = { "store-tile", "widget" }, CornerRadius = new CornerRadius(Look.Radius == "sharp" ? 4 : Look.Radius == "round" ? 28 : 22),
+            Classes = { "store-tile", "widget" }, CornerRadius = new CornerRadius(Look.Radius == "sharp" ? 4 : Look.Radius == "round" ? 28 : Look.Calm ? 14 : 22),
             Padding = new Thickness(pad), Background = background ?? Ui.Res("Surface"), ClipToBounds = true, Child = body,
         };
         if (open is not null && !_editWidgets) StoreKit.OnClick(b, open);
@@ -212,7 +212,7 @@ public sealed partial class HomePage
                 DockPanel.SetDock(count, Dock.Right);
                 top.Children.Add(count);
                 top.Children.Add(Cap(Icons.Users, I18n.T("h95.friends")));
-                return Shell(Stack(top, col), () => Go(() => v.SignedIn ? new FriendsPage() : new SettingsPage("accounts")));
+                return Shell(Stack(top, col), () => Go(() => v.SignedIn ? new CommunityPage() : new SettingsPage("accounts")));
             }
             case "tip":
             {
@@ -241,6 +241,27 @@ public sealed partial class HomePage
                 }
                 else list.Add(Small(rows.Count > 0 ? I18n.T("v10.w.hours.top", ("game", rows[0].g.Def.ShortName)) : I18n.T("v98.replay.empty"), lines: 1));
                 return Shell(Stack(Cap(Icons.Chart, I18n.T("v10.w.playtime")), list.ToArray()), () => Go(() => new ProfilePage("replay")));
+            }
+            case "builds":
+            {
+                // 11.0: часы по сборкам — самая обжитая сборка; широкий — две сборки полосками.
+                var builds = BuildTime.All();
+                var list = new List<Control>();
+                if (builds.Count == 0) list.Add(Small(I18n.T("v11.bt.empty.short")));
+                else
+                {
+                    var top = builds[0];
+                    list.Add(Ui.Row(6, Big(((long)top.Hours).ToString(), 36), new TextBlock { Text = I18n.T("v10.w.hours"), FontSize = 13, Foreground = Ui.Res("Faint"), VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, 7) }));
+                    if (wide)
+                    {
+                        var max = Math.Max(1, top.TotalMs);
+                        foreach (var b in builds.Take(2))
+                            list.Add(Ui.Row(8, new Border { Width = 96, Child = new TextBlock { Text = b.Name, FontSize = 11.5, Foreground = Ui.Res("Muted"), TextTrimming = TextTrimming.CharacterEllipsis } },
+                                new Border { Height = 6, CornerRadius = new CornerRadius(3), Width = Math.Max(6, 150.0 * b.TotalMs / max), Background = Ui.Res("Brand"), VerticalAlignment = VerticalAlignment.Center }));
+                    }
+                    else list.Add(Small(top.Name, lines: 1));
+                }
+                return Shell(Stack(Cap(Icons.Hourglass, I18n.T("v11.w.builds")), list.ToArray()), () => Go(() => new ProfilePage("builds")));
             }
             case "downloads":
                 return new Border { CornerRadius = new CornerRadius(22), ClipToBounds = true, Child = new DownloadsTile() };

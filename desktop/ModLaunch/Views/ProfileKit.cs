@@ -36,6 +36,7 @@ public static class ProfileKit
             "neon" => Grad("#19D3F5", "#7C5CFF", "#FF3D81"),
             "flame" => Grad("#FFE066", "#FF8A1F", "#E8290B"),
             "holo" => Grad("#9BF6FF", "#BDB2FF", "#FFC6FF", "#CAFFBF"),
+            "steel" => Grad("#F4F7FA", "#9FB0C2", "#3A4A5C"),
             "game" => Grad(Lighter(GameAccent(game)), GameAccent(game), Look.Mix(Color.Parse(GameAccent(game)), Colors.Black, 0.35).ToString()),
             _ => Ui.Res("Brand"),
         };
@@ -80,6 +81,7 @@ public static class ProfileKit
             "sunset" => Grad("#FF7A59", "#E83E8C", "#3B1D6E"),
             "midnight" => Grad("#0A0F2C", "#1B2A6B", "#0B0D17"),
             "vault" => Grad("#1A1430", "#3B2A7A", "#0C0A14"),
+            "forge" => Grad("#2B1A0E", "#B4541A", "#0E0B09"),
             _ => new LinearGradientBrush
             {
                 StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
@@ -119,8 +121,9 @@ public static class ProfileKit
         else
             face = new Border
             {
-                CornerRadius = new CornerRadius(size / 2), Background = key == "heart" ? Grad("#FF7AA8", "#E83E8C") : key == "case" ? Grad("#9B82FF", "#4A2FD0") : Grad("#5AA9FF", "#2D5BD8"),
-                Child = Ui.Icon(key == "heart" ? Icons.Heart : key == "case" ? Icons.Cube : Icons.Clock, size * 0.46, Brushes.White),
+                CornerRadius = new CornerRadius(size / 2),
+                Background = key switch { "heart" => Grad("#FF7AA8", "#E83E8C"), "case" => Grad("#9B82FF", "#4A2FD0"), "build" => Grad("#5BE3A8", "#168A63"), _ => Grad("#5AA9FF", "#2D5BD8") },
+                Child = Ui.Icon(key switch { "heart" => Icons.Heart, "case" => Icons.Cube, "build" => Icons.Hourglass, _ => Icons.Clock }, size * 0.46, Brushes.White),
             };
         var medal = new Border
         {

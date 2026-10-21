@@ -17,3 +17,4 @@ out/
 site/download/
 build/task.log
 build/publish.log
+firestore-debug.log

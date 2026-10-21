@@ -1,0 +1,12 @@
+{
+  "ru": {
+    "v11.fix.cm.host.err.starting": "«{name}» уже готовится к запуску — загрузка видна в «Загрузках»",
+    "v11.fix.cm.host.err.gone": "Папки сервера «{name}» больше нет — запуск отменён",
+    "v11.fix.cm.join.loaderFirst": "Сначала поставьте {loader}, потом снова нажмите «Зайти»"
+  },
+  "en": {
+    "v11.fix.cm.host.err.starting": "\"{name}\" is already getting ready to start — see Downloads",
+    "v11.fix.cm.host.err.gone": "The folder of server \"{name}\" is gone — start canceled",
+    "v11.fix.cm.join.loaderFirst": "Install {loader} first, then press Join again"
+  }
+}
