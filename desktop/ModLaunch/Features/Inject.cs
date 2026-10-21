@@ -82,23 +82,28 @@ public static class Inject
     /// </summary>
     public static (InjectItem? Item, Verdict Verdict) AddPurchase(Listing l, string file)
     {
-        var bytes = File.ReadAllBytes(file);
-        var name = l.FileName is { Length: > 0 } f ? f : Path.GetFileName(file);
-        var v = Moderation.Check(name, bytes);
-        var id = "mk_" + l.Id;
-        Moderation.Note(id, l.Title, v, "buy");
-        try { File.Delete(file); } catch { }
-        if (!v.Ok) return (null, v);
-        File.WriteAllBytes(BlobPath(id), Vault.Seal(bytes));
-        Items[id] = new JsonObject
+        // Скачанный файл удаляем в любом случае (даже если автомодерация упала с исключением):
+        // расшифрованный исходник не должен остаться лежать в %TEMP%.
+        try
         {
-            ["title"] = l.Title, ["game"] = GameCatalog.ById(l.Game) is not null ? l.Game : "", ["kind"] = KindOf(name), ["source"] = "market",
-            ["listing"] = l.Id, ["seller"] = l.Author, ["fileName"] = name, ["sha256"] = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant(),
-            ["enabled"] = true, ["changes"] = v.Changes, ["added"] = DateTime.UtcNow.ToString("o"),
-        };
-        Lib.Save();
-        Notify();
-        return (Get(id), v);
+            var bytes = File.ReadAllBytes(file);
+            var name = l.FileName is { Length: > 0 } f ? f : Path.GetFileName(file);
+            var v = Moderation.Check(name, bytes);
+            var id = "mk_" + l.Id;
+            Moderation.Note(id, l.Title, v, "buy");
+            if (!v.Ok) return (null, v);
+            File.WriteAllBytes(BlobPath(id), Vault.Seal(bytes));
+            Items[id] = new JsonObject
+            {
+                ["title"] = l.Title, ["game"] = GameCatalog.ById(l.Game) is not null ? l.Game : "", ["kind"] = KindOf(name), ["source"] = "market",
+                ["listing"] = l.Id, ["seller"] = l.Author, ["fileName"] = name, ["sha256"] = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant(),
+                ["enabled"] = true, ["changes"] = v.Changes, ["added"] = DateTime.UtcNow.ToString("o"),
+            };
+            Lib.Save();
+            Notify();
+            return (Get(id), v);
+        }
+        finally { try { File.Delete(file); } catch { } }
     }
 
     /// <summary>Свой .modx из Creator Hub: ставится при каждом запуске игры (файл читается заново — правки видны сразу).</summary>
@@ -198,35 +203,51 @@ public static class Inject
                     notes.Add(I18n.T("v11.inj.blocked", ("title", item.Title)));
                     continue;
                 }
-                var entry = Apply(item, bytes, g, root);
+                var entry = Apply(item, bytes, g, root, notes);
                 if (entry is null) { skipped++; continue; }
                 applied.Add(entry);
+                // Список пишем сразу после каждого инжекта: даже если следующий упадёт, уже поставленное
+                // запишется и уборка после игры снимет его — ничего не остаётся в папке игры навсегда.
+                File.WriteAllText(SessionFile(g.Def.Id), new JsonObject { ["path"] = root, ["at"] = DateTime.UtcNow.ToString("o"), ["items"] = applied }.ToJsonString());
             }
-            catch (Exception e) when (e is IOException or UnauthorizedAccessException or CryptographicException or InvalidDataException or InvalidOperationException)
+            catch (Exception)
             {
+                // Любая ошибка одного инжекта (кривой файл, нет прав, падение перевода) не срывает запуск.
                 skipped++;
                 notes.Add(I18n.T("v11.inj.failed", ("title", item.Title)));
             }
         }
-        if (applied.Count > 0)
-            File.WriteAllText(SessionFile(g.Def.Id), new JsonObject { ["path"] = root, ["at"] = DateTime.UtcNow.ToString("o"), ["items"] = applied }.ToJsonString());
         Notify();
         return new(sw.ElapsedMilliseconds, applied.Count, skipped, back, notes);
     }
 
     /// <summary>Поставить один инжект. Возвращает запись для сеанса (что снимать после игры).</summary>
-    static JsonObject? Apply(InjectItem item, byte[] bytes, GameState g, string root)
+    static JsonObject? Apply(InjectItem item, byte[] bytes, GameState g, string root, List<string> notes)
     {
         switch (item.Kind)
         {
             case "modx":
             {
-                var r = MX.Injector.Inject(Encoding.UTF8.GetString(bytes), root, null);
+                // Сеансовый инжект получает свой ModScript id (имя мода + метка инжекта): его файлы и запись в
+                // installed.json не пересекаются с постоянной установкой того же мода из Creator Hub и с другим
+                // инжектом с тем же именем. Уборка после игры снимает ровно этот id.
+                var r = MX.Injector.Inject(Namespaced(Encoding.UTF8.GetString(bytes), item.Id), root, null);
                 if (!r.Doc.Ok || r.Target is null) return null;
-                // Покупателю — без исходника: C# после сборки остаётся только в виде dll.
-                if (item.Sealed && r.Target.Id == "unity")
-                    foreach (var f in r.Files.Where(f => f.EndsWith(".cs") || f.EndsWith(".csproj")))
-                        try { File.Delete(Path.Combine(root, f)); } catch { }
+                if (r.Target.Id == "unity")
+                {
+                    // C# нужно собрать. Нет .NET SDK / BepInEx или ошибка сборки — dll не появится: инжект не применён.
+                    var dll = Path.Combine(root, "BepInEx", "plugins", $"ModScript_{r.Doc.Id}.dll");
+                    if (!File.Exists(dll))
+                    {
+                        try { MX.Injector.Eject(r.Doc.Id, root); } catch { }
+                        notes.Add(I18n.T("v11fix.inj.buildFailed", ("title", item.Title)));
+                        return null;
+                    }
+                    // Покупателю — без исходника: после сборки остаётся только dll.
+                    if (item.Sealed)
+                        foreach (var f in r.Files.Where(f => f.EndsWith(".cs") || f.EndsWith(".csproj")))
+                            try { File.Delete(Path.Combine(root, f)); } catch { }
+                }
                 return new JsonObject { ["id"] = item.Id, ["kind"] = "modx", ["modx"] = r.Doc.Id };
             }
             default:
@@ -234,28 +255,47 @@ public static class Inject
                 var baseDir = g.Registry?.ModsDir is { } mods && Inside(mods, root) ? mods : root;
                 var folder = Path.Combine(baseDir, "ML-inject-" + item.Id);
                 var files = new JsonArray();
-                if (item.Kind == "package")
+                try
                 {
-                    using var zip = new ZipArchive(new MemoryStream(bytes), ZipArchiveMode.Read);
-                    foreach (var e in zip.Entries.Where(e => !e.FullName.EndsWith('/')))
+                    if (item.Kind == "package")
                     {
-                        var dest = Path.GetFullPath(Path.Combine(folder, e.FullName));
-                        if (!Inside(dest, folder)) continue;
-                        Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
-                        e.ExtractToFile(dest, true);
+                        using var zip = new ZipArchive(new MemoryStream(bytes), ZipArchiveMode.Read);
+                        foreach (var e in zip.Entries.Where(e => !e.FullName.EndsWith('/')))
+                        {
+                            var dest = Path.GetFullPath(Path.Combine(folder, e.FullName));
+                            if (!Inside(dest, folder)) continue;
+                            Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
+                            e.ExtractToFile(dest, true);
+                            files.Add((JsonNode)Path.GetRelativePath(root, dest));
+                        }
+                    }
+                    else
+                    {
+                        Directory.CreateDirectory(folder);
+                        var dest = Path.Combine(folder, Path.GetFileName(item.FileName));
+                        File.WriteAllBytes(dest, bytes);
                         files.Add((JsonNode)Path.GetRelativePath(root, dest));
                     }
                 }
-                else
+                catch
                 {
-                    Directory.CreateDirectory(folder);
-                    var dest = Path.Combine(folder, Path.GetFileName(item.FileName));
-                    File.WriteAllBytes(dest, bytes);
-                    files.Add((JsonNode)Path.GetRelativePath(root, dest));
+                    // Распаковка упала на полпути — убираем недоделанную папку, чтобы не осталась в игре неучтённой.
+                    try { if (Directory.Exists(folder)) Directory.Delete(folder, true); } catch { }
+                    throw;
                 }
                 return new JsonObject { ["id"] = item.Id, ["kind"] = item.Kind, ["folder"] = Path.GetRelativePath(root, folder), ["files"] = files };
             }
         }
+    }
+
+    /// <summary>Имя мода дополняем меткой инжекта, чтобы ModScript id сеанса был уникальным (см. Apply).</summary>
+    static string Namespaced(string source, string injectId)
+    {
+        var tag = " ~" + injectId;
+        var m = System.Text.RegularExpressions.Regex.Match(source, "(?m)^\\s*mod\\s+\"([^\"]*)\"");
+        if (!m.Success || m.Groups[1].Value.EndsWith(tag)) return source;
+        var g1 = m.Groups[1];
+        return source[..g1.Index] + g1.Value + tag + source[(g1.Index + g1.Length)..];
     }
 
     static bool Inside(string path, string root) =>
@@ -297,7 +337,9 @@ public static class Inject
         }
         if (park && On && AppState.Games.FirstOrDefault(x => x.Def.Id == gameId) is { Path: { } path } g && !g.Def.IsMinecraft)
         {
-            try { CleanBoot.Run(g, quarantine: false); } catch { }
+            // Чистую загрузку — только если пользователь её включил: иначе уборка затирала бы логи загрузчика
+            // (BepInEx/LogOutput.log) до того, как помощник по вылетам их прочитает. Карантин — по настройке.
+            if (CleanBoot.On) try { CleanBoot.Run(g); } catch { }
             try { if (!Vanilla.IsParked(gameId) && Vanilla.LoaderFiles(g.Def, path).Count > 0) Vanilla.Park(g.Def, path, "inject"); } catch { }
             g.Refresh();
         }
@@ -313,7 +355,10 @@ public static class Inject
     {
         if (game.IsMinecraft || (!On && !Live(game.Id))) return;
         if (ran < TimeSpan.FromSeconds(20)) await Task.Delay(15000);
-        for (var i = 0; i < 2400 && Vanilla.GameProcessRunning(game); i++) await Task.Delay(3000);
+        // Ждём, пока закроется настоящий процесс игры (Steam мог перезапустить её сам) — без жёсткого
+        // потолка: иначе на длинной сессии уборка снесла бы инжекты из ещё работающей игры. Запас на случай
+        // «вечно живого» процесса — сутки.
+        for (var i = 0; i < 28800 && Vanilla.GameProcessRunning(game); i++) await Task.Delay(3000);
         var ids = SessionIds(game.Id);
         var crashed = Launcher.LastExit(game.Id) is { ByUser: false, Ms: < 60_000, Code: not null and not 0 };
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
@@ -345,7 +390,13 @@ public static class Inject
             foreach (var file in Directory.EnumerateFiles(Dir, "session-*.json"))
             {
                 var id = Path.GetFileNameWithoutExtension(file)["session-".Length..];
-                if (GameCatalog.ById(id) is { } def && Vanilla.GameProcessRunning(def)) continue;
+                if (GameCatalog.ById(id) is { } def && Vanilla.GameProcessRunning(def))
+                {
+                    // Игра ещё идёт (ModLaunch закрыли/перезапустили во время игры): дождёмся выхода и тогда уберём,
+                    // а не пропускаем — иначе инжекты оставались бы в папке игры до следующего «Играть».
+                    _ = AfterExit(def, TimeSpan.FromMinutes(5));
+                    continue;
+                }
                 Cleanup(id);
             }
         }
@@ -363,12 +414,14 @@ public static class Inject
         var g = new GameState { Def = def, Path = root, Status = Detect.Found };
         var item = new InjectItem("t1", "Test", def.Id, "modx", "local", null, "", "t.modx", "", true, null, "", null);
         var modx = Encoding.UTF8.GetBytes("mod \"Test\"\nengine renpy\nhook start {\n  add gold 5\n}\n");
-        var entry = Apply(item, modx, g, root) ?? throw new Exception("modx not applied");
+        var notes = new List<string>();
+        var entry = Apply(item, modx, g, root, notes) ?? throw new Exception("modx not applied");
         var pkg = new MemoryStream();
         using (var z = new ZipArchive(pkg, ZipArchiveMode.Create, true))
         using (var w = new StreamWriter(z.CreateEntry("tex/skin.png").Open())) w.Write("png");
-        var entry2 = Apply(item with { Id = "t2", Kind = "package", FileName = "p.zip" }, pkg.ToArray(), g, root) ?? throw new Exception("package not applied");
-        if (!File.Exists(Path.Combine(root, "game", "modscript_Test.rpy"))) throw new Exception("rpy missing");
+        var entry2 = Apply(item with { Id = "t2", Kind = "package", FileName = "p.zip" }, pkg.ToArray(), g, root, notes) ?? throw new Exception("package not applied");
+        // Имя мода помечено id инжекта (t1) — файл с уникальным именем, не затирает чужую установку.
+        if (!File.Exists(Path.Combine(root, "game", "modscript_Test_t1.rpy"))) throw new Exception("rpy missing");
         File.WriteAllText(SessionFile("inject-test"), new JsonObject { ["path"] = root, ["items"] = new JsonArray(entry, entry2) }.ToJsonString());
         var n = Cleanup("inject-test", park: false);
         var left = Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories).Select(f => Path.GetRelativePath(root, f)).Where(f => !f.StartsWith(".modscript")).ToList();

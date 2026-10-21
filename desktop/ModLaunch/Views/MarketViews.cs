@@ -170,6 +170,9 @@ public static class MarketViews
 
     public static async void Download(Listing l)
     {
+        // 11.0: «запечатанный» купленный лот (код/скрипт/сборка) исходником не скачивается — подключаем инжектом.
+        // Прикрывает все входы в скачивание сразу: меню карточки, «Библиотека» и «Покупки».
+        if (Moderation.Sealed(l)) { Connect(l); return; }
         var w = MainWindow.Current!;
         w.Toast(I18n.T("mk.downloading", ("title", l.Title)));
         try
