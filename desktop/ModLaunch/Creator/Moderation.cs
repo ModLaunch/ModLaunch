@@ -319,16 +319,18 @@ public static class Moderation
         if (loop.Ok) throw new Exception("endless loop passed");
         // 1.2: то, что роняло песочницу (rand с перепутанными границами, список внутри себя), больше не роняет и проверку.
         CheckModx("mod \"Crash\"\nhook start {\n  set x = rand(5, missing)\n  let a = [0]\n  a[0] = a\n  log a\n}\n");
-        using var ms = new MemoryStream();
-        using (var zip = new ZipArchive(ms, ZipArchiveMode.Create, true))
+        // Каждое имя — отдельным архивом: в --selfcheck переводов нет, и одинаковые тексты находок склеиваются.
+        static byte[] Zip(string name)
         {
-            using (var w = new StreamWriter(zip.CreateEntry("../evil.txt").Open())) w.Write("x");
-            using (var w = new StreamWriter(zip.CreateEntry("run.bat").Open())) w.Write("x");
-            // 1.6: хвостовая точка — Windows превратит run.bat. в run.bat.
-            using (var w = new StreamWriter(zip.CreateEntry("run.bat.").Open())) w.Write("x");
+            using var ms = new MemoryStream();
+            using (var zip = new ZipArchive(ms, ZipArchiveMode.Create, true))
+            using (var w = new StreamWriter(zip.CreateEntry(name).Open())) w.Write("x");
+            return ms.ToArray();
         }
-        var pkg = CheckPackage(ms.ToArray());
-        if (pkg.Ok || pkg.Findings.Count(f => f.Level == "block") < 3) throw new Exception("zip slip, .bat or trailing-dot .bat passed");
+        // 1.6: хвостовая точка — Windows превратит run.bat. в run.bat.
+        foreach (var name in new[] { "../evil.txt", "run.bat", "run.bat." })
+            if (CheckPackage(Zip(name)).Ok) throw new Exception($"zip slip, .bat or trailing-dot .bat passed: {name}");
+        if (!CheckPackage(Zip("textures/stone.png")).Ok) throw new Exception("clean package blocked");
         return "clean .modx passes; os/eval/import, hook-body RCE, endless loops, ../ and .bat are blocked; sandbox crashes are gone";
     }
 }
