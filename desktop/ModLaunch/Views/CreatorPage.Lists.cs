@@ -34,7 +34,7 @@ public sealed partial class CreatorPage
         var head = new DockPanel();
         var action = codes
             ? Ui.Button(I18n.T("v91.cr.publish"), PublishArchive, "primary", Icons.Upload)
-            : Ui.Button(I18n.T("v91.cr.sell"), () => MarketViews.Editor(null, () => { _ = LoadMarket(force: true); _studio = null; }), "primary", Icons.Plus);
+            : Ui.Button(I18n.T("v91.cr.sell"), () => MarketViews.Editor(null, () => _ = LoadMarket(force: true)), "primary", Icons.Plus);
         action.VerticalAlignment = VerticalAlignment.Center;
         DockPanel.SetDock(action, Dock.Right);
         head.Children.Add(action);
@@ -75,7 +75,7 @@ public sealed partial class CreatorPage
             {
                 var ll = l;
                 items.Add(new ShelfItem(l.Title, l.Author, l.Game, l.Kind, MarketViews.PriceText(l), l.Images.FirstOrDefault(), l.Updated ?? l.Created, false,
-                    () => MarketViews.Open(ll, () => { _studio = null; _ = LoadMarket(force: true); })));
+                    () => MarketViews.Open(ll, () => _ = LoadMarket(force: true))));
             }
         if (_filter != "")
             items = items.Where(i => i.Title.Contains(_filter, StringComparison.OrdinalIgnoreCase) || i.Author.Contains(_filter, StringComparison.OrdinalIgnoreCase)).ToList();

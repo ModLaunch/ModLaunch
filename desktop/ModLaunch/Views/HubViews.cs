@@ -25,11 +25,16 @@ public sealed partial class CreatorPage
         if (_hubLoading) return;
         _hubLoading = true;
         _hubError = null;
-        Build();
+        // 12.0: Обзор зовёт загрузку прямо из Build — и раньше страница строилась заново внутри своей же
+        // постройки (а та звала LoadMarket — ещё раз). Теперь сначала даём постройке закончиться:
+        // она уже видит _hubLoading и рисует «загрузку»; вне постройки (кнопка «Обновить») — строим сами.
+        var nested = _building;
+        await Task.Yield();
+        if (!nested) Build();
         try { _hub = await Hub.All(force); }
         catch { _hub = []; _hubError = Hub.LastError; }
         _hubLoading = false;
-        Build();
+        RebuildCurrent();
     }
 
     /// <summary>Для скриншотов: готовый список без сети.</summary>
@@ -262,7 +267,8 @@ public sealed partial class CreatorPage
         if (_hubError is not null) col.Children.Add(Ui.Card(Ui.Text(_hubError, "muted", wrap: true), 20));
         if (mine.Count == 0 && _hubError is null)
             col.Children.Add(Ui.Card(Ui.Col(6, Ui.Text(I18n.T("hub.mine.empty"), "h3"), Ui.Text(I18n.T("hub.mine.empty.text"), "small muted", wrap: true)), 22));
-        foreach (var m in mine)
+        // 12.0: поиск на «Опубликованных» — по своим модам.
+        foreach (var m in mine.Where(m => _filter == "" || m.Name.Contains(_filter, StringComparison.OrdinalIgnoreCase)))
         {
             var mm = m;
             var actions = Ui.Row(6,

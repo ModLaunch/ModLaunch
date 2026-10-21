@@ -167,7 +167,7 @@ public sealed partial class CreatorPage
             ? new Panel { Children = { Gradient("#EC4899", MarketViews.KindIcon(l.Kind)), Pic(l.Images[0]) } }
             : game is not null ? Ui.GameImage(game, 500, art: Images.Art.Cover) : Gradient("#EC4899", MarketViews.KindIcon(l.Kind));
         return Tall(art, I18n.T("v91.cr.fresh"), l.Title, $"{l.Author} · {I18n.T("mk.kind." + l.Kind)}", MarketViews.PriceText(l),
-            () => MarketViews.Open(l, () => { _studio = null; _market = null; }));
+            () => MarketViews.Open(l, () => _market = null));
     }
 
     static Control TallPromo(string icon, string title, string text, string accent, Action open) =>

@@ -20,7 +20,8 @@ public sealed partial class CreatorPage
         var projects = Projects.List();
         var published = (_hub ?? []).Where(m => m.Mine).ToList();
         var selling = (_market ?? []).Where(l => l.Mine).ToList();
-        var built = Directory.Exists(Projects.OutDir) && Directory.EnumerateFiles(Projects.OutDir).Any();
+        // 12.0: сборки проектов лежат по папкам (_build/<проект>/) — ищем и в них.
+        var built = Directory.Exists(Projects.OutDir) && Directory.EnumerateFiles(Projects.OutDir, "*.zip", SearchOption.AllDirectories).Any();
 
         var name = ProfileKit.PlayerName();
         var muted = Ui.Res("Muted");

@@ -589,7 +589,6 @@ public sealed partial class MainWindow : Window
             (I18n.T("look.title"), Icons.Palette, () => Navigate(() => new SettingsPage("look"))),
             (I18n.T("v11.cm.title"), Icons.Users, () => Navigate(() => new CommunityPage())),
             (I18n.T("acc.page"), Icons.User, () => Navigate(() => new AccountPage())),
-            (I18n.T("mk.tab"), Icons.Bag, () => Navigate(() => new MarketPage())),
             ("Minecraft", Icons.Cube, () => Navigate(() => new MinecraftPage())),
             ("Minecraft · " + I18n.T("mine.tab.catalog"), Icons.Bag, () => Navigate(() => new MinecraftPage("catalog"))),
             ("Minecraft · " + I18n.T("mine.build.new"), Icons.Plus, () => { Navigate(() => new MinecraftPage("builds")); MinecraftPage.CreateDialog(); }),
@@ -599,18 +598,41 @@ public sealed partial class MainWindow : Window
             (I18n.T("cmd.theme"), Icons.Eye, () => Look.SetTheme(Look.Themes[(Array.IndexOf(Look.Themes, Look.Theme) + 1) % Look.Themes.Length])),
             (I18n.T("keys.title"), Icons.Key, () => Shortcuts()),
         };
+        // 12.0: Creator Hub — одной строкой выше (раньше ещё и «Маркет» вёл на ту же страницу), а здесь —
+        // его вкладки, «Новый проект» и свои проекты: открыть сразу в редакторе.
+        foreach (var (id, key, icon) in HubNav.Tabs.Where(t => t.Id != "store"))
+        {
+            var tab = id;
+            commands.Add(($"Creator Hub · {I18n.T(key)}", icon, () => HubNav.Open(tab)));
+        }
+        commands.Add((I18n.T("v12h2.cmd.newProject"), Icons.Plus, CreatorPage.NewProjectDialog));
+        try
+        {
+            foreach (var p in Creator.Projects.List())
+            {
+                var id = p.Id;
+                commands.Add((I18n.T("v12h2.cmd.project", ("name", p.Name)), Icons.Edit, () => Navigate(() => new CreatorPage("mine", id))));
+            }
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
         foreach (var g in AppState.Games)
         {
             var gs = g;
             commands.Add((gs.Def.Name, Icons.Folder, () => Navigate(() => new GamePage(gs.Def.Id))));
             if (gs.Status == Detect.Found) commands.Add((I18n.T("tray.play", ("game", gs.Def.Name)), Icons.Play, () => Actions.Play(gs)));
         }
+        // Сначала — где запрос в начале названия, потом — в начале слова, потом — где угодно; внутри — как в списке.
+        static int Rank(string title, string q) =>
+            q == "" || title.StartsWith(q, StringComparison.OrdinalIgnoreCase) ? 0
+            : title.Split(' ', '·', '-', '(', '«').Any(w => w.StartsWith(q, StringComparison.OrdinalIgnoreCase)) ? 1
+            : title.Contains(q, StringComparison.OrdinalIgnoreCase) ? 2 : -1;
         var shown = new List<(string Title, string Icon, Action Run)>();
         var selected = 0;
         void Render()
         {
             var q = (box.Text ?? "").Trim();
-            shown = commands.Where(c => q == "" || c.Title.Contains(q, StringComparison.OrdinalIgnoreCase)).Take(9).ToList();
+            shown = commands.Select((c, i) => (c, i, r: Rank(c.Title, q))).Where(x => x.r >= 0)
+                .OrderBy(x => x.r).ThenBy(x => x.i).Select(x => x.c).Take(9).ToList();
             selected = Math.Clamp(selected, 0, Math.Max(0, shown.Count - 1));
             list.Children.Clear();
             for (var i = 0; i < shown.Count; i++)

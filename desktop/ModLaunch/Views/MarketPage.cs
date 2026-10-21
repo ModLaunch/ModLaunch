@@ -62,7 +62,7 @@ public sealed partial class MarketPage : Page
 
     public override void Search(string text) { _query = text.Trim(); _tab = "browse"; Build(); MainWindow.Current?.RenderCrumbs(); }
 
-    public override bool SameScreenAs(Page? previous) => previous is MarketPage;
+    public override bool SameScreenAs(Page? previous) => HubNav.IsHub(previous);
 
     void Go(string tab) { _tab = tab; Build(); MainWindow.Current?.RenderCrumbs(); }
 

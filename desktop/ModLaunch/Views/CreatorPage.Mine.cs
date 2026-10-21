@@ -35,13 +35,15 @@ public sealed partial class CreatorPage
         col.Children.Add(bar);
         if (_minePart == "published") { col.Children.Add(PublishedView()); return col; }
 
+        // Проверка в игре закончится, пока смотрим список, — точка статуса обновится сама.
+        HookTest();
         var projects = Projects.List().Where(p => _filter == "" || p.Name.Contains(_filter, StringComparison.OrdinalIgnoreCase)).ToList();
         if (projects.Count == 0)
         {
             col.Children.Add(Ui.Card(Ui.Col(10,
                 Ui.Text(I18n.T("cr.empty"), "h3"),
                 Ui.Text(I18n.T("cr.empty.text"), "muted", wrap: true),
-                Ui.Row(8, Ui.Button(I18n.T("cr.home.create"), NewProject, "primary", Icons.Plus), Ui.Button(I18n.T("cr.tab.examples"), () => Go("examples"), "", Icons.Wand))), 28));
+                Ui.Row(8, Ui.Button(I18n.T("cr.home.create"), NewProjectDialog, "primary", Icons.Plus), Ui.Button(I18n.T("cr.tab.examples"), () => Go("examples"), "", Icons.Wand))), 28));
             return col;
         }
         var grid = new UniformGrid { Columns = 4 };
@@ -53,22 +55,15 @@ public sealed partial class CreatorPage
             HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Center, VerticalContentAlignment = VerticalAlignment.Center,
             Content = plus,
         };
-        add.Click += (_, _) => NewProject();
+        // 12.0: новый проект — через мастер (имя, игра, шаблон или импорт), см. CreatorPage.NewProject.cs.
+        add.Click += (_, _) => NewProjectDialog();
         grid.Children.Add(add);
         foreach (var p in projects) grid.Children.Add(ProjectCard(p));
         col.Children.Add(grid);
         return col;
     }
 
-    void NewProject()
-    {
-        var p = Projects.Create("Мой мод", Templates.ById("blank")!.Code);
-        _tab = "mine";
-        Open(p);
-        Build();
-    }
-
-    /// <summary>Карточка проекта: картинка игры, название, игра, когда изменён.</summary>
+    /// <summary>Карточка проекта: картинка игры, название, игра, статус (точка) с версией, когда изменён.</summary>
     Control ProjectCard(Project p)
     {
         var game = GameCatalog.ById(p.Game);
@@ -76,9 +71,15 @@ public sealed partial class CreatorPage
             ? Ui.GameImage(game, 400)
             : new Border { Background = Ui.Res("Surface3"), Child = Ui.Icon(Icons.Creator, 30, Ui.Res("Faint")) };
         var top = new Border { Height = 96, ClipToBounds = true, CornerRadius = new CornerRadius(16, 16, 0, 0), Child = art };
+        // 12.0: точка статуса из project.json — собран ли, проверен ли в игре, менялся ли код после сборки.
+        var status = p.Meta().Status(p.Updated);
+        var state = Ui.Row(6, Ui.Dot(StatusBrush(status), 8), Ui.Text(I18n.T($"v12.pj.st.{status}.short"), "small"));
+        if (p.Version != "") state.Children.Add(Ui.Text("· v" + p.Version, "small muted"));
+        ToolTip.SetTip(state, I18n.T($"v12.pj.st.{status}"));
         var body = Ui.Col(3,
             Ui.Text(p.Name, "h3"),
             Ui.Text(game?.Name ?? p.Game, "small muted"),
+            state,
             Ui.Text(I18n.T("cr.edited", ("when", Ui.Ago(p.Updated))), "small muted"));
         body.Margin = new Thickness(14, 12, 14, 14);
         var card = new Button
@@ -87,9 +88,11 @@ public sealed partial class CreatorPage
             HorizontalAlignment = HorizontalAlignment.Stretch,
             Content = new StackPanel { Children = { top, body } },
         };
-        card.Click += (_, _) => { _tab = "mine"; Open(p); Build(); };
+        card.Click += (_, _) => OpenProject(p);
         Ctx.Attach(card, () => Ctx.Menu(
-            Ctx.Item(I18n.T("ctx.open"), Icons.Edit, () => { _tab = "mine"; Open(p); Build(); }),
+            Ctx.Item(I18n.T("ctx.open"), Icons.Edit, () => OpenProject(p)),
+            Ctx.Item(I18n.T("v12.pj.pane.overview"), Icons.Chart, () => OpenProject(p, "overview")),
+            Ctx.Item(I18n.T("v12.pj.run"), Icons.Play, () => { OpenProject(p); BuildAndTest(); }, gesture: "F5"),
             Ctx.Item(I18n.T("ctx.duplicate"), Icons.Layers, () => { Projects.Create(p.Name + " (2)", File.ReadAllText(p.Script)); Build(); }),
             Ctx.Folder(I18n.T("games.openFolder"), p.Dir),
             Ctx.Copy(I18n.T("ctx.copyCode"), File.Exists(p.Script) ? File.ReadAllText(p.Script) : ""),
@@ -100,6 +103,16 @@ public sealed partial class CreatorPage
 }
 public sealed partial class CreatorPage
 {
+    /// <summary>Открыть проект: редактор (code) или обзор (overview).</summary>
+    void OpenProject(Project p, string pane = "code")
+    {
+        _tab = "mine";
+        _pane = pane;
+        if (pane == "overview") ForgetStats(p.Id);
+        Open(p);
+        Build();
+    }
+
     void DeleteProject(Project p)
     {
         var w = MainWindow.Current!;

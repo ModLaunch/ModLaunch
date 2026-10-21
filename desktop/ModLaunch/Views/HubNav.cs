@@ -11,8 +11,9 @@ namespace ModLaunch.Views;
 /// 9.5: одна навигация Creator Hub для рынка (MarketPage) и мастерской (CreatorPage) — раньше это
 /// были два разных экрана со своими вкладками. Три раздела, как в магазинах приложений:
 /// «Магазин» (витрина, обзор, Мастерская, авторы, очередь), «Моё» (библиотека, желаемое,
-/// кошелёк) и «Автору» (студия продаж, проекты, шаблоны, справка). Выбранный раздел — заливкой,
-/// его страницы — рядом; справа — баланс и «Продать работу».
+/// кошелёк) и «Автору» (проекты, студия продаж, шаблоны, справка). Выбранный раздел — заливкой,
+/// его страницы — рядом; справа — баланс и «Продать работу». 12.0: раздел помнит последнюю вкладку,
+/// а «Автору» по умолчанию — «Проекты» (они работают и без входа, студия продаж — нет).
 /// </summary>
 public static class HubNav
 {
@@ -31,8 +32,8 @@ public static class HubNav
         new("wishlist", "v93.mk.tab.wishlist", Icons.Heart, Group.Mine),
         new("injects", "v11.hub.injects", Icons.Zap, Group.Mine),
         new("wallet", "v93.mk.tab.wallet", Icons.Bag, Group.Mine),
-        new("studio", "v93.mk.tab.studio", Icons.Chart, Group.Author),
         new("projects", "v95.hub.projects", Icons.Edit, Group.Author),
+        new("studio", "v93.mk.tab.studio", Icons.Chart, Group.Author),
         new("lang", "v11.hub.lang", Icons.Code, Group.Author),
         new("templates", "v91.cr.tab.templates", Icons.Wand, Group.Author),
         new("docs", "cr.tab.docs", Icons.Book, Group.Author),
@@ -42,6 +43,24 @@ public static class HubNav
     public static bool IsMarketTab(string id) => id is "store" or "browse" or "workshop" or "authors" or "queue" or "library" or "wishlist" or "wallet" or "studio";
 
     static Group GroupOf(string id) => Items.FirstOrDefault(i => i.Id == id)?.Group ?? Group.Shop;
+
+    /// <summary>Все вкладки (для палитры команд): id, ключ названия, значок.</summary>
+    public static IEnumerable<(string Id, string Key, string Icon)> Tabs => Items.Select(i => (i.Id, i.Key, i.Icon));
+
+    /// <summary>Страница Creator Hub (рынок или мастерская): между ними — без въезда всей страницы.</summary>
+    public static bool IsHub(Page? page) => page is MarketPage or CreatorPage;
+
+    /// <summary>12.0: последняя открытая вкладка каждого раздела (на сеанс).</summary>
+    static readonly Dictionary<Group, string> Last = [];
+
+    /// <summary>Куда ведёт кнопка раздела: туда, где ушли, иначе на первую вкладку («Автору» — «Проекты», не стена входа студии).</summary>
+    public static string Target(Group g) => Last.TryGetValue(g, out var id) ? id : Items.First(i => i.Group == g).Id;
+
+    /// <summary>Запомнить вкладку её разделу; неизвестные id не трогают память.</summary>
+    public static void Remember(string id)
+    {
+        if (Items.FirstOrDefault(i => i.Id == id) is { } item) Last[item.Group] = id;
+    }
 
     /// <summary>Открыть раздел: вкладку рынка — на той же странице (inPage), остальное — в мастерской.</summary>
     public static void Open(string id, Action<string>? inPage = null)
@@ -69,6 +88,7 @@ public static class HubNav
     /// </summary>
     public static Control Header(string current, Action<string>? inPage = null, Action? sold = null, IReadOnlyList<Control>? sub = null, Control? action = null)
     {
+        Remember(current);
         var title = new TextBlock { Text = "Creator Hub", FontFamily = Gx.Display, FontSize = 20, FontWeight = FontWeight.Bold, LetterSpacing = -0.4, VerticalAlignment = VerticalAlignment.Center };
         ToolTip.SetTip(title, I18n.T("v93.mk.sub", ("n", 100 - Market.FeePercent)));
         var left = Ui.Row(12, CreatorLogo.Tile(36), title, Groups(current, inPage));
@@ -105,7 +125,7 @@ public static class HubNav
         var groups = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2 };
         foreach (var (g, key) in new[] { (Group.Shop, "v95.hub.group.shop"), (Group.Mine, "v95.hub.group.mine"), (Group.Author, "v95.hub.group.author") })
         {
-            var target = Items.First(i => i.Group == g).Id;
+            var target = Target(g);
             var b = Ui.Button(I18n.T(key), () => { if (g != group) Open(target, inPage); }, "hub-group");
             b.Padding = new Thickness(12, 6);
             if (g == group) b.Classes.Add("active");
@@ -134,5 +154,36 @@ public static class HubNav
             tabs.AddRange(sub);
         }
         return Ui.TabBar(tabs.ToArray());
+    }
+
+    [SelfTest]
+    static string HubNavRemembersTabs()
+    {
+        var saved = new Dictionary<Group, string>(Last);
+        try
+        {
+            Last.Clear();
+            if (Target(Group.Author) != "projects" || Target(Group.Shop) != "store" || Target(Group.Mine) != "library")
+                throw new Exception($"defaults {Target(Group.Shop)}/{Target(Group.Mine)}/{Target(Group.Author)}");
+            Remember("templates");
+            Remember("wishlist");
+            Remember("no-such-tab");
+            if (Target(Group.Author) != "templates" || Target(Group.Mine) != "wishlist" || Target(Group.Shop) != "store") throw new Exception("not remembered");
+            Remember("docs");
+            if (Target(Group.Author) != "docs") throw new Exception("last tab must win");
+            // Вкладки мастерской попадают в свой раздел шапки (старые id тоже).
+            foreach (var (tab, hub) in new[] { ("home", "projects"), ("mine", "projects"), ("codes", "projects"), ("examples", "templates"), ("inject", "lang"), ("mxdev", "lang"), ("hub", "workshop") })
+                if (CreatorPage.HubTabOf(tab) != hub) throw new Exception($"{tab} → {CreatorPage.HubTabOf(tab)}");
+            // Поиск: со своим списком — фильтр на месте, с Обзора, справки и из редактора — к проектам.
+            foreach (var (tab, editing, q, to) in new[] { ("home", false, "x", "mine"), ("home", false, "", "home"), ("mine", true, "x", "mine"), ("docs", false, "x", "mine"),
+                ("inject", false, "x", "mine"), ("codes", false, "x", "codes"), ("examples", false, "x", "examples"), ("hub", false, "x", "hub") })
+                if (CreatorPage.SearchTab(tab, editing, q) != to) throw new Exception($"search on {tab} → {CreatorPage.SearchTab(tab, editing, q)}");
+            return "Author opens Projects; each group remembers its last tab";
+        }
+        finally
+        {
+            Last.Clear();
+            foreach (var (k, v) in saved) Last[k] = v;
+        }
     }
 }
