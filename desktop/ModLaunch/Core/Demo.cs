@@ -42,6 +42,7 @@ public static class Demo
         Make("lethal-company", "Lethal Company", "Lethal Company_Data", true);
         Make("valheim", "Valheim", "valheim_Data", false);
         Make("repo", "REPO", "REPO_Data", true);
+        Make("hollow-knight", "Hollow Knight", "hollow_knight_Data", false);
         Settings.Save();
 
         // Игровое время — прямо в файл, до первого обращения к PlayTime.

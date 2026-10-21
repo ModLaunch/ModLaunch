@@ -1,4 +1,4 @@
-using System.Text.Json.Nodes;
+﻿using System.Text.Json.Nodes;
 
 namespace ModLaunch.Core;
 
@@ -25,6 +25,7 @@ public static class Widgets
         new("attention", "Bell", ["s", "m"]),
         new("streak", "Flame", ["s"]),
         new("random", "Shuffle", ["s", "m"]),
+        new("lore", "Sparkles", ["m", "l"]),
     ];
 
     /// <summary>11.0: по умолчанию — дело, а не счётчики: продолжить, часы по сборкам, друзья, что требует внимания.</summary>
@@ -64,11 +65,23 @@ public static class Widgets
         Settings.Save();
     }
 
-    public static void Add(string id)
+    /// <summary>Добавить виджет; 12.0: сразу нужного размера и на нужное место (из меню правой кнопки).</summary>
+    public static void Add(string id, string? size = null, int at = -1)
     {
         if (Find(id) is not { } k) return;
         var l = Layout();
-        l.Add((id, k.Sizes[0]));
+        var item = (id, size is not null && k.Sizes.Contains(size) ? size : k.Sizes[0]);
+        if (at >= 0 && at <= l.Count) l.Insert(at, item); else l.Add(item);
+        Set(l);
+        Notify();
+    }
+
+    /// <summary>Задать размер виджета (из меню правой кнопки).</summary>
+    public static void SetSize(int index, string size)
+    {
+        var l = Layout();
+        if (index < 0 || index >= l.Count || Find(l[index].Id) is not { } k || !k.Sizes.Contains(size)) return;
+        l[index] = (k.Id, size);
         Set(l);
         Notify();
     }

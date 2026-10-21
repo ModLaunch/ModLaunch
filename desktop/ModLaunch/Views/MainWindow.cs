@@ -1,4 +1,4 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
@@ -204,6 +204,12 @@ public sealed partial class MainWindow : Window
         SmoothScroll.Attach(this);
         // Где нажали в последний раз — отсюда «вырастает» страница мода.
         AddHandler(PointerPressedEvent, (_, e) => { _lastPress = e.GetPosition(this); _pointerDown = true; }, Avalonia.Interactivity.RoutingStrategies.Tunnel, handledEventsToo: true);
+        // 12.0: боковые кнопки мыши — назад и вперёд, как в браузере.
+        AddHandler(PointerReleasedEvent, (_, e) =>
+        {
+            if (e.InitialPressMouseButton == MouseButton.XButton1) { GoBack(); e.Handled = true; }
+            else if (e.InitialPressMouseButton == MouseButton.XButton2) { GoForward(); e.Handled = true; }
+        }, Avalonia.Interactivity.RoutingStrategies.Tunnel);
         // 9.5: перерисовка страницы, пришедшая между нажатием и отпусканием кнопки мыши, ждёт отпускания —
         // иначе кнопка, по которой щёлкнули, пропадала вместе со старой страницей и щелчок терялся.
         AddHandler(PointerReleasedEvent, (_, _) =>
@@ -626,6 +632,7 @@ public sealed partial class MainWindow : Window
         {
             ("Ctrl+P", "keys.palette"), ("Ctrl+K", "keys.search"), ("Ctrl+J", "keys.downloads"), ("Ctrl+B", "keys.rail"),
             ("Ctrl+,", "keys.settings"), ("Ctrl+Shift+P", "cp.title"), ("Ctrl+L", "lib.title"), ("Ctrl+U", "mc.title"), ("Ctrl+Shift+M", "keys.minecraft"),
+            ("Ctrl+H", "keys.home"), ("Ctrl+1…9", "keys.game"), ("Ctrl+Enter", "keys.play"), ("← / →", "keys.stage"), ("Mouse 4 / 5", "keys.history"),
             ("Ctrl+Shift+C", "keys.creator"), ("Ctrl+I", "keys.aside"), ("F11", "bp.open"), ("Alt+← / Alt+→", "keys.history"), ("F1", "keys.help"), ("Esc", "keys.close"),
         })
         {
@@ -775,6 +782,16 @@ public sealed partial class MainWindow : Window
 
     public void RefreshFriendsDock() => _friendsDock?.Render();
 
+    /// <summary>n-я игра для Ctrl+1…9: найденные, в порядке, как в боковой панели.</summary>
+    static GameState? QuickGame(int n) => OrderedGames().Where(g => g.Status == Detect.Found && !Features.GameCollections.IsHidden(g.Def.Id)).Skip(n).FirstOrDefault();
+
+    /// <summary>Игра «на экране»: открытая страница игры или выбранная на сцене главной.</summary>
+    GameState? CurrentGame()
+    {
+        var id = _current?.GameId ?? (_current is HomePage ? HomePage.StageGame : null);
+        return id is null ? null : AppState.Games.FirstOrDefault(g => g.Def.Id == id && g.Status == Detect.Found);
+    }
+
     /// <summary>Выйти из программы совсем (не в трей).</summary>
     public void Quit() { _quitting = true; Close(); }
 
@@ -793,6 +810,11 @@ public sealed partial class MainWindow : Window
         else if (e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift) && e.Key == Key.C) Navigate(() => new MarketPage());
         else if (e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift) && e.Key == Key.P) Navigate(() => new ControlPanelPage());
         else if (e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift) && e.Key == Key.M) Navigate(() => new MinecraftPage());
+        else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.H) Navigate(() => new HomePage());
+        // 12.0: Ctrl+1…9 — открыть свою игру по порядку, Ctrl+Enter — играть в открытую (или выбранную на главной).
+        else if (e.KeyModifiers == KeyModifiers.Control && e.Key is >= Key.D1 and <= Key.D9 && QuickGame(e.Key - Key.D1) is { } quick) Navigate(() => new GamePage(quick.Def.Id));
+        else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.Enter && CurrentGame() is { } playing) Actions.Play(playing);
+        else if (e.KeyModifiers == KeyModifiers.None && e.Key is Key.Left or Key.Right && _current is HomePage home && FocusManager?.GetFocusedElement() is not TextBox && home.StepStage(e.Key == Key.Right ? 1 : -1)) { }
         else if (e.Key == Key.F5 && e.KeyModifiers == KeyModifiers.None) _current?.Build();
         else if (e.Key == Key.F1) Shortcuts();
         else if (e.Key == Key.F11) BigPictureWindow.Open();

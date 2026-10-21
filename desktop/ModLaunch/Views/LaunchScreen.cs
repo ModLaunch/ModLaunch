@@ -17,6 +17,7 @@ namespace ModLaunch.Views;
 /// что сейчас происходит, и три шага мелким текстом; по нижнему краю — тонкая полоса прогресса
 /// цветом игры. Игра стартует сразу на третьем шаге; через пару секунд экран закрывается сам.
 /// Выключается в Настройки → Интерфейс (или командой конфига anim_launch off).
+/// 12.0: поверх арта — лор игры (LoreVeil), он меняется по мере прохождения.
 /// </summary>
 public sealed class LaunchScreen : Panel
 {
@@ -83,11 +84,20 @@ public sealed class LaunchScreen : Panel
             FontSize = 12.5, Foreground = Ui.Hex("#8E95A3"),
         };
 
+        // 12.0: лор игры — стадия по прохождению (сохранение, достижения или часы) и её название.
+        var depth = Lore.Of(g.Def);
+        var lore = new TextBlock
+        {
+            Text = I18n.T("lore.line", ("stage", Lore.StageName(g.Def, depth.Stage)), ("n", depth.Stage + 1)) + "  ·  " + I18n.T("lore.src." + depth.Source),
+            FontSize = 12, LetterSpacing = 0.6, Foreground = new SolidColorBrush(Color.FromArgb(200, 255, 255, 255)),
+        };
+
         var left = new StackPanel
         {
             Spacing = 14, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(72, 0, 72, 64),
             Children = { _eyebrow, title, _status, steps, meta, _result },
         };
+        if (Lore.Enabled) left.Children.Insert(5, lore);
 
         // Полоса прогресса по нижнему краю.
         var track = new Border { Height = 2, VerticalAlignment = VerticalAlignment.Bottom, Background = new SolidColorBrush(Color.FromArgb(28, 255, 255, 255)) };
@@ -102,6 +112,7 @@ public sealed class LaunchScreen : Panel
         Children.Add(_art);
         Children.Add(new Border { Background = Gx.ShadeLeft(0.8, 245) });
         Children.Add(new Border { Background = Gx.ShadeUp(0.3, 250) });
+        if (Lore.Enabled) Children.Add(new LoreVeil(g.Def, depth.Stage));
         Children.Add(left);
         Children.Add(track);
         Children.Add(_bar);
@@ -167,7 +178,7 @@ public sealed class LaunchScreen : Panel
             }
             catch { return (0, 0); }
         });
-        await Task.Delay(300);
+        await Task.Delay(140);
         if (_closed) return;
         SetStep(0, conflicts > 0 ? State.Warn : State.Done,
             mods == 0 ? I18n.T("launch.check.none")
@@ -176,7 +187,7 @@ public sealed class LaunchScreen : Panel
 
         var backups = Backups.OnLaunch;
         SetStep(1, backups ? State.Working : State.Skipped, backups ? null : I18n.T("launch.backup.off"));
-        await Task.Delay(backups ? 260 : 120);
+        await Task.Delay(backups ? 140 : 60);
         if (_closed) return; // закрыли до запуска — значит, передумали
         SetStep(2, State.Working, I18n.T("v10.launch.starting", ("game", _g.Def.ShortName)));
         var r = launch();
@@ -187,7 +198,7 @@ public sealed class LaunchScreen : Panel
             ShowFailure(r.Error);
             return;
         }
-        await Task.Delay(320);
+        await Task.Delay(200);
         SetStep(2, State.Done, null);
         ShowSuccess(r.Note);
         await Task.Delay(2200);

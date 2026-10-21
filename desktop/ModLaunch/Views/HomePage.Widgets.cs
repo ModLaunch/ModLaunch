@@ -1,4 +1,4 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
 using Avalonia.Layout;
@@ -78,6 +78,8 @@ public sealed partial class HomePage
             try { w = Widget(id, size, mine); }
             catch { w = Shell(Ui.Text(I18n.T("v10.w.error"), "small muted"), null); }
             grid.Sizes.Add(size);
+            // 12.0: правая кнопка по виджету — размер, сдвиг, убрать, добавить рядом (свои меню внутри виджета важнее).
+            if (!_editWidgets && w.ContextFlyout is null) w.ContextFlyout = WidgetMenu(i, id, size, layout.Count);
             grid.Children.Add(_editWidgets ? EditChrome(w, i, layout.Count) : w);
         }
         var col = Ui.Col(14);
@@ -287,6 +289,7 @@ public sealed partial class HomePage
                 var lines = new List<Control> { Big(notices.Count == 0 ? "✓" : notices.Count.ToString(), 36, tint), Small(first?.Title ?? I18n.T("v10.w.calm"), lines: wide ? 2 : 1) };
                 return Shell(Stack(Cap(Icons.Bell, I18n.T("v10.w.attention"), tint), lines.ToArray()), first is null ? null : () => (first.Open ?? first.Run)?.Invoke());
             }
+            case "lore": return LoreWidget(size, mine);
             case "streak":
             {
                 var n = PlayStreak.Current();

@@ -1,4 +1,4 @@
-using ModLaunch.Games;
+﻿using ModLaunch.Games;
 using ModLaunch.Loaders;
 using ModLaunch.Mods;
 
@@ -82,6 +82,8 @@ public static class AppState
         }
         Notify();
         await DetectMany(Games.Where(g => g.Status != Detect.Found).ToList());
+        // 12.0: стадии лора (сохранения игр) — заранее, чтобы запуск и открытие игры не ждали диск.
+        if (!Program.Screenshot) _ = Task.Run(Lore.Warm);
     }
 
     /// <summary>Найти несколько игр за один обход дисков; каждая показывается, как только нашлась.</summary>

@@ -1,4 +1,4 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Animation;
 using Avalonia.Animation.Easings;
 using Avalonia.Controls;
@@ -61,14 +61,15 @@ public static class Animate
     }
 
     /// <summary>Страница въезжает снизу — только при переходе, не при перерисовке.</summary>
-    public static void PageIn(Control page) => From(page, "translateY(18px)", 340);
+    /// 12.0: короче и ближе — переход не задерживает следующий клик.
+    public static void PageIn(Control page) => From(page, "translateY(10px)", 220);
 
     /// <summary>
     /// Волна: карточки поднимаются по очереди (задержка ограничена, чтобы длинные списки не ждали).
     /// 9.5: без «отскока» и без увеличения — карточка не вылезает за край сетки и соседей.
     /// </summary>
     public static void Rise(Control c, int index) =>
-        From(c, "translateY(12px)", 380, Math.Min(index * 28, 300), new QuinticEaseOut());
+        From(c, "translateY(10px)", 260, Math.Min(index * 16, 140), new QuinticEaseOut());
 
     /// <summary>Всплывающее окно появляется — чуть увеличиваясь, без «перелёта».</summary>
     public static void Pop(Control c) => From(c, "scale(0.96)", 260, 0, new CubicEaseOut());

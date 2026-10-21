@@ -1,4 +1,4 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
@@ -170,7 +170,7 @@ public sealed class GameOpenRun
             case GameFx.Warp: Warp(); break;
             case GameFx.Expand: Expand(from, game); break;
             case GameFx.Wipe: Wipe(); break;
-            case GameFx.Calm: Calm(); break;
+            case GameFx.Calm: Calm(game); break;
             default: Doors(); break;
         }
         Seek(0);
@@ -545,7 +545,7 @@ public sealed class GameOpenRun
 
     // ---------------------------------------------------------------- 9. Спокойная (10.0)
 
-    void Calm()
+    void Calm(Games.GameDef? game)
     {
         Length = 380;
         OpaquePage();
@@ -554,12 +554,26 @@ public sealed class GameOpenRun
         var shrink = new ScaleTransform();
         old.RenderTransform = shrink;
         var (ps, _) = PageTransform();
+        // 12.0: у каждой игры своё открытие — её лор (стадия по прохождению) на миг проступает поверх
+        // страницы и уходит. Страница под ним уже рабочая: слой не ловит нажатия.
+        LoreVeil? veil = null;
+        if (game is not null && Lore.Enabled)
+        {
+            Length = 1100;
+            veil = new LoreVeil(game, Lore.Of(game).Stage) { Width = _size.Width, Height = _size.Height, GrowMs = 520, StillMs = 700, Strength = 0 };
+            _stage.Children.Add(veil);
+        }
         _frame = ms =>
         {
             var k = CubicOut(Phase(ms, 0, 340));
             old.Opacity = 1 - k;
             shrink.ScaleX = shrink.ScaleY = 1 - 0.015 * k;
             ps.ScaleX = ps.ScaleY = 1.02 - 0.02 * CubicOut(Phase(ms, 0, 380));
+            if (veil is not null)
+            {
+                veil.Strength = Phase(ms, 0, 160) * (1 - CubicInOut(Phase(ms, 620, 480)));
+                veil.InvalidateVisual();
+            }
         };
     }
 

@@ -304,6 +304,7 @@ public static class Configs
                 case "anim": d["animations"] = On(value); break;
                 case "anim_open" when value is "calm" or "classic" or "off": d["gameOpenStyle"] = value; break;
                 case "anim_launch" when value is "calm" or "off": d["launchFx"] = value; break;
+                case "anim_lore": d["loreFx"] = On(value); break;
                 case "home_hero" when value is "stage" or "compact" or "off": d["homeHero"] = value; break;
                 case "headings" when value is "ui" or "wide": d["headings"] = value; break;
                 case "glow" when double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var g) && g is >= 0 and <= 1: d["glow"] = g; break;
@@ -356,6 +357,7 @@ public static class Configs
         sb.AppendLine("anim " + (Look.Animations ? 1 : 0));
         sb.AppendLine("anim_open " + (d.Str("gameOpenStyle") ?? "calm"));
         sb.AppendLine("anim_launch " + (d.Str("launchFx") ?? "calm"));
+        sb.AppendLine("anim_lore " + (Lore.Enabled ? 1 : 0));
         sb.AppendLine("home_hero " + (d.Str("homeHero") ?? "stage"));
         sb.AppendLine("headings " + (Look.WideHeadings ? "wide" : "ui"));
         sb.AppendLine("glow " + Look.Glow.ToString(CultureInfo.InvariantCulture));
