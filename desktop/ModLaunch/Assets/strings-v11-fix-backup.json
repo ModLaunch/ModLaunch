@@ -1,0 +1,8 @@
+{
+  "ru": {
+    "v11.fixbk.keep.hint": "Старые бэкапы этого ПК удаляются сами. Бэкапы других компьютеров и другие файлы в папке не трогаются."
+  },
+  "en": {
+    "v11.fixbk.keep.hint": "Older backups from this PC are removed automatically. Backups from other PCs and other files in the folder are left alone."
+  }
+}

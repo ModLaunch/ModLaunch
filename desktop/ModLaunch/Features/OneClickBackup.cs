@@ -47,8 +47,11 @@ public sealed record RestoreResult(int Files, IReadOnlyList<string> Restart, int
 /// </summary>
 public static partial class OneClickBackup
 {
-    /// <summary>Файлы данных в бэкапе (settings.json — отдельно, очищенный).</summary>
-    static readonly string[] DataFiles = ["profiles.json", "playtime.json", "buildtime.json", "history.json", "vanilla.json", "ai-builds.json", "plays.json"];
+    /// <summary>
+    /// Файлы данных в бэкапе (settings.json — отдельно, очищенный). vanilla.json сюда не входит: это запись,
+    /// какие файлы загрузчиков отложены в папках игр этого ПК, — со старой записью загрузчик не вернуть.
+    /// </summary>
+    static readonly string[] DataFiles = ["profiles.json", "playtime.json", "buildtime.json", "history.json", "ai-builds.json", "plays.json"];
     /// <summary>Папки данных в бэкапе: настройки модов профилей, стили, проекты Creator Hub, описания сборок Minecraft.</summary>
     static readonly string[] DataFolders = ["profiles", "configs", "creator", "minecraft"];
     /// <summary>Файл из папки данных больше этого — не «лёгкий» (картинка, собранный мод), в бэкап не идёт.</summary>
@@ -69,7 +72,7 @@ public static partial class OneClickBackup
     [GeneratedRegex("token|secret|password|passwd|apikey|api_key|cookie|credential|dpapi", RegexOptions.IgnoreCase)]
     private static partial Regex SecretKey();
 
-    [GeneratedRegex(@"^ModLaunch-(\d{8}-\d{6})\.zip$")] private static partial Regex FileName();
+    [GeneratedRegex(@"^ModLaunch-([0-9]{8}-[0-9]{6})\.zip$")] private static partial Regex FileName();
     [GeneratedRegex(@"^[a-z0-9][a-z0-9._-]{0,63}$")] private static partial Regex GameId();
     /// <summary>Имя копии сохранений, как в Backups: ГГГГММДД-ЧЧММСС-причина.zip.</summary>
     [GeneratedRegex(@"^\d{8}-\d{6}-[a-z]+\.zip$")] private static partial Regex SaveName();
@@ -259,7 +262,7 @@ public static partial class OneClickBackup
     }
 
     /// <summary>Собрать архив из папки данных и отдать его в место сохранения.</summary>
-    static async Task<BackupResult> Make(BackupTarget target, bool saves, int keep, string reason, IProgress<double>? progress)
+    static async Task<BackupResult> Make(BackupTarget target, bool saves, int keep, string reason, IProgress<double>? progress, string? spare = null)
     {
         // Настройки и списки, ждущие фоновой записи, — сначала на диск: в бэкап идёт самое свежее.
         JsonFile.FlushAll();
@@ -267,10 +270,13 @@ public static partial class OneClickBackup
         var copies = saves ? LatestSaves(Paths.DataDir) : [];
         if (target.Kind == "cloud")
         {
+            // Больше 8 МБ облако не примет — не собираем и не читаем в память гигабайты: копии сохранений
+            // (они не сжимаются) проверяем сразу, остальное Write проверяет по ходу.
+            if (copies.Sum(c => Length(c.File)) > CloudLimit) throw new ServiceError("TOO_BIG");
             var temp = Path.Combine(Paths.CacheDir, $"cloud-backup-{Guid.NewGuid():N}.zip");
             try
             {
-                var (files, skipped) = Write(Paths.DataDir, temp, mods, copies, reason, Scale(progress, 0, 0.4));
+                var (files, skipped) = Write(Paths.DataDir, temp, mods, copies, reason, Scale(progress, 0, 0.4), CloudLimit);
                 var bytes = await File.ReadAllBytesAsync(temp);
                 await Upload(bytes, Scale(progress, 0.4, 1));
                 return new BackupResult(true, target.Id, null, bytes.Length, files, skipped, DateTime.UtcNow, null);
@@ -285,7 +291,7 @@ public static partial class OneClickBackup
         {
             var (files, skipped) = Write(Paths.DataDir, tmp, mods, copies, reason, progress);
             File.Move(tmp, path);
-            Prune(folder, keep);
+            Prune(folder, keep, spare);
             progress?.Report(1);
             return new BackupResult(true, target.Id, path, new FileInfo(path).Length, files, skipped, DateTime.UtcNow, null);
         }
@@ -296,10 +302,18 @@ public static partial class OneClickBackup
         }
     }
 
+    static long Length(string file)
+    {
+        try { return new FileInfo(file).Length; }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return 0; }
+    }
+
     static string FreeName(string folder, DateTime at)
     {
-        var name = $"ModLaunch-{at:yyyyMMdd-HHmmss}.zip";
-        for (var i = 1; File.Exists(Path.Combine(folder, name)); i++) name = $"ModLaunch-{at.AddSeconds(i):yyyyMMdd-HHmmss}.zip";
+        // Григорианский календарь при любом языке Windows: ListFolder читает дату так же.
+        static string Name(DateTime t) => "ModLaunch-" + t.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture) + ".zip";
+        var name = Name(at);
+        for (var i = 1; File.Exists(Path.Combine(folder, name)); i++) name = Name(at.AddSeconds(i));
         return name;
     }
 
@@ -377,9 +391,10 @@ public static partial class OneClickBackup
     /// Собрать архив из папки данных root: файлы, составы модов (mods/&lt;игра&gt;.json) и копии
     /// сохранений (saves/&lt;игра&gt;/…), а в конце manifest.json с sha256 каждого файла.
     /// Возвращает, сколько файлов вошло и сколько не прочиталось (заняты другой программой).
+    /// Архив перерос limit — ServiceError TOO_BIG (для облака ModLaunch).
     /// </summary>
     internal static (int Files, int Skipped) Write(string root, string zipPath, IReadOnlyDictionary<string, JsonObject> mods,
-        IReadOnlyList<(string Game, string File)> saves, string reason, IProgress<double>? progress = null)
+        IReadOnlyList<(string Game, string File)> saves, string reason, IProgress<double>? progress = null, long limit = long.MaxValue)
     {
         var items = new List<(string Entry, Func<Stream> Open)>();
         if (ReadJson(Path.Combine(root, "settings.json")) is { } settings)
@@ -421,7 +436,8 @@ public static partial class OneClickBackup
 
         var listed = new JsonArray();
         var skipped = 0;
-        using (var zip = ZipFile.Open(zipPath, ZipArchiveMode.Create))
+        using (var stream = new FileStream(zipPath, FileMode.CreateNew, FileAccess.Write))
+        using (var zip = new ZipArchive(stream, ZipArchiveMode.Create))
         {
             for (var i = 0; i < items.Count; i++)
             {
@@ -435,6 +451,7 @@ public static partial class OneClickBackup
                     listed.Add(new JsonObject { ["path"] = name, ["size"] = size, ["sha256"] = sha });
                 }
                 catch (Exception e) when (e is IOException or UnauthorizedAccessException) { skipped++; }
+                if (stream.Length > limit) throw new ServiceError("TOO_BIG");
                 progress?.Report((i + 1.0) / (items.Count + 1));
             }
             var manifest = new JsonObject
@@ -511,6 +528,8 @@ public static partial class OneClickBackup
         foreach (var f in manifest.Arr("files").OfType<JsonObject>())
         {
             var path = f.Str("path") ?? "";
+            // Бэкапы первых сборок 11.0 ещё содержат vanilla.json — пропускаем его, не трогая свой.
+            if (path == "data/vanilla.json") continue;
             if (!Allowed(path) || zip.GetEntry(path) is not { } entry || entry.Length != f.Long("size")) throw Broken();
             bool same;
             try
@@ -566,6 +585,8 @@ public static partial class OneClickBackup
     /// она держит в памяти, поэтому они ложатся в restore-pending и подменяются при следующем запуске.
     /// Составы модов становятся снимками «как было» (snapshots), копии сохранений — копиями игр (backups);
     /// вход, ключи и инжекты не трогаются: их в архиве не бывает, а лишние пути не проходят проверку.
+    /// При stage — всё или ничего: файлы данных сначала ложатся во временную папку и попадают на место, только
+    /// когда распакован весь архив; не удалось — временная папка, новые снимки и копии сохранений убираются.
     /// </summary>
     internal static RestoreResult Unpack(string zipPath, string root, bool stage, string? safety = null)
     {
@@ -573,53 +594,88 @@ public static partial class OneClickBackup
         using var zip = OpenZip(zipPath);
         var (manifest, files) = Verify(zip);
         var pending = Path.Combine(root, PendingDir);
-        if (stage && Directory.Exists(pending)) Directory.Delete(pending, true);
+        var staging = pending + ".tmp";
+        if (stage && Directory.Exists(staging)) Directory.Delete(staging, true);
         var created = Firebase.Time(manifest.Str("created")) ?? DateTime.UtcNow;
         var restart = new List<string>();
+        var moves = new List<string>();
+        var added = new List<string>();
         int written = 0, lists = 0, copies = 0;
-        foreach (var (path, entry) in files)
+        try
         {
-            var parts = path.Split('/');
-            if (parts[0] == "data")
+            foreach (var (path, entry) in files)
             {
-                var rel = string.Join('/', parts[1..]);
-                var live = stage && rel.EndsWith(".json", StringComparison.OrdinalIgnoreCase);
-                var target = Inside(live ? pending : root, rel);
-                if (rel == "settings.json" && !live)
+                var parts = path.Split('/');
+                if (parts[0] == "data")
                 {
-                    using var s = entry.Open();
-                    var restored = JsonNode.Parse(s) as JsonObject ?? throw Broken();
-                    WriteAtomic(target, Merge(restored, ReadJson(target)).ToJsonString(Pretty));
+                    var rel = string.Join('/', parts[1..]);
+                    var target = Inside(stage ? staging : root, rel);
+                    if (rel == "settings.json" && !stage)
+                    {
+                        using var s = entry.Open();
+                        var restored = JsonNode.Parse(s) as JsonObject ?? throw Broken();
+                        WriteAtomic(target, Merge(restored, ReadJson(target)).ToJsonString(Pretty));
+                    }
+                    else Extract(entry, target);
+                    // Не JSON программа в памяти не держит — он встанет на место сразу после распаковки.
+                    if (stage) (rel.EndsWith(".json", StringComparison.OrdinalIgnoreCase) ? restart : moves).Add(rel);
+                    written++;
                 }
-                else Extract(entry, target);
-                if (live) restart.Add(rel);
-                written++;
+                else if (parts[0] == "mods")
+                {
+                    JsonObject snap;
+                    using (var s = entry.Open()) snap = JsonNode.Parse(s) as JsonObject ?? throw Broken();
+                    snap["at"] = created.ToString("o");
+                    snap["reason"] = "backup";
+                    snap["config"] = false;
+                    var file = Inside(root, $"snapshots/{parts[1][..^5]}/{created:yyyyMMdd-HHmmss}-backup.json");
+                    var fresh = !File.Exists(file);
+                    WriteAtomic(file, snap.ToJsonString());
+                    if (fresh) added.Add(file);
+                    lists++;
+                }
+                else
+                {
+                    // Своя копия сохранений не заменяется: из бэкапа добавляется только то, чего здесь нет.
+                    var copy = Inside(root, $"backups/{parts[1]}/{parts[2]}");
+                    if (File.Exists(copy)) continue;
+                    Extract(entry, copy);
+                    added.Add(copy);
+                    copies++;
+                }
             }
-            else if (parts[0] == "mods")
+            if (stage)
             {
-                JsonObject snap;
-                using (var s = entry.Open()) snap = JsonNode.Parse(s) as JsonObject ?? throw Broken();
-                snap["at"] = created.ToString("o");
-                snap["reason"] = "backup";
-                snap["config"] = false;
-                WriteAtomic(Inside(root, $"snapshots/{parts[1][..^5]}/{created:yyyyMMdd-HHmmss}-backup.json"), snap.ToJsonString());
-                lists++;
+                foreach (var rel in moves)
+                {
+                    var target = Inside(root, rel);
+                    Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+                    File.Move(Inside(staging, rel), target, true);
+                }
+                // Прошлое неприменённое восстановление заменяется этим — только теперь, когда это удалось целиком.
+                if (Directory.Exists(pending)) Directory.Delete(pending, true);
+                if (Directory.Exists(staging)) Directory.Move(staging, pending);
             }
-            else
+        }
+        catch
+        {
+            try { if (stage && Directory.Exists(staging)) Directory.Delete(staging, true); }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+            foreach (var file in added)
             {
-                // Своя копия сохранений не заменяется: из бэкапа добавляется только то, чего здесь нет.
-                var copy = Inside(root, $"backups/{parts[1]}/{parts[2]}");
-                if (File.Exists(copy)) continue;
-                Extract(entry, copy);
-                copies++;
+                try { File.Delete(file); }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
             }
+            throw;
         }
         return new RestoreResult(written, restart, lists, copies, safety);
     }
 
     /// <summary>
     /// При запуске, до чтения настроек: подменить JSON-файлы, отложенные восстановлением. settings.json
-    /// сливается с нынешним (вход и ключи этого ПК остаются). Ничего не бросает; возвращает, сколько файлов подменено.
+    /// сливается с нынешним (вход и ключи этого ПК остаются). Подменённый файл сразу уходит из папки: иначе
+    /// при следующем запуске настройки из бэкапа слились бы снова поверх новых. Не подменился (файл занят) —
+    /// остаётся до следующего запуска. Ничего не бросает; возвращает, сколько файлов подменено.
     /// </summary>
     public static int ApplyPending(string? root = null)
     {
@@ -632,14 +688,20 @@ public static partial class OneClickBackup
             foreach (var file in Directory.EnumerateFiles(pending, "*", SearchOption.AllDirectories).ToList())
             {
                 var rel = Path.GetRelativePath(pending, file).Replace('\\', '/');
-                if (!Allowed("data/" + rel) || rel.EndsWith(".bk-tmp", StringComparison.Ordinal)) continue;
                 try
                 {
-                    var target = Inside(root, rel);
-                    if (rel == "settings.json")
+                    // Чужой, недописанный или нечитаемый файл не подменится никогда — просто убираем.
+                    var restored = rel == "settings.json" ? ReadJson(file) : null;
+                    if (!Allowed("data/" + rel) || rel.EndsWith(".bk-tmp", StringComparison.Ordinal) || (rel == "settings.json" && restored is null))
                     {
-                        if (ReadJson(file) is not { } restored) continue;
+                        File.Delete(file);
+                        continue;
+                    }
+                    var target = Inside(root, rel);
+                    if (restored is not null)
+                    {
                         WriteAtomic(target, Merge(restored, ReadJson(target)).ToJsonString(Pretty));
+                        File.Delete(file);
                     }
                     else
                     {
@@ -650,7 +712,7 @@ public static partial class OneClickBackup
                 }
                 catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException) { }
             }
-            Directory.Delete(pending, true);
+            if (!Directory.EnumerateFiles(pending, "*", SearchOption.AllDirectories).Any()) Directory.Delete(pending, true);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException) { }
         return done;
@@ -672,9 +734,10 @@ public static partial class OneClickBackup
         if (!Directory.Exists(folder)) return list;
         foreach (var file in Directory.EnumerateFiles(folder, "ModLaunch-*.zip"))
         {
+            // Имя с невозможной датой (ModLaunch-20261399-250000.zip) — не наш бэкап: пропускаем, а не падаем.
             var m = FileName().Match(Path.GetFileName(file));
-            if (!m.Success) continue;
-            var at = DateTime.ParseExact(m.Groups[1].Value, "yyyyMMdd-HHmmss", CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal).ToUniversalTime();
+            if (!m.Success || !DateTime.TryParseExact(m.Groups[1].Value, "yyyyMMdd-HHmmss", CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var made)) continue;
+            var at = made.ToUniversalTime();
             JsonObject? manifest = null;
             long size = 0;
             try
@@ -690,12 +753,18 @@ public static partial class OneClickBackup
         return list.OrderByDescending(b => b.At).ToList();
     }
 
-    /// <summary>Оставить в папке keep новых бэкапов (чужие файлы не трогаются). Возвращает, сколько удалено.</summary>
-    internal static int Prune(string folder, int keep)
+    /// <summary>
+    /// Оставить в папке keep новых бэкапов этого ПК: папку облачного сервиса делят все компьютеры человека,
+    /// поэтому бэкапы других ПК и чужие файлы не трогаются. spare — не удалять (из него сейчас восстанавливают).
+    /// Возвращает, сколько удалено.
+    /// </summary>
+    internal static int Prune(string folder, int keep, string? spare = null)
     {
         var removed = 0;
-        foreach (var old in ListFolder("", folder).Skip(Math.Max(1, keep)))
+        var mine = ListFolder("", folder).Where(b => string.Equals(b.Device, Device, StringComparison.OrdinalIgnoreCase));
+        foreach (var old in mine.Skip(Math.Max(1, keep)))
         {
+            if (spare is not null && string.Equals(Path.GetFullPath(old.File!), Path.GetFullPath(spare), StringComparison.OrdinalIgnoreCase)) continue;
             try { File.Delete(old.File!); removed++; }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
         }
@@ -714,14 +783,15 @@ public static partial class OneClickBackup
         var keep = Keep;
         Running = true;
         Changed?.Invoke();
-        // Работаем с копией: страховочный бэкап по сроку хранения может удалить тот, из которого восстанавливаем.
+        // Работаем с копией (сервис синхронизации может заменить файл посреди восстановления), а сам бэкап
+        // страховочный по сроку хранения не удаляет: если восстановление не удастся, он нужен целым.
         var work = Path.Combine(Paths.CacheDir, $"restore-{Guid.NewGuid():N}.zip");
         try
         {
             if (entry.Target == "cloud") await Download(work, Scale(progress, 0, 0.4));
             else await Task.Run(() => File.Copy(entry.File!, work, true));
             await Task.Run(() => { using var zip = OpenZip(work); Verify(zip); });
-            var safety = await Task.Run(() => Make(local, saves: false, keep, "safety", Scale(progress, 0.4, 0.8)));
+            var safety = await Task.Run(() => Make(local, saves: false, keep, "safety", Scale(progress, 0.4, 0.8), entry.File));
             var result = await Task.Run(() => Unpack(work, Paths.DataDir, stage: true, Path.GetFileName(safety.File)));
             progress?.Report(1);
             return result;
@@ -750,7 +820,11 @@ public static partial class OneClickBackup
     /// <summary>Самый большой бэкап для облака ModLaunch: 8 МБ (16 частей).</summary>
     public const long CloudLimit = 8L * 1024 * 1024;
 
-    sealed record CloudMeta(DateTime At, long Size, string Sha, int Chunks, string Device, string Version);
+    /// <summary>Base — с какой части лежит архив: 0 (files/0…15) или 16 (files/16…31).</summary>
+    sealed record CloudMeta(DateTime At, long Size, string Sha, int Chunks, int Base, string Device, string Version);
+
+    /// <summary>Куда писать новый бэкап: в половину, где прошлого нет, — он цел, пока описание не переключится.</summary>
+    static int NextBase(CloudMeta? old) => old is { Base: 0 } ? MaxChunks : 0;
 
     static async Task<(string Uid, string Token)> Member()
     {
@@ -795,39 +869,56 @@ public static partial class OneClickBackup
         try { doc = await Call($"/backups/{uid}", HttpMethod.Get, token); }
         catch (ServiceError e) when (e.Code == "NOT_FOUND") { return null; }
         var f = Firebase.FromFields(doc?["fields"] as JsonObject);
-        return new CloudMeta(Firebase.Time(f.S("at")) ?? DateTime.MinValue, f.L("size"), f.S("sha256"), (int)Math.Clamp(f.L("chunks"), 0, MaxChunks), f.S("device"), f.S("version"));
+        return new CloudMeta(Firebase.Time(f.S("at")) ?? DateTime.MinValue, f.L("size"), f.S("sha256"), (int)Math.Clamp(f.L("chunks"), 0, MaxChunks),
+            f.L("base") == MaxChunks ? MaxChunks : 0, f.S("device"), f.S("version"));
     }
 
     /// <summary>
-    /// Выгрузить архив: части files/0…N, потом описание backups/&lt;uid&gt; (по нему восстановление сверяет sha256),
-    /// потом убрать лишние части прошлого, более длинного бэкапа.
+    /// Выгрузить архив, не трогая прошлый бэкап: части — в другую половину (NextBase), потом описание
+    /// backups/&lt;uid&gt; переключается на них (по нему восстановление сверяет sha256), и только тогда части
+    /// прошлого бэкапа удаляются. Оборвалась выгрузка — описание и части прошлого бэкапа целы.
     /// </summary>
     static async Task Upload(byte[] zip, IProgress<double>? progress)
     {
         if (zip.Length > CloudLimit) throw new ServiceError("TOO_BIG");
         var (uid, token) = await Member();
         var old = await Meta(uid, token);
+        var start = NextBase(old);
         var data = Convert.ToBase64String(zip);
         var chunks = (data.Length + ChunkChars - 1) / ChunkChars;
         for (var i = 0; i < chunks; i++)
         {
             var part = data.Substring(i * ChunkChars, Math.Min(ChunkChars, data.Length - i * ChunkChars));
-            await Call($"/backups/{uid}/files/{i}", HttpMethod.Patch, token,
+            // Токен — на каждую часть: на медленной связи выгрузка идёт дольше, чем живёт один токен.
+            (_, token) = await Member();
+            await Call($"/backups/{uid}/files/{start + i}", HttpMethod.Patch, token,
                 new JsonObject { ["fields"] = Firebase.ToFields(new Dictionary<string, object?> { ["data"] = part }) });
             progress?.Report((i + 1.0) / (chunks + 1));
         }
         var fields = Firebase.ToFields(new Dictionary<string, object?>
         {
-            ["size"] = (long)zip.Length, ["sha256"] = Sha(zip), ["chunks"] = (long)chunks, ["device"] = Device, ["version"] = Http.Version,
+            ["size"] = (long)zip.Length, ["sha256"] = Sha(zip), ["chunks"] = (long)chunks, ["base"] = (long)start, ["device"] = Device, ["version"] = Http.Version,
         });
         fields["at"] = new JsonObject { ["timestampValue"] = DateTime.UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", CultureInfo.InvariantCulture) };
+        (_, token) = await Member();
         await Call($"/backups/{uid}", HttpMethod.Patch, token, new JsonObject { ["fields"] = fields });
-        for (var i = chunks; i < (old?.Chunks ?? 0); i++)
+        if (old is not null) await DeleteChunks(uid, old.Base, old.Chunks);
+        progress?.Report(1);
+    }
+
+    /// <summary>Убрать части from…from+count-1. Ошибки не мешают: на часть без описания ничто не ссылается.</summary>
+    static async Task DeleteChunks(string uid, int from, int count)
+    {
+        for (var i = from; i < from + count; i++)
         {
-            try { await Call($"/backups/{uid}/files/{i}", HttpMethod.Delete, token); }
+            try
+            {
+                var (_, token) = await Member();
+                await Call($"/backups/{uid}/files/{i}", HttpMethod.Delete, token);
+            }
+            catch (ServiceError e) when (e.Code is "OFFLINE" or "OFFLINE_MODE" or "SIGN_IN" or "SESSION") { return; } // связи нет — остальные тоже не удалятся
             catch (ServiceError) { }
         }
-        progress?.Report(1);
     }
 
     static async Task Download(string path, IProgress<double>? progress)
@@ -837,7 +928,8 @@ public static partial class OneClickBackup
         var data = new StringBuilder();
         for (var i = 0; i < meta.Chunks; i++)
         {
-            var doc = await Call($"/backups/{uid}/files/{i}", HttpMethod.Get, token);
+            (_, token) = await Member();
+            var doc = await Call($"/backups/{uid}/files/{meta.Base + i}", HttpMethod.Get, token);
             data.Append(Firebase.FromFields(doc?["fields"] as JsonObject).S("data"));
             progress?.Report((i + 1.0) / meta.Chunks);
         }
@@ -857,13 +949,10 @@ public static partial class OneClickBackup
     static async Task DeleteCloud()
     {
         var (uid, token) = await Member();
-        if (await Meta(uid, token) is not { } meta) return;
+        if (await Meta(uid, token) is null) return;
         await Call($"/backups/{uid}", HttpMethod.Delete, token);
-        for (var i = 0; i < meta.Chunks; i++)
-        {
-            try { await Call($"/backups/{uid}/files/{i}", HttpMethod.Delete, token); }
-            catch (ServiceError) { }
-        }
+        // Обе половины целиком: части оборванной выгрузки тоже уходят.
+        await DeleteChunks(uid, 0, 2 * MaxChunks);
     }
 
     /// <summary>
@@ -931,9 +1020,15 @@ public static partial class OneClickBackup
         {
             ["valheim"] = new() { ["game"] = "Valheim", ["mods"] = ModSetup.ToJson([new SetupMod("denikson-BepInExPack_Valheim", "BepInEx", "5.4.2202", "thunderstore", true)]) },
         };
+        // vanilla.json — что отложено в папках игр этого ПК: в бэкап не идёт.
+        File.WriteAllText(Path.Combine(src, "vanilla.json"), """{"games":{"valheim":{"mode":"inject","files":["winhttp.dll"]}}}""");
         var zip = Path.Combine(TestDir("zip"), "b.zip");
         var (files, skipped) = Write(src, zip, mods, LatestSaves(src), "manual");
         if (skipped != 0 || files != 7) throw new Exception($"{files} files, {skipped} skipped");
+
+        // Для облака: архив перерос предел — сборка останавливается сразу, а не читает в память гигабайты.
+        try { Write(src, Path.Combine(TestDir("big"), "b.zip"), mods, [], "manual", null, 1000); throw new Exception("archive over the limit written"); }
+        catch (ServiceError e) when (e.Code == "TOO_BIG") { }
 
         File.WriteAllText(Path.Combine(dst, "settings.json"), """{"nexusApiKey":"KEEP-ME","language":"en"}""");
         var r = Unpack(zip, dst, stage: false);
@@ -955,6 +1050,27 @@ public static partial class OneClickBackup
         if (!File.Exists(Path.Combine(live, "profiles", "valheim", "Строитель.zip"))) throw new Exception("non-JSON file not written at once");
         if (ApplyPending(live) != staged.Restart.Count || !File.Exists(Path.Combine(live, "profiles.json")) || Directory.Exists(Path.Combine(live, PendingDir))) throw new Exception("pending not applied");
 
+        // Восстановление сорвалось на последнем файле — ни отложенных JSON, ни половины файлов, ни новых снимков.
+        var fail = TestDir("fail");
+        Directory.CreateDirectory(Path.Combine(fail, "backups", "valheim", "20261002-120000-launch.zip"));
+        try { Unpack(zip, fail, stage: true); throw new Exception("restore over a busy file succeeded"); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+        var snaps = Path.Combine(fail, "snapshots");
+        if (Directory.Exists(Path.Combine(fail, PendingDir)) || Directory.Exists(Path.Combine(fail, PendingDir + ".tmp"))
+            || File.Exists(Path.Combine(fail, "profiles", "valheim", "Строитель.zip")) || (Directory.Exists(snaps) && Directory.EnumerateFiles(snaps, "*", SearchOption.AllDirectories).Any()))
+            throw new Exception("failed restore left files behind");
+
+        // Подменённый файл сразу уходит из restore-pending: занятый ждёт следующего запуска, настройки второй раз не сливаются.
+        var retry = TestDir("retry");
+        Unpack(zip, retry, stage: true);
+        var busy = Directory.CreateDirectory(Path.Combine(retry, "playtime.json")).FullName;
+        ApplyPending(retry);
+        if (!File.Exists(Path.Combine(retry, PendingDir, "playtime.json")) || File.Exists(Path.Combine(retry, PendingDir, "settings.json"))) throw new Exception("pending: busy file lost or settings left");
+        File.WriteAllText(Path.Combine(retry, "settings.json"), """{"theme":"mine"}""");
+        Directory.Delete(busy);
+        if (ApplyPending(retry) != 1 || ReadJson(Path.Combine(retry, "settings.json")).Str("theme") != "mine" || !File.Exists(Path.Combine(retry, "playtime.json"))
+            || Directory.Exists(Path.Combine(retry, PendingDir))) throw new Exception("pending retry");
+
         // Испорченный архив не восстанавливается.
         using (var z = ZipFile.Open(zip, ZipArchiveMode.Update))
         {
@@ -964,7 +1080,7 @@ public static partial class OneClickBackup
         }
         try { Unpack(zip, TestDir("bad"), stage: false); throw new Exception("tampered backup restored"); }
         catch (InvalidDataException) { }
-        return $"{files} files backed up and restored; JSON staged until restart; tampering detected";
+        return $"{files} files backed up and restored; JSON staged until restart; a failed restore leaves nothing; tampering detected";
     }
 
     [SelfTest]
@@ -1025,6 +1141,10 @@ public static partial class OneClickBackup
             catch (InvalidDataException) { }
         }
         if (File.ReadAllText(Path.Combine(dst, "account.json")) != "MINE" || Directory.Exists(Path.Combine(dst, "injects"))) throw new Exception("account or injects touched");
+        // Бэкап первых сборок 11.0 с vanilla.json восстанавливается, а свой vanilla.json (что отложено в папках игр) остаётся.
+        File.WriteAllText(Path.Combine(dst, "vanilla.json"), "MINE");
+        Unpack(Crafted(("data/vanilla.json", "OLD"), ("data/history.json", "{}")), dst, stage: false);
+        if (File.ReadAllText(Path.Combine(dst, "vanilla.json")) != "MINE" || !File.Exists(Path.Combine(dst, "history.json"))) throw new Exception("vanilla.json restored");
         return "no tokens, keys, account or injects in the backup; restore never overwrites them";
     }
 
@@ -1033,14 +1153,34 @@ public static partial class OneClickBackup
     {
         var dir = TestDir("keep");
         var start = new DateTime(2026, 1, 1, 12, 0, 0);
-        for (var i = 0; i < 13; i++) File.WriteAllText(Path.Combine(dir, $"ModLaunch-{start.AddDays(i):yyyyMMdd-HHmmss}.zip"), "x");
+        string Name(int day) => $"ModLaunch-{start.AddDays(day).ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture)}.zip";
+        // Архив с манифестом этого ПК или другого: папку облачного сервиса делят все компьютеры человека.
+        void Zip(string name, string device)
+        {
+            using var zip = ZipFile.Open(Path.Combine(dir, name), ZipArchiveMode.Create);
+            using var w = new StreamWriter(zip.CreateEntry("manifest.json").Open());
+            w.Write(new JsonObject { ["modlaunchBackup"] = 1, ["device"] = device }.ToJsonString());
+        }
+        for (var i = 0; i < 13; i++) Zip(Name(i), Device);
+        var laptop = Name(-5);
+        Zip(laptop, Device + "-LAPTOP");
         File.WriteAllText(Path.Combine(dir, "notes.txt"), "mine");
         File.WriteAllText(Path.Combine(dir, "ModLaunch-old.zip"), "mine");
+        // Невозможная дата и не ASCII-цифры в имени: список и чистка не падают, файл не трогается.
+        File.WriteAllText(Path.Combine(dir, "ModLaunch-20261399-250000.zip"), "mine");
+        File.WriteAllText(Path.Combine(dir, "ModLaunch-٢٠٢٦٠١٠١-١٢٠٠٠٠.zip"), "mine");
         if (Prune(dir, 10) != 3) throw new Exception("not 3 removed");
-        var left = ListFolder("local", dir);
+        var left = ListFolder("local", dir).Where(b => b.Device == Device).ToList();
         if (left.Count != 10 || left[^1].At != start.AddDays(3).ToUniversalTime() || left[0].At != start.AddDays(12).ToUniversalTime()) throw new Exception("wrong ones kept");
-        if (!File.Exists(Path.Combine(dir, "notes.txt")) || !File.Exists(Path.Combine(dir, "ModLaunch-old.zip"))) throw new Exception("foreign file removed");
-        return "10 newest kept, other files untouched";
+        foreach (var name in new[] { "notes.txt", "ModLaunch-old.zip", "ModLaunch-20261399-250000.zip", "ModLaunch-٢٠٢٦٠١٠١-١٢٠٠٠٠.zip", laptop })
+            if (!File.Exists(Path.Combine(dir, name))) throw new Exception("foreign file removed: " + name);
+
+        // Восстанавливают из самого старого: страховочный бэкап его не удаляет, удалится он потом, как обычно.
+        var oldest = Path.Combine(dir, Name(3));
+        Zip(Name(20), Device);
+        if (Prune(dir, 10, spare: oldest) != 0 || !File.Exists(oldest)) throw new Exception("backup being restored removed");
+        if (Prune(dir, 10) != 1 || File.Exists(oldest)) throw new Exception("spared backup kept forever");
+        return "10 newest of this PC kept; other PCs' backups, odd names and the one being restored untouched";
     }
 
     [SelfTest]
@@ -1073,6 +1213,20 @@ public static partial class OneClickBackup
         var all = Targets();
         if (all.First().Id != "local" || all.Last().Id != "cloud") throw new Exception("targets order");
         return "OneDrive, Google Drive, Dropbox, Yandex Disk, MEGA, iCloud found; garbage paths do not throw";
+    }
+
+    /// <summary>Новый облачный бэкап никогда не пишется поверх частей, на которые ссылается описание прошлого.</summary>
+    [SelfTest]
+    static string CloudUploadKeepsLastBackup()
+    {
+        CloudMeta Old(int start, int chunks) => new(DateTime.UtcNow, 1, "", chunks, start, "", "");
+        foreach (var old in new[] { null, Old(0, 1), Old(0, MaxChunks), Old(MaxChunks, 1), Old(MaxChunks, MaxChunks) })
+        {
+            var start = NextBase(old);
+            if (start is not (0 or MaxChunks)) throw new Exception($"parts from {start}");
+            if (old is not null && start < old.Base + old.Chunks && old.Base < start + MaxChunks) throw new Exception($"new parts from {start} overwrite the last backup at {old.Base}");
+        }
+        return "new parts go to the other half; the last backup stays whole until the description switches";
     }
 
     /// <summary>Обычный человек не видит в ошибке слов о правилах базы и Firebase.</summary>

@@ -518,12 +518,15 @@ service cloud.firestore {
 
     // ── Бэкап в облаке ModLaunch (11.0) ──────────────────────────────────
     // Последний бэкап аккаунта: описание backups/<uid> (когда, размер, sha256,
-    // сколько частей, с какого ПК, версия) и части архива files/0…15 — base64
-    // до 700 000 знаков каждая (всего до 8 МБ). Читать и писать может только хозяин.
+    // сколько частей, с какой части base, с какого ПК, версия) и части архива — base64
+    // до 700 000 знаков каждая (всего до 8 МБ). Части лежат в files/0…15 или files/16…31:
+    // новый бэкап пишется в другую половину, описание переключается последним, и
+    // оборванная выгрузка не портит прошлый бэкап. Читать и писать может только хозяин.
     match /backups/{uid} {
       allow get, delete: if friendsMember() && request.auth.uid == uid;
       allow create, update: if friendsMember() && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['at', 'size', 'sha256', 'chunks', 'device', 'version'])
+        && request.resource.data.keys().hasOnly(['at', 'size', 'sha256', 'chunks', 'base', 'device', 'version'])
+        && request.resource.data.get('base', 0) in [0, 16]
         && request.resource.data.at is timestamp
         && request.resource.data.size is int && request.resource.data.size > 0 && request.resource.data.size <= 8388608
         && request.resource.data.sha256 is string && request.resource.data.sha256.matches('^[0-9a-f]{64}$')
@@ -534,7 +537,7 @@ service cloud.firestore {
       match /files/{n} {
         allow get, delete: if friendsMember() && request.auth.uid == uid;
         allow create, update: if friendsMember() && request.auth.uid == uid
-          && n.matches('^([0-9]|1[0-5])$')
+          && n.matches('^([0-9]|[12][0-9]|3[01])$')
           && request.resource.data.keys().hasOnly(['data'])
           && request.resource.data.data is string && request.resource.data.data.size() <= 700000;
       }

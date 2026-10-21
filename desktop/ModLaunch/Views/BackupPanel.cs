@@ -278,7 +278,7 @@ public static class BackupPanel
         var inside = Ui.Text(I18n.T("v11.bk.inside"), "small muted", wrap: true);
         return Section(I18n.T("v11.bk.options"), null, null,
             Setting(I18n.T("v11.bk.saves"), I18n.T("v11.bk.saves.hint"), saves),
-            Setting(I18n.T("v11.bk.keep"), I18n.T("v11.bk.keep.hint"), keep),
+            Setting(I18n.T("v11.bk.keep"), I18n.T("v11.fixbk.keep.hint"), keep),
             Line(Icons.Lock, Ui.Res("Muted"), I18n.T("v11.bk.safe")),
             inside);
     }
