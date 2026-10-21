@@ -107,8 +107,7 @@ public static class Moderation
     public static string Changes(MX.ModxDoc doc)
     {
         var body = doc.Hooks.SelectMany(h => h.Body).Concat(doc.Functions.SelectMany(f => f.Body)).ToList();
-        var locals = body.Where(s => s.Kind is "let" or "for").Select(s => s.Target).Concat(doc.Functions.SelectMany(f => f.Params)).ToHashSet();
-        var vars = body.Where(s => s.Kind is "set" or "add" && !locals.Contains(s.Target)).Select(s => s.Target).Distinct().Take(12).ToList();
+        var vars = ChangedVars(doc);
         var parts = new List<string>();
         if (vars.Count > 0) parts.Add(I18n.T("v11.mod.ch.vars", ("list", string.Join(", ", vars))));
         if (doc.Hooks.Count > 0) parts.Add(I18n.T("v11.mod.ch.events", ("list", string.Join(", ", doc.Hooks.Select(h => h.Event).Distinct()))));
@@ -116,6 +115,14 @@ public static class Moderation
         if (doc.Engine is { } e) parts.Add(I18n.T("v11.mod.ch.engine", ("engine", e)));
         if (doc.Natives.Count > 0) parts.Add(I18n.T("v11.mod.ch.native", ("list", string.Join(", ", doc.Natives.Select(n => n.Lang).Distinct()))));
         return string.Join(" · ", parts);
+    }
+
+    /// <summary>Переменные игры, которые мод меняет (set/add), без своих let, for и параметров функций.</summary>
+    internal static List<string> ChangedVars(MX.ModxDoc doc)
+    {
+        var body = doc.Hooks.SelectMany(h => h.Body).Concat(doc.Functions.SelectMany(f => f.Body)).ToList();
+        var locals = body.Where(s => s.Kind is "let" or "for").Select(s => s.Target).Concat(doc.Functions.SelectMany(f => f.Params)).ToHashSet();
+        return body.Where(s => s.Kind is "set" or "add" && !locals.Contains(s.Target)).Select(s => s.Target).Distinct().Take(12).ToList();
     }
 
     /// <summary>Проверить архив (сборка, ассет, модель): пути, исполняемые файлы, размер.</summary>
@@ -218,8 +225,10 @@ public static class Moderation
     [SelfTest]
     static string ModerationBlocksDangerousInjects()
     {
-        var good = CheckModx("mod \"Ok\"\nlet bonus = 5\nhook start {\n  add gold bonus\n}\n");
-        if (!good.Ok || !good.Changes.Contains("gold")) throw new Exception("clean mod blocked: " + string.Join("; ", good.Findings.Select(f => f.Text)));
+        const string clean = "mod \"Ok\"\nlet bonus = 5\nhook start {\n  add gold bonus\n}\n";
+        var good = CheckModx(clean);
+        // Не по тексту Changes: в --selfcheck (без окна) переводов нет, и I18n.T отдаёт ключи.
+        if (!good.Ok || !ChangedVars(MX.ModxDoc.Parse(clean)).Contains("gold")) throw new Exception("clean mod blocked: " + string.Join("; ", good.Findings.Select(f => f.Text)));
         var bad = CheckModx("mod \"Bad\"\nhook start {\n  add gold 1\n}\nnative python {\n    import os\n    os.remove('save')\n}\n");
         if (bad.Ok) throw new Exception("os in python passed");
         var loop = CheckModx("mod \"Loop\"\nhook tick {\n  while true {\n    add x 1\n  }\n}\n");
