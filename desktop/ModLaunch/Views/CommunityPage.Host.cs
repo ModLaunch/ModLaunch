@@ -17,6 +17,8 @@ namespace ModLaunch.Views;
 public sealed partial class CommunityPage
 {
     static string? _hostId;
+    /// <summary>Запуск с загрузкой — задачей в «Загрузках» (она может и постоять в очереди).</summary>
+    static readonly Dictionary<string, Job> _hostJobs = [];
     string _hostKey = "";
     string _command = "";
     McHostRun? _consoleRun;
@@ -31,7 +33,13 @@ public sealed partial class CommunityPage
 
     /// <summary>Что видно на вкладке, кроме числа игроков: поменялось — вкладка перестраивается, иначе обновляется только число.</summary>
     static string HostKey(List<McHosted> list, McHosted h, McHostRun? run) =>
-        $"{string.Join(",", list.Select(x => x.Id + ":" + (McHost.Running(x.Id)?.State ?? "")))}|{h.Id}|{run?.State}|{McHost.EulaAccepted(h)}|{h.Board}|{McHost.ModCount(h)}|{h.Installed}";
+        $"{string.Join(",", list.Select(x => x.Id + ":" + HostState(x.Id)))}|{h.Id}|{run?.State}|{McHost.EulaAccepted(h)}|{h.Board}|{McHost.ModCount(h)}|{h.Installed}";
+
+    /// <summary>Запуск уже готовится: задача ждёт очереди или качает файлы и Java.</summary>
+    static bool Preparing(string id) => McHost.IsStarting(id) || (_hostJobs.TryGetValue(id, out var job) && job.Active);
+
+    /// <summary>starting | running | stopping | stopped — с учётом запуска, который ещё готовится.</summary>
+    static string HostState(string id) => McHost.Running(id)?.State ?? (Preparing(id) ? "starting" : "stopped");
 
     void OnHost() => Dispatcher.UIThread.Post(() =>
     {
@@ -105,9 +113,8 @@ public sealed partial class CommunityPage
         var side = Ui.Col(8);
         foreach (var x in list)
         {
-            var r = McHost.Running(x.Id);
             var on = x.Id == h.Id;
-            var dot = Ui.Dot(r?.State switch { "running" => Ui.Res("Good"), "starting" or "stopping" => Ui.Res("Warn"), _ => Ui.Res("Faint") }, 9);
+            var dot = Ui.Dot(HostState(x.Id) switch { "running" => Ui.Res("Good"), "starting" or "stopping" => Ui.Res("Warn"), _ => Ui.Res("Faint") }, 9);
             var item = new DockPanel();
             DockPanel.SetDock(dot, Dock.Right);
             item.Children.Add(dot);
@@ -134,7 +141,7 @@ public sealed partial class CommunityPage
     Control HostCard(McHosted h, McHostRun? run, string? lan)
     {
         var w = MainWindow.Current!;
-        var state = run?.State ?? "stopped";
+        var state = run?.State ?? HostState(h.Id);
         var dot = state switch { "running" => Ui.Res("Good"), "starting" or "stopping" => Ui.Res("Warn"), _ => Ui.Res("Faint") };
         var facts = new List<string> { h.Label, I18n.T("v11.cm.host.port", ("port", h.Port)), I18n.T("v11.cm.host.at." + h.Difficulty) };
         var mods = McHost.ModCount(h);
@@ -172,12 +179,12 @@ public sealed partial class CommunityPage
         if (run is { Active: true } active)
             Add(Ui.Button(I18n.T("v11.cm.host.stop"), () => _ = active.Stop(), "", Icons.Stop), state != "stopping");
         else
-            Add(Ui.Button(I18n.T("v11.cm.host.start"), () => StartHost(h), "primary", Icons.Play), accepted);
+            Add(Ui.Button(I18n.T("v11.cm.host.start"), () => StartHost(h), "primary", Icons.Play), accepted && state == "stopped");
         Add(Ui.Button(I18n.T("v11.cm.host.publish"), () => PublishHost(h), "", Icons.Upload, I18n.T("v11.cm.host.publish.tip")), state == "running");
         Add(Ui.Button(I18n.T("v11.cm.host.settings"), () => HostDialog(h), "ghost", Icons.Sliders));
         if (h.Fabric) Add(Ui.Button(I18n.T("v11.cm.host.mods"), () => CopyModsDialog(h), "ghost", Icons.Package));
         Add(Ui.Button(I18n.T("v11.cm.host.folder"), () => Actions.OpenFolder(h.Dir), "ghost", Icons.Folder));
-        Add(Ui.Button("", () => ConfirmDeleteHost(h), "icon ghost", Icons.Trash, I18n.T("v11.cm.host.delete")), run is not { Active: true });
+        Add(Ui.Button("", () => ConfirmDeleteHost(h), "icon ghost", Icons.Trash, I18n.T("v11.cm.host.delete")), state == "stopped");
 
         var where = Ui.Col(6);
         if (lan is null) where.Children.Add(Notice(I18n.T("v11.cm.host.noLan"), Icons.WifiOff));
@@ -246,11 +253,23 @@ public sealed partial class CommunityPage
     {
         var w = MainWindow.Current!;
         if (!McHost.EulaAccepted(h)) { w.Toast(I18n.T("v11.cm.host.err.eula"), bad: true); return; }
+        // Второй щелчок, пока первый запуск ещё готовится, — второго Java в той же папке не будет.
+        if (Preparing(h.Id)) { w.Toast(I18n.T("v11.fix.cm.host.err.starting", ("name", h.Name))); return; }
         if (McHost.NeedsDownload(h))
         {
             // Файлы сервера и Java качаются задачей — видно в «Загрузках», после неё сервер стартует сам.
             w.Toast(I18n.T("v11.cm.host.preparing", ("name", h.Name)));
-            Jobs.Run(h.Name, "Minecraft", async (_, progress, ct) => { await McHost.Start(h, progress, ct); });
+            var job = Jobs.Run(h.Name, "Minecraft", async (_, progress, ct) => { await McHost.Start(h, progress, ct); });
+            _hostJobs[h.Id] = job;
+            // Задачу отменили, пока она ждала очереди, — кнопка «Запустить» снова доступна.
+            void Finished(Job j)
+            {
+                if (j != job) return;
+                Jobs.Finished -= Finished;
+                McHost.Notify();
+            }
+            Jobs.Finished += Finished;
+            McHost.Notify();
             return;
         }
         try { await McHost.Start(h); }

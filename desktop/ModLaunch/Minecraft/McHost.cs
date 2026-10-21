@@ -81,6 +81,8 @@ public static class McHost
     const string InstallerMeta = McMeta.FabricMeta + "/versions/installer";
 
     static readonly Dictionary<string, McHostRun> Runs = [];
+    /// <summary>Запуск ещё готовится (качаются файлы сервера или Java) — второй такой же не начинаем.</summary>
+    static readonly HashSet<string> Starting = [];
     static bool _exitHooked;
 
     /// <summary>Сервер создан, удалён, запущен, остановлен, поменялось число игроков (бывает из фонового потока).</summary>
@@ -97,18 +99,21 @@ public static class McHost
         {
             if (!Directory.Exists(ServersDir)) return list;
             foreach (var dir in Directory.EnumerateDirectories(ServersDir))
-            {
-                var file = Path.Combine(dir, MetaFile);
-                if (!File.Exists(file)) continue;
-                try { if (JsonNode.Parse(File.ReadAllText(file)) is JsonObject o) list.Add(McHosted.FromJson(Path.GetFileName(dir), dir, o)); }
-                catch (Exception e) when (e is IOException or System.Text.Json.JsonException or UnauthorizedAccessException) { }
-            }
+                if (Read(Path.GetFileName(dir), dir) is { } h) list.Add(h);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
         return list.OrderByDescending(h => h.Created).ToList();
     }
 
     public static McHosted? Get(string? id) => id is null ? null : List().FirstOrDefault(h => h.Id == id);
+
+    /// <summary>Описание сервера из его папки, как оно сейчас на диске (нет или не читается — null).</summary>
+    static McHosted? Read(string id, string dir)
+    {
+        var file = Path.Combine(dir, MetaFile);
+        try { return File.Exists(file) && JsonNode.Parse(File.ReadAllText(file)) is JsonObject o ? McHosted.FromJson(id, dir, o) : null; }
+        catch (Exception e) when (e is IOException or System.Text.Json.JsonException or UnauthorizedAccessException) { return null; }
+    }
 
     /// <summary>Порт по умолчанию — 25565; занят другим своим сервером — следующий свободный.</summary>
     public static int FreePort()
@@ -151,7 +156,7 @@ public static class McHost
     /// <summary>Убрать сервер: папка — в «удалённое» рядом (мир не пропадает молча). Запущенный не трогаем.</summary>
     public static void Delete(McHosted h)
     {
-        if (Running(h.Id) is { Active: true }) throw new InvalidOperationException(I18n.T("v11.cm.host.err.running"));
+        if (Running(h.Id) is { Active: true } || IsStarting(h.Id)) throw new InvalidOperationException(I18n.T("v11.cm.host.err.running"));
         var trash = Path.Combine(Mc.Root, "ModLaunch", "deleted", $"server-{h.Id}-{DateTime.Now:yyyyMMdd-HHmmss}");
         Directory.CreateDirectory(Path.GetDirectoryName(trash)!);
         Directory.Move(h.Dir, trash);
@@ -162,11 +167,27 @@ public static class McHost
     /// <summary>Сервер выложен на доску (или снят с неё): запомнить, и если он идёт — держать запись «в сети».</summary>
     public static void SetBoard(McHosted h, string board)
     {
-        if (h.Board != "" && h.Board != board) Social.Servers.Release(h.Board);
+        // У идущего сервера своё описание — то, с которым его запустили (страница берёт свежее с диска).
+        // Меняем и его: по нему сервер снимает запись с «в сети», когда остановится.
+        var run = Running(h.Id);
+        foreach (var old in new[] { h.Board, run?.Host.Board ?? "" }.Distinct())
+            if (old != "" && old != board) Social.Servers.Release(old);
         h.Board = board;
+        if (run is not null) run.Host.Board = board;
         Save(h);
-        if (board != "" && Running(h.Id) is { State: "running" } run) Social.Servers.KeepAlive(board, () => run.Players);
+        if (board != "")
+        {
+            // Сервер не идёт (остановился, пока открыт диалог) — запись не держим «в сети».
+            if (run is { State: "running" }) Social.Servers.KeepAlive(board, () => run.Players);
+            else Social.Servers.Release(board);
+        }
         Notify();
+    }
+
+    /// <summary>Идущий свой сервер, выложенный на доску под этой записью: он сам считает своих игроков.</summary>
+    public static McHostRun? RunningFor(string board)
+    {
+        lock (Runs) return board == "" ? null : Runs.Values.FirstOrDefault(r => r.State == "running" && r.Host.Board == board);
     }
 
     // ---------------------------------------------------------------- server.properties и EULA
@@ -275,7 +296,10 @@ public static class McHost
         {
             h.LoaderVersion = await McMeta.PickLoader("fabric", h.GameVersion, ct: ct)
                 ?? throw new InvalidOperationException(I18n.T("v11.cm.host.err.noFabric", ("version", h.GameVersion)));
-            Save(h);
+            // Записываем только номер Fabric: настройки, поменянные пока шла загрузка, не откатываем.
+            var fresh = Read(h.Id, h.Dir) ?? h;
+            fresh.LoaderVersion = h.LoaderVersion;
+            Save(fresh);
         }
         var installer = await FabricInstaller(ct);
         var launcher = $"{McMeta.FabricMeta}/versions/loader/{Uri.EscapeDataString(h.GameVersion)}/{Uri.EscapeDataString(h.LoaderVersion)}/{Uri.EscapeDataString(installer)}/server/jar";
@@ -298,28 +322,46 @@ public static class McHost
     /// <summary>Запустить сервер. Без принятой EULA — отказ (eula.txt сам никогда не пишется).</summary>
     public static async Task<McHostRun> Start(McHosted h, IProgress<InstallStep>? progress = null, CancellationToken ct = default)
     {
-        if (Running(h.Id) is { Active: true } already) return already;
-        if (!EulaAccepted(h)) throw new InvalidOperationException(I18n.T("v11.cm.host.err.eula"));
-        if (!h.Installed) await Install(h, progress, ct);
-        var java = McInstall.FindJava(McInstall.JavaFor(h.GameVersion)) ?? await McInstall.Java(progress, ct, McInstall.JavaFor(h.GameVersion));
-        Save(h);
-        var psi = new ProcessStartInfo(java)
-        {
-            WorkingDirectory = h.Dir, UseShellExecute = false, CreateNoWindow = true,
-            RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true,
-            StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8, StandardInputEncoding = new UTF8Encoding(false),
-        };
-        foreach (var a in Args(h)) psi.ArgumentList.Add(a);
-        var process = Process.Start(psi) ?? throw new InvalidOperationException(java);
-        var run = new McHostRun(h, process);
         lock (Runs)
         {
-            Runs[h.Id] = run;
-            if (!_exitHooked)
+            if (Runs.GetValueOrDefault(h.Id) is { Active: true } already) return already;
+            // Второй запуск, пока первый ещё качает файлы: два Java в одной папке, и один остался бы без присмотра
+            // (не виден в программе и не останавливается при выходе).
+            if (!Starting.Add(h.Id)) throw new InvalidOperationException(I18n.T("v11.fix.cm.host.err.starting", ("name", h.Name)));
+        }
+        McHostRun run;
+        try
+        {
+            Notify();
+            if (!EulaAccepted(h)) throw new InvalidOperationException(I18n.T("v11.cm.host.err.eula"));
+            if (!h.Installed) await Install(h, progress, ct);
+            var java = McInstall.FindJava(McInstall.JavaFor(h.GameVersion)) ?? await McInstall.Java(progress, ct, McInstall.JavaFor(h.GameVersion));
+            // Пока качались файлы, настройки могли поменять («Настройки» берут описание с диска) — запускаем со свежими.
+            h = Read(h.Id, h.Dir) ?? throw new InvalidOperationException(I18n.T("v11.fix.cm.host.err.gone", ("name", h.Name)));
+            Save(h);
+            var psi = new ProcessStartInfo(java)
             {
-                _exitHooked = true;
-                AppDomain.CurrentDomain.ProcessExit += (_, _) => StopAll();
+                WorkingDirectory = h.Dir, UseShellExecute = false, CreateNoWindow = true,
+                RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true,
+                StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8, StandardInputEncoding = new UTF8Encoding(false),
+            };
+            foreach (var a in Args(h)) psi.ArgumentList.Add(a);
+            var process = Process.Start(psi) ?? throw new InvalidOperationException(java);
+            run = new McHostRun(h, process);
+            lock (Runs)
+            {
+                Runs[h.Id] = run;
+                if (!_exitHooked)
+                {
+                    _exitHooked = true;
+                    AppDomain.CurrentDomain.ProcessExit += (_, _) => StopAll();
+                }
             }
+        }
+        finally
+        {
+            lock (Runs) Starting.Remove(h.Id);
+            Notify();
         }
         run.Begin();
         Notify();
@@ -328,13 +370,18 @@ public static class McHost
 
     public static McHostRun? Running(string id) { lock (Runs) return Runs.GetValueOrDefault(id); }
 
+    public static bool IsStarting(string id) { lock (Runs) return Starting.Contains(id); }
+
     internal static void Forget(McHostRun run)
     {
         lock (Runs) if (Runs.GetValueOrDefault(run.Host.Id) == run) Runs.Remove(run.Host.Id);
     }
 
-    /// <summary>ModLaunch закрывается: каждому серверу — stop (мир сохраняется), не ответил за 10 секунд — закрыть.</summary>
-    static void StopAll()
+    /// <summary>
+    /// ModLaunch закрывается: каждому серверу — stop (мир сохраняется), не ответил за 10 секунд — закрыть.
+    /// Перед обновлением программы звать заранее: установщик закрывает старый ModLaunch вместе с дочерними процессами.
+    /// </summary>
+    public static void StopAll()
     {
         List<McHostRun> runs;
         lock (Runs) runs = [.. Runs.Values];
@@ -454,6 +501,50 @@ public static class McHost
             return "eula.txt only after the checkbox; start refuses without it; LAN address is the private IPv4 with a gateway";
         }
         finally { try { Directory.Delete(dir, true); } catch (IOException) { } }
+    }
+
+    [SelfTest]
+    static string HostStartsOnceAndReleasesBoard()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "ml-host-run-" + Environment.ProcessId);
+        const string first = "selftest-board-1", second = "selftest-board-2";
+        McHostRun? run = null;
+        try
+        {
+            var h = new McHosted { Id = "run-test-" + Environment.ProcessId, Dir = dir, Name = "Test", GameVersion = "1.21.1" };
+            Save(h);
+            AcceptEula(h);
+            // Запуск уже готовится — второй отказывает сразу, ничего не качая; неудачный запуск отметку снимает.
+            lock (Runs) Starting.Add(h.Id);
+            try { Task.Run(() => Start(h)).GetAwaiter().GetResult(); throw new Exception("second start not refused"); }
+            catch (InvalidOperationException) { }
+            finally { lock (Runs) Starting.Remove(h.Id); }
+            File.Delete(Path.Combine(dir, "eula.txt"));
+            try { Task.Run(() => Start(h)).GetAwaiter().GetResult(); } catch (InvalidOperationException) { }
+            if (IsStarting(h.Id)) throw new Exception("failed start left the server «starting»");
+            AcceptEula(h);
+
+            // Выложен, пока не идёт, — «в сети» не держим.
+            SetBoard(h, first);
+            if (Social.Servers.IsLive(first)) throw new Exception("stopped server kept online");
+            // Идёт со своим описанием, а выкладывают свежее с диска (как страница после перестройки).
+            run = Demo(new McHosted { Id = h.Id, Dir = dir, Name = h.Name, GameVersion = h.GameVersion }, [], 3);
+            if (Task.Run(() => Start(h)).GetAwaiter().GetResult() != run) throw new Exception("active run replaced");
+            var page = Read(h.Id, dir)!;
+            SetBoard(page, second);
+            if (run.Host.Board != second || !Social.Servers.IsLive(second) || Social.Servers.IsLive(first) || RunningFor(second) != run)
+                throw new Exception("running server does not follow the board entry");
+            run.Stop().GetAwaiter().GetResult();
+            if (Social.Servers.IsLive(second) || Running(h.Id) is not null) throw new Exception("stopped server still online on the board");
+            return "a second start is refused while the first prepares; a stopped server takes its current board entry offline";
+        }
+        finally
+        {
+            if (run is not null) Forget(run);
+            Social.Servers.Release(first);
+            Social.Servers.Release(second);
+            try { Directory.Delete(dir, true); } catch (IOException) { }
+        }
     }
 }
 

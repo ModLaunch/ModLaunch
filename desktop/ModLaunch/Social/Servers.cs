@@ -223,7 +223,10 @@ public static partial class Servers
 
     static string NewId() => RandomNumberGenerator.GetString(IdAlphabet, 20);
 
-    /// <summary>Создать свой сервер (Id = null) или поправить свой. Сервер сразу «в сети» и держится в ней, пока открыт ModLaunch.</summary>
+    /// <summary>
+    /// Создать свой сервер (Id = null) или поправить свой. Сервер сразу «в сети» и держится в ней, пока открыт ModLaunch.
+    /// Запись своего сервера Minecraft держит «в сети» он сам, пока идёт (McHost) — правка этого не меняет.
+    /// </summary>
     public static async Task<GameServer> Save(ServerDraft draft)
     {
         if (Check(draft) is [var first, ..]) throw new ArgumentException(I18n.T(first, ("n", MaxName)));
@@ -249,7 +252,7 @@ public static partial class Servers
         var saved = new GameServer(id, uid, name, d.Name, d.Game, d.Address, d.Build, d.Mods, d.Visibility, d.Players, d.Max, d.Version,
             create ? now : _cache?.FirstOrDefault(s => s.Id == id)?.Created, now);
         Put(saved);
-        KeepAlive(id);
+        if (create || !Minecraft.McHost.List().Any(h => h.Board == id)) KeepAlive(id);
         return saved;
     }
 
@@ -291,12 +294,13 @@ public static partial class Servers
     /// <summary>
     /// Держать свой сервер «в сети»: отметка раз в пять минут, пока открыт ModLaunch. players — сколько
     /// игроков сейчас (свой сервер Minecraft считает их сам); без него — последнее известное число.
+    /// Без players того, кто уже считает игроков, не заменяем.
     /// </summary>
     public static void KeepAlive(string id, Func<int>? players = null)
     {
         lock (Live)
         {
-            Live[id] = players;
+            if (players is not null || !Live.ContainsKey(id)) Live[id] = players;
             _beat ??= new Timer(_ => _ = BeatAll(), null, Beat, Beat);
         }
         Changed?.Invoke();
@@ -408,5 +412,26 @@ public static partial class Servers
         var ids = string.Join(",", list.Select(s => s.Id));
         if (ids != "mine,open-fresh,friend,open-old") throw new Exception(ids);
         return "online for 15 minutes after the last heartbeat; friends-only servers of strangers and stale ones are hidden";
+    }
+
+    [SelfTest]
+    static string ServerLiveKeepsPlayerCounter()
+    {
+        const string id = "selftest-live";
+        try
+        {
+            KeepAlive(id, () => 7);
+            KeepAlive(id); // правка записи на доске — без счётчика
+            Func<int>? players;
+            lock (Live) players = Live.GetValueOrDefault(id);
+            if (players?.Invoke() != 7) throw new Exception("player counter replaced by an edit");
+            KeepAlive(id, () => 3);
+            lock (Live) players = Live.GetValueOrDefault(id);
+            if (players?.Invoke() != 3) throw new Exception("new counter not taken");
+            Release(id);
+            if (IsLive(id)) throw new Exception("not released");
+            return "editing a board entry keeps the hosted server's player counter";
+        }
+        finally { Release(id); }
     }
 }

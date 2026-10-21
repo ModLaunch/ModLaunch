@@ -124,8 +124,10 @@ public sealed partial class CommunityPage
         if (Servers.IsLive(s.Id)) { Servers.Release(s.Id); MainWindow.Current?.Toast(I18n.T("v11.cm.s.paused", ("name", s.Name))); return; }
         try
         {
-            await Servers.Heartbeat(s.Id, s.Players);
-            Servers.KeepAlive(s.Id);
+            // Свой идущий сервер Minecraft считает игроков сам — отдаём доске его счётчик.
+            var run = McHost.RunningFor(s.Id);
+            await Servers.Heartbeat(s.Id, run?.Players ?? s.Players);
+            Servers.KeepAlive(s.Id, run is null ? null : () => run.Players);
             MainWindow.Current?.Toast(I18n.T("v11.cm.s.resumed", ("name", s.Name)));
         }
         catch (ServiceError e) { MainWindow.Current?.Toast(Servers.Explain(e), bad: true); }
@@ -387,8 +389,10 @@ public sealed partial class CommunityPage
         async void Install()
         {
             w.CloseDialog();
+            // Без загрузчика InstallCode сам предложит его поставить и ничего не начнёт — это не «сборка не встала».
+            var loader = game.LoaderInstalled;
             if (await Actions.InstallCode(game, profile, withConfig.IsChecked == true, others.IsChecked == true)) StartGame(game, address);
-            else w.Toast(I18n.T("v11.cm.join.buildFailed"), bad: true);
+            else w.Toast(loader ? I18n.T("v11.cm.join.buildFailed") : I18n.T("v11.fix.cm.join.loaderFirst", ("loader", game.Def.LoaderName)), bad: loader);
         }
         var text = work == 0
             ? I18n.T("v11.cm.join.build.ready", ("name", profile.Name), ("game", game.Def.Name))

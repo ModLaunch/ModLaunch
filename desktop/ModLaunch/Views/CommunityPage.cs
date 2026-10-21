@@ -25,6 +25,9 @@ public sealed partial class CommunityPage : Page
     string _shownTab = "";
     string? _code, _friendsError, _boardError;
     bool _loading;
+    /// <summary>Набранный код друга и где был курсор — вкладка перестраивается, когда приходят данные.</summary>
+    string _addCode = "", _friendsKey = "";
+    bool _addFocused;
     readonly DispatcherTimer _refresh = new() { Interval = TimeSpan.FromMinutes(2) };
 
     public CommunityPage(string tab = "friends")
@@ -55,7 +58,14 @@ public sealed partial class CommunityPage : Page
     static bool SignedIn => Friends.View().SignedIn;
 
     void OnFriends() => Dispatcher.UIThread.Post(() => { if (_tab == "friends") Build(); });
-    void OnServers() => Dispatcher.UIThread.Post(() => { if (_tab != "host") Build(); });
+    // Друзья: с доски на вкладке только их серверы и число серверов в сети — остальное (отметки «в сети» и т. п.) её не трогает.
+    void OnServers() => Dispatcher.UIThread.Post(() => { if (_tab == "servers" || (_tab == "friends" && FriendsBoardKey() != _friendsKey)) Build(); });
+
+    static string FriendsBoardKey()
+    {
+        var board = Servers.Cached;
+        return $"{board.Count(Servers.IsOnline)}|{string.Join(",", board.Where(s => s.Owner != Servers.Me).Select(s => $"{s.Id}:{s.Owner}:{s.Name}:{s.Game}:{s.Players}:{s.Max}:{Servers.IsOnline(s)}"))}";
+    }
 
     async Task Load()
     {
@@ -209,7 +219,12 @@ public sealed partial class CommunityPage : Page
             Ui.Row(14, codeText, copy),
             Field(I18n.T("v11.cm.f.mode"), mode)), 20);
 
-        var box = new TextBox { Watermark = "XXXX-XXXX", FontFamily = Mono, MaxLength = 12, MinWidth = 200 };
+        var box = new TextBox { Text = _addCode, Watermark = "XXXX-XXXX", FontFamily = Mono, MaxLength = 12, MinWidth = 200 };
+        box.TextChanged += (_, _) => _addCode = box.Text ?? "";
+        box.GotFocus += (_, _) => _addFocused = true;
+        box.LostFocus += (_, _) => _addFocused = false;
+        if (_addFocused)
+            Dispatcher.UIThread.Post(() => { box.Focus(); box.CaretIndex = box.Text?.Length ?? 0; }, DispatcherPriority.Loaded);
         async void Add()
         {
             if ((box.Text ?? "").Trim() == "") return;
@@ -258,6 +273,7 @@ public sealed partial class CommunityPage : Page
         ((StackPanel)friendsCard.Children[0]).Children[1].VerticalAlignment = VerticalAlignment.Center;
         if (view.Friends.Count == 0) friendsCard.Children.Add(Ui.Text(_loading ? I18n.T("common.loading") : I18n.T("v11.cm.f.empty"), "muted", wrap: true));
         var board = Servers.Cached;
+        _friendsKey = FriendsBoardKey();
         void Group(string key, IEnumerable<Friend> friends)
         {
             var list = friends.ToList();
