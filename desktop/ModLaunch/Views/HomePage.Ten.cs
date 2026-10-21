@@ -108,17 +108,7 @@ public sealed partial class HomePage
 
         var when = running ? I18n.T("time.running") : played.LastPlayed is not null ? I18n.T("time.last", ("when", Ui.Ago(played.LastPlayed))) : I18n.T("v93.home.notPlayed");
         var meta = new TextBlock { Text = string.Join("  ·  ", new[] { when, g.ModCount > 0 ? StoreKit.Mods(g.ModCount) : null, played.TotalMs >= 3_600_000 ? I18n.T("v93.home.hours", ("n", played.TotalMs / 3_600_000)) : null }.OfType<string>()), FontSize = 13.5, Foreground = Ui.Hex("#D5D9E2") };
-        // 12.0: стадия лора игры — маленькой плашкой над логотипом; сам лор едва заметно живёт на арте.
-        var depth = Lore.Enabled ? Lore.Of(g.Def) : new Lore.Depth(0, "none");
         var accent = Color.TryParse(g.Def.Accent, out var ac) ? ac : Gx.Accent;
-        var loreChip = new Border
-        {
-            Background = new SolidColorBrush(Color.FromArgb(70, 0, 0, 0)), BorderBrush = new SolidColorBrush(Color.FromArgb(60, 255, 255, 255)), BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(20), Padding = new Thickness(10, 4), HorizontalAlignment = HorizontalAlignment.Left,
-            Child = Ui.Row(7, new Border { Width = 6, Height = 6, CornerRadius = new CornerRadius(3), Background = new SolidColorBrush(accent), VerticalAlignment = VerticalAlignment.Center },
-                new TextBlock { Text = I18n.T("lore.line", ("stage", Lore.StageName(g.Def, depth.Stage)), ("n", depth.Stage + 1)), FontSize = 11.5, FontWeight = FontWeight.SemiBold, LetterSpacing = 0.4, Foreground = Brushes.White }),
-        };
-        ToolTip.SetTip(loreChip, I18n.T("lore.src." + depth.Source));
 
         var buttons = Ui.Row(10);
         if (running)
@@ -145,7 +135,6 @@ public sealed partial class HomePage
         }
 
         var left = Ui.Col(compact ? 10 : 14, title, meta, buttons);
-        if (Lore.Enabled && !compact) left.Children.Insert(0, loreChip);
         left.VerticalAlignment = VerticalAlignment.Bottom;
         left.HorizontalAlignment = HorizontalAlignment.Left;
         left.Margin = new Thickness(compact ? 28 : 40, 0, 0, compact ? 24 : 36);
@@ -171,7 +160,6 @@ public sealed partial class HomePage
                 shelf,
             },
         };
-        if (Lore.Enabled) stage.Children.Insert(3, new LoreVeil(g.Def, depth.Stage) { Strength = 0.5 });
 
         var radius = new CornerRadius(Look.Radius == "sharp" ? 4 : 22);
         var frame = new Border { CornerRadius = radius, ClipToBounds = true, Child = stage, ContextFlyout = GameCard.Menu(g) };

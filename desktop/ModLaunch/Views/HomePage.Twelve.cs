@@ -9,8 +9,7 @@ namespace ModLaunch.Views;
 
 /// <summary>
 /// 12.0: главная — правая кнопка мыши. По пустому месту — «Добавить виджет» (сразу с размером),
-/// по виджету — размер, сдвиг, убрать и «добавить рядом». Стрелки ← → листают игры на сцене,
-/// виджет «Путь» показывает лор-стадию каждой игры.
+/// по виджету — размер, сдвиг, убрать и «добавить рядом». Стрелки ← → листают игры на сцене.
 /// </summary>
 public sealed partial class HomePage
 {
@@ -92,28 +91,5 @@ public sealed partial class HomePage
         menu.Items.Add(new Separator());
         menu.Items.Add(Item(I18n.T("v10.w.remove"), Icons.Close, () => Widgets.Remove(index)));
         return menu;
-    }
-
-    /// <summary>Виджет «Путь»: стадия лора по каждой игре — четыре точки и название стадии.</summary>
-    Control LoreWidget(string size, List<GameState> mine)
-    {
-        var rows = Ui.Col(size == "l" ? 9 : 6);
-        foreach (var g in mine.Take(size == "l" ? 6 : 2))
-        {
-            var d = Lore.Of(g.Def);
-            var accent = Color.TryParse(g.Def.Accent, out var c) ? c : Gx.Accent;
-            var dots = Ui.Row(3);
-            for (var i = 0; i < 4; i++)
-                dots.Children.Add(new Border { Width = 14, Height = 4, CornerRadius = new CornerRadius(2), VerticalAlignment = VerticalAlignment.Center, Background = i <= d.Stage ? new SolidColorBrush(accent) : Ui.Res("Surface3") });
-            var name = new TextBlock { Text = g.Def.ShortName, FontSize = 12.5, FontWeight = FontWeight.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center };
-            var stage = new TextBlock { Text = Lore.StageName(g.Def, d.Stage), FontSize = 12, Foreground = Ui.Res("Muted"), TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 0, 0) };
-            var row = new DockPanel();
-            DockPanel.SetDock(dots, Dock.Right);
-            row.Children.Add(dots);
-            row.Children.Add(Ui.Row(0, name, stage));
-            rows.Children.Add(row);
-        }
-        if (mine.Count == 0) rows.Children.Add(Small(I18n.T("home.noGames")));
-        return Shell(Stack(Cap(Icons.Sparkles, I18n.T("v10.w.name.lore")), rows), () => MainWindow.Current?.Navigate(() => new ProfilePage()));
     }
 }

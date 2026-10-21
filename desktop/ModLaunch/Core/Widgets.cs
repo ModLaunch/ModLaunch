@@ -25,7 +25,6 @@ public static class Widgets
         new("attention", "Bell", ["s", "m"]),
         new("streak", "Flame", ["s"]),
         new("random", "Shuffle", ["s", "m"]),
-        new("lore", "Sparkles", ["m", "l"]),
     ];
 
     /// <summary>11.0: по умолчанию — дело, а не счётчики: продолжить, часы по сборкам, друзья, что требует внимания.</summary>

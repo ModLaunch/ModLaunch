@@ -355,9 +355,8 @@ public sealed partial class SettingsPage
             Ui.Col(8, Ui.Text(I18n.T("look.bg"), "h3"), backdrops),
             Toggle(I18n.T("v10.fx.scan"), I18n.T("v10.fx.scan.hint"), Look.Scanlines, v => { Look.SetEffect("fxScanlines", v); Settings.Data.Remove("config"); }),
             Toggle(I18n.T("v10.fx.vignette"), I18n.T("v10.fx.vignette.hint"), Look.Vignette, v => { Look.SetEffect("fxVignette", v); Settings.Data.Remove("config"); }),
-            Toggle(I18n.T("v12.lore"), I18n.T("v12.lore.hint"), Lore.Enabled, v => { Settings.Data["loreFx"] = v; Settings.Save(); }),
             // Только оформление: раскладка главной, картинка на ней и анимации остаются свои.
-            Ui.Button(I18n.T("look.reset"), () => { Configs.Apply(Look.Pro("widget", "home_hero", "anim_open", "anim_launch", "anim_lore")); Build(); }, "ghost", Icons.Undo));
+            Ui.Button(I18n.T("look.reset"), () => { Configs.Apply(Look.Pro("widget", "home_hero", "anim_open", "anim_launch")); Build(); }, "ghost", Icons.Undo));
         var expander = new Expander
         {
             Header = Ui.Col(2, Ui.Text(I18n.T("v11.set.fine"), "h3"), Ui.Text(I18n.T("v11.set.fine.hint"), "small muted", wrap: true)),

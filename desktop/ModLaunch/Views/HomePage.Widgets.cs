@@ -289,7 +289,6 @@ public sealed partial class HomePage
                 var lines = new List<Control> { Big(notices.Count == 0 ? "✓" : notices.Count.ToString(), 36, tint), Small(first?.Title ?? I18n.T("v10.w.calm"), lines: wide ? 2 : 1) };
                 return Shell(Stack(Cap(Icons.Bell, I18n.T("v10.w.attention"), tint), lines.ToArray()), first is null ? null : () => (first.Open ?? first.Run)?.Invoke());
             }
-            case "lore": return LoreWidget(size, mine);
             case "streak":
             {
                 var n = PlayStreak.Current();

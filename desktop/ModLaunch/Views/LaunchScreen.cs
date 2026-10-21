@@ -17,7 +17,6 @@ namespace ModLaunch.Views;
 /// что сейчас происходит, и три шага мелким текстом; по нижнему краю — тонкая полоса прогресса
 /// цветом игры. Игра стартует сразу на третьем шаге; через пару секунд экран закрывается сам.
 /// Выключается в Настройки → Интерфейс (или командой конфига anim_launch off).
-/// 12.0: поверх арта — лор игры (LoreVeil), он меняется по мере прохождения.
 /// </summary>
 public sealed class LaunchScreen : Panel
 {
@@ -84,20 +83,11 @@ public sealed class LaunchScreen : Panel
             FontSize = 12.5, Foreground = Ui.Hex("#8E95A3"),
         };
 
-        // 12.0: лор игры — стадия по прохождению (сохранение, достижения или часы) и её название.
-        var depth = Lore.Enabled ? Lore.Of(g.Def) : new Lore.Depth(0, "none");
-        var lore = new TextBlock
-        {
-            Text = I18n.T("lore.line", ("stage", Lore.StageName(g.Def, depth.Stage)), ("n", depth.Stage + 1)) + "  ·  " + I18n.T("lore.src." + depth.Source),
-            FontSize = 12, LetterSpacing = 0.6, Foreground = new SolidColorBrush(Color.FromArgb(200, 255, 255, 255)),
-        };
-
         var left = new StackPanel
         {
             Spacing = 14, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(72, 0, 72, 64),
             Children = { _eyebrow, title, _status, steps, meta, _result },
         };
-        if (Lore.Enabled) left.Children.Insert(5, lore);
 
         // Полоса прогресса по нижнему краю.
         var track = new Border { Height = 2, VerticalAlignment = VerticalAlignment.Bottom, Background = new SolidColorBrush(Color.FromArgb(28, 255, 255, 255)) };
@@ -112,7 +102,6 @@ public sealed class LaunchScreen : Panel
         Children.Add(_art);
         Children.Add(new Border { Background = Gx.ShadeLeft(0.8, 245) });
         Children.Add(new Border { Background = Gx.ShadeUp(0.3, 250) });
-        if (Lore.Enabled) Children.Add(new LoreVeil(g.Def, depth.Stage));
         Children.Add(left);
         Children.Add(track);
         Children.Add(_bar);
