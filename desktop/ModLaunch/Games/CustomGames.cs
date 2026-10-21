@@ -16,8 +16,11 @@ public sealed record FoundGame(string Name, string Path, string Exe, int AppId, 
 public sealed class DirMatcher
 {
     readonly Dictionary<int, DirGame> _steam = new();
+    readonly Dictionary<string, DirGame> _strict = new(StringComparer.Ordinal);
     readonly Dictionary<string, DirGame> _name = new(StringComparer.Ordinal);
     readonly Dictionary<string, DirGame> _folder = new(StringComparer.OrdinalIgnoreCase);
+    // Записи по первому и по последнему слову имени — для «имя из справочника стоит в начале или в конце».
+    readonly Dictionary<string, List<(string[] Words, DirGame Game)>> _first = new(StringComparer.Ordinal), _last = new(StringComparer.Ordinal);
 
     public DirMatcher(IEnumerable<DirGame> games)
     {
@@ -25,22 +28,66 @@ public sealed class DirMatcher
         foreach (var g in games)
         {
             if (g.SteamAppId > 0) _steam.TryAdd(g.SteamAppId, g);
+            if (GameDirectory.StrictName(g.Name) is { Length: > 0 } s) _strict.TryAdd(s, g);
             if (GameDirectory.Norm(g.Name) is { Length: > 0 } n) _name.TryAdd(n, g);
             if (!string.IsNullOrWhiteSpace(g.Folder)) _folder.TryAdd(g.Folder.Trim(), g);
+            var w = Words(g.Name);
+            // Одно короткое слово («Doom», «Rust») внутри чужого имени — скорее совпадение, чем та же игра.
+            if (w.Length >= 2 || w is [{ Length: >= 6 }])
+            {
+                Bucket(_first, w[0]).Add((w, g));
+                Bucket(_last, w[^1]).Add((w, g));
+            }
         }
     }
 
+    static List<(string[], DirGame)> Bucket(Dictionary<string, List<(string[] Words, DirGame Game)>> map, string key) =>
+        map.TryGetValue(key, out var list) ? list : map[key] = [];
+
+    static readonly string[] Roman = ["", "i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x"];
+
+    /// <summary>Слова имени; римские цифры — арабскими (DARK SOULS™ III ↔ Dark Souls 3).</summary>
+    static string[] Words(string name) =>
+        Array.ConvertAll(GameDirectory.NameWords(name), w => Array.IndexOf(Roman, w) is var r and > 1 ? r.ToString() : w);
+
     /// <summary>
-    /// Сначала номер Steam, потом имя из манифеста, потом папка установки. Имя и папка не спорят
-    /// с номером: у записи с другим номером Steam это другая игра (демо, плейтест, VR-версия).
+    /// Сначала номер Steam, потом имя из манифеста (строго, затем без слов издания), потом папка установки,
+    /// и в конце — имя из справочника в начале или в конце имени из Steam (The Elder Scrolls V: Skyrim Special Edition
+    /// ↔ Skyrim Special Edition). Имя и папка не спорят с номером: у записи с другим номером Steam это другая игра
+    /// (демо, плейтест, VR-версия).
     /// </summary>
     public DirGame? Match(int appId, string name, string? folder)
     {
         if (appId > 0 && _steam.TryGetValue(appId, out var bySteam)) return bySteam;
         bool Fits(DirGame g) => appId <= 0 || g.SteamAppId <= 0 || g.SteamAppId == appId;
+        if (_strict.TryGetValue(GameDirectory.StrictName(name), out var byStrict) && Fits(byStrict)) return byStrict;
         if (_name.TryGetValue(GameDirectory.Norm(name), out var byName) && Fits(byName)) return byName;
         if (!string.IsNullOrWhiteSpace(folder) && _folder.TryGetValue(folder.Trim(), out var byFolder) && Fits(byFolder)) return byFolder;
-        return null;
+        return Affix(Words(name), Fits);
+    }
+
+    /// <summary>Самое длинное имя из справочника в начале или в конце; два разных одной длины — не угадываем.</summary>
+    DirGame? Affix(string[] words, Func<DirGame, bool> fits)
+    {
+        if (words.Length < 2) return null;
+        DirGame? best = null;
+        int bestLength = 0;
+        var tie = false;
+        void Consider(string[] w, DirGame g)
+        {
+            if (!fits(g)) return;
+            var length = w.Sum(x => x.Length + 1);
+            if (length > bestLength) { best = g; bestLength = length; tie = false; }
+            else if (length == bestLength && !ReferenceEquals(best, g)) tie = true;
+        }
+        if (_first.TryGetValue(words[0], out var heads))
+            foreach (var (w, g) in heads)
+                // Dark Souls 3 — не Dark Souls: число сразу после имени — это другая часть серии.
+                if (w.Length < words.Length && words.AsSpan(0, w.Length).SequenceEqual(w) && !char.IsDigit(words[w.Length][0])) Consider(w, g);
+        if (_last.TryGetValue(words[^1], out var tails))
+            foreach (var (w, g) in tails)
+                if (w.Length < words.Length && words.AsSpan(words.Length - w.Length).SequenceEqual(w)) Consider(w, g);
+        return tie ? null : best;
     }
 }
 
@@ -365,9 +412,9 @@ public static partial class CustomGames
     public static async Task<GameState> Add(FoundGame found, CancellationToken ct = default)
     {
         // 12.0: игра из справочника — каталоги и загрузчик уже известны, угадывать по имени не нужно.
-        // По сети — только номер игры на Nexus (один запрос, без него не открываются страницы модов).
+        // По сети — только номер игры на Nexus, если его нет в справочнике (без него не открываются страницы модов).
         var sources = found.Dir is { } d
-            ? (d.Community, d.Pack, d.NexusDomain, d.NexusDomain is { } domain ? await NexusId(domain, ct) : 0)
+            ? (d.Community, d.Pack, d.NexusDomain, d.NexusId > 0 ? d.NexusId : d.NexusDomain is { } domain ? await NexusId(domain, ct) : 0)
             : await FindSources(found.Name, ct);
         var id = "custom-" + Slug(found.Name);
         if (id == "custom-") id = "custom-" + Guid.NewGuid().ToString("N")[..8];
@@ -477,6 +524,10 @@ public static partial class CustomGames
         new("probe-folder", "Inscryption", 0, "inscryption", null, "bepinex", "BepInEx-BepInExPack_Inscryption", "InscryptionGame", [], null, 900),
         new("probe-builtin", "R.E.P.O.", 0, "repo", "repo", "bepinex", "BepInEx-BepInExPack", "REPO", ["REPO.exe"], null, 9000),
         new("probe-other-id", "Same Name Game", 777001, null, "samename", null, null, null, [], null, 10),
+        new("probe-affix", "Skyrim Special Edition", 0, null, "skyrimspecialedition", null, null, null, [], null, 140000, 1704),
+        new("probe-short", "Skyrim", 0, null, "skyrim", null, null, null, [], null, 70000, 110),
+        new("probe-series", "Dark Souls", 0, null, "darksouls", null, null, null, [], null, 3000, 160),
+        new("probe-roman", "Dark Souls 2", 0, null, "darksouls2", null, null, null, [], null, 2000, 161),
     ];
 
     /// <summary>
@@ -508,9 +559,12 @@ public static partial class CustomGames
             Game(990005, "Totally Unknown", "Unknown", "Unknown.exe");                 // не из справочника
             Game(990006, "Gone Game", "Gone", "Gone.exe", manifestOnly: true);         // манифест без папки
             Game(892970, "Valheim", "Valheim", "valheim.exe");                         // встроенная по номеру
+            Game(489830, "The Elder Scrolls V: Skyrim Special Edition", "Skyrim Special Edition", "SkyrimSE.exe"); // имя в конце
+            Game(374320, "DARK SOULS™ III", "DARK SOULS III", "DarkSoulsIII.exe");     // другая часть серии — не Dark Souls
+            Game(335300, "DARK SOULS™ II: Scholar of the First Sin", "Dark Souls II Scholar", "DarkSoulsII.exe"); // римская цифра = арабская
 
             var steam = Locator.SteamApps([lib]);
-            if (steam.Count != 8) throw new Exception($"{steam.Count} manifests read");
+            if (steam.Count != 11) throw new Exception($"{steam.Count} manifests read");
             var found = Collect(steam, [], new DirMatcher(ProbeDir));
             string? Key(string name) => found.FirstOrDefault(f => f.Name == name)?.Dir?.Key;
             if (Key("Deep Rock Galactic") != "probe-steam") throw new Exception("steam id: " + Key("Deep Rock Galactic"));
@@ -520,6 +574,9 @@ public static partial class CustomGames
             if (found.FirstOrDefault(f => f.Name == "Same Name Game") is not { Dir: null }) throw new Exception("name matched across different steam ids");
             if (found.FirstOrDefault(f => f.Name == "Totally Unknown") is not { Dir: null }) throw new Exception("unknown game lost or matched");
             if (found.First(f => f.Name == "Deep Rock Galactic").Exe != "FSD.exe") throw new Exception("exe not taken from directory");
+            if (Key("The Elder Scrolls V: Skyrim Special Edition") != "probe-affix") throw new Exception("suffix: " + Key("The Elder Scrolls V: Skyrim Special Edition"));
+            if (Key("DARK SOULS™ III") is not null) throw new Exception("sequel matched the first game: " + Key("DARK SOULS™ III"));
+            if (Key("DARK SOULS™ II: Scholar of the First Sin") != "probe-roman") throw new Exception("roman numeral: " + Key("DARK SOULS™ II: Scholar of the First Sin"));
             return $"{steam.Count} manifests in one pass: steam id, name and folder matched; builtin and missing skipped; {found.Count} offered";
         }
         finally { try { Directory.Delete(lib, true); } catch { } }

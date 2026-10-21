@@ -12,9 +12,14 @@ namespace ModLaunch.Games;
 /// Игра из справочника. Key — постоянный id (сообщество Thunderstore, иначе раздел Nexus);
 /// Loader — "bepinex" | "bepinex-il2cpp" | "melonloader" | null; Pack — пакет загрузчика на Thunderstore
 /// (например, BepInEx-BepInExPack_IL2CPP); Folder — папка игры в Steam (installdir); Exes — имена exe;
-/// ModsRoute — папка модов относительно папки игры; Mods — модов на Nexus и Thunderstore вместе (0 — неизвестно).
+/// ModsRoute — папка модов относительно папки игры; Mods — модов на Nexus и Thunderstore вместе (0 — неизвестно);
+/// NexusId — номер игры на Nexus (без него не открываются страницы модов; 0 — неизвестен).
 /// </summary>
-public sealed record DirGame(string Key, string Name, int SteamAppId, string? Community, string? NexusDomain, string? Loader, string? Pack, string? Folder, string[] Exes, string? ModsRoute, long Mods);
+public sealed record DirGame(string Key, string Name, int SteamAppId, string? Community, string? NexusDomain, string? Loader, string? Pack, string? Folder, string[] Exes, string? ModsRoute, long Mods, int NexusId = 0)
+{
+    /// <summary>Картинка игры: обложка Steam, иначе плитка Nexus (у игр только с Nexus номера Steam нет).</summary>
+    public string? Art => SteamAppId > 0 ? GameDef.SteamArt(SteamAppId) : NexusId > 0 ? $"https://staticdelivery.nexusmods.com/Images/games/4_3/tile_{NexusId}.jpg" : null;
+}
 
 /// <summary>
 /// 12.0: справочник моддируемых игр — больше тысячи, а не только встроенные. Три открытых списка без входа:
@@ -159,6 +164,17 @@ public static partial class GameDirectory
     /// <summary>Строже Norm: издание остаётся (Skyrim и Skyrim Special Edition на Nexus — разные игры).</summary>
     static string Strict(string s) => Join(Words(s), editions: false);
 
+    /// <summary>Слова имени для сравнения по началу и концу (The Elder Scrolls V: Skyrim Special Edition ↔ Skyrim Special Edition).</summary>
+    public static string[] NameWords(string s)
+    {
+        var w = Words(s);
+        if (w.Count > 1 && w[0] == "the") w.RemoveAt(0);
+        return [.. w];
+    }
+
+    /// <summary>Строгое имя (издание не выкидывается) — для точного совпадения раньше Norm.</summary>
+    public static string StrictName(string s) => Strict(s);
+
     /// <summary>Только буквы и цифры, «the» остаётся: id сообщества и раздела (the-forest ↔ theforest).</summary>
     static string Squash(string s) => string.Concat(Words(s));
 
@@ -219,6 +235,7 @@ public static partial class GameDirectory
         public int Steam;
         public string[] Exes = [];
         public long TsMods, NexusMods;
+        public int NexusId;
         /// <summary>Число пакетов пришло из списка сообществ (а не «неизвестно»).</summary>
         public bool TsKnown;
     }
@@ -262,7 +279,7 @@ public static partial class GameDirectory
                 foreach (var n in doc.RootElement.EnumerateArray())
                     // «site» — раздел Nexus для инструментов, а не игра.
                     if (Str(n, "domain_name") is { Length: > 0 } d && d != "site" && Str(n, "name") is { Length: > 0 } name && Long(n, "mods") > 0)
-                        nx.Add(new Entry { Domain = d, Name = WebUtility.HtmlDecode(name).Trim(), NexusMods = Long(n, "mods") });
+                        nx.Add(new Entry { Domain = d, Name = WebUtility.HtmlDecode(name).Trim(), NexusMods = Long(n, "mods"), NexusId = (int)Long(n, "id") });
         }
         // Порог по числу модов на Nexus: 5, а если игр всё равно меньше тысячи с запасом — ниже.
         List<DirGame> result = [];
@@ -330,7 +347,7 @@ public static partial class GameDirectory
             }
             if (steam == 0 && n is not null && builtinByDomain.TryGetValue(n.Domain!, out var bd)) steam = bd.SteamAppId;
             keys.Add(t.Community!);
-            result.Add(new DirGame(t.Community!, t.Name, steam, t.Community, n?.Domain, t.Loader, pack, t.Folder, t.Exes, t.Route, t.TsMods + (n?.NexusMods ?? 0)));
+            result.Add(new DirGame(t.Community!, t.Name, steam, t.Community, n?.Domain, t.Loader, pack, t.Folder, t.Exes, t.Route, t.TsMods + (n?.NexusMods ?? 0), n?.NexusId ?? 0));
         }
         foreach (var n in nx.Where(n => !taken.Contains(n)).OrderBy(n => n.Domain, StringComparer.Ordinal))
         {
@@ -338,7 +355,7 @@ public static partial class GameDirectory
             var key = keys.Add(n.Domain!) ? n.Domain! : "nexus-" + n.Domain;
             if (key != n.Domain && !keys.Add(key)) continue;
             var steam = builtinByDomain.TryGetValue(n.Domain!, out var b) ? b.SteamAppId : 0;
-            result.Add(new DirGame(key, n.Name, steam, null, n.Domain, null, null, null, [], null, n.NexusMods));
+            result.Add(new DirGame(key, n.Name, steam, null, n.Domain, null, null, null, [], null, n.NexusMods, n.NexusId));
         }
         result.Sort((a, b) => string.CompareOrdinal(a.Key, b.Key));
         return result;
@@ -464,6 +481,7 @@ public static partial class GameDirectory
                 void Opt(string key, string? value) { if (!string.IsNullOrEmpty(value)) w.WriteString(key, value); }
                 Opt("c", g.Community);
                 Opt("d", g.NexusDomain);
+                if (g.NexusId > 0) w.WriteNumber("i", g.NexusId);
                 Opt("l", g.Loader);
                 Opt("p", g.Pack);
                 Opt("f", g.Folder);
@@ -492,7 +510,7 @@ public static partial class GameDirectory
         {
             if (g.Str("k") is not { Length: > 0 } key || g.Str("n") is not { Length: > 0 } name || !seen.Add(key)) continue;
             var exes = g.Arr("e").Select(x => x is JsonValue v && v.TryGetValue<string>(out var s) ? s : null).OfType<string>().ToArray();
-            list.Add(new DirGame(key, name, (int)g.Long("s"), g.Str("c"), g.Str("d"), g.Str("l"), g.Str("p"), g.Str("f"), exes, g.Str("r"), g.Long("m")));
+            list.Add(new DirGame(key, name, (int)g.Long("s"), g.Str("c"), g.Str("d"), g.Str("l"), g.Str("p"), g.Str("f"), exes, g.Str("r"), g.Long("m"), (int)g.Long("i")));
         }
         return list.Count >= min ? list : null;
     }

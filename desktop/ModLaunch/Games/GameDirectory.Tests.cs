@@ -199,6 +199,7 @@ public static partial class GameDirectory
         var sdv = Get("stardewvalley");
         if (sdv.SteamAppId != 413150 || !IsBuiltin(sdv) || IsBuiltin(Get("skyrim"))) throw new Exception("stardew: " + sdv);
         if (Get("skyrimspecialedition").Mods != 100000 || Get("pokemonfangame").Name != "Pokémon Fan Game") throw new Exception("nexus-only entries");
+        if (Get("skyrimspecialedition").NexusId != 1704 || lc.NexusId != 5848 || Get("skyrimspecialedition").Art?.EndsWith("tile_1704.jpg") != true) throw new Exception("nexus id / tile art");
         if (Get("some-new-game").Community != "some-new-game") throw new Exception("community from cyberstorm");
         // Ни модов, ни каталога: Empty Game, раздел «site», пустое и скрытое сообщества.
         foreach (var gone in new[] { "emptygame", "site", "dead-community", "phasmophobia" })

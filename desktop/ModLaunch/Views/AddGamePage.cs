@@ -283,7 +283,7 @@ public sealed class AddGamePage : Page
         text.Children.Add(Badges(d, found is not null, existing is not null));
         if (found is not null) text.Children.Add(new TextBlock { Text = $"{I18n.T("store." + found.Store)} · {found.Path}", Classes = { "small", "muted" }, Margin = new Thickness(0, 5, 0, 0), TextTrimming = Avalonia.Media.TextTrimming.CharacterEllipsis });
         if (d.Loader == "melonloader" && existing is null) text.Children.Add(new TextBlock { Text = I18n.T("v12g.melon.hint"), Classes = { "small" }, Foreground = Ui.Res("Faint"), Margin = new Thickness(0, 3, 0, 0) });
-        row.Children.Add(Ui.Row(14, Ui.Thumb(d.SteamAppId > 0 ? GameDef.SteamArt(d.SteamAppId) : null, d.Name, 48, 10), text));
+        row.Children.Add(Ui.Row(14, Ui.Thumb(d.Art, d.Name, 48, 10), text));
         return row;
     }
 
@@ -304,7 +304,7 @@ public sealed class AddGamePage : Page
             _ => I18n.T("add.hint.other"),
         };
         row.Children.Add(Ui.Row(14,
-            Ui.Thumb(f.AppId > 0 ? GameDef.SteamArt(f.AppId) : null, f.Name, 48, 10),
+            Ui.Thumb(f.AppId > 0 ? GameDef.SteamArt(f.AppId) : f.Dir?.Art, f.Name, 48, 10),
             new StackPanel
             {
                 VerticalAlignment = VerticalAlignment.Center, Spacing = 2,
