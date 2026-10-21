@@ -6,7 +6,8 @@ namespace ModLaunch.Games;
 public sealed record Located(string Path, string Source);
 
 /// <summary>Игра из манифеста Steam: номер, имя, папка в steamapps/common и полный путь к ней.</summary>
-public sealed record SteamApp(int AppId, string Name, string InstallDir, string Path);
+/// <summary>Игра из манифеста Steam. LastPlayed — unix-время последней игры (0 — неизвестно), SizeOnDisk — байты.</summary>
+public sealed record SteamApp(int AppId, string Name, string InstallDir, string Path, long LastPlayed = 0, long SizeOnDisk = 0);
 
 /// <summary>
 /// Поиск игры на диске: Steam (реестр → libraryfolders.vdf → appmanifest),
@@ -122,7 +123,9 @@ public static class Locator
                     if (Vdf.Get(acf, "AppState", "installdir") is not string dir || dir == "") continue;
                     if (!int.TryParse(Vdf.Get(acf, "AppState", "appid") as string, out var appId))
                         int.TryParse(Path.GetFileNameWithoutExtension(file)["appmanifest_".Length..], out appId);
-                    var app = new SteamApp(appId, Vdf.Get(acf, "AppState", "name") as string ?? dir, dir, Path.Combine(library, "steamapps", "common", dir));
+                    long.TryParse(Vdf.Get(acf, "AppState", "LastPlayed") as string, out var lastPlayed);
+                    long.TryParse(Vdf.Get(acf, "AppState", "SizeOnDisk") as string, out var size);
+                    var app = new SteamApp(appId, Vdf.Get(acf, "AppState", "name") as string ?? dir, dir, Path.Combine(library, "steamapps", "common", dir), lastPlayed, size);
                     if (appId > 0 && at.TryGetValue(appId, out var i))
                     {
                         if (!Directory.Exists(result[i].Path) && Directory.Exists(app.Path)) result[i] = app;

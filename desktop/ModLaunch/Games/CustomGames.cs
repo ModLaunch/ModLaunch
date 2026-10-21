@@ -115,6 +115,9 @@ public static partial class CustomGames
     [GeneratedRegex(@"(Redistributable|Steamworks|Proton|Steam Linux Runtime|SteamVR|Dedicated Server|\bSDK\b|Soundtrack|Wallpaper Engine|Benchmark|Demo$)", RegexOptions.IgnoreCase)]
     private static partial Regex NotGame();
 
+    /// <summary>Не игра (инструмент Steam, Proton, саундтрек, демо) — по имени из манифеста.</summary>
+    public static bool IsTool(string name) => NotGame().IsMatch(name);
+
     [GeneratedRegex(@"[^a-z0-9]+")]
     private static partial Regex NonAlnum();
 

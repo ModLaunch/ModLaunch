@@ -4,12 +4,14 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using ModLaunch.Core;
 using ModLaunch.Features;
+using ModLaunch.Games;
 
 namespace ModLaunch.Views;
 
 /// <summary>
-/// 12.0: главная — правая кнопка мыши. По пустому месту — «Добавить виджет» (сразу с размером),
-/// по виджету — размер, сдвиг, убрать и «добавить рядом». Стрелки ← → листают игры на сцене.
+/// 12.0: главная — правая кнопка мыши. По пустому месту — «Добавить виджет…» (галерея как на iPhone:
+/// вид, размер, настройки, живой предпросмотр) и быстрое добавление; по виджету — «Изменить виджет…»,
+/// размер, игра, цвет, сдвиг, убрать и «добавить рядом». Стрелки ← → листают игры на сцене.
 /// </summary>
 public sealed partial class HomePage
 {
@@ -43,7 +45,7 @@ public sealed partial class HomePage
     /// <summary>«Добавить виджет ›» — каждый вид, у кого несколько размеров — подменю размеров.</summary>
     static MenuItem AddMenu(int at)
     {
-        var add = new MenuItem { Header = I18n.T("v10.w.add"), Icon = Ui.Icon(Icons.Plus, 14) };
+        var add = new MenuItem { Header = I18n.T("v12w.quick"), Icon = Ui.Icon(Icons.Zap, 14) };
         foreach (var k in Widgets.Catalog)
         {
             var name = I18n.T("v10.w.name." + k.Id);
@@ -63,7 +65,9 @@ public sealed partial class HomePage
     MenuFlyout AreaMenu()
     {
         var menu = new MenuFlyout();
+        menu.Items.Add(Item(I18n.T("v12w.add") + "…", Icons.Plus, () => OpenStudio()));
         menu.Items.Add(AddMenu(-1));
+        menu.Items.Add(new Separator());
         menu.Items.Add(Item(_editWidgets ? I18n.T("v10.w.done") : I18n.T("v10.w.edit"), _editWidgets ? Icons.Check : Icons.Grid, () => { _editWidgets = !_editWidgets; Build(); }));
         menu.Items.Add(new Separator());
         menu.Items.Add(Item(I18n.T("v10.cfg.short"), Icons.Palette, () => MainWindow.Current?.Navigate(() => new SettingsPage("configs"))));
@@ -71,10 +75,35 @@ public sealed partial class HomePage
         return menu;
     }
 
-    /// <summary>Правая кнопка по виджету: размер, сдвиг, убрать, добавить рядом.</summary>
-    MenuFlyout WidgetMenu(int index, string id, string size, int count)
+    /// <summary>Правая кнопка по виджету: изменить, размер, игра и цвет, сдвиг, убрать, добавить рядом.</summary>
+    MenuFlyout WidgetMenu(int index, Widgets.Entry e, int count)
     {
+        var (id, size) = (e.Id, e.Size);
         var menu = new MenuFlyout();
+        menu.Items.Add(Item(I18n.T("v12w.edit") + "…", Icons.Sliders, () => OpenStudio(edit: index)));
+        var kind = Widgets.Find(id);
+        // Быстро сменить игру — без галереи: свои игры и игры Steam.
+        if (kind?.Options.Any(o => o.Type == "game") == true)
+        {
+            var games = new MenuItem { Header = I18n.T("v12w.opt.game"), Icon = Ui.Icon(Icons.Gamepad, 14) };
+            var current = e.Get("game");
+            foreach (var (value, label) in GameChoices(id).Take(24))
+            {
+                var v = value;
+                games.Items.Add(Item((v == current ? "✓  " : "") + label, v.StartsWith("steam:") ? Icons.Layers : Icons.Gamepad, () => SetOpt(index, e, "game", v)));
+            }
+            menu.Items.Add(games);
+        }
+        if (kind?.Options.Any(o => o.Key == "tint") == true)
+        {
+            var colors = new MenuItem { Header = I18n.T("v12w.opt.tint"), Icon = Ui.Icon(Icons.Palette, 14) };
+            foreach (var t in Widgets.Tints)
+            {
+                var one = t;
+                colors.Items.Add(Item((one == e.Get("tint") ? "✓  " : "") + I18n.T("v12w.tint." + one), Icons.Palette, () => SetOpt(index, e, "tint", one)));
+            }
+            menu.Items.Add(colors);
+        }
         if (Widgets.Find(id) is { Sizes.Length: > 1 } k)
         {
             var sizes = new MenuItem { Header = I18n.T("v10.w.size"), Icon = Ui.Icon(Icons.Maximize, 14) };
@@ -87,9 +116,29 @@ public sealed partial class HomePage
         }
         if (index > 0) menu.Items.Add(Item(I18n.T("v10.w.left"), Icons.ChevronLeft, () => Widgets.Move(index, -1)));
         if (index < count - 1) menu.Items.Add(Item(I18n.T("v10.w.right"), Icons.ChevronRight, () => Widgets.Move(index, 1)));
-        menu.Items.Add(AddMenu(index + 1));
+        menu.Items.Add(Item(I18n.T("v12w.addNear") + "…", Icons.Plus, () => OpenStudio(at: index + 1)));
         menu.Items.Add(new Separator());
         menu.Items.Add(Item(I18n.T("v10.w.remove"), Icons.Close, () => Widgets.Remove(index)));
         return menu;
+    }
+
+    static void SetOpt(int index, Widgets.Entry e, string key, string value)
+    {
+        var opts = new Dictionary<string, string>(e.Opts) { [key] = value };
+        Widgets.Update(index, e.Size, opts);
+    }
+
+    /// <summary>
+    /// Игры для настройки «Игра»: «авто» (если вид его понимает), свои игры ModLaunch, потом все установленные
+    /// игры Steam, которых в ModLaunch нет (steam:номер).
+    /// </summary>
+    static List<(string Value, string Label)> GameChoices(string kind)
+    {
+        var list = new List<(string, string)>();
+        if (kind != "game") list.Add(("", I18n.T("v12w.game.auto")));
+        foreach (var g in MyGames()) list.Add((g.Def.Id, g.Def.Name));
+        foreach (var a in SteamLibrary.Sorted("recent"))
+            if (SteamLibrary.Managed(a.AppId) is null) list.Add(("steam:" + a.AppId, "Steam · " + a.Name));
+        return list;
     }
 }

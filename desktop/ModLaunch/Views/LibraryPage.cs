@@ -128,20 +128,33 @@ public sealed partial class LibraryPage : Page
     /// </summary>
     Control? SupportedLink()
     {
-        var more = Games.CustomGames.MoreSupported;
-        if (more <= 0) return null;
         var query = _query;
-        var title = query != ""
-            ? I18n.T("v12g.lib.find", ("query", query))
-            : I18n.T("v12g.lib.more." + I18n.Plural(more, "one", "few", "many"), ("n", more.ToString("N0", I18n.Culture)));
-        var icon = new Border { Width = 34, Height = 34, CornerRadius = new CornerRadius(17), Background = Ui.Res("Surface3"), Child = Ui.Icon(query != "" ? Icons.Search : Icons.Plus, 16, Ui.Res("Brand2")) };
+        var row = new WrapPanel();
+        var more = Games.CustomGames.MoreSupported;
+        if (more > 0)
+        {
+            var title = query != ""
+                ? I18n.T("v12g.lib.find", ("query", query))
+                : I18n.T("v12g.lib.more." + I18n.Plural(more, "one", "few", "many"), ("n", more.ToString("N0", I18n.Culture)));
+            row.Children.Add(Link(query != "" ? Icons.Search : Icons.Plus, title, I18n.T("v12g.lib.more.hint"), () => MainWindow.Current?.Navigate(() => new AddGamePage(query))));
+        }
+        // Все игры Steam — и без модов: играть через Steam, искать по всему магазину.
+        var steam = Games.SteamLibrary.Installed.Count;
+        if (steam > 0)
+            row.Children.Add(Link(Icons.Layers, I18n.T("v12w.steam.link") + " · " + steam.ToString("N0", I18n.Culture), I18n.T("v12w.steam.link.hint"), () => MainWindow.Current?.Navigate(() => new SteamGamesPage(query))));
+        return row.Children.Count == 0 ? null : row;
+    }
+
+    static Button Link(string glyph, string title, string hint, Action open)
+    {
+        var icon = new Border { Width = 34, Height = 34, CornerRadius = new CornerRadius(17), Background = Ui.Res("Surface3"), Child = Ui.Icon(glyph, 16, Ui.Res("Brand2")) };
         var button = new Button
         {
             // Отступ влево — значок встаёт по краю обложек, а подсветка кнопки остаётся вокруг него.
-            Classes = { "ghost" }, HorizontalAlignment = HorizontalAlignment.Left, Padding = new Thickness(10, 8, 16, 8), Margin = new Thickness(-10, 0, 0, 0),
-            Content = Ui.Row(12, icon, Ui.Col(1, Ui.Text(title, "h3"), Ui.Text(I18n.T("v12g.lib.more.hint"), "small muted")), Ui.Icon(Icons.ChevronRight, 16, Ui.Res("Muted"))),
+            Classes = { "ghost" }, HorizontalAlignment = HorizontalAlignment.Left, Padding = new Thickness(10, 8, 16, 8), Margin = new Thickness(-10, 0, 18, 0),
+            Content = Ui.Row(12, icon, Ui.Col(1, Ui.Text(title, "h3"), Ui.Text(hint, "small muted")), Ui.Icon(Icons.ChevronRight, 16, Ui.Res("Muted"))),
         };
-        button.Click += (_, _) => MainWindow.Current?.Navigate(() => new AddGamePage(query));
+        button.Click += (_, _) => open();
         return button;
     }
 
