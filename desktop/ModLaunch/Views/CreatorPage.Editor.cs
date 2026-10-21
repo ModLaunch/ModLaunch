@@ -30,41 +30,29 @@ public sealed partial class CreatorPage
     {
         var p = _open!;
         HookTest();
-        var back = Ui.Button(I18n.T("cr.back"), () => { if (_dirty) Save(quiet: true); _open = null; _pane = "code"; Build(); }, "ghost", Icons.Back);
-        var name = Ui.Text(p.Name, "h3");
-        name.VerticalAlignment = VerticalAlignment.Center;
-        // Длинное имя не должно выдавить переключатель «Код · Обзор» и кнопки.
-        name.MaxWidth = 260;
-        name.TextTrimming = TextTrimming.CharacterEllipsis;
-        ToolTip.SetTip(name, p.Name);
+        // 12.1: полоса инструментов маленькой IDE: назад, статус сборки с версией и действия; «Код · Обзор» — вкладками в шапке Hub (PaneTabs).
+        var back = Ui.Button("", () => { if (_dirty) Save(quiet: true); _open = null; _pane = "code"; Build(); }, "icon ghost", Icons.Back, I18n.T("cr.back"));
+        var status = p.Meta().Status(File.Exists(p.Script) ? File.GetLastWriteTimeUtc(p.Script) : p.Updated);
+        var state = Ui.Row(8, Ui.Dot(StatusBrush(status), 8), Ui.Text(I18n.T($"v12.pj.st.{status}.short"), "small"), HubLook.MonoText(p.Version == "" ? "" : "v" + p.Version));
+        state.VerticalAlignment = VerticalAlignment.Center;
+        ToolTip.SetTip(state, I18n.T($"v12.pj.st.{status}"));
         _testAction = new ContentControl { VerticalAlignment = VerticalAlignment.Center };
         // 12.0: главная кнопка — «Собрать и проверить»; сохранить и просто установить — значками (Ctrl+S и сборка сохраняют и так).
-        var actions = Ui.Row(8,
-            Ui.Button("", () => Actions.OpenFolder(Directory.CreateDirectory(Path.Combine(p.Dir, "files")).FullName), "icon", Icons.Folder, I18n.T("cr.files")),
+        var actions = Ui.Row(6,
+            Ui.Button("", () => Actions.OpenFolder(Directory.CreateDirectory(Path.Combine(p.Dir, "files")).FullName), "icon ghost", Icons.Folder, I18n.T("cr.files")),
             Ui.Button("", Delete, "icon ghost", Icons.Trash, I18n.T("cr.delete")),
-            Ui.Button("", () => Save(), "icon", Icons.Save, I18n.T("cr.save") + " (Ctrl+S)"),
-            Ui.Button("", () => _ = InstallOpen(), "icon", Icons.Download, I18n.T("cr.install")),
+            Ui.Button("", () => Save(), "icon ghost", Icons.Save, I18n.T("cr.save") + " (Ctrl+S)"),
+            Ui.Button("", () => _ = InstallOpen(), "icon ghost", Icons.Download, I18n.T("cr.install")),
+            new Border { Width = 1, Height = 22, Background = HubLook.Edge, Margin = new Thickness(4, 0), VerticalAlignment = VerticalAlignment.Center },
             Ui.Button(I18n.T("cr.export"), () => _ = Export(), "", Icons.Package),
             Ui.Button(I18n.T("cr.publish"), Publish, "", Icons.Upload),
-            _testAction);
-        // 12.0: «Код · Обзор» — у проекта появилась своя сводка (статус, сборки, проверки, Hub).
-        var panes = Ui.Row(4);
-        foreach (var (id, key) in new[] { ("code", "v12.pj.pane.code"), ("overview", "v12.pj.pane.overview") })
-        {
-            var pane = id;
-            // Открыли обзор — цифры Hub и маркета перечитать (сессия могла идти часами).
-            var b = Ui.Button(I18n.T(key), () => { if (_pane == pane) return; _pane = pane; if (pane == "overview") ForgetStats(p.Id); Build(); }, "pivot");
-            b.Padding = new Thickness(10, 6);
-            b.FontSize = 13;
-            b.VerticalAlignment = VerticalAlignment.Center;
-            if (_pane == id) { b.Classes.Add("active"); b.Background = Ui.Res("Surface2"); }
-            panes.Children.Add(b);
-        }
-        panes.Margin = new Thickness(8, 0, 0, 0);
-        var bar = new DockPanel();
+            _testAction, HubLook.Key("F5"));
+        actions.VerticalAlignment = VerticalAlignment.Center;
+        var strip = new DockPanel();
         DockPanel.SetDock(actions, Dock.Right);
-        bar.Children.Add(actions);
-        bar.Children.Add(Ui.Row(8, back, name, panes));
+        strip.Children.Add(actions);
+        strip.Children.Add(Ui.Row(10, back, new Border { Width = 1, Height = 22, Background = HubLook.Edge, VerticalAlignment = VerticalAlignment.Center }, state));
+        var bar = new Border { Background = HubLook.Panel, BorderBrush = HubLook.Edge, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(3), Padding = new Thickness(6, 7, 8, 7), Child = strip };
 
         Control root;
         if (_pane == "overview")
@@ -82,6 +70,22 @@ public sealed partial class CreatorPage
             else if (e.KeyModifiers == KeyModifiers.Shift) { e.Handled = true; Playtest.For(_open.Id)?.Stop(); }
         }, RoutingStrategies.Tunnel);
         return root;
+    }
+
+    /// <summary>12.0: «Код · Обзор» — у проекта своя сводка (статус, сборки, проверки, Hub); 12.1 — вкладками в шапке Hub.</summary>
+    List<Control> PaneTabs()
+    {
+        var p = _open!;
+        var tabs = new List<Control>();
+        foreach (var (id, key) in new[] { ("code", "v12.pj.pane.code"), ("overview", "v12.pj.pane.overview") })
+        {
+            var pane = id;
+            // Открыли обзор — цифры Hub и маркета перечитать (сессия могла идти часами).
+            var b = Ui.Button(I18n.T(key), () => { if (_pane == pane) return; _pane = pane; if (pane == "overview") ForgetStats(p.Id); Build(); }, "hub-tab");
+            if (_pane == id) b.Classes.Add("active");
+            tabs.Add(b);
+        }
+        return tabs;
     }
 
     Control CodePane()
@@ -104,16 +108,40 @@ public sealed partial class CreatorPage
         {
             var t = text;
             var chip = Ui.Button("+ " + label, () => Insert(t), "chip snippet");
-            chip.FontFamily = new FontFamily("Cascadia Mono, Consolas, monospace");
+            chip.FontFamily = HubLook.Mono;
             snippets.Children.Add(chip);
         }
 
-        var editor = new Border { Classes = { "card" }, Padding = new Thickness(4), Child = Free(_code) };
+        // 12.1: поверхность кода — вкладка файла, быстрые вставки, редактор и строка подсказок по клавишам.
+        var file = Ui.Row(8, Ui.Dot(HubLook.Violet, 6), HubLook.MonoText("main.mls", 12, Ui.Res("Text")));
+        var fileTab = new Border { Background = HubLook.Panel, BorderBrush = HubLook.Edge, BorderThickness = new Thickness(1, 0, 1, 0), Padding = new Thickness(14, 9), Child = file };
+        var lang = HubLook.MonoText(Dotted("ModScript", GameCatalog.ById(_open!.Game)?.ShortName ?? _open.Game), 11);
+        lang.Margin = new Thickness(0, 0, 14, 0);
+        var tabs = new DockPanel { Background = HubLook.Raised };
+        DockPanel.SetDock(lang, Dock.Right);
+        tabs.Children.Add(lang);
+        tabs.Children.Add(new Border { Child = fileTab, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(10, 0, 0, 0) });
+        snippets.Margin = new Thickness(10, 8);
+        var inserts = new ScrollViewer { Content = snippets, HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled };
+        var keys = HubLook.MonoText(I18n.T("v12d.ide.keys"), 10.5);
+        keys.TextTrimming = TextTrimming.CharacterEllipsis;
+        var status = new Border { Background = HubLook.Raised, BorderBrush = HubLook.Edge, BorderThickness = new Thickness(0, 1, 0, 0), Padding = new Thickness(14, 5), Child = keys };
+        var surface = new DockPanel();
+        foreach (var (part, edge) in new (Control, bool)[] { (tabs, true), (inserts, true) })
+        {
+            var holder = new Border { BorderBrush = HubLook.Edge, BorderThickness = new Thickness(0, 0, 0, edge ? 1 : 0), Child = part };
+            DockPanel.SetDock(holder, Dock.Top);
+            surface.Children.Add(holder);
+        }
+        DockPanel.SetDock(status, Dock.Bottom);
+        surface.Children.Add(status);
+        surface.Children.Add(new Border { Padding = new Thickness(4, 6, 4, 4), Child = Free(_code) });
+        var editor = new Border { Background = HubLook.Panel, BorderBrush = HubLook.Edge, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(3), ClipToBounds = true, Child = surface };
         _testBox = new StackPanel { Spacing = 8 };
-        var side = Ui.Card(new ScrollViewer { Content = Ui.Col(14, _testBox, new Border { Height = 1, Background = Ui.Res("Line") }, Free(_check)), MaxHeight = 640 }, 18);
+        var side = HubLook.Frame(new ScrollViewer { Content = Ui.Col(16, _testBox, new Border { Height = 1, Background = HubLook.Edge }, Free(_check)), MaxHeight = 640 }, new Thickness(18, 16));
         side.VerticalAlignment = VerticalAlignment.Top;
         var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,340"), ColumnSpacing = 16 };
-        grid.Children.Add(Ui.Col(10, new ScrollViewer { Content = snippets, HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled }, editor));
+        grid.Children.Add(editor);
         Grid.SetColumn(side, 1);
         grid.Children.Add(side);
         RenderCheck();
@@ -147,6 +175,7 @@ public sealed partial class CreatorPage
         var game = GameCatalog.ById(b.Game);
         var errors = b.Diags.Where(d => !d.Warning).ToList();
         _code.MarkErrors(errors.Select(d => d.Line));
+        _check.Children.Add(HubLook.Eyebrow(I18n.T("v12d.ide.check"), HubLook.Violet));
         _check.Children.Add(Ui.Row(8,
             Ui.Dot(errors.Count == 0 ? Ui.Res("Good") : Ui.Res("Bad"), 10),
             Ui.Text(errors.Count == 0 ? I18n.T("cr.ok") : I18n.T("cr.errors", ("n", errors.Count)), "h3")));
@@ -163,8 +192,8 @@ public sealed partial class CreatorPage
         if (errors.Count > 0) return;
 
         var format = game is null ? "?" : game.Loader switch { LoaderKind.Smapi => "Content Patcher", LoaderKind.Bepinex => "Thunderstore (BepInEx)", _ => "zip" };
-        _check.Children.Add(new Border { Height = 1, Background = Ui.Res("Line"), Margin = new Thickness(0, 4) });
-        _check.Children.Add(Ui.Text(I18n.T("cr.result"), "small muted"));
+        _check.Children.Add(new Border { Height = 1, Background = HubLook.Edge, Margin = new Thickness(0, 4) });
+        _check.Children.Add(HubLook.Eyebrow(I18n.T("cr.result")));
         void Line(string k, string v) { var r = new DockPanel(); var val = Ui.Text(v, "small"); DockPanel.SetDock(val, Dock.Right); r.Children.Add(val); r.Children.Add(Ui.Text(k, "small muted")); _check.Children.Add(r); }
         Line(I18n.T("cr.r.name"), $"{b.Name} {b.Version}");
         Line(I18n.T("cr.r.game"), game?.Name ?? b.Game);
@@ -175,7 +204,7 @@ public sealed partial class CreatorPage
         if (b.Inis.Count > 0) Line(I18n.T("cr.r.inis"), b.Inis.Count.ToString());
         if (b.Copies.Count > 0) Line(I18n.T("cr.r.files"), b.Copies.Count.ToString());
         if (game is null) _check.Children.Add(Ui.Text(I18n.T("cr.build.noGame", ("game", b.Game)), "small", color: Ui.Res("Warn"), wrap: true));
-        foreach (var log in b.Log.Take(8)) _check.Children.Add(Ui.Text("› " + log, "small", color: Ui.Res("Brand2"), wrap: true));
+        foreach (var log in b.Log.Take(8)) _check.Children.Add(new TextBlock { Text = "› " + log, FontFamily = HubLook.Mono, FontSize = 11.5, Foreground = HubLook.Cyan, TextWrapping = TextWrapping.Wrap });
     }
 
     void Delete()
@@ -241,7 +270,7 @@ public sealed partial class CreatorPage
         if (_testBox is null) return;
         _testBox.Children.Clear();
         _testClock = null;
-        _testBox.Children.Add(Ui.Row(8, Ui.Icon(Icons.Activity, 15, Ui.Res("Brand2")), Ui.Text(I18n.T("v12.pj.test"), "h3")));
+        _testBox.Children.Add(HubLook.Head(I18n.T("v12d.ide.run"), I18n.T("v12.pj.test")));
         if (run is { Active: true } or { Step: Playtest.Stage.Failed })
         {
             _testBox.Children.Add(TestSteps(run));

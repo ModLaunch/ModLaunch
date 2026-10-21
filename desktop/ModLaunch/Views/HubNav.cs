@@ -14,6 +14,7 @@ namespace ModLaunch.Views;
 /// кошелёк) и «Автору» (проекты, студия продаж, шаблоны, справка). Выбранный раздел — заливкой,
 /// его страницы — рядом; справа — баланс и «Продать работу». 12.0: раздел помнит последнюю вкладку,
 /// а «Автору» по умолчанию — «Проекты» (они работают и без входа, студия продаж — нет).
+/// 12.1: вместо двух рядов переключателей — боковая панель инструментов внутри Hub (Frame).
 /// </summary>
 public static class HubNav
 {
@@ -81,79 +82,193 @@ public static class HubNav
         });
     }
 
+    /// <summary>Пункт боковой панели Hub: id, ключ названия, значок.</summary>
+    sealed record Rail(string Id, string Key, string Icon);
+
+    /// <summary>12.1: «Автору» — работа над своими модами; ниже черты — Hub: магазин, своё и списки сообщества.</summary>
+    static readonly Rail[] MakeRail =
+    [
+        new("home", "v12d.rail.overview", Icons.Grid), new("mine", "v12d.rail.projects", Icons.Folder), new("studio", "v93.mk.tab.studio", Icons.Chart),
+        new("lang", "v11.hub.lang", Icons.Code), new("templates", "v91.cr.tab.templates", Icons.Wand), new("docs", "cr.tab.docs", Icons.Book),
+    ];
+
+    static readonly Rail[] HubRail =
+    [
+        new("shop", "v95.hub.group.shop", Icons.Bag), new("my", "v95.hub.group.mine", Icons.Layers),
+        new("codes", "v91.cr.tab.codes", Icons.List), new("models", "v91.cr.tab.models", Icons.Cube),
+    ];
+
+    /// <summary>Какой пункт боковой панели горит: у мастерской — по её вкладке, у рынка — студия или раздел.</summary>
+    public static string RailOf(string tab, bool creator) => creator
+        ? tab switch
+        {
+            "home" or "mine" or "codes" or "models" or "docs" => tab,
+            "inject" or "mxdev" => "lang",
+            "examples" => "templates",
+            "injects" => "my",
+            "hub" => "shop",
+            _ => "mine",
+        }
+        : tab == "studio" ? "studio" : GroupOf(tab) == Group.Mine ? "my" : "shop";
+
+    /// <summary>Перейти по пункту панели; local — страница может открыть его у себя, без новой страницы.</summary>
+    static void Go(string rail, Action<string>? inPage, Func<string, bool>? local)
+    {
+        if (local?.Invoke(rail) == true) return;
+        switch (rail)
+        {
+            case "studio": Open("studio", inPage); return;
+            case "shop": Open(Target(Group.Shop), inPage); return;
+            case "my": Open(Target(Group.Mine), inPage); return;
+        }
+        var tab = rail switch { "lang" => "inject", "templates" => "examples", _ => rail };
+        MainWindow.Current?.Navigate(() => new CreatorPage(tab));
+    }
+
     /// <summary>
-    /// Шапка Creator Hub. 10.0 — тише: одна строка (знак, название, три раздела, баланс и кнопки)
-    /// и под ней одна линия вкладок без значков. Вкладки внутри страницы (sub, например у «Проектов»)
-    /// встают в ту же линию после черты, а не третьим рядом; action — главная кнопка страницы.
+    /// 12.1: весь экран Creator Hub — своё пространство: слева боковая панель инструментов (не прокручивается),
+    /// справа шапка (раздел, цифры автора, «Новый проект») и тело страницы на сетке чертежа.
+    /// current — вкладка HubNav (её раздел запоминается), rail — горящий пункт панели, local — переходы внутри страницы.
     /// </summary>
-    public static Control Header(string current, Action<string>? inPage = null, Action? sold = null, IReadOnlyList<Control>? sub = null, Control? action = null)
+    public static Control Frame(string current, string rail, string title, Control body, Action<string>? inPage = null, Action? sold = null,
+        Func<string, bool>? local = null, IReadOnlyList<Control>? sub = null)
     {
         Remember(current);
-        var title = new TextBlock { Text = "Creator Hub", FontFamily = Gx.Display, FontSize = 20, FontWeight = FontWeight.Bold, LetterSpacing = -0.4, VerticalAlignment = VerticalAlignment.Center };
-        ToolTip.SetTip(title, I18n.T("v93.mk.sub", ("n", 100 - Market.FeePercent)));
-        var left = Ui.Row(12, CreatorLogo.Tile(36), title, Groups(current, inPage));
-        left.Children[2].Margin = new Thickness(14, 0, 0, 0);
+        var column = new StackPanel { Spacing = 20, Margin = new Thickness(32, 22, 32, 40), MaxWidth = 1640 };
+        column.Children.Add(Head(current, title, inPage, sold, sub));
+        column.Children.Add(body);
+        var scroll = new ScrollViewer { Content = column, HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled };
+        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*") };
+        grid.Children.Add(RailPanel(rail, inPage, local));
+        Grid.SetColumn(scroll, 1);
+        grid.Children.Add(scroll);
+        var root = new Panel { Classes = { "hub-space" }, Children = { new HubLook.Blueprint(), grid } };
+        HubLook.Scope(root);
+        return root;
+    }
 
-        var right = Ui.Row(8);
-        right.VerticalAlignment = VerticalAlignment.Center;
+    /// <summary>Боковая панель: знак и название, «Автору», черта, Hub; внизу — баланс и «Продать работу».</summary>
+    static Control RailPanel(string current, Action<string>? inPage, Func<string, bool>? local)
+    {
+        var brand = Ui.Row(10, CreatorLogo.Tile(30), Ui.Col(1,
+            new TextBlock { Text = "Creator Hub", FontSize = 15, FontWeight = FontWeight.Bold, LetterSpacing = -0.2 },
+            HubLook.MonoText(I18n.T("v12d.rail.studio"), 10)));
+        ToolTip.SetTip(brand, I18n.T("v93.mk.sub", ("n", 100 - Market.FeePercent)));
+        brand.Margin = new Thickness(6, 2, 0, 18);
+
+        var items = new StackPanel { Spacing = 2 };
+        void Section(string key, Rail[] list)
+        {
+            var label = HubLook.Eyebrow(I18n.T(key));
+            label.Margin = new Thickness(10, items.Children.Count == 0 ? 0 : 6, 0, 6);
+            items.Children.Add(label);
+            foreach (var r in list)
+            {
+                var id = r.Id;
+                var on = id == current;
+                var bar = new Border { Width = 3, Height = 18, CornerRadius = new CornerRadius(2), Background = on ? HubLook.Signature() : Brushes.Transparent, Margin = new Thickness(0, 0, 9, 0) };
+                var text = new TextBlock { Text = I18n.T(r.Key), VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
+                var row = new DockPanel { Children = { bar, Ui.Row(10, Ui.Icon(r.Icon, 16, on ? HubLook.Violet : null), text) } };
+                DockPanel.SetDock(bar, Dock.Left);
+                var b = new Button { Classes = { "hub-rail" }, Content = row };
+                if (on) b.Classes.Add("active");
+                if (id == "my" && MarketLocal.WishCount > 0) ToolTip.SetTip(b, I18n.T("v93.mk.tab.wishlist") + ": " + MarketLocal.WishCount);
+                b.Click += (_, _) => Go(id, inPage, local);
+                items.Children.Add(b);
+            }
+        }
+        Section("v95.hub.group.author", MakeRail);
+        items.Children.Add(new Border { Height = 1, Background = HubLook.Edge, Margin = new Thickness(10, 12, 10, 8) });
+        Section("v12d.rail.hub", HubRail);
+
+        var foot = Ui.Col(8);
         if (Social.Account.SignedIn && MarketData.Wallet is { } w)
         {
             var wallet = new Button
             {
-                Classes = { "chip" }, Padding = new Thickness(12, 7),
-                Content = Ui.Row(8, Ui.Icon(Icons.Bag, 15, Ui.Res("Muted")), new TextBlock { Text = Market.Money(w.Balance), FontWeight = FontWeight.SemiBold, VerticalAlignment = VerticalAlignment.Center }),
+                Classes = { "hub-rail" }, Content = new DockPanel
+                {
+                    Margin = new Thickness(12, 0, 0, 0),
+                    Children = { Ui.Row(10, Ui.Icon(Icons.Bag, 15), new TextBlock { Text = Market.Money(w.Balance), FontFamily = HubLook.Mono, FontWeight = FontWeight.SemiBold, VerticalAlignment = VerticalAlignment.Center }) },
+                },
             };
-            if (current == "wallet") wallet.Classes.Add("active");
+            if (current == "my" && Last.GetValueOrDefault(Group.Mine) == "wallet") wallet.Classes.Add("active");
             ToolTip.SetTip(wallet, I18n.T("v93.mk.wallet"));
             wallet.Click += (_, _) => Open("wallet", inPage);
-            right.Children.Add(wallet);
+            foot.Children.Add(wallet);
         }
-        // Главная кнопка одна: на странице со своим действием «Продать работу» уходит во вторые.
-        right.Children.Add(Ui.Button(I18n.T("mk.sell"), () => ListingWizard.Show(null, sold ?? MarketData.Reload), action is null ? "primary" : "", Icons.Plus));
-        if (action is not null) right.Children.Add(action);
+        var dock = new DockPanel { Margin = new Thickness(12, 18, 12, 14) };
+        DockPanel.SetDock(brand, Dock.Top);
+        DockPanel.SetDock(foot, Dock.Bottom);
+        dock.Children.Add(brand);
+        dock.Children.Add(foot);
+        dock.Children.Add(new ScrollViewer { Content = items, HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled });
+        return new Border
+        {
+            Width = 216, Background = HubLook.Panel, BorderBrush = HubLook.Edge, BorderThickness = new Thickness(0, 0, 1, 0), Child = dock,
+        };
+    }
+
+    /// <summary>Шапка раздела: «// CREATOR HUB · РАЗДЕЛ», название, цифры автора и главные кнопки; под ней — вкладки раздела.</summary>
+    static Control Head(string current, string title, Action<string>? inPage, Action? sold, IReadOnlyList<Control>? sub)
+    {
+        var group = GroupOf(current);
+        var groupKey = group switch { Group.Shop => "v95.hub.group.shop", Group.Mine => "v95.hub.group.mine", _ => "v95.hub.group.author" };
+        var words = Ui.Col(4,
+            HubLook.Eyebrow("Creator Hub · " + I18n.T(groupKey), HubLook.Violet),
+            new TextBlock { Text = title, FontFamily = Look.Display, FontSize = 26, FontWeight = FontWeight.Bold, LetterSpacing = -0.6, TextTrimming = TextTrimming.CharacterEllipsis });
+        words.VerticalAlignment = VerticalAlignment.Bottom;
+
+        // Цифры автора — тихо, моноширинно: проекты, в Hub, загрузки.
+        var (projects, published, downloads) = CreatorPage.AuthorStats();
+        var stats = Ui.Row(18);
+        stats.VerticalAlignment = VerticalAlignment.Center;
+        stats.Margin = new Thickness(0, 0, 10, 0);
+        foreach (var (value, key) in new[] { (projects.ToString(), "v99.cr.projects"), (published?.ToString() ?? "—", "v99.cr.published"), (downloads is { } d ? I18n.Compact(d) : "—", "v99.cr.downloads") })
+            stats.Children.Add(Ui.Col(0,
+                new TextBlock { Text = value, FontFamily = HubLook.Mono, FontSize = 15, FontWeight = FontWeight.SemiBold },
+                HubLook.MonoText(I18n.T(key), 10)));
+        var sell = Ui.Button(I18n.T("mk.sell"), () => ListingWizard.Show(null, sold ?? MarketData.Reload), "", Icons.Upload);
+        var create = Ui.Button(I18n.T("v95.hub.newProject"), CreatorPage.CreateNew, "primary", Icons.Plus);
+        var right = Ui.Row(8, stats, new Border { Width = 1, Height = 28, Background = HubLook.Edge, Margin = new Thickness(0, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center }, sell, create);
+        right.VerticalAlignment = VerticalAlignment.Bottom;
+
         var head = new DockPanel();
         DockPanel.SetDock(right, Dock.Right);
         head.Children.Add(right);
-        head.Children.Add(left);
-        return Ui.Col(10, head, Bar(current, inPage, sub));
+        head.Children.Add(words);
+        var col = Ui.Col(12, head);
+        if (Bar(current, inPage, sub) is { } bar) col.Children.Add(bar);
+        else col.Children.Add(new Border { Height = 1, Background = HubLook.Edge });
+        return col;
     }
 
-    /// <summary>Три раздела — маленьким переключателем рядом с названием.</summary>
-    static Control Groups(string current, Action<string>? inPage)
+    /// <summary>Вкладки раздела «Магазин» или «Моё» (и вкладки страницы после черты) — тонкой линией с фирменным подчёркиванием.</summary>
+    public static Control? Bar(string current, Action<string>? inPage = null, IReadOnlyList<Control>? sub = null)
     {
         var group = GroupOf(current);
-        var groups = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2 };
-        foreach (var (g, key) in new[] { (Group.Shop, "v95.hub.group.shop"), (Group.Mine, "v95.hub.group.mine"), (Group.Author, "v95.hub.group.author") })
-        {
-            var target = Target(g);
-            var b = Ui.Button(I18n.T(key), () => { if (g != group) Open(target, inPage); }, "hub-group");
-            b.Padding = new Thickness(12, 6);
-            if (g == group) b.Classes.Add("active");
-            groups.Children.Add(b);
-        }
-        return new Border { Background = Ui.Res("Surface2"), CornerRadius = new CornerRadius(9), Padding = new Thickness(3), Child = groups, VerticalAlignment = VerticalAlignment.Center };
-    }
-
-    /// <summary>Линия вкладок выбранного раздела (и вкладки страницы после черты).</summary>
-    public static Control Bar(string current, Action<string>? inPage = null, IReadOnlyList<Control>? sub = null)
-    {
-        var group = GroupOf(current);
-        var tabs = new List<Control>();
-        foreach (var item in Items.Where(i => i.Group == group))
-        {
-            var label = I18n.T(item.Key);
-            if (item.Id == "wishlist" && MarketLocal.WishCount > 0) label += "  " + MarketLocal.WishCount;
-            var id = item.Id;
-            var b = Ui.Button(label, () => Open(id, inPage), "tab");
-            if (current == item.Id) b.Classes.Add("active");
-            tabs.Add(b);
-        }
+        var tabs = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 22 };
+        if (group != Group.Author)
+            foreach (var item in Items.Where(i => i.Group == group))
+            {
+                var label = I18n.T(item.Key);
+                if (item.Id == "wishlist" && MarketLocal.WishCount > 0) label += "  " + MarketLocal.WishCount;
+                var id = item.Id;
+                var b = Ui.Button(label, () => Open(id, inPage), "hub-tab");
+                if (current == item.Id) b.Classes.Add("active");
+                tabs.Children.Add(b);
+            }
         if (sub is { Count: > 0 })
         {
-            tabs.Add(new Border { Width = 1, Height = 18, Background = Ui.Res("Line"), Margin = new Thickness(4, 0, 20, 0), VerticalAlignment = VerticalAlignment.Center });
-            tabs.AddRange(sub);
+            if (tabs.Children.Count > 0) tabs.Children.Add(new Border { Width = 1, Height = 16, Background = HubLook.Edge, VerticalAlignment = VerticalAlignment.Center });
+            foreach (var c in sub) tabs.Children.Add(c);
         }
-        return Ui.TabBar(tabs.ToArray());
+        if (tabs.Children.Count == 0) return null;
+        return new Border
+        {
+            BorderBrush = HubLook.Edge, BorderThickness = new Thickness(0, 0, 0, 1),
+            Child = new ScrollViewer { Content = tabs, HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Hidden, VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled },
+        };
     }
 
     [SelfTest]
@@ -178,6 +293,10 @@ public static class HubNav
             foreach (var (tab, editing, q, to) in new[] { ("home", false, "x", "mine"), ("home", false, "", "home"), ("mine", true, "x", "mine"), ("docs", false, "x", "mine"),
                 ("inject", false, "x", "mine"), ("codes", false, "x", "codes"), ("examples", false, "x", "examples"), ("hub", false, "x", "hub") })
                 if (CreatorPage.SearchTab(tab, editing, q) != to) throw new Exception($"search on {tab} → {CreatorPage.SearchTab(tab, editing, q)}");
+            // 12.1: боковая панель горит на своём пункте и у мастерской, и у рынка.
+            foreach (var (tab, creator, rail) in new[] { ("home", true, "home"), ("inject", true, "lang"), ("mxdev", true, "lang"), ("examples", true, "templates"), ("injects", true, "my"),
+                ("hub", true, "shop"), ("studio", false, "studio"), ("wallet", false, "my"), ("workshop", false, "shop") })
+                if (RailOf(tab, creator) != rail) throw new Exception($"rail {tab} → {RailOf(tab, creator)}");
             return "Author opens Projects; each group remembers its last tab";
         }
         finally

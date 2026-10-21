@@ -192,33 +192,11 @@ public sealed partial class CreatorPage : Page
 
     void BuildNow()
     {
-        var content = StoreKit.Fit(new StackPanel { Spacing = 22, Margin = new Thickness(40, 24, 40, 40), MaxWidth = 1640 });
         // Баланс в шапке берётся из общих данных рынка: открыли сразу мастерскую — загрузить их (один раз за сеанс).
         if (Social.Account.SignedIn && MarketData.Wallet is null && !MarketData.Loading && !_walletAsked && !Program.Screenshot) { _walletAsked = true; _ = MarketData.Load(); }
         _hadWallet = MarketData.Wallet is not null;
 
-        var hubTab = HubTabOf(_tab);
-        // Внутри «Проектов» — свои вкладки (обзор, все мои, коды, модели, ModScript X) в той же линии.
-        List<Control>? sub = null;
-        Control? create = null;
-        if (hubTab == "projects")
-        {
-            sub = [];
-            foreach (var (id, key, _) in MainTabs.Where(t => t.Id is not ("examples" or "inject")))
-            {
-                var tab = id;
-                var b = Ui.Button(I18n.T(key), () => Go(tab), "pivot");
-                b.Padding = new Thickness(10, 6);
-                b.FontSize = 13;
-                b.VerticalAlignment = VerticalAlignment.Center;
-                if (_tab == id) { b.Classes.Add("active"); b.Background = Ui.Res("Surface2"); }
-                sub.Add(b);
-            }
-            create = Ui.Button(I18n.T("v95.hub.newProject"), CreateNew, "primary", Icons.Plus);
-        }
-        content.Children.Add(HubNav.Header(hubTab, sold: () => _ = LoadMarket(force: true), sub: sub, action: create));
-
-        content.Children.Add(_tab switch
+        var body = _tab switch
         {
             "home" => Home(),
             "examples" => Examples(),
@@ -230,8 +208,35 @@ public sealed partial class CreatorPage : Page
             "mxdev" => Injector(),
             "injects" => Injects(),
             _ => _open is null ? Mine() : Editor(),
-        });
-        Content = new ScrollViewer { Content = content, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+        };
+        // 12.1: своё пространство Hub — боковая панель, шапка с цифрами автора и «Новым проектом», сетка чертежа.
+        // Открытый проект: в шапке — его имя и вкладки «Код · Обзор»; в «Моих проектах» — «Проекты · Опубликованные».
+        var editing = _open is not null && _tab is not ("home" or "examples" or "codes" or "models" or "hub" or "docs" or "inject" or "mxdev" or "injects");
+        var sub = editing ? PaneTabs() : _tab == "mine" ? MineTabs() : null;
+        Content = HubNav.Frame(HubTabOf(_tab), HubNav.RailOf(_tab, creator: true), editing ? _open!.Name : HubTitle(), body, sold: () => _ = LoadMarket(force: true), local: Rail, sub: sub);
+    }
+
+    /// <summary>Название раздела в шапке Hub — так же, как пункт боковой панели.</summary>
+    string HubTitle() => _tab switch
+    {
+        "home" => I18n.T("v12d.rail.overview"),
+        "mine" => I18n.T("v12d.rail.projects"),
+        "inject" => I18n.T("v11.hub.lang"),
+        _ => TabTitle(_tab),
+    };
+
+    /// <summary>12.1: пункты боковой панели, что живут в мастерской, открываются здесь же, без новой страницы.</summary>
+    bool Rail(string rail)
+    {
+        var tab = rail switch { "lang" => "inject", "templates" => "examples", _ => rail };
+        if (tab is not ("home" or "mine" or "codes" or "models" or "inject" or "examples" or "docs")) return false;
+        if (_dirty) Save(quiet: true);
+        // «Мои проекты» из редактора — к списку (как «Назад»).
+        _open = null;
+        _pane = "code";
+        Go(tab);
+        MainWindow.Current?.RenderCrumbs();
+        return true;
     }
 
     /// <summary>

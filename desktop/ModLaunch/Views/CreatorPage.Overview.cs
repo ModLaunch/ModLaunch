@@ -43,14 +43,18 @@ public sealed partial class CreatorPage
         void Kpi(string label, string value, string sub, IBrush? color = null)
         {
             var i = kpis.Children.Count;
+            // 12.1: показания приборов — подпись «// СБОРКА», значение моноширинным, слева — тонкая фирменная черта.
+            var rule = new Border { Width = 2, Background = HubLook.Signature(), CornerRadius = new CornerRadius(1), Margin = new Thickness(0, 2, 12, 2) };
+            var words = Ui.Col(5,
+                HubLook.Eyebrow(label),
+                new TextBlock { Text = value, FontFamily = HubLook.Mono, FontSize = 19, FontWeight = FontWeight.SemiBold, Foreground = color ?? Ui.Res("Text"), TextTrimming = TextTrimming.CharacterEllipsis },
+                new TextBlock { Text = sub, FontSize = 12, Foreground = Ui.Res("Muted"), TextTrimming = TextTrimming.CharacterEllipsis });
+            var dock = new DockPanel { Children = { rule, words } };
+            DockPanel.SetDock(rule, Dock.Left);
             kpis.Children.Add(new Border
             {
-                Classes = { "card" }, CornerRadius = new CornerRadius(14), Padding = new Thickness(16, 14),
-                Margin = new Thickness(i == 0 ? 0 : 6, 0, i == 3 ? 0 : 6, 0),
-                Child = Ui.Col(4,
-                    new TextBlock { Text = label.ToUpper(I18n.Culture), FontSize = 10.5, FontWeight = FontWeight.SemiBold, LetterSpacing = 1.1, Foreground = Ui.Res("Muted") },
-                    new TextBlock { Text = value, FontFamily = Look.Display, FontSize = 20, FontWeight = FontWeight.Bold, Foreground = color ?? Ui.Res("Text"), TextTrimming = TextTrimming.CharacterEllipsis },
-                    new TextBlock { Text = sub, FontSize = 12, Foreground = Ui.Res("Muted"), TextTrimming = TextTrimming.CharacterEllipsis }),
+                Background = HubLook.Panel, BorderBrush = HubLook.Edge, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(3), Padding = new Thickness(14, 12),
+                Margin = new Thickness(i == 0 ? 0 : 6, 0, i == 3 ? 0 : 6, 0), Child = dock,
             });
         }
         if (meta.LastBuild is { } b)
@@ -94,16 +98,17 @@ public sealed partial class CreatorPage
         Control art = game is not null
             ? Ui.GameImage(game, 200)
             : new Border { Background = Ui.Res("Surface3"), Child = Ui.Icon(Icons.Creator, 24, Ui.Res("Faint")) };
-        var pic = new Border { Width = 64, Height = 64, CornerRadius = new CornerRadius(14), ClipToBounds = true, Child = art, VerticalAlignment = VerticalAlignment.Center };
+        var pic = new Border { Width = 64, Height = 64, CornerRadius = new CornerRadius(3), ClipToBounds = true, Child = art, VerticalAlignment = VerticalAlignment.Center };
         var color = StatusBrush(status);
         var pill = new Border
         {
-            Background = Ui.Res("Surface2"), CornerRadius = new CornerRadius(20), Padding = new Thickness(10, 4),
-            Child = Ui.Row(7, Ui.Dot(color, 8), Ui.Text(I18n.T($"v12.pj.st.{status}"), "small", color: Ui.Res("Text"))),
+            BorderBrush = HubLook.Edge, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(3), Padding = new Thickness(8, 3),
+            Child = Ui.Row(7, Ui.Dot(color, 7), HubLook.MonoText(I18n.T($"v12.pj.st.{status}").ToUpper(I18n.Culture), 10.5, Ui.Res("Text"))),
             VerticalAlignment = VerticalAlignment.Center,
         };
         var title = new TextBlock { Text = p.Name, FontFamily = Look.Display, FontSize = 20, FontWeight = FontWeight.Bold, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
         var words = Ui.Col(6,
+            HubLook.Eyebrow(I18n.T("v12d.ov.project"), HubLook.Violet),
             Ui.Row(12, title, pill),
             Ui.Text(Dotted(version == "" ? "" : "v" + version, game?.Name ?? p.Game, I18n.T("cr.edited", ("when", Since(edited)))), "small muted"),
             Ui.Text(I18n.T($"v12.pj.st.{status}.text"), "small", color: status is "error" or "failed" ? Ui.Res("Bad") : Ui.Res("Muted"), wrap: true));
@@ -112,14 +117,15 @@ public sealed partial class CreatorPage
         grid.Children.Add(pic);
         Grid.SetColumn(words, 1);
         grid.Children.Add(words);
-        return new Border { Classes = { "card" }, CornerRadius = new CornerRadius(16), Padding = new Thickness(18, 16), Child = grid };
+        return HubLook.Frame(grid, new Thickness(18, 16));
     }
 
     static Control Block(string title, string icon, params Control[] body)
     {
-        var col = Ui.Col(12, Ui.Row(8, Ui.Icon(icon, 15, Ui.Res("Brand2")), Ui.Text(title, "h3")));
+        // 12.1: блок пульта — рамка с уголками и подписью «// НАЗВАНИЕ» моноширинным.
+        var col = Ui.Col(12, Ui.Row(8, Ui.Icon(icon, 14, HubLook.Violet), HubLook.Eyebrow(title, Ui.Res("Text"))));
         foreach (var b in body) col.Children.Add(b);
-        return new Border { Classes = { "card" }, CornerRadius = new CornerRadius(16), Padding = new Thickness(18, 16), Child = col };
+        return HubLook.Frame(col, new Thickness(18, 16));
     }
 
     /// <summary>Сборки по версиям (_build/&lt;проект&gt;): последние Projects.KeepBuilds архивов.</summary>
@@ -132,17 +138,17 @@ public sealed partial class CreatorPage
         {
             var file = f;
             var latest = meta.LastBuild?.Zip is { } zip && string.Equals(Path.GetFullPath(zip), file.FullName, StringComparison.OrdinalIgnoreCase);
-            var name = Ui.Text(file.Name, "small");
+            var name = HubLook.MonoText(file.Name, 11.5, Ui.Res("Text"));
             name.TextTrimming = TextTrimming.CharacterEllipsis;
             if (latest) name.FontWeight = FontWeight.SemiBold;
             var right = Ui.Text(Dotted(GamePage.Size(file.Length), Since(file.LastWriteTimeUtc)), "small muted");
             var row = new DockPanel();
             DockPanel.SetDock(right, Dock.Right);
             row.Children.Add(right);
-            var left = Ui.Row(8, Ui.Icon(Icons.Package, 14, latest ? Ui.Res("Brand2") : Ui.Res("Faint")), name);
+            var left = Ui.Row(8, Ui.Icon(Icons.Package, 14, latest ? HubLook.Violet : Ui.Res("Faint")), name);
             if (latest) left.Children.Add(new Border
             {
-                Background = Ui.Res("Surface2"), CornerRadius = new CornerRadius(6), Padding = new Thickness(6, 1),
+                BorderBrush = HubLook.Edge, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(3), Padding = new Thickness(6, 1),
                 Child = Ui.Text(I18n.T("v12.pj.builds.latest"), "small muted"),
             });
             row.Children.Add(left);
@@ -200,8 +206,7 @@ public sealed partial class CreatorPage
             var row = new DockPanel();
             DockPanel.SetDock(when, Dock.Right);
             row.Children.Add(when);
-            var v = Ui.Text("v" + r.Version, "small");
-            v.FontWeight = FontWeight.SemiBold;
+            var v = HubLook.MonoText("v" + r.Version, 11.5, Ui.Res("Text"));
             row.Children.Add(Ui.Row(8, Ui.Icon(Icons.Upload, 14, Ui.Res("Faint")), v, Ui.Text(r.Where == "market" ? I18n.T("v12.pj.market") : "Hub", "small muted")));
             list.Children.Add(row);
         }
@@ -218,7 +223,7 @@ public sealed partial class CreatorPage
         return new Canvas
         {
             Width = width, Height = height, HorizontalAlignment = HorizontalAlignment.Left,
-            Children = { new Avalonia.Controls.Shapes.Polyline { Points = points, Stroke = Ui.Res("Brand2"), StrokeThickness = 2, StrokeJoin = PenLineJoin.Round, StrokeLineCap = PenLineCap.Round } },
+            Children = { new Avalonia.Controls.Shapes.Polyline { Points = points, Stroke = HubLook.Cyan, StrokeThickness = 2, StrokeJoin = PenLineJoin.Round, StrokeLineCap = PenLineCap.Round } },
         };
     }
 

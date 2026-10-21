@@ -13,8 +13,8 @@
     "new.v12.fast.text": "Переходы короче, запуск без лишних пауз. Ctrl+1…9 — своя игра, Ctrl+Enter — играть, Ctrl+H — главная, ← → — игры на главной, боковые кнопки мыши — назад и вперёд.",
     "new.v12.games": "Почти 3000 игр",
     "new.v12.games.text": "Справочник моддируемых игр с Nexus и Thunderstore. ModLaunch сам находит их у вас на ПК: «Добавить игру» — добавить в один клик, поиск по всем, «Установить в Steam».",
-    "new.v12.hub": "Creator Hub удобнее",
-    "new.v12.hub.text": "«Собрать и проверить» (F5) ставит мод и запускает игру, потом показывает строки лога про ваш мод. Обзор проекта, версии сборок, мастер нового проекта с шаблонами и импортом готового мода.",
+    "new.v12.hub": "Новый Creator Hub",
+    "new.v12.hub.text": "Свой вид мастерской: чертёжная сетка, панель инструментов слева, редактор как маленькая IDE. «Собрать и проверить» (F5) ставит мод и запускает игру, потом показывает строки лога про ваш мод. Обзор проекта, версии сборок, мастер нового проекта с шаблонами и импортом.",
     "new.v12.steam": "Все игры Steam",
     "new.v12.steam.text": "Все игры Steam на ПК видны в ModLaunch — и без модов: играть в один клик, добавить моды, где они есть. Поиск по всему магазину Steam."
   },
@@ -32,8 +32,8 @@
     "new.v12.fast.text": "Shorter transitions, no extra pauses on launch. Ctrl+1…9 opens your game, Ctrl+Enter plays, Ctrl+H goes Home, ← → browse games on Home, mouse side buttons go back and forward.",
     "new.v12.games": "Almost 3000 games",
     "new.v12.games.text": "A directory of moddable games from Nexus and Thunderstore. ModLaunch finds them on your PC: Add game adds them in one click, search everything, Install in Steam.",
-    "new.v12.hub": "A better Creator Hub",
-    "new.v12.hub.text": "Build and test (F5) installs your mod and starts the game, then shows the log lines about your mod. Project overview, versioned builds, a new-project wizard with templates and importing an existing mod.",
+    "new.v12.hub": "A new Creator Hub",
+    "new.v12.hub.text": "Its own workshop look: a blueprint grid, a tool rail on the left, the editor as a small IDE. Build and test (F5) installs your mod and starts the game, then shows the log lines about your mod. Project overview, versioned builds, a new-project wizard with templates and import.",
     "new.v12.steam": "All Steam games",
     "new.v12.steam.text": "Every Steam game on your PC shows up in ModLaunch, even without mods: one-click play, add mods where they exist. Search the whole Steam store."
   }

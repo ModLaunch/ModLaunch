@@ -70,11 +70,9 @@ public sealed partial class MarketPage : Page
     {
         if (MarketData.Listings is null && !MarketData.Loading) _ = MarketData.Load();
         _rotate?.Stop();
-        var col = StoreKit.Column(spacing: 22, top: 20);
-        // 9.5: одна шапка и одна навигация на весь Creator Hub (рынок и мастерская) — HubNav.
-        col.Children.Add(HubNav.Header(_tab, Go, () => { MarketData.Reload(); if (_tab == "studio") ReloadStudio(); }));
+        // 9.5: одна шапка и одна навигация на весь Creator Hub (рынок и мастерская) — HubNav; 12.1 — боковая панель и своё пространство.
         var loading = MarketData.Listings is null;
-        col.Children.Add(_tab switch
+        Control body = _tab switch
         {
             "browse" => loading ? Skeleton() : Browse(),
             "workshop" => loading ? Skeleton() : WorkshopView(),
@@ -85,8 +83,8 @@ public sealed partial class MarketPage : Page
             "wallet" => new WalletPanel(),
             "studio" => Studio(),
             _ => loading ? Skeleton() : Front(),
-        });
-        Content = new ScrollViewer { Content = col, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+        };
+        Content = HubNav.Frame(_tab, HubNav.RailOf(_tab, creator: false), I18n.T("v93.mk.tab." + _tab), body, Go, () => { MarketData.Reload(); if (_tab == "studio") ReloadStudio(); });
     }
 
     static Control Skeleton()
