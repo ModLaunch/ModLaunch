@@ -119,6 +119,9 @@ public abstract class Lang
 
     protected abstract string StringLit(string text);
 
+    /// <summary>Ключевые слова языка: переменная, функция или параметр с таким именем не соберётся (base в C#, end в Lua).</summary>
+    public abstract IReadOnlySet<string> Reserved { get; }
+
     /// <summary>Значение общей переменной на этом языке.</summary>
     public virtual string Literal(JsonNode? v) => v switch
     {
@@ -135,6 +138,11 @@ public abstract class Lang
     public sealed class Python : Lang
     {
         public override string Id => "python";
+        // print и exec — ключевые слова Python 2, на нём Ren'Py 7.
+        public override IReadOnlySet<string> Reserved => Words;
+        static readonly HashSet<string> Words = new(["False", "None", "True", "and", "as", "assert", "async", "await", "break",
+            "class", "continue", "def", "del", "elif", "else", "except", "exec", "finally", "for", "from", "global", "if", "import", "in", "is", "lambda",
+            "nonlocal", "not", "or", "pass", "print", "raise", "return", "try", "while", "with", "yield"]);
         protected override string True => "True";
         protected override string False => "False";
         protected override string Null => "None";
@@ -152,6 +160,12 @@ public abstract class Lang
     public sealed class JavaScript : Lang
     {
         public override string Id => "javascript";
+        // Плагин RPG Maker идёт в "use strict": там запрещены ещё и arguments, eval, let, static, interface…
+        public override IReadOnlySet<string> Reserved => Words;
+        static readonly HashSet<string> Words = new(["arguments", "await", "break", "case", "catch", "class", "const",
+            "continue", "debugger", "default", "delete", "do", "else", "enum", "eval", "export", "extends", "false", "finally", "for", "function", "if",
+            "implements", "import", "in", "instanceof", "interface", "let", "new", "null", "package", "private", "protected", "public", "return", "static",
+            "super", "switch", "this", "throw", "true", "try", "typeof", "var", "void", "while", "with", "yield"]);
         protected override string And => "&&";
         protected override string Or => "||";
         protected override string Not => "!";
@@ -169,6 +183,9 @@ public abstract class Lang
     public sealed class Lua : Lang
     {
         public override string Id => "lua";
+        public override IReadOnlySet<string> Reserved => Words;
+        static readonly HashSet<string> Words = new(["and", "break", "do", "else", "elseif", "end", "false", "for",
+            "function", "goto", "if", "in", "local", "nil", "not", "or", "repeat", "return", "then", "true", "until", "while"]);
         protected override string Null => "nil";
         protected override string NotEq => "~=";
 
@@ -190,6 +207,13 @@ public abstract class Lang
     public sealed class CSharp : Lang
     {
         public override string Id => "csharp";
+        public override IReadOnlySet<string> Reserved => Words;
+        static readonly HashSet<string> Words = new(["abstract", "as", "base", "bool", "break", "byte", "case", "catch",
+            "char", "checked", "class", "const", "continue", "decimal", "default", "delegate", "do", "double", "else", "enum", "event", "explicit", "extern",
+            "false", "finally", "fixed", "float", "for", "foreach", "goto", "if", "implicit", "in", "int", "interface", "internal", "is", "lock", "long",
+            "namespace", "new", "null", "object", "operator", "out", "override", "params", "private", "protected", "public", "readonly", "ref", "return",
+            "sbyte", "sealed", "short", "sizeof", "stackalloc", "static", "string", "struct", "switch", "this", "throw", "true", "try", "typeof", "uint",
+            "ulong", "unchecked", "unsafe", "ushort", "using", "virtual", "void", "volatile", "while"]);
         protected override string And => "&&";
         protected override string Or => "||";
         protected override string Not => "!";
@@ -225,6 +249,11 @@ public abstract class Lang
     public sealed class GdScript : Lang
     {
         public override string Id => "gdscript";
+        public override IReadOnlySet<string> Reserved => Words;
+        static readonly HashSet<string> Words = new(["and", "as", "assert", "await", "break", "breakpoint", "class",
+            "class_name", "const", "continue", "elif", "else", "enum", "extends", "false", "for", "func", "if", "in", "is", "match", "namespace", "not",
+            "null", "or", "pass", "preload", "return", "self", "signal", "static", "super", "trait", "true", "var", "void", "while", "yield",
+            "PI", "TAU", "INF", "NAN"]);
 
         protected override string StringLit(string text)
         {

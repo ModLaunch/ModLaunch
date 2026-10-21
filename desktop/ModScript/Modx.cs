@@ -160,7 +160,7 @@ public sealed partial class ModxDoc
     static List<Stmt> ParseHook(string[] body, int firstLine, List<Diag> diags)
     {
         var list = new List<Stmt>();
-        // Что открыто: if, while или for — break и continue можно только внутри цикла.
+        // Что открыто: if, else (у if уже был else) или loop — break и continue можно только внутри цикла.
         var open = new Stack<string>();
         var name = @"[\p{L}_][\p{L}\w.\[\]]*";
         for (var k = 0; k < body.Length; k++)
@@ -172,15 +172,19 @@ public sealed partial class ModxDoc
             {
                 var after = s[1..].Trim();
                 Match em;
+                // Второй else или else if после else дают неверный код в каждом движке.
                 if (Regex.IsMatch(after, @"^else\s*\{$"))
                 {
-                    if (open.Count == 0 || open.Peek() != "if") diags.Add(new Diag(no, "else without if"));
+                    if (open.Count > 0 && open.Peek() == "else") diags.Add(new Diag(no, "else after else"));
+                    else if (open.Count == 0 || open.Peek() != "if") diags.Add(new Diag(no, "else without if"));
+                    else { open.Pop(); open.Push("else"); }
                     list.Add(new Stmt("else", "", "", no));
                     continue;
                 }
                 if ((em = Regex.Match(after, @"^else\s+if\s+(.+?)\s*\{$")).Success)
                 {
-                    if (open.Count == 0 || open.Peek() != "if") diags.Add(new Diag(no, "else if without if"));
+                    if (open.Count > 0 && open.Peek() == "else") diags.Add(new Diag(no, "else if after else"));
+                    else if (open.Count == 0 || open.Peek() != "if") diags.Add(new Diag(no, "else if without if"));
                     list.Add(new Stmt("elseif", "", em.Groups[1].Value, no));
                     continue;
                 }

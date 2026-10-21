@@ -4,12 +4,12 @@ version 2.0.0
 author "ModLaunch"
 about "Every wave pays more gold; a lucky streak doubles it"
 
-let base = 50
+let base_pay = 50
 let waves = [1, 2, 3]
 
 # Own function: called from hooks and from other functions.
 fn reward(wave) {
-    let pay = base * wave
+    let pay = base_pay * wave
     if wave >= 3 {
         pay += 25
     } else if wave == 2 {

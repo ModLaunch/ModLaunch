@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json.Nodes;
 using ModLaunch.Creator;
@@ -20,8 +22,17 @@ public sealed class Sandbox
 
     enum Flow { Normal, Break, Continue, Return }
 
-    sealed class StepLimit() : Exception("too many steps: an endless loop?");
+    sealed class StepLimit(string message = "too many steps: an endless loop?") : Exception(message);
     sealed class RunError(string message) : Exception(message);
+
+    /// <summary>Вложенность скобок, not, минусов и блоков: глубже — ошибка мода, а не переполнение стека (оно убивает весь процесс).</summary>
+    const int MaxNest = 200;
+    /// <summary>Самая длинная строка или список: склейка s = s + s иначе за 30 шагов съедает всю память.</summary>
+    const int MaxSize = 1_000_000;
+    /// <summary>Сколько знаков показывает текст списка или словаря; строк вывода и знаков в строке вывода.</summary>
+    const int MaxShow = 100_000, MaxLines = 1000, MaxLine = 2000;
+    /// <summary>Запасной предел по времени: песочница идёт в потоке интерфейса, мод не должен его вешать.</summary>
+    static readonly TimeSpan MaxTime = TimeSpan.FromSeconds(3);
 
     readonly ModxDoc _doc;
     readonly Dictionary<string, object?> _globals = new(StringComparer.Ordinal);
@@ -31,7 +42,8 @@ public sealed class Sandbox
     readonly HashSet<string> _guessed = [];
     readonly Random _random;
     readonly int _maxSteps;
-    int _steps, _depth, _line;
+    readonly Stopwatch _clock = Stopwatch.StartNew();
+    int _steps, _depth, _nest, _line;
     string _where = "";
 
     Sandbox(ModxDoc doc, int maxSteps, int seed)
@@ -64,6 +76,8 @@ public sealed class Sandbox
         }
         catch (StepLimit e) { s._errors.Add(new Diag(s._line, e.Message)); }
         catch (RunError e) { s._errors.Add(new Diag(s._line, e.Message)); }
+        // Запасной выход: любая другая ошибка .NET — тоже ошибка мода, а не падение ModLaunch на запуске игры.
+        catch (Exception e) { s._errors.Add(new Diag(s._line, "sandbox error: " + e.Message)); }
         return new Result(s._out, s._globals, s._errors, s._steps);
     }
 
@@ -81,8 +95,9 @@ public sealed class Sandbox
             var eq = line.IndexOf('=');
             if (eq <= 0) { errors?.Add(new Diag(no, "use name = value")); continue; }
             var name = line[..eq].Trim();
+            empty._nest = 0;
             try { vars[name] = empty.Eval(line[(eq + 1)..].Trim(), new()); }
-            catch (Exception e) when (e is RunError or StepLimit) { errors?.Add(new Diag(no, e.Message)); }
+            catch (Exception e) { errors?.Add(new Diag(no, e.Message)); }
         }
         return vars;
     }
@@ -141,16 +156,17 @@ public sealed class Sandbox
     {
         foreach (var n in nodes)
         {
-            if (++_steps > _maxSteps) throw new StepLimit();
+            Step();
             _line = n.S.Line;
             var s = n.S;
             switch (s.Kind)
             {
                 case "let": locals[s.Target] = Eval(s.Expr, locals); break;
                 case "set": Assign(s.Target, Eval(s.Expr, locals), locals); break;
-                case "add": Assign(s.Target, Add(Get(s.Target, locals), Eval(s.Expr, locals)), locals); break;
-                case "say": _out.Add($"[{_where}] 💬 {Text(Eval(s.Expr, locals))}"); break;
-                case "log": _out.Add($"[{_where}] {Text(Eval(s.Expr, locals))}"); break;
+                // items[0] += 1: текущее значение — выражением, как в Assign (Get не знает скобок).
+                case "add": Assign(s.Target, Add(Eval(s.Target, locals), Eval(s.Expr, locals)), locals); break;
+                case "say": Print($"[{_where}] 💬 {Text(Eval(s.Expr, locals))}"); break;
+                case "log": Print($"[{_where}] {Text(Eval(s.Expr, locals))}"); break;
                 case "call": Eval(s.Expr, locals); break;
                 case "return":
                     _returned = s.Expr == "" ? null : Eval(s.Expr, locals);
@@ -163,14 +179,14 @@ public sealed class Sandbox
                     if (run is null)
                         foreach (var (cond, body) in n.Branches)
                             if (cond == "" || Truthy(Eval(cond, locals))) { run = body; break; }
-                    if (run is not null && Exec(run, locals) is var f && f != Flow.Normal) return f;
+                    if (run is not null && Block(run, locals) is var f && f != Flow.Normal) return f;
                     break;
                 }
                 case "while":
                     while (Truthy(Eval(s.Expr, locals)))
                     {
-                        if (++_steps > _maxSteps) throw new StepLimit();
-                        var f = Exec(n.Body, locals);
+                        Step();
+                        var f = Block(n.Body, locals);
                         if (f == Flow.Break) break;
                         if (f == Flow.Return) return f;
                     }
@@ -185,10 +201,13 @@ public sealed class Sandbox
                         null => [],
                         var other => throw new RunError($"for … in needs a list, got {TypeName(other)}"),
                     };
+                    Cost(items.Count);
                     foreach (var item in items)
                     {
+                        // Шаг на каждый проход, как у while: иначе пустой for в for — 10^10 проходов за 100 тысяч шагов.
+                        Step();
                         locals[s.Target] = item;
-                        var f = Exec(n.Body, locals);
+                        var f = Block(n.Body, locals);
                         if (f == Flow.Break) break;
                         if (f == Flow.Return) return f;
                     }
@@ -197,6 +216,43 @@ public sealed class Sandbox
             }
         }
         return Flow.Normal;
+    }
+
+    /// <summary>Тело if, while или for: ещё один уровень вложенности.</summary>
+    Flow Block(List<Node> body, Dictionary<string, object?> locals)
+    {
+        Enter();
+        var f = Exec(body, locals);
+        _nest--;
+        return f;
+    }
+
+    /// <summary>Глубже на уровень (скобка, not, минус, блок, аргументы). Предел и край стека — RunError, а не StackOverflow.</summary>
+    void Enter()
+    {
+        if (++_nest > MaxNest || !RuntimeHelpers.TryEnsureSufficientExecutionStack())
+            throw new RunError($"nested too deep: over {MaxNest} brackets, blocks or calls inside each other");
+    }
+
+    void Step(int n = 1)
+    {
+        _steps += n;
+        if (_steps > _maxSteps) throw new StepLimit();
+        if (_clock.Elapsed > MaxTime) throw new StepLimit("runs too long: an endless loop?");
+    }
+
+    /// <summary>Работа, которая растёт с длиной (склейка, range, contains, копия списка): шаг за каждую тысячу.</summary>
+    void Cost(long size)
+    {
+        if (size >= 1000) Step((int)Math.Min(size / 1000, _maxSteps + 1L));
+    }
+
+    /// <summary>Строка вывода: не больше MaxLines строк по MaxLine знаков — say в цикле не съест память.</summary>
+    void Print(string line)
+    {
+        Cost(line.Length);
+        if (_out.Count > MaxLines) return;
+        _out.Add(_out.Count == MaxLines ? "… (output is cut)" : line.Length > MaxLine ? line[..MaxLine] + "…" : line);
     }
 
     void Assign(string target, object? value, Dictionary<string, object?> locals)
@@ -225,6 +281,7 @@ public sealed class Sandbox
         if (_globals.TryGetValue(name, out v)) return v;
         // player.gold: свойство словаря player.
         var dot = name.LastIndexOf('.');
+        if (dot > 0 && !RuntimeHelpers.TryEnsureSufficientExecutionStack()) throw new RunError($"name is too long: {name[..Math.Min(name.Length, 40)]}…");
         if (dot > 0 && Get(name[..dot], locals) is Dictionary<string, object?> obj && obj.TryGetValue(name[(dot + 1)..], out v)) return v;
         // Переменная игры, которую не задали: считаем нулём и предупреждаем один раз.
         if (_guessed.Add(name)) _errors.Add(new Diag(_line, $"'{name}' is not set: using 0 (add it to the game variables)", true));
@@ -234,18 +291,23 @@ public sealed class Sandbox
 
     // ---------------------------------------------------------------- выражения
 
-    object? Eval(string src, Dictionary<string, object?> locals)
+    object? Eval(string src, Dictionary<string, object?> locals, bool skip = false)
     {
-        var p = new Parser(src, this, locals);
+        var p = new Parser(src, this, locals, skip);
         var v = p.Expr();
         p.End();
         return v;
     }
 
-    /// <summary>Разбор и вычисление выражения за один проход (приоритеты: or, and, not, сравнения, +, *, унарные).</summary>
-    sealed class Parser(string src, Sandbox box, Dictionary<string, object?> locals)
+    /// <summary>
+    /// Разбор и вычисление выражения за один проход (приоритеты: or, and, not, сравнения, +, *, унарные).
+    /// skip — только разобрать, ничего не вычисляя: правая часть and/or, когда левая уже всё решила (как во всех движках).
+    /// </summary>
+    sealed class Parser(string src, Sandbox box, Dictionary<string, object?> locals, bool skip = false)
     {
         int _i;
+        int _skip = skip ? 1 : 0;
+        bool Off => _skip > 0;
 
         void Ws() { while (_i < src.Length && char.IsWhiteSpace(src[_i])) _i++; }
         bool Peek(string s) { Ws(); return string.CompareOrdinal(src, _i, s, 0, s.Length) == 0; }
@@ -267,18 +329,33 @@ public sealed class Sandbox
         object? Or()
         {
             var a = And();
-            while (Word("or")) { var b = And(); a = Truthy(a) || Truthy(b); }
+            while (Word("or"))
+            {
+                if (Truthy(a)) { _skip++; And(); _skip--; a = true; }
+                else a = Truthy(And());
+            }
             return a;
         }
 
         object? And()
         {
             var a = Not();
-            while (Word("and")) { var b = Not(); a = Truthy(a) && Truthy(b); }
+            while (Word("and"))
+            {
+                if (!Truthy(a)) { _skip++; Not(); _skip--; a = false; }
+                else a = Truthy(Not());
+            }
             return a;
         }
 
-        object? Not() => Word("not") ? !Truthy(Not()) : Compare();
+        object? Not()
+        {
+            if (!Word("not")) return Compare();
+            box.Enter();
+            var v = !Truthy(Not());
+            box._nest--;
+            return v;
+        }
 
         object? Compare()
         {
@@ -301,7 +378,7 @@ public sealed class Sandbox
             while (true)
             {
                 if (Peek("+=") || Peek("-=")) return a;
-                if (Take("+")) a = Add(a, Product());
+                if (Take("+")) a = box.Add(a, Product());
                 else if (Take("-")) a = Num(a) - Num(Product());
                 else return a;
             }
@@ -316,13 +393,13 @@ public sealed class Sandbox
                 else if (Take("/"))
                 {
                     var b = Num(Unary());
-                    if (b == 0) throw new RunError("division by zero");
+                    if (b == 0 && !Off) throw new RunError("division by zero");
                     a = Num(a) / b;
                 }
                 else if (Take("%"))
                 {
                     var b = Num(Unary());
-                    if (b == 0) throw new RunError("division by zero");
+                    if (b == 0 && !Off) throw new RunError("division by zero");
                     a = Num(a) % b;
                 }
                 else return a;
@@ -331,9 +408,12 @@ public sealed class Sandbox
 
         object? Unary()
         {
-            if (Take("-")) return -Num(Unary());
-            if (Take("+")) return Num(Unary());
-            return Postfix(Primary());
+            var minus = Take("-");
+            if (!minus && !Take("+")) return Postfix(Primary());
+            box.Enter();
+            var v = Num(Unary());
+            box._nest--;
+            return minus ? -v : v;
         }
 
         object? Postfix(object? v)
@@ -341,8 +421,11 @@ public sealed class Sandbox
             while (Peek("["))
             {
                 _i++;
+                box.Enter();
                 var key = Expr();
+                box._nest--;
                 Need("]");
+                if (Off) { v = null; continue; }
                 v = v switch
                 {
                     List<object?> l when key is double d => (int)d >= 0 && (int)d < l.Count ? l[(int)d] : throw new RunError($"index {Text(key)} is outside the list ({l.Count} items)"),
@@ -359,24 +442,38 @@ public sealed class Sandbox
             Ws();
             if (_i >= src.Length) throw new RunError("missing value in: " + src);
             var c = src[_i];
-            if (c == '(') { _i++; var v = Expr(); Need(")"); return v; }
+            if (c == '(')
+            {
+                _i++;
+                box.Enter();
+                var v = Expr();
+                box._nest--;
+                Need(")");
+                return v;
+            }
             if (c == '[')
             {
                 _i++;
                 var list = new List<object?>();
+                box.Enter();
                 if (!Take("]"))
                 {
                     do list.Add(Expr()); while (Take(","));
                     Need("]");
                 }
-                return list;
+                box._nest--;
+                return Off ? null : list;
             }
             if (c == '"') return StringLit();
             if (char.IsDigit(c) || (c == '.' && _i + 1 < src.Length && char.IsDigit(src[_i + 1])))
             {
+                // Не больше одной точки: «1.2.3» — ошибка в выражении, а не FormatException из double.Parse.
                 var start = _i;
-                while (_i < src.Length && (char.IsDigit(src[_i]) || src[_i] == '.' && _i + 1 < src.Length && char.IsDigit(src[_i + 1]))) _i++;
-                return double.Parse(src[start.._i], CultureInfo.InvariantCulture);
+                var dot = false;
+                while (_i < src.Length && (char.IsDigit(src[_i]) || src[_i] == '.' && !dot && _i + 1 < src.Length && char.IsDigit(src[_i + 1])))
+                    if (src[_i++] == '.') dot = true;
+                return double.TryParse(src.AsSpan(start, _i - start), NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var num)
+                    ? num : throw new RunError($"bad number '{src[start.._i]}'");
             }
             if (char.IsLetter(c) || c == '_')
             {
@@ -394,25 +491,28 @@ public sealed class Sandbox
                 {
                     _i++;
                     var args = new List<object?>();
+                    box.Enter();
                     if (!Take(")"))
                     {
                         do args.Add(Expr()); while (Take(","));
                         Need(")");
                     }
-                    return box.Call(name, args);
+                    box._nest--;
+                    return Off ? null : box.Call(name, args);
                 }
-                return box.Get(name, locals);
+                return Off ? null : box.Get(name, locals);
             }
             throw new RunError($"unexpected '{c}' in: {src}");
         }
 
         /// <summary>"текст {выражение}" — подстановка, {{ и }} — сами скобки.</summary>
-        string StringLit()
+        string? StringLit()
         {
             _i++;
             var sb = new StringBuilder();
             while (_i < src.Length && src[_i] != '"')
             {
+                if (sb.Length > MaxSize) throw new RunError($"text is too long: more than {MaxSize} characters");
                 var c = src[_i];
                 if (c == '\\' && _i + 1 < src.Length)
                 {
@@ -426,7 +526,10 @@ public sealed class Sandbox
                 {
                     var close = src.IndexOf('}', _i + 1);
                     if (close < 0) throw new RunError("'{' without '}' in a string");
-                    sb.Append(Text(box.Eval(src[(_i + 1)..close], locals)));
+                    box.Enter();
+                    var part = box.Eval(src[(_i + 1)..close], locals, Off);
+                    box._nest--;
+                    if (!Off) sb.Append(Text(part));
                     _i = close + 1;
                     continue;
                 }
@@ -435,6 +538,8 @@ public sealed class Sandbox
             }
             if (_i >= src.Length) throw new RunError("string is not closed with \"");
             _i++;
+            if (Off) return null;
+            box.Cost(sb.Length);
             return sb.ToString();
         }
     }
@@ -443,11 +548,11 @@ public sealed class Sandbox
 
     object? Call(string name, List<object?> a)
     {
-        if (++_steps > _maxSteps) throw new StepLimit();
+        Step();
         if (_fns.TryGetValue(name, out var fn))
         {
             if (a.Count > fn.Params.Count) throw new RunError($"{name}() takes {fn.Params.Count} arguments, got {a.Count}");
-            if (++_depth > 200) throw new RunError($"{name}() calls itself too deep");
+            if (++_depth > 200 || !RuntimeHelpers.TryEnsureSufficientExecutionStack()) throw new RunError($"{name}() calls itself too deep");
             var locals = new Dictionary<string, object?>(StringComparer.Ordinal);
             for (var i = 0; i < fn.Params.Count; i++) locals[fn.Params[i]] = i < a.Count ? a[i] : null;
             var line = _line;
@@ -462,10 +567,16 @@ public sealed class Sandbox
         switch (name)
         {
             case "len": return A(0) switch { string s => (double)s.Length, List<object?> l => l.Count, Dictionary<string, object?> d => d.Count, null => 0d, var o => throw new RunError($"len() of {TypeName(o)}") };
-            case "str": return Text(A(0));
+            case "str": { var t = Text(A(0)); Cost(t.Length); return t; }
             case "int": return Math.Truncate(Num(A(0) is string s1 && double.TryParse(s1, NumberStyles.Float, CultureInfo.InvariantCulture, out var p1) ? p1 : A(0)));
             case "num": return A(0) is string s2 ? double.TryParse(s2, NumberStyles.Float, CultureInfo.InvariantCulture, out var p2) ? p2 : throw new RunError($"num(\"{s2}\"): not a number") : Num(A(0));
-            case "rand": return (double)_random.NextInt64((long)Num(A(0)), (long)Num(A(1)) + 1);
+            case "rand":
+            {
+                // Как randint и math.random: a ≤ b, иначе ошибка мода, а не ArgumentOutOfRangeException.
+                double lo = Num(A(0)), hi = Num(A(1));
+                if (!(lo <= hi)) throw new RunError($"rand({Text(lo)}, {Text(hi)}): the first number must not be bigger than the second");
+                return (double)_random.NextInt64((long)Math.Clamp(lo, -1e15, 1e15), (long)Math.Clamp(hi, -1e15, 1e15) + 1);
+            }
             case "chance": return _random.NextDouble() * 100 < Num(A(0));
             case "min": return Math.Min(Num(A(0)), Num(A(1)));
             case "max": return Math.Max(Num(A(0)), Num(A(1)));
@@ -476,16 +587,21 @@ public sealed class Sandbox
             {
                 double from = a.Count > 1 ? Num(A(0)) : 0, to = a.Count > 1 ? Num(A(1)) : Num(A(0));
                 if (to - from > 100_000) throw new RunError("range() is too long");
+                // Считаем проходы, а не i++: у 1e16 шаг +1 теряется, и цикл не кончился бы.
+                var count = Math.Ceiling(to - from);
                 var list = new List<object?>();
-                for (var i = from; i < to; i++) list.Add(i);
+                for (var k = 0; k < count; k++) list.Add(from + k);
+                Cost(list.Count);
                 return list;
             }
-            case "contains": return A(0) switch { string s => s.Contains(Text(A(1)), StringComparison.Ordinal), List<object?> l => l.Any(x => Same(x, A(1))), Dictionary<string, object?> d => d.ContainsKey(Text(A(1))), _ => false };
-            case "upper": return Text(A(0)).ToUpperInvariant();
-            case "lower": return Text(A(0)).ToLowerInvariant();
+            case "contains":
+                Cost(A(0) switch { string s => s.Length, List<object?> l => l.Count, _ => 0 });
+                return A(0) switch { string s => s.Contains(Text(A(1)), StringComparison.Ordinal), List<object?> l => l.Any(x => Same(x, A(1))), Dictionary<string, object?> d => d.ContainsKey(Text(A(1))), _ => false };
+            case "upper": { var t = Text(A(0)); Cost(t.Length); return t.ToUpperInvariant(); }
+            case "lower": { var t = Text(A(0)); Cost(t.Length); return t.ToLowerInvariant(); }
         }
         // Функция игры (renpy.notify, player.heal…): в песочнице её нет — отмечаем и идём дальше.
-        _out.Add($"[{_where}] → {name}({string.Join(", ", a.Select(Show))})  (game function)");
+        Print($"[{_where}] → {name}({string.Join(", ", a.Select(Show))})  (game function)");
         return null;
     }
 
@@ -523,14 +639,22 @@ public sealed class Sandbox
         _ => throw new RunError($"expected a number, got {TypeName(v)} {Show(v)}"),
     };
 
-    static object? Add(object? a, object? b) => a switch
+    /// <summary>+ : числа складываются, строки и списки склеиваются — не длиннее MaxSize и с ценой по длине.</summary>
+    object? Add(object? a, object? b)
     {
-        string or null when b is string => Text(a) + Text(b),
-        string => Text(a) + Text(b),
-        List<object?> l when b is List<object?> m => l.Concat(m).ToList(),
-        _ when b is string => Text(a) + Text(b),
-        _ => Num(a) + Num(b),
-    };
+        object r = a switch
+        {
+            string or null when b is string => Text(a) + Text(b),
+            string => Text(a) + Text(b),
+            List<object?> l when b is List<object?> m => l.Concat(m).ToList(),
+            _ when b is string => Text(a) + Text(b),
+            _ => Num(a) + Num(b),
+        };
+        var size = r switch { string s => s.Length, List<object?> l => l.Count, _ => 0 };
+        if (size > MaxSize) throw new RunError(r is string ? $"text is too long: more than {MaxSize} characters" : $"list is too long: more than {MaxSize} items");
+        Cost(size);
+        return r;
+    }
 
     static bool Same(object? a, object? b) => (a, b) switch
     {
@@ -553,10 +677,48 @@ public sealed class Sandbox
         double d when d == Math.Floor(d) && Math.Abs(d) < 1e15 => ((long)d).ToString(CultureInfo.InvariantCulture),
         double d => d.ToString("0.######", CultureInfo.InvariantCulture),
         string s => s,
-        List<object?> l => "[" + string.Join(", ", l.Select(Show)) + "]",
-        Dictionary<string, object?> m => "{" + string.Join(", ", m.Select(kv => $"\"{kv.Key}\": {Show(kv.Value)}")) + "}",
+        List<object?> or Dictionary<string, object?> => Nested(v),
         _ => v.ToString() ?? "",
     };
+
+    /// <summary>
+    /// Список или словарь текстом. items[0] = items кладёт список в сам себя, а l = [l] в цикле строит
+    /// огромную глубину: повтор и глубже MaxNest — […], длиннее MaxShow знаков — «…», а не переполнение стека.
+    /// </summary>
+    static string Nested(object v)
+    {
+        var sb = new StringBuilder();
+        var open = new HashSet<object>(ReferenceEqualityComparer.Instance);
+        void Put(object? x)
+        {
+            if (sb.Length > MaxShow) return;
+            if (x is not (List<object?> or Dictionary<string, object?>)) { sb.Append(Show(x)); return; }
+            if (open.Count >= MaxNest || !open.Add(x)) { sb.Append(x is List<object?> ? "[…]" : "{…}"); return; }
+            if (x is List<object?> l)
+            {
+                sb.Append('[');
+                for (var i = 0; i < l.Count && sb.Length <= MaxShow; i++) { if (i > 0) sb.Append(", "); Put(l[i]); }
+                sb.Append(']');
+            }
+            else
+            {
+                sb.Append('{');
+                var first = true;
+                foreach (var (key, value) in (Dictionary<string, object?>)x)
+                {
+                    if (sb.Length > MaxShow) break;
+                    if (!first) sb.Append(", ");
+                    first = false;
+                    sb.Append('"').Append(key).Append("\": ");
+                    Put(value);
+                }
+                sb.Append('}');
+            }
+            open.Remove(x);
+        }
+        Put(v);
+        return sb.Length > MaxShow ? sb.ToString(0, MaxShow) + "…" : sb.ToString();
+    }
 
     /// <summary>Значение для вывода: строки — в кавычках.</summary>
     public static string Show(object? v) => v is string s ? "\"" + s + "\"" : Text(v);
