@@ -59,7 +59,7 @@ public sealed class AddGamePage : Page
         if (!_refreshStarted && !Program.Screenshot)
         {
             _refreshStarted = true;
-            _ = Task.Run(GameDirectory.RefreshAsync);
+            _ = Task.Run(() => GameDirectory.RefreshAsync());
         }
     }
 
