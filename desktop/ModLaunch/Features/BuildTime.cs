@@ -22,6 +22,13 @@ public static class BuildTime
     static readonly JsonFile File = new(Path.Combine(Paths.DataDir, "buildtime.json"), () => new JsonObject { ["builds"] = new JsonObject() });
     static readonly Dictionary<string, (string Key, DateTime Since)> Running = [];
     static readonly Dictionary<string, (string Key, string Name, int Mods)> Pending = [];
+    /// <summary>
+    /// Сборки трогают окно (запуск, список), поток выхода игры, облако (Adopt, Snapshot) и запись на диск —
+    /// всё под одним замком, иначе запись падает с «Collection was modified».
+    /// </summary>
+    static readonly object Lock = new();
+    /// <summary>Сколько сборок уходит в облако с одного ПК (по часам): документ облака не должен расти без конца.</summary>
+    const int CloudMax = 200;
 
     /// <summary>Пороги часов для достижений сборки.</summary>
     public static readonly int[] Milestones = [1, 10, 50, 100, 500];
@@ -52,17 +59,20 @@ public static class BuildTime
     {
         (string Key, string Name, int Mods) b;
         lock (Pending) b = Pending.Remove(g.Def.Id, out var p) ? p : Current(g, vanilla);
-        var o = Builds[b.Key] as JsonObject;
-        if (o is null)
+        lock (Lock)
         {
-            o = new JsonObject { ["game"] = g.Def.Id, ["totalMs"] = 0, ["sessions"] = 0, ["longestMs"] = 0, ["first"] = DateTime.UtcNow.ToString("o") };
-            Builds[b.Key] = o;
+            var o = Builds[b.Key] as JsonObject;
+            if (o is null)
+            {
+                o = new JsonObject { ["game"] = g.Def.Id, ["totalMs"] = 0, ["sessions"] = 0, ["longestMs"] = 0, ["first"] = DateTime.UtcNow.ToString("o") };
+                Builds[b.Key] = o;
+            }
+            o["name"] = b.Name;
+            o["mods"] = b.Mods;
+            o["last"] = DateTime.UtcNow.ToString("o");
+            lock (Running) Running[g.Def.Id] = (b.Key, DateTime.UtcNow);
+            File.Save();
         }
-        o["name"] = b.Name;
-        o["mods"] = b.Mods;
-        o["last"] = DateTime.UtcNow.ToString("o");
-        lock (Running) Running[g.Def.Id] = (b.Key, DateTime.UtcNow);
-        File.Save();
     }
 
     /// <summary>Игра закрылась: те же правила, что у общего времени (меньше 15 секунд не считается).</summary>
@@ -71,11 +81,17 @@ public static class BuildTime
         (string Key, DateTime Since) r;
         lock (Running) if (!Running.Remove(gameId, out r)) return;
         var ms = (long)(DateTime.UtcNow - r.Since).TotalMilliseconds;
-        if (ms < 15_000 || ms > 86_400_000 || Builds[r.Key] is not JsonObject o) return;
-        o["totalMs"] = o.Long("totalMs") + ms;
-        o["sessions"] = o.Long("sessions") + 1;
-        o["longestMs"] = Math.Max(o.Long("longestMs"), ms);
-        File.Save();
+        if (ms < 15_000 || ms > 86_400_000) return;
+        lock (Lock)
+        {
+            if (Builds[r.Key] is not JsonObject o) return;
+            o["totalMs"] = o.Long("totalMs") + ms;
+            o["sessions"] = o.Long("sessions") + 1;
+            o["longestMs"] = Math.Max(o.Long("longestMs"), ms);
+            // Сыграно здесь — теперь это и часы этого ПК (уходят в облако).
+            o.Remove("adopted");
+            File.Save();
+        }
         Changed?.Invoke();
     }
 
@@ -89,12 +105,13 @@ public static class BuildTime
         var list = new List<BuildPlay>();
         HashSet<string> running;
         lock (Running) running = Running.Values.Select(v => v.Key).ToHashSet();
-        foreach (var (key, node) in Builds)
-        {
-            if (node is not JsonObject o) continue;
-            list.Add(new BuildPlay(key, o.Str("game") ?? "", o.Str("name") ?? key, (int)o.Long("mods"), o.Long("totalMs"), (int)o.Long("sessions"),
-                Date(o, "first"), Date(o, "last"), o.Long("longestMs"), running.Contains(key)));
-        }
+        lock (Lock)
+            foreach (var (key, node) in Builds)
+            {
+                if (node is not JsonObject o) continue;
+                list.Add(new BuildPlay(key, o.Str("game") ?? "", o.Str("name") ?? key, (int)o.Long("mods"), o.Long("totalMs"), (int)o.Long("sessions"),
+                    Date(o, "first"), Date(o, "last"), o.Long("longestMs"), running.Contains(key)));
+            }
         try
         {
             if (Minecraft.Mc.Def is { } mc)
@@ -119,17 +136,42 @@ public static class BuildTime
         return (done, done < Milestones.Length ? Milestones[done] : Milestones[^1]);
     }
 
-    /// <summary>Для облачного профиля: часы по сборкам этого ПК.</summary>
-    public static JsonObject Snapshot() => (JsonObject)Builds.DeepClone();
+    /// <summary>
+    /// Для облачного профиля: часы по сборкам этого ПК — без взятых с других ПК (они и так в облаке) и без пустых
+    /// заготовок; не больше CloudMax сборок, самые долгие.
+    /// </summary>
+    public static JsonObject Snapshot()
+    {
+        var result = new JsonObject();
+        lock (Lock)
+            foreach (var (key, node) in Builds.Where(b => b.Value.Long("totalMs") > 0 && !b.Value.Bool("adopted")).OrderByDescending(b => b.Value.Long("totalMs")).Take(CloudMax))
+                result[key] = node!.DeepClone();
+        return result;
+    }
 
-    /// <summary>Сборки из облака, которых здесь нет (своё не перезаписывается).</summary>
+    /// <summary>
+    /// Сборки из облака, которых здесь нет или где здесь пока ноль (запуск с вылетом за 15 секунд); своё не перезаписывается.
+    /// Сборки Minecraft не берём: их часы на этом ПК — в самой сборке (PlayMs, и до 11.0), а id по имени
+    /// («fabric-1-21-1») совпадает и у разных сборок на разных ПК.
+    /// </summary>
     public static void Adopt(JsonObject builds)
     {
         var added = false;
-        foreach (var (key, node) in builds)
-            if (node is JsonObject o && Builds[key] is null && o.Long("totalMs") > 0) { Builds[key] = o.DeepClone(); added = true; }
-        if (!added) return;
-        File.Save();
+        lock (Lock)
+        {
+            foreach (var (key, node) in builds)
+            {
+                if (node is not JsonObject o || o.Long("totalMs") <= 0 || key.Contains("|mc:")) continue;
+                if (Builds[key] is JsonObject mine && mine.Long("totalMs") > 0) continue;
+                var copy = (JsonObject)o.DeepClone();
+                // С другого ПК: в облако от имени этого не уходит, пока здесь в неё не сыграют.
+                copy["adopted"] = true;
+                Builds[key] = copy;
+                added = true;
+            }
+            if (!added) return;
+            File.Save();
+        }
         Changed?.Invoke();
     }
 
@@ -142,7 +184,7 @@ public static class BuildTime
         var at = DateTime.UtcNow;
         void Add(string game, string name, int mods, double hours, int sessions, int days)
         {
-            Builds[$"{game}|p:{name}"] = new JsonObject
+            lock (Lock) Builds[$"{game}|p:{name}"] = new JsonObject
             {
                 ["game"] = game, ["name"] = name, ["mods"] = mods, ["totalMs"] = (long)(hours * 3_600_000), ["sessions"] = sessions,
                 ["longestMs"] = (long)(hours / Math.Max(1, sessions) * 3 * 3_600_000), ["first"] = at.AddDays(-days).ToString("o"), ["last"] = at.AddHours(-days / 4.0).ToString("o"),
@@ -172,5 +214,34 @@ public static class BuildTime
         }
         finally { Builds.Remove(key); File.Save(); }
         return "hours are counted per build; short sessions are skipped";
+    }
+
+    [SelfTest]
+    static string CloudBuildsMerge()
+    {
+        string[] keys = ["selftest|p:Mine", "selftest|p:Zero", "selftest|p:Other", "selftest|mc:fabric-1-21-1", "selftest|p:Empty"];
+        long Ms(string key) { lock (Lock) return Builds[key].Long("totalMs"); }
+        try
+        {
+            lock (Lock)
+            {
+                Builds[keys[0]] = new JsonObject { ["game"] = "selftest", ["name"] = "Mine", ["totalMs"] = 5_000_000 };
+                Builds[keys[1]] = new JsonObject { ["game"] = "selftest", ["name"] = "Zero", ["totalMs"] = 0 };
+            }
+            var cloud = new JsonObject();
+            foreach (var k in keys) cloud[k] = new JsonObject { ["game"] = "selftest", ["name"] = "cloud", ["totalMs"] = k == keys[4] ? 0 : 9_000_000 };
+            Adopt(cloud);
+            if (Ms(keys[0]) != 5_000_000) throw new Exception("own hours overwritten");
+            if (Ms(keys[1]) != 9_000_000) throw new Exception("a zero placeholder blocked the cloud hours");
+            if (Ms(keys[2]) != 9_000_000) throw new Exception("another PC's build not taken");
+            lock (Lock) if (Builds[keys[3]] is not null || Builds[keys[4]] is not null) throw new Exception("Minecraft or empty build taken");
+            var snap = Snapshot();
+            if (!snap.ContainsKey(keys[0]) || snap.ContainsKey(keys[2])) throw new Exception("snapshot: " + string.Join(", ", snap.Select(b => b.Key)));
+            lock (Running) Running["selftest"] = (keys[2], DateTime.UtcNow.AddMinutes(-1));
+            Stop("selftest");
+            if (!Snapshot().ContainsKey(keys[2])) throw new Exception("a build played here is not sent");
+        }
+        finally { lock (Lock) { foreach (var k in keys) Builds.Remove(k); File.Save(); } }
+        return "cloud adds missing and zero builds, skips Minecraft; only builds played here are sent";
     }
 }

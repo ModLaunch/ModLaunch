@@ -140,8 +140,10 @@ public static partial class Launcher
                 ran = DateTime.UtcNow - started;
                 Last[game.Id] = new ExitInfo(started, (long)ran.TotalMilliseconds, code, StopRequested.Remove(game.Id));
             }
-            var (counted, ms) = track ? PlayTime.Stop(game.Id) : (false, 0L);
-            if (track) BuildTime.Stop(game.Id);
+            // Этот поток — не окно: сбой записи (диск полон, файл держит антивирус) здесь ронял бы всю программу.
+            var (counted, ms) = (false, 0L);
+            if (track) try { (counted, ms) = PlayTime.Stop(game.Id); } catch { }
+            if (track) try { BuildTime.Stop(game.Id); } catch { }
             if (parked) _ = Vanilla.RestoreAfterExit(game, ran);
             // 11.0: инжектор — снять инжекты и убрать за игрой (дождавшись перезапуска через Steam).
             if (!parked) _ = Inject.AfterExit(game, ran);
