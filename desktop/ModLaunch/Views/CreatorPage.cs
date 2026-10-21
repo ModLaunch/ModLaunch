@@ -18,7 +18,14 @@ namespace ModLaunch.Views;
 public sealed partial class CreatorPage : Page
 {
     public override string Title => "Creator Hub";
-    public override string SearchHint => I18n.T("cr.search");
+
+    /// <summary>12.0: подсказка поиска — о том, что ищется на этой вкладке (см. <see cref="SearchTab"/>).</summary>
+    public override string SearchHint => _tab switch
+    {
+        "examples" => I18n.T("v12h2.search.templates"),
+        "codes" or "models" or "hub" => I18n.T("cr.search"),
+        _ => I18n.T("v12h2.search.projects"),
+    };
 
     string _tab;
     Project? _open;
@@ -29,10 +36,15 @@ public sealed partial class CreatorPage : Page
     readonly StackPanel _check = new() { Spacing = 8 };
     DispatcherTimer? _debounce;
     bool _dirty;
+    /// <summary>Страница сейчас строится: загрузки, начатые из Build, не строят её второй раз изнутри.</summary>
+    bool _building;
+    bool _hadWallet;
+    static bool _walletAsked, _rebuildQueued;
 
     public CreatorPage(string tab = "home", string? project = null)
     {
-        _tab = tab;
+        // 12.0: витрина и студия продаж живут на странице рынка (Go туда и ведёт); старые ссылки — на обзор проектов.
+        _tab = tab is "market" or "studio" ? "home" : tab;
         if (tab == "published") { _tab = "mine"; _minePart = "published"; }
         if (project is not null) { _tab = "mine"; Open(Projects.Get(project)); }
         _code.TextChanged += () =>
@@ -44,10 +56,57 @@ public sealed partial class CreatorPage : Page
             _debounce.Start();
         };
         _code.SaveRequested += () => Save();
-        DetachedFromVisualTree += (_, _) => { if (_dirty) Save(quiet: true); };
+        DetachedFromVisualTree += (_, _) => { if (_dirty) Save(quiet: true); MarketData.Changed -= OnMarketData; };
+        AttachedToVisualTree += (_, _) => { MarketData.Changed -= OnMarketData; MarketData.Changed += OnMarketData; };
     }
 
-    public override void Search(string text) { _filter = text.Trim(); if (_open is null && _tab is "mine" or "home" or "studio") _tab = "hub"; Build(); }
+    /// <summary>
+    /// 12.0: где показать результат поиска. Вкладки со своим списком (Мои, Коды, Модели, Шаблоны, Hub)
+    /// фильтруют его; Обзор, редактор, справка и Lang ведут к своим проектам. Раньше любой поиск
+    /// с Обзора и «Моих» уводил в старый вид Hub, и фильтр проектов был недостижим.
+    /// </summary>
+    internal static string SearchTab(string tab, bool editing, string query) =>
+        query == "" || !editing && tab is "mine" or "codes" or "models" or "examples" or "hub" ? tab : "mine";
+
+    public override void Search(string text)
+    {
+        _filter = text.Trim();
+        var to = SearchTab(_tab, _open is not null, _filter);
+        if (to != _tab || _open is not null && _filter != "")
+        {
+            if (_dirty) Save(quiet: true);
+            _open = null;
+            _tab = to;
+            _minePart = "projects";
+        }
+        Build();
+        MainWindow.Current?.RenderCrumbs();
+    }
+
+    /// <summary>12.0: рынок и мастерская — один экран Creator Hub: переход между ними без въезда всей страницы.</summary>
+    public override bool SameScreenAs(Page? previous) => HubNav.IsHub(previous);
+
+    /// <summary>Баланс для шапки догрузился — показать его (если на экране список, а не редактор).</summary>
+    void OnMarketData()
+    {
+        if (!_hadWallet && MarketData.Wallet is not null && _open is null && MainWindow.Current?.CurrentPage == this) RebuildCurrent();
+    }
+
+    /// <summary>
+    /// Данные Hub или рынка догрузились: перестроить ту мастерскую, что сейчас на экране, — одну, сколько бы
+    /// загрузок ни закончилось разом. Раньше перестраивалась страница, начавшая загрузку, даже если с неё уже ушли,
+    /// а открытая осталась бы с «загрузкой».
+    /// </summary>
+    static void RebuildCurrent()
+    {
+        if (_rebuildQueued) return;
+        _rebuildQueued = true;
+        Dispatcher.UIThread.Post(() =>
+        {
+            _rebuildQueued = false;
+            if (MainWindow.Current?.CurrentPage is CreatorPage page) page.Build();
+        }, DispatcherPriority.Background);
+    }
 
     void Open(Project? p)
     {
@@ -93,7 +152,7 @@ public sealed partial class CreatorPage : Page
 
     public static readonly (string Id, string Key, string Icon)[] MoreTabs =
     [
-        ("hub", "hub.tab", Icons.Globe), ("market", "mk.tab", Icons.Bag), ("studio", "st.tab", Icons.Chart), ("docs", "cr.tab.docs", Icons.Book),
+        ("hub", "hub.tab", Icons.Globe), ("docs", "cr.tab.docs", Icons.Book),
         ("injects", "v11.hub.injects", Icons.Zap), ("mxdev", "v97.cr.tab.inject", Icons.Zap),
     ];
 
@@ -112,69 +171,77 @@ public sealed partial class CreatorPage : Page
         }
     }
 
+    /// <summary>9.5: та же шапка и навигация, что у рынка (HubNav): мастерская — это раздел «Автору».</summary>
+    internal static string HubTabOf(string tab) => tab switch
+    {
+        "examples" => "templates",
+        "docs" => "docs",
+        "hub" => "workshop",
+        "inject" or "mxdev" => "lang",
+        "injects" => "injects",
+        _ => "projects",
+    };
+
     public override void Build()
     {
-        var content = StoreKit.Fit(new StackPanel { Spacing = 22, Margin = new Thickness(40, 24, 40, 40), MaxWidth = 1640 });
+        // 12.0: один проход по проектам на постройку (Обзор, «Студия автора» и «Мои» читали все main.mls каждая).
+        _building = true;
+        try { using (Projects.Batch()) BuildNow(); }
+        finally { _building = false; }
+    }
 
-        // 9.5: та же шапка и навигация, что у рынка (HubNav): мастерская — это раздел «Автору».
-        var hubTab = _tab switch
-        {
-            "examples" => "templates",
-            "docs" => "docs",
-            "hub" => "workshop",
-            "market" => "store",
-            "studio" => "studio",
-            "inject" or "mxdev" => "lang",
-            "injects" => "injects",
-            _ => "projects",
-        };
-        // Внутри «Проектов» — свои вкладки (обзор, все мои, коды, модели, ModScript X) в той же линии.
-        List<Control>? sub = null;
-        Control? create = null;
-        if (hubTab == "projects")
-        {
-            sub = [];
-            foreach (var (id, key, _) in MainTabs.Where(t => t.Id is not ("examples" or "inject")))
-            {
-                var tab = id;
-                var b = Ui.Button(I18n.T(key), () => Go(tab), "pivot");
-                b.Padding = new Thickness(10, 6);
-                b.FontSize = 13;
-                b.VerticalAlignment = VerticalAlignment.Center;
-                if (_tab == id) { b.Classes.Add("active"); b.Background = Ui.Res("Surface2"); }
-                sub.Add(b);
-            }
-            create = Ui.Button(I18n.T("v95.hub.newProject"), CreateNew, "primary", Icons.Plus);
-        }
-        content.Children.Add(HubNav.Header(hubTab, sold: () => { _ = LoadMarket(force: true); _studio = null; }, sub: sub, action: create));
+    void BuildNow()
+    {
+        // Баланс в шапке берётся из общих данных рынка: открыли сразу мастерскую — загрузить их (один раз за сеанс).
+        if (Social.Account.SignedIn && MarketData.Wallet is null && !MarketData.Loading && !_walletAsked && !Program.Screenshot) { _walletAsked = true; _ = MarketData.Load(); }
+        _hadWallet = MarketData.Wallet is not null;
 
-        content.Children.Add(_tab switch
+        var body = _tab switch
         {
             "home" => Home(),
             "examples" => Examples(),
             "codes" => Shelf("codes"),
             "models" => Shelf("models"),
             "hub" => HubView(),
-            "market" => MarketView(),
-            "studio" => Studio(),
             "docs" => Docs(),
             "inject" => Lang(),
             "mxdev" => Injector(),
             "injects" => Injects(),
             _ => _open is null ? Mine() : Editor(),
-        });
-        Content = new ScrollViewer { Content = content, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+        };
+        // 12.1: своё пространство Hub — боковая панель, шапка с цифрами автора и «Новым проектом», сетка чертежа.
+        // Открытый проект: в шапке — его имя и вкладки «Код · Обзор»; в «Моих проектах» — «Проекты · Опубликованные».
+        var editing = _open is not null && _tab is not ("home" or "examples" or "codes" or "models" or "hub" or "docs" or "inject" or "mxdev" or "injects");
+        var sub = editing ? PaneTabs() : _tab == "mine" ? MineTabs() : null;
+        Content = HubNav.Frame(HubTabOf(_tab), HubNav.RailOf(_tab, creator: true), editing ? _open!.Name : HubTitle(), body, sold: () => _ = LoadMarket(force: true), local: Rail, sub: sub);
+    }
+
+    /// <summary>Название раздела в шапке Hub — так же, как пункт боковой панели.</summary>
+    string HubTitle() => _tab switch
+    {
+        "home" => I18n.T("v12d.rail.overview"),
+        "mine" => I18n.T("v12d.rail.projects"),
+        "inject" => I18n.T("v11.hub.lang"),
+        _ => TabTitle(_tab),
+    };
+
+    /// <summary>12.1: пункты боковой панели, что живут в мастерской, открываются здесь же, без новой страницы.</summary>
+    bool Rail(string rail)
+    {
+        var tab = rail switch { "lang" => "inject", "templates" => "examples", _ => rail };
+        if (tab is not ("home" or "mine" or "codes" or "models" or "inject" or "examples" or "docs")) return false;
+        if (_dirty) Save(quiet: true);
+        // «Мои проекты» из редактора — к списку (как «Назад»).
+        _open = null;
+        _pane = "code";
+        Go(tab);
+        MainWindow.Current?.RenderCrumbs();
+        return true;
     }
 
     /// <summary>
-    /// «Создать» (эскиз Creator Hub, «с теми же анимациями»): новый проект, та же анимация,
-    /// что и у «Скачать», — и сразу редактор.
+    /// «Создать» (шапка, «путь автора»): 12.0 — мастер нового проекта (имя, игра, с чего начать),
+    /// а после него — та же анимация, что и у «Скачать», и сразу редактор.
     /// </summary>
-    public static void CreateNew()
-    {
-        var p = Projects.Create(I18n.Lang == "ru" ? "Мой мод" : "My mod", Templates.ById("blank")!.Code);
-        var game = GameCatalog.ById(p.Game);
-        InstallFx.Play(new FxCard(p.Name, I18n.T("v91.fx.project") + (game is null ? "" : " · " + game.Name), null, game, Icons.Plus), null,
-            () => MainWindow.Current?.Navigate(() => new CreatorPage("mine", p.Id)));
-    }
+    public static void CreateNew() => NewProjectDialog();
 }

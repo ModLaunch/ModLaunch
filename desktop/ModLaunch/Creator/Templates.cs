@@ -1,23 +1,38 @@
+using System.Text.RegularExpressions;
+using ModLaunch.Core;
+using ModLaunch.Games;
+
 namespace ModLaunch.Creator;
 
-public sealed record Template(string Id, string Game, string Code);
+/// <summary>
+/// Шаблон мода. Raw — текст с подстановками: {{name}}, {{game}}, {{author}}, {{hints}} (примеры команд
+/// для загрузчика игры) и {{t:ключ}} (строка интерфейса). Code — тот же текст со значениями по умолчанию.
+/// </summary>
+public sealed record Template(string Id, string Game, string Raw)
+{
+    /// <summary>
+    /// Готовый код: имя — название примера на языке интерфейса (у пустого — «Мой мод» / «My mod»),
+    /// автор — сам человек, а не «ModLaunch», игра — игра шаблона.
+    /// </summary>
+    public string Code => Templates.Apply(this, Id == "blank" ? Templates.DefaultName() : I18n.T($"cr.ex.{Id}"), Game, Templates.DefaultAuthor());
+}
 
 /// <summary>«Примочки» — готовые примеры модов на ModScript: открыть, поменять, поставить.</summary>
-public static class Templates
+public static partial class Templates
 {
     public static readonly Template[] All =
     [
+        // 12.0: пустой проект — без «Мой мод»/«Я» по-русски и без привязки к Valheim: всё подставляется.
         new("blank", "valheim", """
-            # Мой мод на ModScript. Справка по командам — вкладка «Справка».
-            mod "Мой мод"
+            # {{t:v12h2.tpl.blank.head}}
+            mod "{{name}}"
             version 1.0.0
-            author "Я"
-            about "Что делает мод — одной строкой"
-            game valheim
+            author "{{author}}"
+            about "{{t:v12h2.tpl.blank.about}}"
+            game {{game}}
 
-            # Уберите # в начале строки, чтобы включить команду.
-            # needs RandyKnapp-EquipmentAndQuickSlots
-            # config "BepInEx.cfg" [Logging.Console] Enabled = true
+            # {{t:v12h2.tpl.blank.uncomment}}
+            {{hints}}
             """),
 
         new("code-style", "valheim", """
@@ -28,7 +43,7 @@ public static class Templates
 
             mod "Баланс оружия"
             version 1.0.0
-            author "Я"
+            author "{{author}}"
             about "Урон считается формулой, а не руками"
             game valheim
 
@@ -425,11 +440,108 @@ public static class Templates
     /// <summary>Раздел примочки: сборка (только needs), Stardew, настройки BepInEx или логика языка.</summary>
     public static string Category(Template t)
     {
-        var body = t.Code.Split('\n').Select(l => l.Trim()).Where(l => l != "" && !l.StartsWith('#'))
+        var body = t.Raw.Split('\n').Select(l => l.Trim()).Where(l => l != "" && !l.StartsWith('#'))
             .Where(l => !new[] { "mod ", "version ", "author ", "about ", "game " }.Any(l.StartsWith)).ToList();
         if (body.Count > 0 && body.All(l => l.StartsWith("needs "))) return "packs";
-        if (t.Code.Contains("if $") || t.Code.Contains("write ") || t.Id == "blank") return "logic";
+        if (t.Raw.Contains("if $") || t.Raw.Contains("write ") || t.Id == "blank") return "logic";
         if (t.Game == "stardew-valley") return "stardew";
         return "bepinex";
+    }
+
+    // ---------------------------------------------------------------- 12.0: подстановки и мастер
+
+    /// <summary>Имя нового мода по умолчанию — на языке интерфейса (раньше всегда «Мой мод»).</summary>
+    public static string DefaultName() => I18n.T("v12h2.tpl.name");
+
+    /// <summary>Автор по умолчанию: имя аккаунта, иначе «Я» / «Me» по языку интерфейса.</summary>
+    public static string DefaultAuthor() =>
+        Social.Account.SignedIn && Social.Account.Get().Name is { Length: > 0 } n ? n : I18n.T("v12h2.tpl.author");
+
+    [GeneratedRegex(@"\{\{(name|game|author|hints|t:[\w.\-]+)\}\}")]
+    private static partial Regex Slot();
+    [GeneratedRegex(@"^([ \t]*)mod[ \t]+""(?:[^""\\]|\\.)*""", RegexOptions.Multiline)]
+    private static partial Regex ModLine();
+    [GeneratedRegex(@"^([ \t]*)author[ \t]+""(?:[^""\\]|\\.)*""", RegexOptions.Multiline)]
+    private static partial Regex AuthorLine();
+    [GeneratedRegex(@"^([ \t]*)game[ \t]+\S+", RegexOptions.Multiline)]
+    private static partial Regex GameLine();
+
+    /// <summary>Подставить значения в текст шаблона: {{name}}, {{game}}, {{author}}, {{hints}}, {{t:ключ}}.</summary>
+    public static string Fill(string raw, string name, string game, string author) => Slot().Replace(raw, m => m.Groups[1].Value switch
+    {
+        "name" => Text(name),
+        "author" => Text(author),
+        "game" => Word(game),
+        "hints" => Hints(game),
+        var key => Text(I18n.T(key[2..])),
+    });
+
+    /// <summary>
+    /// Код нового проекта из шаблона: подстановки, а у примеров без них — строки mod, author и game
+    /// заменяются на то, что выбрал человек (имя, он сам, его игра).
+    /// </summary>
+    public static string Apply(Template t, string name, string game, string author)
+    {
+        if (name.Trim() == "") name = DefaultName();
+        if (author.Trim() == "") author = DefaultAuthor();
+        if (Word(game) == "") game = t.Game;
+        var code = Fill(t.Raw, name, game, author);
+        // Через функцию, а не строку замены: в имени может быть «$1».
+        code = ModLine().Replace(code, m => $"{m.Groups[1].Value}mod \"{Text(name)}\"", 1);
+        code = AuthorLine().Replace(code, m => $"{m.Groups[1].Value}author \"{Text(author)}\"", 1);
+        code = GameLine().Replace(code, m => $"{m.Groups[1].Value}game {Word(game)}", 1);
+        return code;
+    }
+
+    /// <summary>
+    /// Шаблоны для игры (мастер нового проекта): сначала свои примеры этой игры, затем общие —
+    /// настройки BepInEx для любой игры на BepInEx и «Мод с файлами» для любой. Пустой — отдельно.
+    /// </summary>
+    public static List<Template> For(string game)
+    {
+        var bepinex = GameCatalog.ById(game)?.Loader == LoaderKind.Bepinex;
+        return All.Where(t => t.Id != "blank" && (t.Game == game || t.Id == "files-readme" || bepinex && t.Id.StartsWith("bepinex-", StringComparison.Ordinal)))
+            .OrderBy(t => t.Game == game ? 0 : 1).ToList();
+    }
+
+    /// <summary>Закомментированные примеры команд под загрузчик игры: пустой проект собирается сразу.</summary>
+    static string Hints(string game) => GameCatalog.ById(game)?.Loader switch
+    {
+        LoaderKind.Smapi => "# edit \"Data/Objects\" \"472\" Price = 10\n# dialogue \"Abigail\" \"Mon\" = \"Hello!\"",
+        LoaderKind.Bepinex => "# needs Author-ModName\n# config \"BepInEx.cfg\" [Logging.Console] Enabled = true",
+        _ => "# write \"readme.txt\" = \"Hello!\"\n# copy \"my-file.txt\" to \"my-file.txt\"",
+    };
+
+    /// <summary>Строка для кавычек ModScript: без переносов, «\» и «"» экранированы, «$» убран (это подстановка переменной).</summary>
+    public static string Text(string s) =>
+        s.Replace('\r', ' ').Replace('\n', ' ').Replace("$", "").Replace("\\", "\\\\").Replace("\"", "\\\"").Trim();
+
+    /// <summary>Id игры как слово ModScript: только буквы, цифры, «.», «_» и «-».</summary>
+    public static string Word(string s) => Regex.Replace(s.Trim().ToLowerInvariant(), @"[^a-z0-9._\-]", "");
+
+    [SelfTest]
+    static string TemplatesFillPlaceholders()
+    {
+        var blank = ById("blank")!;
+        if (!blank.Raw.Contains("{{name}}") || blank.Code.Contains("{{")) throw new Exception("blank placeholders not filled");
+        // Имя с кавычками и «$» не ломает скрипт, игра и автор — выбранные.
+        var code = Apply(blank, "Big \"Mod\" $x", "stardew-valley", "Mira");
+        var b = ModScript.Compile(code);
+        if (!b.Ok) throw new Exception(string.Join("; ", b.Diags.Select(d => d.Line + " " + d.Message)));
+        if (b.Name != "Big \"Mod\" x" || b.Game != "stardew-valley" || b.Author != "Mira") throw new Exception($"{b.Name}|{b.Game}|{b.Author}");
+        if (!code.Contains("# edit ")) throw new Exception("no SMAPI hints");
+        // Пример без подстановок: строки mod/author/game заменяются, остальное — как было.
+        var seeds = ModScript.Compile(Apply(ById("sdv-seeds")!, "Cheap", "stardew-valley", "Me"));
+        if (!seeds.Ok || seeds.Name != "Cheap" || seeds.Author != "Me" || seeds.Changes.Count == 0) throw new Exception("sdv-seeds apply");
+        // Готовый код примера: автор — сам человек (не «ModLaunch»), имя — название примера, а не русская строка из кода.
+        var ready = ModScript.Compile(ById("sdv-seeds")!.Code);
+        if (ready.Author != DefaultAuthor() || ready.Name != Text(I18n.T("cr.ex.sdv-seeds"))) throw new Exception($"Code: {ready.Name}|{ready.Author}");
+        // Общие шаблоны BepInEx — для любой игры на BepInEx, но не для Stardew.
+        if (!For("lethal-company").Any(t => t.Id == "bepinex-debug") || For("stardew-valley").Any(t => t.Id.StartsWith("bepinex-")))
+            throw new Exception("For(game) filter");
+        if (For("stardew-valley").FirstOrDefault()?.Game != "stardew-valley") throw new Exception("own game first");
+        var all = All.Count(t => ModScript.Compile(t.Code).Ok);
+        if (all != All.Length) throw new Exception($"{All.Length - all} templates do not compile");
+        return $"{All.Length} templates fill and compile";
     }
 }

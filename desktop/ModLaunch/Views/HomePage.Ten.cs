@@ -26,6 +26,7 @@ public sealed partial class HomePage
 
     void BuildTen()
     {
+        _stageHost = null;
         if (!_widgetsHooked)
         {
             _widgetsHooked = true;
@@ -53,6 +54,9 @@ public sealed partial class HomePage
             if (_ad.Parent is Panel was) was.Children.Remove(_ad);
             col.Children.Add(_ad);
         }
+        // 12.0: правая кнопка по пустому месту главной — добавить виджет.
+        col.Background = Brushes.Transparent;
+        col.ContextFlyout = AreaMenu();
         Content = new ScrollViewer { Content = col, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
     }
 
@@ -63,7 +67,12 @@ public sealed partial class HomePage
         var hello = new TextBlock { Text = Greeting() + ", " + name, FontFamily = Look.Display, FontSize = 22, FontWeight = FontWeight.Bold, LetterSpacing = -0.5, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
         var edit = Ui.Button(_editWidgets ? I18n.T("v10.w.done") : I18n.T("v10.w.edit"), () => { _editWidgets = !_editWidgets; Build(); }, _editWidgets ? "primary" : "ghost", _editWidgets ? Icons.Check : Icons.Grid);
         var style = Ui.Button(I18n.T("v10.cfg.short"), () => MainWindow.Current?.Navigate(() => new SettingsPage("configs")), "ghost", Icons.Palette);
-        var right = Ui.Row(6, style, edit);
+        // 12.0: быстрые переходы одной кнопкой (у каждой — свой Ctrl-ярлык в подсказке).
+        Button Quick(string text, string icon, string keys, Func<Page> make) => Ui.Button(text, () => MainWindow.Current?.Navigate(make), "ghost", icon, keys);
+        var dock = Ui.Row(6,
+            Quick(I18n.T("lib.title"), Icons.Grid, "Ctrl+L", () => new LibraryPage()),
+            Quick(I18n.T("mc.title"), Icons.Package, "Ctrl+U", () => new ModsCenterPage()));
+        var right = Ui.Row(6, dock, new Border { Width = 1, Height = 22, Background = Ui.Res("Line"), Margin = new Thickness(4, 0), VerticalAlignment = VerticalAlignment.Center }, style, edit);
         right.VerticalAlignment = VerticalAlignment.Center;
         var row = new DockPanel { Margin = new Thickness(2, 6, 0, 0) };
         DockPanel.SetDock(right, Dock.Right);
@@ -99,6 +108,7 @@ public sealed partial class HomePage
 
         var when = running ? I18n.T("time.running") : played.LastPlayed is not null ? I18n.T("time.last", ("when", Ui.Ago(played.LastPlayed))) : I18n.T("v93.home.notPlayed");
         var meta = new TextBlock { Text = string.Join("  ·  ", new[] { when, g.ModCount > 0 ? StoreKit.Mods(g.ModCount) : null, played.TotalMs >= 3_600_000 ? I18n.T("v93.home.hours", ("n", played.TotalMs / 3_600_000)) : null }.OfType<string>()), FontSize = 13.5, Foreground = Ui.Hex("#D5D9E2") };
+        var accent = Color.TryParse(g.Def.Accent, out var ac) ? ac : Gx.Accent;
 
         var buttons = Ui.Row(10);
         if (running)
@@ -140,7 +150,7 @@ public sealed partial class HomePage
 
         var stage = new Panel
         {
-            Height = compact ? 230 : 440, ClipToBounds = true,
+            Height = compact ? 230 : 470, ClipToBounds = true,
             Children =
             {
                 art,
@@ -150,10 +160,13 @@ public sealed partial class HomePage
                 shelf,
             },
         };
-        var frame = new Border { CornerRadius = new CornerRadius(Look.Radius == "sharp" ? 4 : 22), ClipToBounds = true, Child = stage, ContextFlyout = GameCard.Menu(g) };
+
+        var radius = new CornerRadius(Look.Radius == "sharp" ? 4 : 22);
+        var frame = new Border { CornerRadius = radius, ClipToBounds = true, Child = stage, ContextFlyout = GameCard.Menu(g) };
         // Если места мало, полка прячется — сцена не налезает сама на себя.
         frame.SizeChanged += (_, e) => shelf.IsVisible = e.NewSize.Width > 1080;
-        return frame;
+        // 12.0: мягкое свечение цветом игры под сценой — на обёртке: у Border с ClipToBounds тень обрезается.
+        return new Border { CornerRadius = radius, Child = frame, BoxShadow = new BoxShadows(new BoxShadow { OffsetY = 18, Blur = 60, Spread = -18, Color = Color.FromArgb(110, accent.R, accent.G, accent.B) }) };
     }
 
     Control StageCover(GameState g, bool on, bool compact)

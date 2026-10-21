@@ -1,0 +1,40 @@
+{
+  "ru": {
+    "v12.w.size.s": "Маленький",
+    "v12.w.size.m": "Широкий",
+    "v12.w.size.l": "Большой",
+    "keys.home": "Главная",
+    "keys.game": "Открыть свою игру по порядку",
+    "keys.play": "Играть в открытую игру",
+    "keys.stage": "Листать игры на главной",
+    "new.v12.widgets": "Виджеты как на iPhone",
+    "new.v12.widgets.text": "Правый клик по главной → «Добавить виджет…»: выбираете вид, размер и настройки и сразу видите, как он будет выглядеть. Новые виджеты: любая игра (и из Steam), заметка, Steam. По виджету — изменить, сменить игру, цвет, размер.",
+    "new.v12.fast": "Быстрее",
+    "new.v12.fast.text": "Переходы короче, запуск без лишних пауз. Ctrl+1…9 — своя игра, Ctrl+Enter — играть, Ctrl+H — главная, ← → — игры на главной, боковые кнопки мыши — назад и вперёд.",
+    "new.v12.games": "Почти 3000 игр",
+    "new.v12.games.text": "Справочник моддируемых игр с Nexus и Thunderstore. ModLaunch сам находит их у вас на ПК: «Добавить игру» — добавить в один клик, поиск по всем, «Установить в Steam».",
+    "new.v12.hub": "Новый Creator Hub",
+    "new.v12.hub.text": "Свой вид мастерской: чертёжная сетка, панель инструментов слева, редактор как маленькая IDE. «Собрать и проверить» (F5) ставит мод и запускает игру, потом показывает строки лога про ваш мод. Обзор проекта, версии сборок, мастер нового проекта с шаблонами и импортом.",
+    "new.v12.steam": "Все игры Steam",
+    "new.v12.steam.text": "Все игры Steam на ПК видны в ModLaunch — и без модов: играть в один клик, добавить моды, где они есть. Поиск по всему магазину Steam."
+  },
+  "en": {
+    "v12.w.size.s": "Small",
+    "v12.w.size.m": "Wide",
+    "v12.w.size.l": "Large",
+    "keys.home": "Home",
+    "keys.game": "Open your game by number",
+    "keys.play": "Play the open game",
+    "keys.stage": "Browse games on Home",
+    "new.v12.widgets": "iPhone-style widgets",
+    "new.v12.widgets.text": "Right-click Home → Add widget…: pick a kind, a size and its settings and see it live. New widgets: any game (Steam too), a note, Steam. Right-click a widget to edit it, switch the game, color or size.",
+    "new.v12.fast": "Faster",
+    "new.v12.fast.text": "Shorter transitions, no extra pauses on launch. Ctrl+1…9 opens your game, Ctrl+Enter plays, Ctrl+H goes Home, ← → browse games on Home, mouse side buttons go back and forward.",
+    "new.v12.games": "Almost 3000 games",
+    "new.v12.games.text": "A directory of moddable games from Nexus and Thunderstore. ModLaunch finds them on your PC: Add game adds them in one click, search everything, Install in Steam.",
+    "new.v12.hub": "A new Creator Hub",
+    "new.v12.hub.text": "Its own workshop look: a blueprint grid, a tool rail on the left, the editor as a small IDE. Build and test (F5) installs your mod and starts the game, then shows the log lines about your mod. Project overview, versioned builds, a new-project wizard with templates and import.",
+    "new.v12.steam": "All Steam games",
+    "new.v12.steam.text": "Every Steam game on your PC shows up in ModLaunch, even without mods: one-click play, add mods where they exist. Search the whole Steam store."
+  }
+}

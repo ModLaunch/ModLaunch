@@ -5,6 +5,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using ModLaunch.Core;
 using ModLaunch.Features;
+using ModLaunch.Games;
 
 namespace ModLaunch.Views;
 
@@ -69,15 +70,17 @@ public sealed partial class HomePage
     /// <summary>Сетка виджетов; в режиме правки у каждого — «убрать», «размер» и стрелки.</summary>
     Control WidgetsArea(List<GameState> mine)
     {
-        var layout = Widgets.Layout();
+        var layout = Widgets.Entries();
         var grid = new WidgetGrid();
         for (var i = 0; i < layout.Count; i++)
         {
-            var (id, size) = layout[i];
+            var e = layout[i];
             Control w;
-            try { w = Widget(id, size, mine); }
+            try { w = Widget(e, mine, i); }
             catch { w = Shell(Ui.Text(I18n.T("v10.w.error"), "small muted"), null); }
-            grid.Sizes.Add(size);
+            grid.Sizes.Add(e.Size);
+            // 12.0: правая кнопка по виджету — изменить, размер, игра, сдвиг, убрать (свои меню внутри виджета важнее).
+            if (!_editWidgets && w.ContextFlyout is null) w.ContextFlyout = WidgetMenu(i, e, layout.Count);
             grid.Children.Add(_editWidgets ? EditChrome(w, i, layout.Count) : w);
         }
         var col = Ui.Col(14);
@@ -128,45 +131,80 @@ public sealed partial class HomePage
         return dock;
     }
 
-    Control Widget(string id, string size, List<GameState> mine)
+    /// <summary>Цвет из настройки виджета; null — как тема.</summary>
+    static IBrush? TintOf(string tint) => tint switch
     {
+        "blue" => Ui.Hex("#4C8DFF"), "violet" => Ui.Hex("#9B7BFF"), "green" => Ui.Hex("#3FCB7E"),
+        "orange" => Ui.Hex("#FF9640"), "pink" => Ui.Hex("#FF6FB1"), "mono" => Ui.Res("Text"), _ => null,
+    };
+
+    /// <summary>Фон цветного виджета: цвет сверху слева мягко уходит в обычную поверхность, как у виджетов iPhone.</summary>
+    static IBrush? Wash(IBrush? tint)
+    {
+        if (tint is not ISolidColorBrush c) return null;
+        var surface = (Ui.Res("Surface") as ISolidColorBrush)?.Color ?? Colors.Black;
+        return new LinearGradientBrush
+        {
+            StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
+            GradientStops = { new GradientStop(Color.FromArgb(70, c.Color.R, c.Color.G, c.Color.B), 0), new GradientStop(surface, 0.85) },
+        };
+    }
+
+    /// <summary>Игра из настройки: своя (id), из Steam (steam:номер) или «авто» — тогда fallback.</summary>
+    static (GameState? Own, SteamApp? Steam) PickGame(string value, GameState? fallback)
+    {
+        if (value.StartsWith("steam:", StringComparison.Ordinal) && int.TryParse(value[6..], out var app) && app > 0)
+            return SteamLibrary.Managed(app) is { } managed ? (managed, null) : (null, SteamLibrary.ById(app) ?? new SteamApp(app, "Steam · " + app, "", ""));
+        if (value != "" && AppState.Games.FirstOrDefault(g => g.Def.Id == value) is { } own) return (own, null);
+        return (fallback, null);
+    }
+
+    Control Widget(Widgets.Entry e, List<GameState> mine, int index = -1)
+    {
+        var id = e.Id;
+        var size = e.Size;
         var wide = size != "s";
         var large = size == "l";
+        var tint = TintOf(e.Get("tint"));
+        var wash = Wash(tint);
         void Go(Func<Page> make) => MainWindow.Current?.Navigate(make);
         switch (id)
         {
             case "clock":
             {
                 var now = DateTime.Now;
-                var time = Big(now.ToString("HH:mm"), wide ? 46 : 38);
-                var date = Small(now.ToString("dddd, d MMMM", I18n.Culture), lines: 1);
+                var format = e.Get("h12") == "1" ? "h:mm" : "HH:mm";
+                var time = Big(now.ToString(format), wide ? 46 : 38, tint);
+                var lines = new List<Control> { time };
+                if (e.Get("date") != "0") lines.Add(Small(now.ToString("dddd, d MMMM", I18n.Culture), lines: 1));
                 var today = mine.Where(g => PlayTime.Get(g.Def.Id).LastPlayed?.Date == DateTime.Today).Select(g => g.Def.ShortName).Take(2).ToList();
-                var extra = wide ? Small(today.Count > 0 ? I18n.T("v10.w.clock.today", ("list", string.Join(", ", today))) : Greeting(), Ui.Res("Faint"), 1) : null;
-                var clock = Stack(Cap(Icons.Clock, I18n.T("v10.w.clock")), extra is null ? [time, date] : [time, date, extra]);
-                // Время обновляется раз в 20 секунд, пока виджет на экране.
-                var tick = new Avalonia.Threading.DispatcherTimer(TimeSpan.FromSeconds(20), Avalonia.Threading.DispatcherPriority.Background, (_, _) => time.Text = DateTime.Now.ToString("HH:mm"));
+                if (wide) lines.Add(Small(today.Count > 0 ? I18n.T("v10.w.clock.today", ("list", string.Join(", ", today))) : Greeting(), Ui.Res("Faint"), 1));
+                var clock = Stack(Cap(Icons.Clock, I18n.T("v10.w.clock"), tint), lines.ToArray());
+                // Время обновляется раз в 20 секунд, пока виджет на экране. Таймер создаётся остановленным.
+                var tick = new Avalonia.Threading.DispatcherTimer(Avalonia.Threading.DispatcherPriority.Background) { Interval = TimeSpan.FromSeconds(20) };
+                tick.Tick += (_, _) => time.Text = DateTime.Now.ToString(format);
                 clock.AttachedToVisualTree += (_, _) => { if (!Program.Screenshot) tick.Start(); };
                 clock.DetachedFromVisualTree += (_, _) => tick.Stop();
-                return Shell(clock, null);
+                return Shell(clock, null, wash);
             }
             case "level":
             {
                 var all = Achievements.All();
                 var (level, _, next) = Achievements.Level(all);
-                var ring = Ring(1 - next / 300.0, 66, 6, Ui.Res("Brand"));
+                var ring = Ring(1 - next / 300.0, 66, 6, tint ?? Ui.Res("Brand"));
                 ring.Children.Add(new TextBlock { Text = level.ToString(), FontFamily = Look.Display, FontSize = 22, FontWeight = FontWeight.Bold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Foreground = Ui.Res("Text") });
                 var words = Ui.Col(2, Small(I18n.T("v10.w.level.next", ("n", next)), lines: 1));
                 if (wide && all.Where(a => !a.Done && a.Reward is not null).OrderByDescending(a => a.Progress).FirstOrDefault() is { } a)
                     words.Children.Add(Small("★ " + a.Title + " · " + (int)(a.Progress * 100) + "%", Ui.Res("Brand2"), 1));
                 var body = wide
-                    ? (Control)Stack(Cap(Icons.Trophy, I18n.T("v10.w.level")), Ui.Row(14, ring, new Border { VerticalAlignment = VerticalAlignment.Center, Child = Ui.Col(4, Big(I18n.T("v10.w.level.n", ("n", level)), 22), words) }))
-                    : Stack(Cap(Icons.Trophy, I18n.T("v10.w.level")), ring, words);
-                return Shell(body, () => Go(() => new ProfilePage()));
+                    ? (Control)Stack(Cap(Icons.Trophy, I18n.T("v10.w.level"), tint), Ui.Row(14, ring, new Border { VerticalAlignment = VerticalAlignment.Center, Child = Ui.Col(4, Big(I18n.T("v10.w.level.n", ("n", level)), 22), words) }))
+                    : Stack(Cap(Icons.Trophy, I18n.T("v10.w.level"), tint), ring, words);
+                return Shell(body, () => Go(() => new ProfilePage()), wash);
             }
             case "autopilot":
             {
-                var g = mine.FirstOrDefault(x => !x.Def.IsMinecraft && x.Registry is not null);
-                if (g is null) return Shell(Stack(Cap(Icons.Wand, I18n.T("v10.ap.short")), Small(I18n.T("v10.w.ap.none"))), () => Go(() => new AutopilotPage()));
+                var g = PickGame(e.Get("game"), mine.FirstOrDefault(x => !x.Def.IsMinecraft && x.Registry is not null)).Own;
+                if (g?.Registry is null || g.Def.IsMinecraft) return Shell(Stack(Cap(Icons.Wand, I18n.T("v10.ap.short")), Small(I18n.T("v10.w.ap.none"))), () => Go(() => new AutopilotPage()));
                 var (score, steps) = Autopilot.Plan(g, quick: true);
                 var color = ScoreBrush(score);
                 var lines = new List<Control> { Ui.Row(6, Big(score.ToString(), wide ? 40 : 36, color), new TextBlock { Text = "/100", FontSize = 13, Foreground = Ui.Res("Faint"), VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, 8) }) };
@@ -176,7 +214,7 @@ public sealed partial class HomePage
             }
             case "continue":
             {
-                var g = _stage is { } s && mine.FirstOrDefault(x => x.Def.Id == s) is { } picked ? picked : mine.FirstOrDefault();
+                var g = PickGame(e.Get("game"), _stage is { } s && mine.FirstOrDefault(x => x.Def.Id == s) is { } picked ? picked : mine.FirstOrDefault()).Own;
                 if (g is null) return Shell(Stack(Cap(Icons.Play, I18n.T("v4.continue")), Small(I18n.T("h95.continue.empty")), Ui.Button(I18n.T("add.title"), () => Go(() => new AddGamePage()), "primary", Icons.Plus)), null);
                 var played = PlayTime.Get(g.Def.Id);
                 var logo = Images.GameAsset(g.Def, Images.Art.Logo, 512);
@@ -229,10 +267,12 @@ public sealed partial class HomePage
             }
             case "playtime":
             {
-                var rows = mine.Select(g => (g, ms: PlayTime.Get(g.Def.Id).TotalMs)).Where(x => x.ms > 0).OrderByDescending(x => x.ms).ToList();
+                var only = e.Get("game") is { Length: > 0 } pick ? PickGame(pick, null).Own : null;
+                var rows = (only is null ? mine : [only]).Select(g => (g, ms: PlayTime.Get(g.Def.Id).TotalMs)).Where(x => x.ms > 0).OrderByDescending(x => x.ms).ToList();
                 var hours = rows.Sum(r => r.ms) / 3_600_000;
-                var list = new List<Control> { Ui.Row(6, Big(hours.ToString(), 36), new TextBlock { Text = I18n.T("v10.w.hours"), FontSize = 13, Foreground = Ui.Res("Faint"), VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, 7) }) };
-                if (wide)
+                var list = new List<Control> { Ui.Row(6, Big(hours.ToString(), 36, tint), new TextBlock { Text = I18n.T("v10.w.hours"), FontSize = 13, Foreground = Ui.Res("Faint"), VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, 7) }) };
+                if (only is not null) list.Add(Small(only.Def.ShortName, lines: 1));
+                else if (wide)
                 {
                     var max = Math.Max(1, rows.FirstOrDefault().ms);
                     foreach (var (g, ms) in rows.Take(2))
@@ -240,7 +280,7 @@ public sealed partial class HomePage
                             new Border { Height = 6, CornerRadius = new CornerRadius(3), Width = Math.Max(6, 150.0 * ms / max), Background = Ui.Hex(g.Def.Accent), VerticalAlignment = VerticalAlignment.Center }));
                 }
                 else list.Add(Small(rows.Count > 0 ? I18n.T("v10.w.hours.top", ("game", rows[0].g.Def.ShortName)) : I18n.T("v98.replay.empty"), lines: 1));
-                return Shell(Stack(Cap(Icons.Chart, I18n.T("v10.w.playtime")), list.ToArray()), () => Go(() => new ProfilePage("replay")));
+                return Shell(Stack(Cap(Icons.Chart, I18n.T("v10.w.playtime"), tint), list.ToArray()), () => Go(() => new ProfilePage("replay")), wash);
             }
             case "builds":
             {
@@ -251,7 +291,7 @@ public sealed partial class HomePage
                 else
                 {
                     var top = builds[0];
-                    list.Add(Ui.Row(6, Big(((long)top.Hours).ToString(), 36), new TextBlock { Text = I18n.T("v10.w.hours"), FontSize = 13, Foreground = Ui.Res("Faint"), VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, 7) }));
+                    list.Add(Ui.Row(6, Big(((long)top.Hours).ToString(), 36, tint), new TextBlock { Text = I18n.T("v10.w.hours"), FontSize = 13, Foreground = Ui.Res("Faint"), VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, 7) }));
                     if (wide)
                     {
                         var max = Math.Max(1, top.TotalMs);
@@ -261,14 +301,20 @@ public sealed partial class HomePage
                     }
                     else list.Add(Small(top.Name, lines: 1));
                 }
-                return Shell(Stack(Cap(Icons.Hourglass, I18n.T("v11.w.builds")), list.ToArray()), () => Go(() => new ProfilePage("builds")));
+                return Shell(Stack(Cap(Icons.Hourglass, I18n.T("v11.w.builds"), tint), list.ToArray()), () => Go(() => new ProfilePage("builds")), wash);
             }
             case "downloads":
                 return new Border { CornerRadius = new CornerRadius(22), ClipToBounds = true, Child = new DownloadsTile() };
             case "library":
             {
                 var wrap = new Avalonia.Controls.Primitives.UniformGrid { Columns = large ? 4 : 4, Rows = large ? 2 : 1 };
-                foreach (var g in mine.Take(large ? 8 : 4))
+                var sorted = e.Get("sort") switch
+                {
+                    "name" => mine.OrderBy(g => g.Def.Name, StringComparer.CurrentCultureIgnoreCase).ToList(),
+                    "hours" => mine.OrderByDescending(g => PlayTime.Get(g.Def.Id).TotalMs).ToList(),
+                    _ => mine,
+                };
+                foreach (var g in sorted.Take(large ? 8 : 4))
                 {
                     var gs = g;
                     var cover = new Border { CornerRadius = new CornerRadius(10), ClipToBounds = true, Margin = new Thickness(3), Child = Ui.GameImage(g.Def, 240, art: Images.Art.Cover), Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand) };
@@ -282,28 +328,144 @@ public sealed partial class HomePage
             {
                 var notices = Notices(mine).Where(n => n.Kind is "failed" or "health" or "app" or "mods" or "mc" or "pack").ToList();
                 var bad = notices.Count(n => n.Kind is "failed" or "health");
-                var tint = bad > 0 ? Ui.Res("Bad") : notices.Count > 0 ? Ui.Res("Warn") : Ui.Res("Good");
+                var state = bad > 0 ? Ui.Res("Bad") : notices.Count > 0 ? Ui.Res("Warn") : Ui.Res("Good");
                 var first = notices.FirstOrDefault();
-                var lines = new List<Control> { Big(notices.Count == 0 ? "✓" : notices.Count.ToString(), 36, tint), Small(first?.Title ?? I18n.T("v10.w.calm"), lines: wide ? 2 : 1) };
-                return Shell(Stack(Cap(Icons.Bell, I18n.T("v10.w.attention"), tint), lines.ToArray()), first is null ? null : () => (first.Open ?? first.Run)?.Invoke());
+                var lines = new List<Control> { Big(notices.Count == 0 ? "✓" : notices.Count.ToString(), 36, state), Small(first?.Title ?? I18n.T("v10.w.calm"), lines: wide ? 2 : 1) };
+                return Shell(Stack(Cap(Icons.Bell, I18n.T("v10.w.attention"), state), lines.ToArray()), first is null ? null : () => (first.Open ?? first.Run)?.Invoke());
             }
             case "streak":
             {
                 var n = PlayStreak.Current();
-                return Shell(Stack(Cap(Icons.Flame, I18n.T("v10.w.streak"), Ui.Hex("#FF8A1F")), Big(n.ToString(), 40, Ui.Hex("#FF8A1F")), Small(I18n.T("v10.w.streak.days." + I18n.Plural(n, "one", "few", "many"), ("n", n)), lines: 1)), null);
+                var flame = tint ?? Ui.Hex("#FF8A1F");
+                return Shell(Stack(Cap(Icons.Flame, I18n.T("v10.w.streak"), flame), Big(n.ToString(), 40, flame), Small(I18n.T("v10.w.streak.days." + I18n.Plural(n, "one", "few", "many"), ("n", n)), lines: 1)), null, wash);
             }
             case "random":
             {
-                var pool = mine.Where(g => !g.Def.IsMinecraft).ToList();
-                if (pool.Count == 0) return Shell(Stack(Cap(Icons.Shuffle, I18n.T("v10.w.random")), Small(I18n.T("home.noGames"))), null);
-                var g = pool[(DateTime.Today.DayOfYear + DateTime.Now.Hour) % pool.Count];
+                var from = e.Get("from");
+                var steamPool = from is "steam" or "all" ? SteamLibrary.Installed.Where(a => SteamLibrary.Managed(a.AppId) is null).ToList() : [];
+                var pool = from == "steam" ? [] : mine.Where(g => !g.Def.IsMinecraft).ToList();
+                var total = pool.Count + steamPool.Count;
+                if (total == 0) return Shell(Stack(Cap(Icons.Shuffle, I18n.T("v10.w.random")), Small(I18n.T("home.noGames"))), null);
+                var at = (DateTime.Today.DayOfYear + DateTime.Now.Hour) % total;
+                if (at >= pool.Count) return SteamTile(steamPool[at - pool.Count], size, Cap(Icons.Shuffle, I18n.T("v10.w.random"), Brushes.White));
+                var g = pool[at];
                 var words = Ui.Col(4, Cap(Icons.Shuffle, I18n.T("v10.w.random"), Brushes.White), new TextBlock { Text = g.Def.Name, FontWeight = FontWeight.Bold, FontSize = wide ? 18 : 14, Foreground = Brushes.White, TextTrimming = TextTrimming.CharacterEllipsis });
                 words.VerticalAlignment = VerticalAlignment.Bottom;
                 words.Margin = new Thickness(14);
                 return Shell(new Panel { Children = { Ui.GameImage(g.Def, 600, art: wide ? Images.Art.Hero : Images.Art.Cover), new Border { Background = Gx.ShadeUp(0.3, 230) }, words } }, () => Go(() => new GamePage(g.Def.Id)), pad: 0);
             }
+            case "game":
+            {
+                var (own, steam) = PickGame(e.Get("game"), null);
+                if (own is not null) return GameTile(own, size);
+                if (steam is not null) return SteamTile(steam, size, null);
+                var pick = Ui.Button(I18n.T("v12w.pick"), () => OpenStudio(edit: index), "primary", Icons.Sliders);
+                pick.HorizontalAlignment = HorizontalAlignment.Left;
+                return Shell(Stack(Cap(Icons.Gamepad, I18n.T("v10.w.name.game")), Small(I18n.T("v12w.game.empty")), pick), null);
+            }
+            case "note":
+            {
+                var text = e.Get("text");
+                var body = text == ""
+                    ? Small(I18n.T("v12w.note.empty"), Ui.Res("Faint"), 4)
+                    : new TextBlock { Text = text, FontSize = large ? 20 : wide ? 17 : 15, FontWeight = FontWeight.SemiBold, Foreground = Ui.Res("Text"), TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis, MaxLines = large ? 9 : wide ? 3 : 4, LineHeight = large ? 27 : 22 };
+                var note = new DockPanel();
+                var cap = Cap(Icons.Edit, I18n.T("v10.w.name.note"), tint ?? Ui.Hex("#F5C542"));
+                DockPanel.SetDock(cap, Dock.Top);
+                cap.Margin = new Thickness(0, 0, 0, 8);
+                note.Children.Add(cap);
+                note.Children.Add(body);
+                return Shell(note, () => OpenStudio(edit: index), wash ?? Wash(Ui.Hex("#F5C542")));
+            }
+            case "steam":
+            {
+                var apps = SteamLibrary.Sorted(e.Get("sort")).ToList();
+                var top = new DockPanel();
+                var count = new TextBlock { Text = apps.Count.ToString(), FontFamily = Look.Display, FontWeight = FontWeight.Bold, FontSize = 15, Foreground = Ui.Res("Brand2") };
+                DockPanel.SetDock(count, Dock.Right);
+                top.Children.Add(count);
+                top.Children.Add(Cap(Icons.Layers, I18n.T("v10.w.name.steam")));
+                if (apps.Count == 0) return Shell(Stack(top, Small(I18n.T("v12w.steam.none"))), () => Go(() => new SteamGamesPage()));
+                var wrap = new Avalonia.Controls.Primitives.UniformGrid { Columns = large ? 4 : 5, Rows = large ? 2 : 1 };
+                foreach (var a in apps.Take(large ? 8 : 5))
+                {
+                    var app = a;
+                    var cover = new Border { CornerRadius = new CornerRadius(8), ClipToBounds = true, Margin = new Thickness(3), Child = WebArt(SteamLibrary.Cover(a.AppId), GameDef.SteamArt(a.AppId), a.Name, 300), Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand) };
+                    ToolTip.SetTip(cover, a.Name);
+                    if (!_editWidgets) StoreKit.OnClick(cover, () => PlaySteam(app));
+                    wrap.Children.Add(cover);
+                }
+                return Shell(Stack(top, wrap), () => Go(() => new SteamGamesPage()), pad: 14);
+            }
         }
         return Shell(Small(id), null);
+    }
+
+    /// <summary>Игра Steam: своя в ModLaunch — страница игры (с модами), иначе — запуск через Steam.</summary>
+    static void PlaySteam(SteamApp a)
+    {
+        if (SteamLibrary.Managed(a.AppId) is { } g) MainWindow.Current?.Navigate(() => new GamePage(g.Def.Id));
+        else SteamLibrary.Play(a.AppId);
+    }
+
+    /// <summary>Картинка по ссылке на весь виджет; не загрузилась — запасная, потом мягкий цветной фон с буквой.</summary>
+    internal static Control WebArt(string url, string? fallback, string name, int decode)
+    {
+        var hue = (int)(name.Aggregate(17u, (h, c) => h * 31 + c) % 360);
+        var back = new Border
+        {
+            Background = new LinearGradientBrush
+            {
+                StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
+                GradientStops = { new GradientStop(Ui.HslColor(hue, 0.45, 0.32), 0), new GradientStop(Ui.HslColor((hue + 40) % 360, 0.5, 0.18), 1) },
+            },
+            Child = new TextBlock { Text = name.Length > 0 ? name[..1].ToUpper(I18n.Culture) : "?", FontSize = 22, FontWeight = FontWeight.Bold, Foreground = new SolidColorBrush(Color.FromArgb(150, 255, 255, 255)), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
+        };
+        var image = new Image { Stretch = Stretch.UniformToFill };
+        _ = Images.FromUrl(url, decode).ContinueWith(async t =>
+        {
+            var bmp = t.Result ?? (fallback is null ? null : await Images.FromUrl(fallback, decode));
+            if (bmp is not null) Avalonia.Threading.Dispatcher.UIThread.Post(() => image.Source = bmp);
+        });
+        return new Panel { Children = { back, image } };
+    }
+
+    /// <summary>Виджет «Игра» для игры ModLaunch: обложка или герой, имя и «Играть».</summary>
+    Control GameTile(GameState g, string size)
+    {
+        var large = size == "l";
+        var play = Launcher.IsRunning(g.Def.Id) ? PlayControls.RunningPill(g.Def.Id, big: false) : Ui.Button(I18n.T("games.play"), () => Actions.Play(g), "primary", Icons.Play);
+        play.HorizontalAlignment = HorizontalAlignment.Left;
+        var hours = PlayTime.Get(g.Def.Id).TotalMs / 3_600_000;
+        var words = size == "s"
+            ? Ui.Col(6, new TextBlock { Text = g.Def.ShortName, FontWeight = FontWeight.Bold, FontSize = 14, Foreground = Brushes.White, TextTrimming = TextTrimming.CharacterEllipsis }, play)
+            : Ui.Col(8, Gx.Eyebrow(hours > 0 ? I18n.T("v12w.game.hours", ("n", hours)) : I18n.T("v93.home.notPlayed"), Ui.Hex("#E6E7EE"), 10), Gx.Title(g.Def.Name, large ? 26 : 20, Brushes.White, 2), play);
+        words.VerticalAlignment = VerticalAlignment.Bottom;
+        words.Margin = new Thickness(size == "s" ? 12 : 18, 12, 12, size == "s" ? 12 : 16);
+        var art = size == "s" ? Images.Art.Cover : Images.Art.Hero;
+        var tile = Shell(new Panel { Children = { Ui.GameImage(g.Def, size == "s" ? 400 : 1024, art: art), new Border { Background = Gx.ShadeUp(0.25, 230) }, words } }, () => MainWindow.Current?.Navigate(() => new GamePage(g.Def.Id)), pad: 0);
+        tile.ContextFlyout = GameCard.Menu(g);
+        return tile;
+    }
+
+    /// <summary>Виджет игры Steam без модов: картинка Steam, имя, «Играть» через Steam (не установлена — «Установить»).</summary>
+    static Control SteamTile(SteamApp a, string size, Control? cap)
+    {
+        var installed = SteamLibrary.ById(a.AppId) is not null;
+        var play = installed
+            ? Ui.Button(I18n.T("games.play"), () => SteamLibrary.Play(a.AppId), "primary", Icons.Play)
+            : Ui.Button(I18n.T("v12w.steam.install"), () => SteamLibrary.Install(a.AppId), "", Icons.Download);
+        play.HorizontalAlignment = HorizontalAlignment.Left;
+        var badge = new Border { Background = new SolidColorBrush(Color.FromArgb(150, 10, 12, 20)), CornerRadius = new CornerRadius(6), Padding = new Thickness(7, 2), HorizontalAlignment = HorizontalAlignment.Left, Child = new TextBlock { Text = "STEAM", FontSize = 9.5, FontWeight = FontWeight.Bold, LetterSpacing = 1, Foreground = Ui.Hex("#C7D5E0") } };
+        var words = Ui.Col(size == "s" ? 6 : 8);
+        if (cap is not null) words.Children.Add(cap);
+        else words.Children.Add(badge);
+        words.Children.Add(new TextBlock { Text = a.Name, FontWeight = FontWeight.Bold, FontSize = size == "s" ? 14 : size == "l" ? 24 : 19, Foreground = Brushes.White, TextTrimming = TextTrimming.CharacterEllipsis, TextWrapping = TextWrapping.Wrap, MaxLines = 2 });
+        if (cap is null) words.Children.Add(play);
+        words.VerticalAlignment = VerticalAlignment.Bottom;
+        words.Margin = new Thickness(size == "s" ? 12 : 18, 12, 12, size == "s" ? 12 : 16);
+        var art = size == "s" ? WebArt(SteamLibrary.Cover(a.AppId), GameDef.SteamArt(a.AppId), a.Name, 400) : WebArt(SteamLibrary.Hero(a.AppId), GameDef.SteamArt(a.AppId), a.Name, 1024);
+        return Shell(new Panel { Children = { art, new Border { Background = Gx.ShadeUp(0.25, 230) }, words } }, () => PlaySteam(a), pad: 0);
     }
 
     /// <summary>Кольцо прогресса (0…1) с местом под текст в середине.</summary>
@@ -349,13 +511,14 @@ public sealed partial class HomePage
     }
 
     /// <summary>«Добавить виджет»: все виды.</summary>
-    Control Gallery(List<(string Id, string Size)> layout)
+    Control Gallery(List<Widgets.Entry> layout)
     {
         var row = new WrapPanel();
         foreach (var k in Widgets.Catalog)
         {
             var icon = typeof(Icons).GetField(k.Icon)?.GetValue(null) as string ?? Icons.Grid;
-            var b = Ui.Button(I18n.T("v10.w.name." + k.Id), () => Widgets.Add(k.Id), "", icon, I18n.T("v10.w.add.one"));
+            var kind = k.Id;
+            var b = Ui.Button(I18n.T("v10.w.name." + k.Id), () => OpenStudio(kind: kind), "", icon, I18n.T("v10.w.add.one"));
             b.Margin = new Thickness(0, 0, 8, 8);
             row.Children.Add(b);
         }

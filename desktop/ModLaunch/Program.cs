@@ -34,6 +34,8 @@ public static class Program
     public static int Main(string[] args)
     {
         if (args.Contains("--catalog-report")) return CatalogReport.Run().GetAwaiter().GetResult();
+        // 12.0: справочник игр из живых списков → снимок Assets/gamedir.config.json (CI: gamedir.yml).
+        if (args.Contains("--gen-directory")) return Games.GameDirectory.Generate(args).GetAwaiter().GetResult();
         if (args.Contains("--selfcheck")) return SelfCheck.Run().GetAwaiter().GetResult();
         if (args.Contains("--selftest")) { Hooks.PrepareSelfTest(); StartHeadless(); return Hooks.SelfTest(); }
         var shot = Array.IndexOf(args, "--screenshot");
@@ -186,7 +188,7 @@ public static class Program
         Save("4-catalog");
         window.Navigate(() => new GamePage("valheim"));
         Save("5-loader");
-        window.Navigate(() => new GamePage("hollow-knight"));
+        window.Navigate(() => new GamePage("gtfo")); // 12.0: Hollow Knight теперь есть в демо — «не найдена» показываем на GTFO
         Save("6-notfound");
         window.Navigate(() => new SettingsPage("games"));
         Save("7-settings");

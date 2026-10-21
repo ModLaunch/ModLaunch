@@ -25,7 +25,7 @@ public static class V92Shots
         s.Save("v92-2-library-list");
         Settings.Data["libraryView"] = "grid";
 
-        foreach (var (id, tab, name) in new[] { ("subnautica", "", "overview"), ("subnautica", "installed", "installed"), ("lethal-company", "catalog", "catalog"), ("valheim", "", "loader"), ("hollow-knight", "", "notfound") })
+        foreach (var (id, tab, name) in new[] { ("subnautica", "", "overview"), ("subnautica", "installed", "installed"), ("lethal-company", "catalog", "catalog"), ("valheim", "", "loader"), ("gtfo", "", "notfound") })
         {
             w.Navigate(() => new GamePage(id, tab));
             s.Pump(1400);

@@ -383,10 +383,67 @@ public static class GameCatalog
         },
     ];
 
-    /// <summary>Все игры: встроенные и свои (свои живут в AppState.Games).</summary>
-    public static GameDef[] All => Core.AppState.Games.Select(g => g.Def).ToArray();
+    /// <summary>Все игры: встроенные и свои (свои живут в AppState.Games). Массив общий — не менять.</summary>
+    public static GameDef[] All => Current.Defs;
 
-    public static GameDef? ById(string id) => All.FirstOrDefault(g => g.Id == id);
+    public static GameDef? ById(string id) => Current.Map.GetValueOrDefault(id);
+
+    /// <summary>Снимок списка игр и словарь по id.</summary>
+    sealed record Snapshot(int Count, GameDef[] Defs, Dictionary<string, GameDef> Map);
+
+    static Snapshot? _index;
+    static readonly object IndexLock = new();
+
+    /// <summary>
+    /// 12.0: своих игр из справочника может быть сотни, а ById и All зовут на каждой перерисовке —
+    /// поэтому снимок и словарь, а не новый массив и перебор на каждый вызов. Список меняют только
+    /// CustomGames.Add/Remove (они зовут Invalidate); сверка числа игр — страховка на случай других правок.
+    /// </summary>
+    static Snapshot Current
+    {
+        get
+        {
+            var games = Core.AppState.Games;
+            var index = _index;
+            if (index is not null && index.Count == games.Count) return index;
+            lock (IndexLock)
+            {
+                index = _index;
+                if (index is not null && index.Count == games.Count) return index;
+                // ToArray у List не проверяет версию: из фонового потока не упадёт посреди добавления.
+                var defs = Array.ConvertAll(games.ToArray(), g => g.Def);
+                var map = new Dictionary<string, GameDef>(defs.Length);
+                foreach (var d in defs) map.TryAdd(d.Id, d);
+                return _index = new Snapshot(defs.Length, defs, map);
+            }
+        }
+    }
+
+    /// <summary>Список игр поменялся — следующий All/ById соберёт снимок заново.</summary>
+    public static void Invalidate() { lock (IndexLock) _index = null; }
+
+    /// <summary>ById через словарь: те же игры, что и перебором, и новая своя игра видна сразу после Invalidate.</summary>
+    [SelfTest]
+    static string CatalogIndexById()
+    {
+        foreach (var g in Builtin)
+            if (!ReferenceEquals(ById(g.Id), Core.AppState.Games.First(s => s.Def.Id == g.Id).Def)) throw new Exception("wrong def for " + g.Id);
+        if (ById("no-such-game") is not null) throw new Exception("phantom game");
+        if (!ReferenceEquals(All, All)) throw new Exception("All is rebuilt on every call");
+        var probe = new Core.GameState { Def = new GameDef
+        {
+            Id = "custom-index-probe", Name = "Probe", ShortName = "Probe", SteamAppId = 0, FolderNames = [], Accent = "#7C5CFF",
+            Loader = LoaderKind.None, LoaderName = "—", LoaderSite = "", Catalog = CatalogKind.None, BrowseUrl = "", Sections = [], Executables = ["probe.exe"], ModMarker = "any",
+        } };
+        Core.AppState.Games.Add(probe);
+        try
+        {
+            if (ById("custom-index-probe") != probe.Def || !All.Contains(probe.Def)) throw new Exception("added game not indexed");
+        }
+        finally { Core.AppState.Games.Remove(probe); Invalidate(); }
+        if (ById("custom-index-probe") is not null) throw new Exception("removed game still indexed");
+        return $"{All.Length} games indexed, add/remove seen";
+    }
 
     /// <summary>Сохранения в Steam: userdata/&lt;id&gt;/&lt;appid&gt;/remote/UserProfiles.</summary>
     static Func<string, string> SteamUserdataSaves(int appId) => gamePath =>

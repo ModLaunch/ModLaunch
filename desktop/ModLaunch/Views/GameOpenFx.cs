@@ -98,6 +98,9 @@ public static class GameOpenFx
         return run;
     }
 
+    /// <summary>Досрочно завершить идущую анимацию открытия игры (ушли на другую страницу).</summary>
+    public static void Cancel() => _active?.Finish();
+
     [SelfTest]
     static string NeverThreeInARow()
     {

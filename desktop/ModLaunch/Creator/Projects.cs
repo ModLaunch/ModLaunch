@@ -8,9 +8,11 @@ using ModLaunch.Mods;
 
 namespace ModLaunch.Creator;
 
-public sealed record Project(string Id, string Dir, string Name, string Game, DateTime Updated)
+public sealed record Project(string Id, string Dir, string Name, string Game, DateTime Updated, string Version = "")
 {
     public string Script => Path.Combine(Dir, "main" + ModScript.Extension);
+    /// <summary>12.0: история проекта (сборки, проверки, выпуски) — creator/&lt;проект&gt;/project.json.</summary>
+    public ProjectMeta Meta() => ProjectMeta.Load(Dir);
 }
 
 /// <summary>Результат сборки: архив мода и что в нём.</summary>
@@ -29,9 +31,12 @@ public static partial class Projects
     private static partial Regex ModLine();
     [GeneratedRegex(@"^\s*game\s+(\S+)", RegexOptions.Multiline)]
     private static partial Regex GameLine();
+    [GeneratedRegex(@"^\s*version\s+""?([^""\s]+)", RegexOptions.Multiline)]
+    private static partial Regex VersionLine();
 
     public static List<Project> List()
     {
+        if (FromBatch() is { } batch) return batch;
         var list = new List<Project>();
         foreach (var dir in Directory.EnumerateDirectories(Root))
         {
@@ -41,7 +46,8 @@ public static partial class Projects
             if (!File.Exists(script)) continue;
             var text = File.ReadAllText(script);
             list.Add(new Project(name, dir, ModLine().Match(text) is { Success: true } m ? m.Groups[1].Value : name,
-                GameLine().Match(text) is { Success: true } g ? g.Groups[1].Value : "", File.GetLastWriteTimeUtc(script)));
+                GameLine().Match(text) is { Success: true } g ? g.Groups[1].Value : "", File.GetLastWriteTimeUtc(script),
+                VersionLine().Match(text) is { Success: true } v ? v.Groups[1].Value : ""));
         }
         return list.OrderByDescending(p => p.Updated).ToList();
     }
@@ -60,11 +66,18 @@ public static partial class Projects
         return Get(id)!;
     }
 
-    public static void Save(Project p, string code) => File.WriteAllText(p.Script, code);
+    public static void Save(Project p, string code)
+    {
+        // 12.0: тот же текст не переписываем — по времени изменения скрипта видно «код менялся после сборки».
+        try { if (File.Exists(p.Script) && File.ReadAllText(p.Script) == code) return; } catch { }
+        File.WriteAllText(p.Script, code);
+    }
 
     public static void Delete(Project p)
     {
         try { Directory.Delete(p.Dir, true); } catch { }
+        // Сборки проекта без самого проекта не нужны.
+        try { if (Directory.Exists(BuildsDir(p.Id))) Directory.Delete(BuildsDir(p.Id), true); } catch { }
     }
 
     /// <summary>Имя пакета Thunderstore: только буквы, цифры и «_».</summary>
@@ -79,8 +92,27 @@ public static partial class Projects
 
     // ---------------------------------------------------------------- сборка
 
-    /// <summary>Собрать архив. dir — папка проекта (для copy/image), null — скрипт без своих файлов (из галереи).</summary>
+    /// <summary>
+    /// Собрать архив. dir — папка проекта (для copy/image), null — скрипт без своих файлов (из галереи).
+    /// 12.0: сборка проекта мастерской записывается в его project.json — и удачная, и нет.
+    /// </summary>
     public static async Task<Packed> Pack(ModBuild b, string? dir, CancellationToken ct = default)
+    {
+        var project = ProjectIdOf(dir) is not null ? dir : null;
+        try
+        {
+            var packed = await PackCore(b, dir, ct);
+            if (project is not null) ProjectMeta.NoteBuild(project, true, packed.Warnings.Count, packed.Zip, b.Version);
+            return packed;
+        }
+        catch when (project is not null && !ct.IsCancellationRequested)
+        {
+            ProjectMeta.NoteBuild(project, false, 0, null, b.Version);
+            throw;
+        }
+    }
+
+    static async Task<Packed> PackCore(ModBuild b, string? dir, CancellationToken ct)
     {
         if (!b.Ok) throw new InvalidOperationException(I18n.T("cr.build.hasErrors"));
         var game = GameCatalog.ById(b.Game) ?? throw new InvalidOperationException(I18n.T("cr.build.noGame", ("game", b.Game)));
@@ -179,7 +211,7 @@ public static partial class Projects
             files["modlaunch-ini.json"] = Utf8(edits.ToJsonString(Pretty));
         }
 
-        var zip = Path.Combine(OutDir, $"{PackageName(b.Name)}-{b.Version}.zip");
+        var zip = ZipPath(b, dir);
         if (File.Exists(zip)) File.Delete(zip);
         using (var archive = ZipFile.Open(zip, ZipArchiveMode.Create))
         {
@@ -190,7 +222,67 @@ public static partial class Projects
                 await s.WriteAsync(bytes, ct);
             }
         }
+        // 12.0: у проекта — свои сборки по версиям; старые сверх KeepBuilds убираем.
+        if (Path.GetDirectoryName(zip) is { } own && !SamePath(own, OutDir)) Prune(own, KeepBuilds);
         return new Packed(zip, format, files.Keys.ToList(), warnings);
+    }
+
+    // ---------------------------------------------------------------- сборки по версиям
+
+    /// <summary>Сколько сборок проекта держать (каждая версия — свой архив).</summary>
+    public const int KeepBuilds = 5;
+
+    /// <summary>Сборки проекта: _build/&lt;проект&gt;/.</summary>
+    public static string BuildsDir(string projectId) => Path.Combine(OutDir, projectId);
+
+    static bool SamePath(string a, string b) =>
+        string.Equals(Path.GetFullPath(a).TrimEnd(Path.DirectorySeparatorChar), Path.GetFullPath(b).TrimEnd(Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Папка — проект мастерской (creator/&lt;проект&gt;)? Тогда его id, иначе null.</summary>
+    public static string? ProjectIdOf(string? dir)
+    {
+        if (string.IsNullOrEmpty(dir)) return null;
+        var full = Path.GetFullPath(dir).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var id = Path.GetFileName(full);
+        return id.Length > 0 && !id.StartsWith('_') && Path.GetDirectoryName(full) is { } parent && SamePath(parent, Root) ? id : null;
+    }
+
+    /// <summary>Архив из сборок проекта (_build/&lt;проект&gt;/…) — чей он; общая _build и чужие пути — null.</summary>
+    public static string? ProjectIdOfZip(string zip)
+    {
+        var folder = Path.GetDirectoryName(Path.GetFullPath(zip));
+        return folder is not null && Path.GetDirectoryName(folder) is { } parent && SamePath(parent, OutDir) ? Path.GetFileName(folder) : null;
+    }
+
+    /// <summary>
+    /// Куда собрать: проект мастерской — _build/&lt;проект&gt;/&lt;Имя&gt;-&lt;версия&gt;.zip (версии не затирают друг друга,
+    /// а имя файла остаётся понятным тем, кто скачает его из Hub); скрипт без проекта — как раньше, в общую _build.
+    /// </summary>
+    static string ZipPath(ModBuild b, string? dir)
+    {
+        var file = $"{PackageName(b.Name)}-{Regex.Replace(b.Version, @"[^\w.\-]+", "_")}.zip";
+        return ProjectIdOf(dir) is { } id ? Path.Combine(Directory.CreateDirectory(BuildsDir(id)).FullName, file) : Path.Combine(OutDir, file);
+    }
+
+    /// <summary>Сборки проекта, свежие первыми.</summary>
+    public static List<FileInfo> Builds(string projectId)
+    {
+        var dir = new DirectoryInfo(BuildsDir(projectId));
+        try { return dir.Exists ? dir.EnumerateFiles("*.zip").OrderByDescending(f => f.LastWriteTimeUtc).ToList() : []; }
+        catch { return []; }
+    }
+
+    /// <summary>Оставить keep свежих архивов в папке, остальные удалить.</summary>
+    public static int Prune(string dir, int keep)
+    {
+        var removed = 0;
+        try
+        {
+            foreach (var old in new DirectoryInfo(dir).EnumerateFiles("*.zip").OrderByDescending(f => f.LastWriteTimeUtc).Skip(keep))
+                try { old.Delete(); removed++; } catch { }
+        }
+        catch { }
+        return removed;
     }
 
     static readonly System.Text.Json.JsonSerializerOptions Pretty = new() { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
@@ -232,6 +324,9 @@ public static partial class Projects
         if (g.Path is null || g.Registry is null) throw new InvalidOperationException(I18n.T("cr.install.noGame"));
         var record = Install(g.Registry, b, packed, "creator:" + PackageName(b.Name), "creator");
         g.Refresh();
+        // 12.0: сборка проекта — отметить в его истории, куда и какая версия поставлена.
+        if (ProjectIdOfZip(packed.Zip) is { } id && Directory.Exists(Path.Combine(Root, id)))
+            ProjectMeta.Update(Path.Combine(Root, id), m => m.LastInstall = new InstallNote(DateTime.UtcNow, g.Def.Id, b.Version));
         return record;
     }
 

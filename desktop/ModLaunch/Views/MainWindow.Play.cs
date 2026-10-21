@@ -39,6 +39,8 @@ public sealed partial class MainWindow
     {
         var screen = new LaunchScreen(g);
         screen.Closed += HideLaunch;
+        // 12.0: прежний экран запуска останавливаем, а не просто убираем — иначе он доведёт свой запуск до конца.
+        foreach (var old in _launchLayer.Children.OfType<LaunchScreen>().ToList()) { old.Closed -= HideLaunch; old.Close(); }
         _launchLayer.Children.Clear();
         _launchLayer.Children.Add(screen);
         _launchLayer.IsVisible = true;

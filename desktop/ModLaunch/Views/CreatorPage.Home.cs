@@ -15,44 +15,26 @@ public sealed partial class CreatorPage
     // ---------------------------------------------------------------- главная
 
     /// <summary>
-    /// Главная Creator Hub (9.1, по эскизу): слева «+ Создать» и «Опубликовать», под ними — мои моды;
-    /// справа — две высокие карточки (хит Hub и новинка маркета). Ниже — популярное, маркет и шаблоны.
+    /// Обзор Creator Hub (12.1 — пульт мастерской): слева «Верстак» с недавними проектами, справа «Путь автора»;
+    /// ниже — ящики с инструментами, популярное в Hub, новое в маркете и шаблоны.
+    /// Цифры автора и «Новый проект» — в шапке Hub (HubNav.Frame).
     /// </summary>
     Control Home()
     {
         if (_hub is null && !_hubLoading && !Program.Screenshot) _ = LoadHub();
         if (_market is null && !_marketLoading && !Program.Screenshot) _ = LoadMarket();
-        var col = new StackPanel { Spacing = 24 };
-        // Сверху — «Студия автора» и быстрые инструменты.
-        var studio = StudioHeader();
+        var col = new StackPanel { Spacing = 26 };
+        var top = new Grid { ColumnDefinitions = new ColumnDefinitions("*,330"), ColumnSpacing = 16 };
+        var bench = Bench();
+        var path = AuthorPath();
+        top.Children.Add(bench);
+        Grid.SetColumn(path, 1);
+        top.Children.Add(path);
         var tools = Tools();
-        col.Children.Add(studio);
+        col.Children.Add(top);
         col.Children.Add(tools);
-        if (!Shown) { Animate.Rise(studio, 0); Animate.Rise(tools, 1); }
+        if (!Shown) { Animate.Rise(top, 0); Animate.Rise(tools, 1); }
 
-        // 10.0: без больших цветных кнопок и высоких карточек — «Создать» уже в шапке,
-        // «Опубликовать» — тихой кнопкой у «Моих модов».
-        var recent = Projects.List().OrderByDescending(p => p.Updated).Take(4).ToList();
-        Control mine;
-        if (recent.Count > 0)
-        {
-            var grid = new UniformGrid { Columns = 4 };
-            foreach (var p in recent) grid.Children.Add(ProjectCard(p));
-            mine = grid;
-        }
-        else
-        {
-            mine = Ui.Card(Ui.Row(14,
-                new Border { Width = 40, Height = 40, CornerRadius = new CornerRadius(20), Background = Ui.Res("Surface2"), Child = Ui.Icon(Icons.Edit, 18, Ui.Res("Muted")) },
-                Ui.Text(I18n.T("v91.cr.myMods.empty"), "muted", wrap: true)), 18);
-        }
-        var publish = Ui.Button(I18n.T("v91.cr.publish"), PublishArchive, "ghost", Icons.Upload);
-        publish.Padding = new Thickness(10, 4);
-        var mineSection = Section(I18n.T("v91.cr.myMods"), () => Go("mine"), mine, publish);
-        col.Children.Add(mineSection);
-        if (!Shown) Animate.Rise(mineSection, 2);
-
-        // Ниже — как раньше: популярное в Hub, свежее в маркете, шаблоны.
         Control popular;
         if (_hubLoading && _hub is null)
         {
@@ -63,20 +45,68 @@ public sealed partial class CreatorPage
         else if (_hubError is not null) popular = Ui.Text(I18n.T("hub.error"), "muted");
         else if ((_hub ?? []).Count == 0) popular = Ui.Text(I18n.T("cr.home.hubEmpty"), "muted");
         else popular = Grid3(Hub.Sort(_hub!, "trending").Take(6));
-        col.Children.Add(Section(I18n.T("cr.home.popular"), () => Go("hub"), popular));
+        col.Children.Add(Section(I18n.T("cr.home.popular"), () => Go("hub"), popular, eyebrow: "Hub"));
 
         var newest = Market.Sort(_market ?? [], "new").Take(3).ToList();
         if (newest.Count > 0)
         {
             var shop = new UniformGrid { Columns = 3 };
             foreach (var l in newest) shop.Children.Add(MarketViews.Card(l));
-            col.Children.Add(Section(I18n.T("mk.home.fresh"), () => Go("market"), shop));
+            col.Children.Add(Section(I18n.T("mk.home.fresh"), () => Go("market"), shop, eyebrow: I18n.T("v95.hub.group.shop")));
         }
 
         var templates = new UniformGrid { Columns = 3 };
         foreach (var t in Templates.All.Take(3)) templates.Children.Add(TemplateCard(t));
-        col.Children.Add(Section(I18n.T("cr.home.templates"), () => Go("examples"), templates));
+        col.Children.Add(Section(I18n.T("cr.home.templates"), () => Go("examples"), templates, eyebrow: I18n.T("v91.cr.tab.templates")));
         return col;
+    }
+
+    /// <summary>«Верстак»: недавние проекты строками — точка статуса, имя и игра, версия, когда менялся.</summary>
+    Control Bench()
+    {
+        var recent = Projects.List().OrderByDescending(p => p.Updated).Take(5).ToList();
+        var publish = Ui.Button(I18n.T("v91.cr.publish"), PublishArchive, "ghost", Icons.Upload);
+        publish.Padding = new Thickness(10, 4);
+        var all = Ui.Button(I18n.T("home.all"), () => Go("mine"), "ghost");
+        all.Padding = new Thickness(10, 4);
+        var body = Ui.Col(2);
+        if (recent.Count == 0)
+        {
+            body.Children.Add(Ui.Text(I18n.T("v91.cr.myMods.empty"), "muted", wrap: true));
+            var start = Ui.Row(8, Ui.Button(I18n.T("v95.hub.newProject"), CreateNew, "primary", Icons.Plus), Ui.Button(I18n.T("cr.tab.examples"), () => Go("examples"), "", Icons.Wand));
+            start.Margin = new Thickness(0, 12, 0, 0);
+            body.Children.Add(start);
+        }
+        foreach (var p in recent)
+        {
+            var project = p;
+            var game = GameCatalog.ById(p.Game);
+            var status = p.Meta().Status(p.Updated);
+            var name = new TextBlock { Text = p.Name, FontWeight = FontWeight.SemiBold, FontSize = 13.5, TextTrimming = TextTrimming.CharacterEllipsis };
+            var words = Ui.Col(1, name, new TextBlock { Text = game?.Name ?? p.Game, FontSize = 12, Foreground = Ui.Res("Muted"), TextTrimming = TextTrimming.CharacterEllipsis });
+            words.VerticalAlignment = VerticalAlignment.Center;
+            var dot = Ui.Dot(StatusBrush(status), 8);
+            ToolTip.SetTip(dot, I18n.T($"v12.pj.st.{status}"));
+            var version = HubLook.MonoText(p.Version == "" ? "—" : "v" + p.Version);
+            var when = HubLook.MonoText(Ui.Ago(p.Updated), 11);
+            var row = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,90,110,Auto"), ColumnSpacing = 12 };
+            row.Children.Add(dot);
+            Grid.SetColumn(words, 1);
+            row.Children.Add(words);
+            Grid.SetColumn(version, 2);
+            row.Children.Add(version);
+            Grid.SetColumn(when, 3);
+            row.Children.Add(when);
+            var go = Ui.Icon(Icons.ChevronRight, 14, Ui.Res("Faint"));
+            go.VerticalAlignment = VerticalAlignment.Center;
+            Grid.SetColumn(go, 4);
+            row.Children.Add(go);
+            var b = new Button { Classes = { "hub-row" }, Content = row };
+            b.Click += (_, _) => OpenProject(project);
+            Ctx.Attach(b, () => ProjectMenu(project));
+            body.Children.Add(b);
+        }
+        return HubLook.Frame(Ui.Col(12, HubLook.Head(I18n.T("v12d.home.bench"), I18n.T("v12d.home.recent"), publish, all), body), new Thickness(18, 16));
     }
 
     /// <summary>Большая кнопка «+ Создать» / «Опубликовать»: значок в кружке, название и пояснение.</summary>
@@ -167,7 +197,7 @@ public sealed partial class CreatorPage
             ? new Panel { Children = { Gradient("#EC4899", MarketViews.KindIcon(l.Kind)), Pic(l.Images[0]) } }
             : game is not null ? Ui.GameImage(game, 500, art: Images.Art.Cover) : Gradient("#EC4899", MarketViews.KindIcon(l.Kind));
         return Tall(art, I18n.T("v91.cr.fresh"), l.Title, $"{l.Author} · {I18n.T("mk.kind." + l.Kind)}", MarketViews.PriceText(l),
-            () => MarketViews.Open(l, () => { _studio = null; _market = null; }));
+            () => MarketViews.Open(l, () => _market = null));
     }
 
     static Control TallPromo(string icon, string title, string text, string accent, Action open) =>
@@ -183,25 +213,18 @@ public sealed partial class CreatorPage
         return image;
     }
 
-    /// <summary>Заголовок раздела со ссылкой «Все» справа (если есть куда вести).</summary>
-    static Control Section(string title, Action? all, Control body, Control? extra = null)
+    /// <summary>Заголовок раздела в духе мастерской: «// ПОДПИСЬ» и название, справа — «Все» (если есть куда вести).</summary>
+    static Control Section(string title, Action? all, Control body, Control? extra = null, string? eyebrow = null)
     {
-        var head = new DockPanel();
-        var actions = Ui.Row(4);
-        if (extra is not null) actions.Children.Add(extra);
+        var actions = new List<Control>();
+        if (extra is not null) actions.Add(extra);
         if (all is not null)
         {
             var more = Ui.Button(I18n.T("home.all"), all, "ghost");
             more.Padding = new Thickness(8, 4);
-            actions.Children.Add(more);
+            actions.Add(more);
         }
-        if (actions.Children.Count > 0)
-        {
-            DockPanel.SetDock(actions, Dock.Right);
-            head.Children.Add(actions);
-        }
-        head.Children.Add(Ui.Text(title, "h2"));
-        return Ui.Col(14, head, body);
+        return Ui.Col(14, HubLook.Head(eyebrow ?? "Creator Hub", title, actions.ToArray()), body);
     }
 
     /// <summary>Большая карточка-действие; акцентная — только одна на экране.</summary>

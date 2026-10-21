@@ -167,7 +167,7 @@ public sealed class LaunchScreen : Panel
             }
             catch { return (0, 0); }
         });
-        await Task.Delay(300);
+        await Task.Delay(140);
         if (_closed) return;
         SetStep(0, conflicts > 0 ? State.Warn : State.Done,
             mods == 0 ? I18n.T("launch.check.none")
@@ -176,7 +176,7 @@ public sealed class LaunchScreen : Panel
 
         var backups = Backups.OnLaunch;
         SetStep(1, backups ? State.Working : State.Skipped, backups ? null : I18n.T("launch.backup.off"));
-        await Task.Delay(backups ? 260 : 120);
+        await Task.Delay(backups ? 140 : 60);
         if (_closed) return; // закрыли до запуска — значит, передумали
         SetStep(2, State.Working, I18n.T("v10.launch.starting", ("game", _g.Def.ShortName)));
         var r = launch();
@@ -187,7 +187,7 @@ public sealed class LaunchScreen : Panel
             ShowFailure(r.Error);
             return;
         }
-        await Task.Delay(320);
+        await Task.Delay(200);
         SetStep(2, State.Done, null);
         ShowSuccess(r.Note);
         await Task.Delay(2200);

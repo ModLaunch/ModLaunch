@@ -265,7 +265,8 @@ public static class SelfCheck
             var lines = new List<string>();
             var small = new List<string>();
             // Minecraft — свой каталог Modrinth под сборку (версия и загрузчик), его проверяют проверки Minecraft.
-            foreach (var g in GameCatalog.All.Where(g => !g.IsMinecraft))
+            // 12.0: только встроенные игры — свои игры из справочника (их сотни) не должны раздувать проверку на CI.
+            foreach (var g in GameCatalog.Builtin.Where(g => !g.IsMinecraft))
             {
                 long total = 0;
                 var parts = new List<string>();
@@ -302,14 +303,14 @@ public static class SelfCheck
         await Check("picks resolve", async () =>
         {
             var bad = new List<string>();
-            foreach (var g in GameCatalog.All)
+            foreach (var g in GameCatalog.Builtin)
             {
                 var found = await Catalog.Many(g, g.Picks);
                 var ids = found.Select(m => m.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
                 bad.AddRange(g.Picks.Where(p => !ids.Contains(p)).Select(p => $"{g.Id}:{p}"));
             }
             if (bad.Count > 0) throw new Exception("not found: " + string.Join(", ", bad));
-            return $"{GameCatalog.All.Sum(g => g.Picks.Length)} picks, all found";
+            return $"{GameCatalog.Builtin.Sum(g => g.Picks.Length)} picks, all found";
         });
         await Check("conflicts + archive + notes", () =>
         {
@@ -540,6 +541,22 @@ public static class SelfCheck
             var pad = new Features.Gamepad();
             for (var i = 0; i < 3; i++) pad.Tick();
             return Task.FromResult(pad.Connected ? "gamepad connected" : "no gamepad (expected on CI), polling is safe");
+        });
+
+        // 12.0: справочник игр из живых списков — больше тысячи. Сеть не ответила — пропуск; ответ с ошибкой (адрес сменился) — провал.
+        await Check("game directory (live)", async () =>
+        {
+            (string Schema, string Nexus, List<string> Communities) raw;
+            try { raw = await GameDirectory.Download(60); }
+            catch (Exception e) when (e is OperationCanceledException || e is HttpRequestException { StatusCode: null }) { return $"skipped (network: {e.Message})"; }
+            var list = GameDirectory.Build(raw.Schema, raw.Nexus, raw.Communities);
+            if (list.Count < GameDirectory.Target) throw new Exception($"only {list.Count} games");
+            var missing = new[] { "skyrimspecialedition", "cyberpunk2077" }.Where(d => !list.Any(g => g.NexusDomain == d))
+                .Concat(new[] { "lethal-company" }.Where(c => !list.Any(g => g.Community == c))).ToList();
+            if (missing.Count > 0) throw new Exception("missing: " + string.Join(", ", missing));
+            var lc = list.First(g => g.Community == "lethal-company");
+            if (lc.NexusDomain != "lethalcompany" || lc.SteamAppId != 1966720 || lc.Loader != "bepinex") throw new Exception("lethal company merge: " + lc);
+            return $"{list.Count} games: {list.Count(g => g.Community is not null)} thunderstore, {list.Count(g => g.NexusDomain is not null)} nexus, {list.Count(g => g.SteamAppId > 0)} steam ids";
         });
 
         // Быстрые проверки функций без сети (те же, что в --selftest).

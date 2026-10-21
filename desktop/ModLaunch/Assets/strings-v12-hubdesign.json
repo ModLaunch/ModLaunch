@@ -1,0 +1,32 @@
+{
+  "ru": {
+    "v12d.rail.overview": "Обзор",
+    "v12d.rail.projects": "Мои проекты",
+    "v12d.rail.studio": "мастерская автора",
+    "v12d.rail.hub": "Сообщество",
+    "v12d.home.bench": "верстак",
+    "v12d.home.recent": "Недавние проекты",
+    "v12d.home.path": "путь автора",
+    "v12d.home.pathDone": "{done} из {all} шагов",
+    "v12d.ide.path": "проекты",
+    "v12d.ide.keys": "F5 — собрать и проверить · Shift+F5 — остановить · Ctrl+S — сохранить",
+    "v12d.ide.check": "проверка кода",
+    "v12d.ide.run": "запуск",
+    "v12d.ov.project": "проект"
+  },
+  "en": {
+    "v12d.rail.overview": "Overview",
+    "v12d.rail.projects": "My projects",
+    "v12d.rail.studio": "creator workshop",
+    "v12d.rail.hub": "Community",
+    "v12d.home.bench": "workbench",
+    "v12d.home.recent": "Recent projects",
+    "v12d.home.path": "creator path",
+    "v12d.home.pathDone": "{done} of {all} steps",
+    "v12d.ide.path": "projects",
+    "v12d.ide.keys": "F5 — build and test · Shift+F5 — stop · Ctrl+S — save",
+    "v12d.ide.check": "code check",
+    "v12d.ide.run": "run",
+    "v12d.ov.project": "project"
+  }
+}

@@ -11,7 +11,7 @@ public sealed record UiConfig(string Id, string Name, string Author, string Abou
 {
     public string? Get(string key) => Lines.LastOrDefault(l => l.Key == key).Value;
     public List<(string Id, string Size)> Widgets() => Lines.Where(l => l.Key == "widget")
-        .Select(l => l.Value.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries))
+        .Select(l => l.Value.Split(' ', 3, StringSplitOptions.RemoveEmptyEntries))
         .Where(p => p.Length > 0).Select(p => (p[0], p.Length > 1 ? p[1] : "s")).ToList();
 }
 

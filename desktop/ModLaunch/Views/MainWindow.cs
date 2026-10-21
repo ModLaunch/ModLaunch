@@ -204,6 +204,21 @@ public sealed partial class MainWindow : Window
         SmoothScroll.Attach(this);
         // Где нажали в последний раз — отсюда «вырастает» страница мода.
         AddHandler(PointerPressedEvent, (_, e) => { _lastPress = e.GetPosition(this); _pointerDown = true; }, Avalonia.Interactivity.RoutingStrategies.Tunnel, handledEventsToo: true);
+        // 12.0: Ctrl+Enter — до того, как нажатая раньше кнопка (фокус остаётся на ней) примет Enter за клик.
+        // В полях ввода не срабатывает; пока идёт экран запуска — тоже (иначе игра запустится дважды).
+        AddHandler(KeyDownEvent, (_, e) =>
+        {
+            if (e.KeyModifiers != KeyModifiers.Control || e.Key != Key.Enter || FocusManager?.GetFocusedElement() is TextBox) return;
+            if (_overlay.IsVisible || _launchLayer.IsVisible || CurrentGame() is not { } playing) return;
+            e.Handled = true;
+            Actions.Play(playing);
+        }, Avalonia.Interactivity.RoutingStrategies.Tunnel);
+        // 12.0: боковые кнопки мыши — назад и вперёд, как в браузере.
+        AddHandler(PointerReleasedEvent, (_, e) =>
+        {
+            if (e.InitialPressMouseButton == MouseButton.XButton1) { GoBack(); e.Handled = true; }
+            else if (e.InitialPressMouseButton == MouseButton.XButton2) { GoForward(); e.Handled = true; }
+        }, Avalonia.Interactivity.RoutingStrategies.Tunnel);
         // 9.5: перерисовка страницы, пришедшая между нажатием и отпусканием кнопки мыши, ждёт отпускания —
         // иначе кнопка, по которой щёлкнули, пропадала вместе со старой страницей и щелчок терялся.
         AddHandler(PointerReleasedEvent, (_, _) =>
@@ -574,7 +589,6 @@ public sealed partial class MainWindow : Window
             (I18n.T("look.title"), Icons.Palette, () => Navigate(() => new SettingsPage("look"))),
             (I18n.T("v11.cm.title"), Icons.Users, () => Navigate(() => new CommunityPage())),
             (I18n.T("acc.page"), Icons.User, () => Navigate(() => new AccountPage())),
-            (I18n.T("mk.tab"), Icons.Bag, () => Navigate(() => new MarketPage())),
             ("Minecraft", Icons.Cube, () => Navigate(() => new MinecraftPage())),
             ("Minecraft · " + I18n.T("mine.tab.catalog"), Icons.Bag, () => Navigate(() => new MinecraftPage("catalog"))),
             ("Minecraft · " + I18n.T("mine.build.new"), Icons.Plus, () => { Navigate(() => new MinecraftPage("builds")); MinecraftPage.CreateDialog(); }),
@@ -584,18 +598,41 @@ public sealed partial class MainWindow : Window
             (I18n.T("cmd.theme"), Icons.Eye, () => Look.SetTheme(Look.Themes[(Array.IndexOf(Look.Themes, Look.Theme) + 1) % Look.Themes.Length])),
             (I18n.T("keys.title"), Icons.Key, () => Shortcuts()),
         };
+        // 12.0: Creator Hub — одной строкой выше (раньше ещё и «Маркет» вёл на ту же страницу), а здесь —
+        // его вкладки, «Новый проект» и свои проекты: открыть сразу в редакторе.
+        foreach (var (id, key, icon) in HubNav.Tabs.Where(t => t.Id != "store"))
+        {
+            var tab = id;
+            commands.Add(($"Creator Hub · {I18n.T(key)}", icon, () => HubNav.Open(tab)));
+        }
+        commands.Add((I18n.T("v12h2.cmd.newProject"), Icons.Plus, CreatorPage.NewProjectDialog));
+        try
+        {
+            foreach (var p in Creator.Projects.List())
+            {
+                var id = p.Id;
+                commands.Add((I18n.T("v12h2.cmd.project", ("name", p.Name)), Icons.Edit, () => Navigate(() => new CreatorPage("mine", id))));
+            }
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
         foreach (var g in AppState.Games)
         {
             var gs = g;
             commands.Add((gs.Def.Name, Icons.Folder, () => Navigate(() => new GamePage(gs.Def.Id))));
             if (gs.Status == Detect.Found) commands.Add((I18n.T("tray.play", ("game", gs.Def.Name)), Icons.Play, () => Actions.Play(gs)));
         }
+        // Сначала — где запрос в начале названия, потом — в начале слова, потом — где угодно; внутри — как в списке.
+        static int Rank(string title, string q) =>
+            q == "" || title.StartsWith(q, StringComparison.OrdinalIgnoreCase) ? 0
+            : title.Split(' ', '·', '-', '(', '«').Any(w => w.StartsWith(q, StringComparison.OrdinalIgnoreCase)) ? 1
+            : title.Contains(q, StringComparison.OrdinalIgnoreCase) ? 2 : -1;
         var shown = new List<(string Title, string Icon, Action Run)>();
         var selected = 0;
         void Render()
         {
             var q = (box.Text ?? "").Trim();
-            shown = commands.Where(c => q == "" || c.Title.Contains(q, StringComparison.OrdinalIgnoreCase)).Take(9).ToList();
+            shown = commands.Select((c, i) => (c, i, r: Rank(c.Title, q))).Where(x => x.r >= 0)
+                .OrderBy(x => x.r).ThenBy(x => x.i).Select(x => x.c).Take(9).ToList();
             selected = Math.Clamp(selected, 0, Math.Max(0, shown.Count - 1));
             list.Children.Clear();
             for (var i = 0; i < shown.Count; i++)
@@ -626,6 +663,7 @@ public sealed partial class MainWindow : Window
         {
             ("Ctrl+P", "keys.palette"), ("Ctrl+K", "keys.search"), ("Ctrl+J", "keys.downloads"), ("Ctrl+B", "keys.rail"),
             ("Ctrl+,", "keys.settings"), ("Ctrl+Shift+P", "cp.title"), ("Ctrl+L", "lib.title"), ("Ctrl+U", "mc.title"), ("Ctrl+Shift+M", "keys.minecraft"),
+            ("Ctrl+H", "keys.home"), ("Ctrl+1…9", "keys.game"), ("Ctrl+Enter", "keys.play"), ("← / →", "keys.stage"), ("Mouse 4 / 5", "keys.history"),
             ("Ctrl+Shift+C", "keys.creator"), ("Ctrl+I", "keys.aside"), ("F11", "bp.open"), ("Alt+← / Alt+→", "keys.history"), ("F1", "keys.help"), ("Esc", "keys.close"),
         })
         {
@@ -665,6 +703,8 @@ public sealed partial class MainWindow : Window
         if (page is GamePage gp && gp.GameId == Minecraft.Mc.Id) page = new MinecraftPage(gp.Tab, gp.Query);
         var previous = _current;
         var same = page.SameScreenAs(previous);
+        // 12.0: лор открытой игры не должен дорисовываться поверх следующей страницы.
+        if (!same) GameOpenFx.Cancel();
         if (same) page.Classes.Add("quiet");
         // Открываем игру с другого экрана — снимок прежнего экрана и нажатая обложка (до замены страницы).
         var gameFx = !same && previous is not null && page is GamePage or MinecraftPage && (force is not null || GameOpenFx.Enabled);
@@ -775,6 +815,19 @@ public sealed partial class MainWindow : Window
 
     public void RefreshFriendsDock() => _friendsDock?.Render();
 
+    /// <summary>n-я игра для Ctrl+1…9: найденные, как на боковой панели — недавно запущенные сверху.</summary>
+    static GameState? QuickGame(int n) => OrderedGames()
+        .Where(g => g.Status == Detect.Found && !Settings.Data.Arr("hiddenGames").Any(x => x?.ToString() == g.Def.Id))
+        .OrderByDescending(g => Features.PlayTime.Get(g.Def.Id).LastPlayed ?? DateTime.MinValue)
+        .Skip(n).FirstOrDefault();
+
+    /// <summary>Игра «на экране»: открытая страница игры или выбранная на сцене главной.</summary>
+    GameState? CurrentGame()
+    {
+        var id = _current?.GameId ?? (_current as HomePage)?.ShownStageGame;
+        return id is null ? null : AppState.Games.FirstOrDefault(g => g.Def.Id == id && g.Status == Detect.Found);
+    }
+
     /// <summary>Выйти из программы совсем (не в трей).</summary>
     public void Quit() { _quitting = true; Close(); }
 
@@ -793,6 +846,10 @@ public sealed partial class MainWindow : Window
         else if (e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift) && e.Key == Key.C) Navigate(() => new MarketPage());
         else if (e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift) && e.Key == Key.P) Navigate(() => new ControlPanelPage());
         else if (e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift) && e.Key == Key.M) Navigate(() => new MinecraftPage());
+        else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.H) Navigate(() => new HomePage());
+        // 12.0: Ctrl+1…9 — открыть свою игру по порядку, как на боковой панели (Ctrl+Enter — в обработчике выше).
+        else if (e.KeyModifiers == KeyModifiers.Control && e.Key is >= Key.D1 and <= Key.D9 && QuickGame(e.Key - Key.D1) is { } quick) Navigate(() => new GamePage(quick.Def.Id));
+        else if (e.KeyModifiers == KeyModifiers.None && e.Key is Key.Left or Key.Right && _current is HomePage home && FocusManager?.GetFocusedElement() is not TextBox && home.StepStage(e.Key == Key.Right ? 1 : -1)) { }
         else if (e.Key == Key.F5 && e.KeyModifiers == KeyModifiers.None) _current?.Build();
         else if (e.Key == Key.F1) Shortcuts();
         else if (e.Key == Key.F11) BigPictureWindow.Open();
