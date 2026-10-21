@@ -18,7 +18,8 @@
     <Version>12.0.0</Version>
     <Product>ModLaunch</Product>
     <Company>ModLaunch</Company>
-    <Copyright>ModLaunch</Copyright>
+    <Copyright>© 2026 ModLaunch</Copyright>
+    <AssemblyTitle>ModLaunch</AssemblyTitle>
     <Description>ModLaunch — mods in one click</Description>
     <ApplicationIcon>Assets/icon.ico</ApplicationIcon>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
@@ -31,7 +32,9 @@
     <SelfContained>true</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
-    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <!-- 12.0: без сжатия. Сжатый exe без подписи Chrome и Защитник Windows принимали за упакованный
+         вирус; несжатый весит больше, но такие ложные тревоги у него бывают реже. -->
+    <EnableCompressionInSingleFile>false</EnableCompressionInSingleFile>
     <PublishTrimmed>true</PublishTrimmed>
     <TrimMode>partial</TrimMode>
     <!-- 8.4.1: сериализация через отражение остаётся включённой — иначе любое
