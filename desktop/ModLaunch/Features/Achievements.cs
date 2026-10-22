@@ -176,6 +176,8 @@ public static class Cosmetics
         all ??= Achievements.All();
         var set = Starter.Select(r => r.Key).ToHashSet();
         foreach (var a in all) if (a.Done && a.Reward is { } r) set.Add(r.Key);
+        // 16.0: награды пути уровней.
+        foreach (var r in LevelRoad.Unlocked(Achievements.Level(all).Level)) set.Add(r.Key);
         return set;
     }
 
@@ -185,6 +187,7 @@ public static class Cosmetics
         all ??= Achievements.All();
         var list = Starter.Select(r => (r, (Achievement?)null)).ToList();
         foreach (var a in all) if (a.Reward is { } r) list.Add((r, a));
+        foreach (var (_, r) in LevelRoad.Road) list.Add((r, null));
         return list;
     }
 
@@ -221,6 +224,9 @@ public static class Cosmetics
     }
 
     public static event Action? Changed;
+
+    /// <summary>16.0: награды поменялись не через Toggle (забрали с пути уровней) — сказать подписчикам.</summary>
+    public static void Notify() => Changed?.Invoke();
 
     /// <summary>Название награды: «Рамка „Золото“», «Титул „Мастер Subnautica“».</summary>
     public static string Name(Reward r)

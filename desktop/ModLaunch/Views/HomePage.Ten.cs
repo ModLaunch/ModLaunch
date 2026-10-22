@@ -37,6 +37,7 @@ public sealed partial class HomePage
         CheckHealthLater(mine);
         if (!Shown) Dispatcher.UIThread.Post(ProfilePage.AnnounceNew, DispatcherPriority.Background);
 
+        Widgets.EnsureRoad();
         var col = StoreKit.Column(spacing: 18, top: 18);
         var n = 0;
         if (Starter(mine) is { } starter) col.Children.Add(Intro(starter, n++));
@@ -72,7 +73,13 @@ public sealed partial class HomePage
         var dock = Ui.Row(6,
             Quick(I18n.T("lib.title"), Icons.Grid, "Ctrl+L", () => new LibraryPage()),
             Quick(I18n.T("mc.title"), Icons.Package, "Ctrl+U", () => new ModsCenterPage()));
-        var right = Ui.Row(6, dock, new Border { Width = 1, Height = 22, Background = Ui.Res("Line"), Margin = new Thickness(4, 0), VerticalAlignment = VerticalAlignment.Center }, style, edit);
+        // 16.0: уровень рядом с приветствием; есть новые награды пути — кнопка «Забрать».
+        var (level, _, next) = RoadKit.Now();
+        var fresh = LevelRoad.Fresh(level).Count;
+        var lv = fresh > 0
+            ? Ui.Button(I18n.T("v16.road.chip.new", ("level", level), ("n", fresh)), RoadKit.Claim, "primary", Icons.Trophy)
+            : Ui.Button(I18n.T("v16.road.lv", ("n", level)), () => MainWindow.Current?.Navigate(() => new ProfilePage("rewards")), "ghost", Icons.Trophy, I18n.T("v98.level.next", ("n", next)) + " · " + RoadKit.NextLine(level));
+        var right = Ui.Row(6, lv, dock, new Border { Width = 1, Height = 22, Background = Ui.Res("Line"), Margin = new Thickness(4, 0), VerticalAlignment = VerticalAlignment.Center }, style, edit);
         right.VerticalAlignment = VerticalAlignment.Center;
         var row = new DockPanel { Margin = new Thickness(2, 6, 0, 0) };
         DockPanel.SetDock(right, Dock.Right);

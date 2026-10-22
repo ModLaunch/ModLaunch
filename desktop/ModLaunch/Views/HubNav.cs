@@ -49,7 +49,7 @@ public static class HubNav
         Sections.Select(s => (s.Id, s.Key, s.Icon)).Concat(ShopTabs.Select(t => (t.Id, t.Key, Icons.Bag))).Concat(ShopMore);
 
     /// <summary>Страница Creator Hub (рынок или мастерская): между ними — без въезда всей страницы.</summary>
-    public static bool IsHub(Page? page) => page is MarketPage or CreatorPage;
+    public static bool IsHub(Page? page) => page is MarketPage or CreatorPage or XStudio;
 
     /// <summary>Последняя вкладка магазина (на сеанс): «Магазин» слева ведёт туда, где ушли.</summary>
     static string? _lastShop;

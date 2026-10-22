@@ -20,7 +20,7 @@ public abstract class Target
     public abstract string Language { get; }
     public virtual string[] Events => ModxDoc.Events;
 
-    public static readonly Target[] All = [new RenPy(), new RpgMaker(), new Unity(), new Godot(), new LuaMods()];
+    public static readonly Target[] All = [new RenPy(), new RpgMaker(), new Unity(), new Godot(), new LuaMods(), new Unreal(), new Html5(), new ReEngine()];
     public static Target? Find(string id) => All.FirstOrDefault(t => t.Id == id || t.Aliases.Contains(id));
     protected virtual string[] Aliases => [];
 
@@ -767,6 +767,188 @@ public abstract class Target
             w.Line("return M");
             var dir = gameDir != null && Directory.Exists(Path.Combine(gameDir, "Mods")) ? "Mods" : "mods";
             return [new OutFile($"{dir}/{d.Id}.lua", w.ToString())];
+        }
+    }
+
+    // ---------------------------------------------------------------- 16.0: Unreal Engine 4/5 + UE4SS (Lua)
+
+    /// <summary>
+    /// Игры на Unreal Engine 4 и 5: мод — Lua-скрипт для UE4SS в &lt;Проект&gt;/Binaries/Win64/Mods/&lt;мод&gt;/Scripts/main.lua
+    /// и пустой enabled.txt рядом (так UE4SS включает мод без правки mods.txt).
+    /// </summary>
+    sealed class Unreal : Target
+    {
+        public override string Id => "unreal";
+        public override string Title => "Unreal Engine (UE4SS Lua)";
+        public override string Language => "lua";
+        protected override string[] Aliases => ["ue4ss", "ue4", "ue5"];
+
+        /// <summary>Папка exe игры, куда ставится UE4SS: первая &lt;Проект&gt;/Binaries/Win64, кроме Engine.</summary>
+        internal static string BinDir(string? gameDir)
+        {
+            if (gameDir is null) return "Binaries/Win64";
+            try
+            {
+                foreach (var dir in Directory.EnumerateDirectories(gameDir).OrderBy(d => d, StringComparer.OrdinalIgnoreCase))
+                {
+                    var bin = Path.Combine(dir, "Binaries", "Win64");
+                    if (!Path.GetFileName(dir).Equals("Engine", StringComparison.OrdinalIgnoreCase) && Directory.Exists(bin))
+                        return Path.GetRelativePath(gameDir, bin).Replace('\\', '/');
+                }
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+            return "Binaries/Win64";
+        }
+
+        public override List<OutFile> Emit(ModxDoc d, string? gameDir)
+        {
+            Warn(d);
+            var w = new Code("  ");
+            w.Raw(Header(d, "--"));
+            w.Line("-- UE4SS has no in-game text box: say and log go to the UE4SS console and UE4SS.log.");
+            w.Line("local function say(text) print(\"[ModScript] \" .. tostring(text) .. \"\\n\") end");
+            w.Line("local M = {}");
+            foreach (var (name, v) in d.Shared) w.Line($"{name} = {L.Literal(v)}");
+            Prelude(w, d);
+            foreach (var code in NativeCode(d)) w.Block(code);
+            Functions(w, d, e => $"say({e})", e => $"say({e})");
+            foreach (var h in d.Hooks)
+            {
+                w.Line($"function M.{h.Event}({(h.Event == "tick" ? "dt" : "")})");
+                w.In();
+                Declare(w, [h.Body], h.Event == "tick" ? ["dt"] : []);
+                Body(w, h.Body, e => $"say({e})", e => $"say({e})");
+                w.Out();
+                w.Line("end");
+            }
+            // Как хуки движка: старт — игрок появился на карте, загрузка — карта загружена, тик — раз в 100 мс.
+            if (d.Hooks.Any(h => h.Event == "start")) w.Line("RegisterHook(\"/Script/Engine.PlayerController:ClientRestart\", function() M.start() end)");
+            if (d.Hooks.Any(h => h.Event == "load")) w.Line("if RegisterLoadMapPostHook then RegisterLoadMapPostHook(function() M.load() end) end");
+            if (d.Hooks.Any(h => h.Event == "tick")) w.Line("LoopAsync(100, function() M.tick(0.1) return false end)");
+            if (d.Hooks.Any(h => h.Event == "ready")) w.Line("M.ready()");
+            var dir = $"{BinDir(gameDir)}/Mods/ModScript_{d.Id}";
+            return [new OutFile($"{dir}/Scripts/main.lua", w.ToString()), new OutFile($"{dir}/enabled.txt", "")];
+        }
+    }
+
+    // ---------------------------------------------------------------- 16.0: HTML5-игры (NW.js, Electron)
+
+    /// <summary>
+    /// Игры на NW.js и Electron без упаковки: скрипт кладётся рядом с index.html (www/, resources/app/ или package.nw/)
+    /// и подключается тегом &lt;script&gt; перед &lt;/body&gt;; снятие убирает и файл, и тег.
+    /// </summary>
+    sealed class Html5 : Target
+    {
+        public override string Id => "html5";
+        public override string Title => "HTML5 (NW.js / Electron)";
+        public override string Language => "javascript";
+        public override string[] Events => ["ready", "start", "tick"];
+        protected override string[] Aliases => ["nwjs", "electron", "web"];
+
+        /// <summary>Папка с index.html: www, resources/app, package.nw или сама папка игры.</summary>
+        internal static string Root(string? gameDir)
+        {
+            if (gameDir is null) return "www";
+            foreach (var r in new[] { "www", "resources/app", "package.nw", "app", "" })
+                if (File.Exists(Path.Combine(gameDir, r, "index.html"))) return r;
+            return "www";
+        }
+
+        static string Script(string id) => $"modscript_{id}.js";
+        static string Tag(string id) => $"<script src=\"js/{Script(id)}\"></script>";
+
+        public override List<OutFile> Emit(ModxDoc d, string? gameDir)
+        {
+            Warn(d);
+            var w = new Code("  ");
+            w.Raw(Header(d, "//"));
+            w.Line("(() => {");
+            w.In();
+            w.Line("\"use strict\";");
+            w.Line("const say = text => { console.log(\"[ModScript]\", text); const el = document.createElement(\"div\"); el.textContent = String(text);");
+            w.Line("  el.style.cssText = \"position:fixed;left:50%;bottom:8%;transform:translateX(-50%);padding:8px 16px;background:rgba(10,12,18,.85);color:#fff;font:15px sans-serif;border-radius:8px;z-index:99999\";");
+            w.Line("  document.body.appendChild(el); setTimeout(() => el.remove(), 3000); };");
+            foreach (var (name, v) in d.Shared) w.Line($"let {name} = {L.Literal(v)};");
+            Prelude(w, d);
+            foreach (var code in NativeCode(d)) w.Block(code);
+            Functions(w, d, e => $"say({e})", e => $"console.log({e})");
+            foreach (var h in d.Hooks)
+            {
+                w.Line($"const {h.Event} = ({(h.Event == "tick" ? "dt" : "")}) => {{");
+                w.In();
+                Declare(w, [h.Body], h.Event == "tick" ? ["dt"] : []);
+                Body(w, h.Body, e => $"say({e})", e => $"console.log({e})");
+                w.Out();
+                w.Line("};");
+                w.Line(h.Event switch
+                {
+                    "start" => "if (document.readyState === \"complete\") start(); else window.addEventListener(\"load\", () => start());",
+                    "tick" => "setInterval(() => tick(0.1), 100);",
+                    _ => $"{h.Event}();",
+                });
+            }
+            w.Out();
+            w.Line("})();");
+            var root = Root(gameDir);
+            return [new OutFile($"{(root == "" ? "" : root + "/")}js/{Script(d.Id)}", w.ToString())];
+        }
+
+        public override string? AfterInstall(ModxDoc d, string gameDir)
+        {
+            var index = Path.Combine(gameDir, Root(gameDir), "index.html");
+            if (!File.Exists(index)) return "index.html not found: add the script tag by hand";
+            var html = File.ReadAllText(index);
+            var tag = Tag(d.Id);
+            if (html.Contains(tag)) return null;
+            var at = html.LastIndexOf("</body>", StringComparison.OrdinalIgnoreCase);
+            File.WriteAllText(index, at < 0 ? html + "\n" + tag + "\n" : html[..at] + tag + "\n" + html[at..]);
+            return $"added {Script(d.Id)} to index.html";
+        }
+
+        public override void AfterEject(string id, string gameDir)
+        {
+            var index = Path.Combine(gameDir, Root(gameDir), "index.html");
+            if (!File.Exists(index)) return;
+            var html = File.ReadAllText(index);
+            var tag = Tag(id);
+            if (html.Contains(tag)) File.WriteAllText(index, html.Replace(tag + "\n", "").Replace(tag, ""));
+        }
+    }
+
+    // ---------------------------------------------------------------- 16.0: RE Engine + REFramework (Lua)
+
+    /// <summary>Игры Capcom на RE Engine: скрипт REFramework в reframework/autorun; тик — re.on_frame.</summary>
+    sealed class ReEngine : Target
+    {
+        public override string Id => "reengine";
+        public override string Title => "RE Engine (REFramework Lua)";
+        public override string Language => "lua";
+        public override string[] Events => ["ready", "tick"];
+        protected override string[] Aliases => ["reframework", "re"];
+
+        public override List<OutFile> Emit(ModxDoc d, string? gameDir)
+        {
+            Warn(d);
+            var w = new Code("  ");
+            w.Raw(Header(d, "--"));
+            w.Line("local function say(text) log.info(\"[ModScript] \" .. tostring(text)) end");
+            w.Line("local M = {}");
+            foreach (var (name, v) in d.Shared) w.Line($"{name} = {L.Literal(v)}");
+            Prelude(w, d);
+            foreach (var code in NativeCode(d)) w.Block(code);
+            Functions(w, d, e => $"say({e})", e => $"say({e})");
+            foreach (var h in d.Hooks)
+            {
+                w.Line($"function M.{h.Event}({(h.Event == "tick" ? "dt" : "")})");
+                w.In();
+                Declare(w, [h.Body], h.Event == "tick" ? ["dt"] : []);
+                Body(w, h.Body, e => $"say({e})", e => $"say({e})");
+                w.Out();
+                w.Line("end");
+            }
+            if (d.Hooks.Any(h => h.Event == "tick")) w.Line("re.on_frame(function() M.tick(1 / 60) end)");
+            if (d.Hooks.Any(h => h.Event == "ready")) w.Line("M.ready()");
+            return [new OutFile($"reframework/autorun/modscript_{d.Id}.lua", w.ToString())];
         }
     }
 

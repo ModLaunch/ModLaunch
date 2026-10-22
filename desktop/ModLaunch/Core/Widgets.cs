@@ -82,6 +82,7 @@ public static class Widgets
         new("note", "Edit", ["s", "m", "l"], [new("text", "text", "", []), Tint]),
         new("steam", "Layers", ["m", "l"], [Choice("sort", "recent", "recent", "name", "size")]),
         new("level", "Trophy", ["s", "m"], [Tint]),
+        new("rewards", "Trophy", ["m", "l"], [Tint]),
         new("autopilot", "Wand", ["s", "m"], [Game()]),
         new("friends", "Users", ["m", "l"], []),
         new("tip", "Sparkles", ["m"], []),
@@ -98,9 +99,21 @@ public static class Widgets
     public static readonly (string Id, string Size)[] Default =
     [
         ("continue", "m"), ("builds", "s"), ("playtime", "s"),
-        ("friends", "m"), ("attention", "s"), ("autopilot", "s"),
-        ("downloads", "m"),
+        ("rewards", "w"), ("attention", "s"),
+        ("friends", "m"), ("autopilot", "s"), ("downloads", "m"),
     ];
+
+    /// <summary>
+    /// 16.0: путь наград за уровни — на главную всем один раз (у кого своя раскладка — четвёртым, широким).
+    /// Убрали сами — больше не возвращается.
+    /// </summary>
+    public static void EnsureRoad()
+    {
+        if (Settings.Data.Bool("v16road", false)) return;
+        Settings.Data["v16road"] = true;
+        if (Settings.Data["widgets"] is JsonArray && Entries().All(e => e.Id != "rewards")) Add("rewards", "w", Math.Min(3, Entries().Count));
+        else Settings.Save();
+    }
 
     public static Kind? Find(string id) => Catalog.FirstOrDefault(k => k.Id == id);
 

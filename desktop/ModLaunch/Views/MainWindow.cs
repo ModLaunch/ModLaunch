@@ -656,7 +656,7 @@ public sealed partial class MainWindow : Window
             var tab = id;
             commands.Add(($"Creator Hub · {I18n.T(key)}", icon, () => HubNav.Open(tab)));
         }
-        commands.Add((I18n.T("v12h2.cmd.newProject"), Icons.Plus, CreatorPage.NewProjectDialog));
+        commands.Add((I18n.T("v12h2.cmd.newProject"), Icons.Plus, CreatorPage.CreateNew));
         try
         {
             foreach (var p in Creator.Projects.List())

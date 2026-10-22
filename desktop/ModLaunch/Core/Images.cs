@@ -76,6 +76,26 @@ public static class Images
         try { return AssetLoader.Exists(new Uri($"avares://ModLaunch/Assets/{n}")); } catch { return false; }
     });
 
+    static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Bitmap, Bitmap> Tinies = new();
+
+    /// <summary>
+    /// 16.0: крошечная копия картинки (32 px в ширину) для фона постера: растянутая на всю рамку, она
+    /// выглядит размытой — без эффекта размытия, который дорого перерисовывать на каждой обложке.
+    /// </summary>
+    public static Bitmap Tiny(Bitmap source)
+    {
+        return Tinies.GetValue(source, s =>
+        {
+            try
+            {
+                var w = Math.Max(1, Math.Min(32, s.PixelSize.Width));
+                var h = Math.Max(1, (int)Math.Round((double)s.PixelSize.Height * w / Math.Max(1, s.PixelSize.Width)));
+                return s.CreateScaledBitmap(new Avalonia.PixelSize(w, h), Avalonia.Media.Imaging.BitmapInterpolationMode.MediumQuality);
+            }
+            catch { return s; }
+        });
+    }
+
     /// <summary>Ссылки Steam на картинку игры — если встроенной нет (свои игры, новые игры).</summary>
     public static string[] SteamUrls(int appId, Art art)
     {
@@ -102,9 +122,11 @@ public static class Images
     public static async Task<Bitmap?> GameAsync(Games.GameDef def, Art art, int width)
     {
         if (GameAsset(def, art, width) is { } local) return local;
-        foreach (var url in SteamUrls(def.SteamAppId, art))
-            if (await FromUrl(url, width) is { } bmp) return bmp;
+        // 16.0: кэш Steam на ПК, старые адреса CDN и настоящие адреса из магазина (GameArt).
+        if (await GameArt.Steam(def.SteamAppId, art, width) is { } steam) return steam;
+        // Нужной формы нет: другая картинка игры — Ui.GameImage сложит из неё постер, а не обрежет.
         if (art == Art.Cover && GameAsset(def, Art.Hero, width * 3) is { } hero) return hero;
+        if (art == Art.Cover && await GameArt.Steam(def.SteamAppId, Art.Header, width * 2) is { } wide) return wide;
         if (art is Art.Header or Art.Cover && def.Art is not null) return Asset(def.Art, width);
         return def.ArtUrl is null ? null : await FromUrl(def.ArtUrl, width);
     }
