@@ -146,6 +146,8 @@ public sealed class XStudio : Page
             return;
         }
         if (Program.Screenshot && _s.Panel == "output" && _s.Run is null) Run();
+        // Области живут дольше раскладки: перестройка (смена языка, настройки, мост догрузился) снимает их со старой.
+        foreach (var region in new Control[] { _top, _activity, _side, _tabs, _editorHost, _panelTabs, _panelBody, _status }) Detach(region);
         _top.Background = HubLook.Panel;
         _top.BorderBrush = HubLook.Edge;
         _top.BorderThickness = new Thickness(0, 0, 0, 1);
@@ -192,6 +194,16 @@ public sealed class XStudio : Page
     }
 
     static Control Docked(Control c, Dock where) { DockPanel.SetDock(c, where); return c; }
+
+    static void Detach(Control c)
+    {
+        switch (c.Parent)
+        {
+            case Panel p: p.Children.Remove(c); break;
+            case Decorator d: d.Child = null; break;
+            case ContentControl cc: cc.Content = null; break;
+        }
+    }
 
     void RenderAll()
     {

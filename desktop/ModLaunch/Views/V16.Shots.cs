@@ -54,5 +54,9 @@ public static class V16Shots
         Shot(s, "v16-x-3-blocks", () => new XStudio(id, "blocks", "output"));
         Shot(s, "v16-x-4-docs", () => new XStudio(id, "docs", "code"));
         Shot(s, "v16-x-5-settings", () => new XStudio(id, "settings", "problems"));
+        // Перестройка той же страницы (смена языка, «Сохранить» в настройках, мост догрузился) не должна падать.
+        s.Window.CurrentPage?.Build();
+        s.Pump(600);
+        s.Save("v16-x-6-rebuilt");
     }
 }
