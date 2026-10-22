@@ -6,7 +6,7 @@
 Object.assign(EN, {
   'nav.how': 'How it works',
   'hero.chip': 'Out now:',
-  'hero.chip2': 'a Home that sums things up, and suggestions from your mods',
+  'hero.chip2': 'ModScript X Studio and the game bridge',
   'hero.t1': 'Mods in one click.',
   'hero.t2': 'No guides, no archives, no copying files by hand.',
   'hero.lead': 'ModLaunch finds the games on your PC, installs the mod loader and every mod with its dependencies, then keeps them up to date. 18 games — from Stardew Valley to Minecraft — and any other with the “+” button.',
@@ -115,6 +115,9 @@ Object.assign(EN, {
   'news.eyebrow': 'What’s new',
   'news.title': 'Latest versions',
   'news.all': 'All versions',
+  'news.160': 'ModScript X Studio', 'news.160a': 'Five quick questions — and a studio for your project', 'news.160b': 'Game bridge: 21 engines detected automatically', 'news.160c': 'A mod card in AI builds', 'news.160d': 'A reward on every level, covers without cropping',
+  'news.151': 'The whole catalog in your library', 'news.151a': 'Every supported game right in the library', 'news.151b': 'New games come first, marked “New”', 'news.151c': 'Games from Steam, Epic and GOG add themselves', 'news.151d': 'A livelier Home stage in the game’s colour',
+  'news.140': 'A grown-up look', 'news.140a': 'Calm colours by default', 'news.140b': 'Steam library with play time', 'news.140c': 'Ads only in a narrow right column', 'news.140d': 'Flexible widgets: six sizes and your own look',
   'news.95': 'What matters, on Home', 'news.95a': 'A summary: what to update, what failed, who’s online', 'news.95b': 'Suggestions based on the mods you already have', 'news.95c': 'Creator Hub: Shop, Mine, Create and a selling wizard', 'news.95d': 'A wallet with a statement — every movement is checked',
   'news.94': 'Minecraft like Modrinth App', 'news.94a': 'Build pictures, .mrpack export, build servers', 'news.94b': 'Mods straight into the build you pick', 'news.94c': 'Multi-part downloads with mirrors and resume', 'news.94d': 'No game? Install it via Steam right from ModLaunch',
   'news.90': '“Showcase” design', 'news.90a': 'Big game art and “Continue playing” on Home', 'news.90b': 'Game covers on the side rail', 'news.90c': 'Full-width game art on the game page', 'news.90d': 'Links from mods can’t launch programs',
@@ -133,7 +136,7 @@ Object.assign(EN, {
   'faq.6q': 'My game isn’t on the list', 'faq.6a': 'Press “+” in the app: ModLaunch finds the game on disk, detects the engine and picks a mod catalog. Or tell us in GitHub Issues which game to build in next.',
   'faq.7q': 'What is ModScript?', 'faq.7a': 'ModLaunch’s simple modding language: one command per line. A script becomes a real mod — a Content Patcher pack for Stardew Valley or a Thunderstore package for BepInEx games. You can try it right on this site.',
   'final.title': 'Ready to try it?',
-  'final.p': 'One file, about 30 MB. Your games are found automatically — all that’s left is picking mods.',
+  'final.p': 'One file, about 150 MB. Your games are found automatically — all that’s left is picking mods.',
   'final.zip': 'Portable version (zip)',
 });
 Object.assign(ru, {
