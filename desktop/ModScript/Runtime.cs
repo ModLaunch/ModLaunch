@@ -599,6 +599,45 @@ public sealed class Sandbox
                 return A(0) switch { string s => s.Contains(Text(A(1)), StringComparison.Ordinal), List<object?> l => l.Any(x => Same(x, A(1))), Dictionary<string, object?> d => d.ContainsKey(Text(A(1))), _ => false };
             case "upper": { var t = Text(A(0)); Cost(t.Length); return t.ToUpperInvariant(); }
             case "lower": { var t = Text(A(0)); Cost(t.Length); return t.ToLowerInvariant(); }
+            // 13.0
+            case "floor": return Math.Floor(Num(A(0)));
+            case "ceil": return Math.Ceiling(Num(A(0)));
+            case "sqrt": { var x = Num(A(0)); return x < 0 ? throw new RunError($"sqrt({Text(x)}): negative number") : Math.Sqrt(x); }
+            case "pow": return Math.Pow(Num(A(0)), Num(A(1)));
+            case "sign": return (double)Math.Sign(Num(A(0)));
+            case "lerp": { double x = Num(A(0)), y = Num(A(1)); return x + (y - x) * Num(A(2)); }
+            case "pick": return A(0) is List<object?> { Count: > 0 } pl ? pl[_random.Next(pl.Count)] : throw new RunError("pick() needs a non-empty list");
+            case "sum":
+            {
+                if (A(0) is not List<object?> sl) throw new RunError($"sum() of {TypeName(A(0))}");
+                Cost(sl.Count);
+                return sl.Sum(Num);
+            }
+            case "join":
+            {
+                if (A(0) is not List<object?> jl) throw new RunError($"join() of {TypeName(A(0))}");
+                var t = string.Join(Text(A(1)), jl.Select(Text));
+                Cost(t.Length);
+                return t.Length > MaxSize ? throw new RunError("join(): the text is too long") : t;
+            }
+            case "split":
+            {
+                var t = Text(A(0));
+                var sep = Text(A(1));
+                Cost(t.Length);
+                return (sep == "" ? t.Select(c => (object?)c.ToString()) : t.Split(sep).Select(x => (object?)x)).ToList();
+            }
+            case "trim": { var t = Text(A(0)); Cost(t.Length); return t.Trim(); }
+            case "replace":
+            {
+                var t = Text(A(0));
+                var from = Text(A(1));
+                Cost(t.Length);
+                var r = from == "" ? t : t.Replace(from, Text(A(2)), StringComparison.Ordinal);
+                return r.Length > MaxSize ? throw new RunError("replace(): the text is too long") : r;
+            }
+            case "startswith": return Text(A(0)).StartsWith(Text(A(1)), StringComparison.Ordinal);
+            case "endswith": return Text(A(0)).EndsWith(Text(A(1)), StringComparison.Ordinal);
         }
         // Функция игры (renpy.notify, player.heal…): в песочнице её нет — отмечаем и идём дальше.
         Print($"[{_where}] → {name}({string.Join(", ", a.Select(Show))})  (game function)");
