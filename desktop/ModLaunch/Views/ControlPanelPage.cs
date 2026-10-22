@@ -19,6 +19,11 @@ public sealed class ControlPanelPage : Page
 {
     public override string Title => I18n.T("cp.title");
 
+    /// <summary>15.0: панель живёт разделом в «Настройках» — без своей прокрутки и полей.</summary>
+    readonly bool _embedded;
+
+    public ControlPanelPage(bool embedded = false) => _embedded = embedded;
+
     bool _editing;
     static List<Storage.Part>? _parts;
     static DateTime _measuredAt;
@@ -126,7 +131,7 @@ public sealed class ControlPanelPage : Page
 
     public override void Build()
     {
-        var col = StoreKit.Fit(new StackPanel { Spacing = 22, Margin = new Thickness(40, 26, 40, 40), MaxWidth = 1640 });
+        var col = StoreKit.Fit(new StackPanel { Spacing = 22, Margin = _embedded ? new Thickness(0) : new Thickness(40, 26, 40, 40), MaxWidth = 1640 });
 
         // Приветствие и сводка.
         var hour = DateTime.Now.Hour;
@@ -232,7 +237,7 @@ public sealed class ControlPanelPage : Page
         col.Children.Add(grid);
 
         col.Children.Add(Ui.Text(I18n.T("cp.keys"), "small muted", wrap: true));
-        Content = new ScrollViewer { Content = col, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+        Content = _embedded ? col : new ScrollViewer { Content = col, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
     }
 
     static Control Stat(string icon, string label, string value, Action? click, IBrush? color = null)

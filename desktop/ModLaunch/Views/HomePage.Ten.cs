@@ -166,6 +166,8 @@ public sealed partial class HomePage
         // Если места мало, полка прячется — сцена не налезает сама на себя.
         frame.SizeChanged += (_, e) => shelf.IsVisible = e.NewSize.Width > 1080;
         // 12.0: мягкое свечение цветом игры под сценой — на обёртке: у Border с ClipToBounds тень обрезается.
+        // 15.0: во «взрослом» виде свечения нет — оно расплывалось за край сцены.
+        if (Look.Mature) return new Border { CornerRadius = radius, Child = frame };
         return new Border { CornerRadius = radius, Child = frame, BoxShadow = new BoxShadows(new BoxShadow { OffsetY = 18, Blur = 60, Spread = -18, Color = Color.FromArgb(110, accent.R, accent.G, accent.B) }) };
     }
 

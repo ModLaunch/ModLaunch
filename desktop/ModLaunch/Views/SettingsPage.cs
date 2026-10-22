@@ -34,6 +34,7 @@ public sealed partial class SettingsPage : Page
     [
         ("v11.set.g.app", [
             ("general", "v11.set.general", Icons.Settings, "#94A3B8"),
+            ("panel", "cp.title", Icons.Grid, "#60A5FA"),
             ("look", "settings.tab.look", Icons.Palette, "#A78BFA"),
         ]),
         ("set.g.games", [
@@ -146,6 +147,7 @@ public sealed partial class SettingsPage : Page
             "accounts" => AccountsTab(),
             "about" => AboutTab(),
             "look" => LookTab(),
+            "panel" => Panel(),
             "services" when Social.Account.Owner => ServicesTab(),
             _ => GeneralTab(),
         };

@@ -59,7 +59,7 @@ public sealed partial class MainWindow : Window
     };
     Border? _adWrap;
     readonly Border _adRail = new() { IsVisible = false };
-    readonly Button _back, _forward, _downloads, _settingsButton, _friendsButton, _statsButton, _donateButton, _creatorButton, _libraryButton, _steamButton, _modsButton, _panelButton, _homeButton, _feedButton;
+    readonly Button _back, _forward, _downloads, _settingsButton, _friendsButton, _statsButton, _donateButton, _creatorButton, _libraryButton, _modsButton, _homeButton, _feedButton;
     readonly LayoutTransformControl _scale = new();
     Control? _railHost;
     Panel? _layers;
@@ -103,9 +103,16 @@ public sealed partial class MainWindow : Window
     /// <summary>Страница на экране.</summary>
     public Page? CurrentPage => _current;
 
+    /// <summary>
+    /// «Сочные» наведения: карточки и кнопки подпрыгивают, увеличиваются и отбрасывают тень.
+    /// 15.0: во «взрослом» виде их нет — они вылезали за свой контур (обрезались соседями и краем
+    /// прокрутки) и перерисовывали пол-окна на каждое движение мыши. Остаются смена цвета и прозрачности.
+    /// </summary>
+    static bool Juicy => Animate.On && !Look.Mature;
+
     public MainWindow()
     {
-        Classes.Set("juicy", Animate.On);
+        Classes.Set("juicy", Juicy);
         Current = this;
         Title = "ModLaunch";
         Width = 1366;
@@ -125,10 +132,7 @@ public sealed partial class MainWindow : Window
         _homeButton = NavButton(LogoIcon, "v93.nav.home", () => Navigate(() => new HomePage()));
         _feedButton = NavButton(Icons.Sparkles, "v98.nav.ai", () => Navigate(() => new AiBuildsPage()));
         _libraryButton = NavButton(Icons.Gamepad, "v92.nav.games", () => Navigate(() => new LibraryPage()));
-        // 14.0: библиотека Steam — свой пункт, как в клиенте Steam.
-        _steamButton = NavButton(Icons.Shelf, "v14.nav.steam", () => Navigate(() => new SteamLibraryPage()));
         _modsButton = NavButton(Icons.Package, "v92.nav.mods", () => Navigate(() => new ModsCenterPage()));
-        _panelButton = NavButton(Icons.Grid, "v92.nav.panel", () => Navigate(() => new ControlPanelPage()));
         _settingsButton = NavButton(Icons.Settings, "v92.nav.settings", () => Navigate(() => new SettingsPage()));
         _friendsButton = NavButton(Icons.Users, "v11.cm.nav", () => Navigate(() => new CommunityPage()));
         _statsButton = NavButton(Icons.Chart, "v92.nav.stats", () => Navigate(() => new StatsPage()));
@@ -188,11 +192,20 @@ public sealed partial class MainWindow : Window
         InitDrop();
         _scale.Child = BuildLayout();
         Content = _scale;
-        PropertyChanged += (_, e) => { if (e.Property == WindowStateProperty || e.Property == OffScreenMarginProperty) ApplyWindowState(); };
+        PropertyChanged += (_, e) =>
+        {
+            if (e.Property == WindowStateProperty || e.Property == OffScreenMarginProperty) ApplyWindowState();
+            // Окно снова на экране — догнать то, что поменялось, пока оно было свёрнуто.
+            if ((e.Property == WindowStateProperty || e.Property == IsVisibleProperty) && _staleWhileHidden && WindowState != WindowState.Minimized && IsVisible)
+            {
+                _staleWhileHidden = false;
+                Dispatcher.UIThread.Post(OnStateChanged, DispatcherPriority.Background);
+            }
+        };
         Opened += (_, _) => { HookCaptionHitTest(); ApplyWindowState(); };
         ApplyScale();
         UpdateAdVisibility();
-        Look.Changed += () => { ApplyScale(); RenderRail(); _current?.Build(); RenderAside(); RenderGlow(); };
+        Look.Changed += () => { Classes.Set("juicy", Juicy); ApplyScale(); RenderRail(); _current?.Build(); RenderAside(); RenderGlow(); };
         Look.GlowChanged += () => _glow.Opacity = Look.Glow;
         _glow.Opacity = Look.Glow;
 
@@ -231,6 +244,9 @@ public sealed partial class MainWindow : Window
         }, Avalonia.Interactivity.RoutingStrategies.Tunnel, handledEventsToo: true);
         AddHandler(PointerCaptureLostEvent, (_, _) => _pointerDown = false, Avalonia.Interactivity.RoutingStrategies.Bubble, handledEventsToo: true);
         Images.Prewarm(AppState.Games.Select(g => g.Def));
+        // 15.0: все игры Steam (100 тыс.+) читаются в фоне; как прочитались — перерисовать страницу (счётчики, поиск).
+        Games.SteamCatalog.Loaded += () => Avalonia.Threading.Dispatcher.UIThread.Post(() => _current?.Build());
+        _ = Games.SteamCatalog.EnsureLoaded();
         // 9.4: официальные картинки Minecraft — в фоне; как скачаются, перерисовать рамку и страницу.
         OfficialArt.Refresh(() => Avalonia.Threading.Dispatcher.UIThread.Post(() => { RenderRail(); _current?.Build(); }));
         Navigate(StartPage());
@@ -240,6 +256,7 @@ public sealed partial class MainWindow : Window
         RenderBell();
         RenderDownloads();
         if (!Program.Screenshot) _ = StartUp();
+        UiWatch.Start();
         if (Program.Autostarted && Settings.Data.Bool("startMinimized"))
         {
             if (Settings.Data.Bool("closeToTray")) Opened += (_, _) => Dispatcher.UIThread.Post(Hide);
@@ -357,13 +374,39 @@ public sealed partial class MainWindow : Window
 
     bool _pointerDown, _rebuildWaiting;
 
+    /// <summary>
+    /// Состояние поменялось (игра найдена, мод поставлен, идёт поиск по дискам) — перерисовать страницу.
+    /// 15.0: не чаще, чем позволяет сама страница: пауза между перерисовками — не меньше 400 мс и не меньше
+    /// четырёх её построек. Раньше поиск игр по дискам присылал «изменилось» на каждую папку, и тяжёлая
+    /// главная перестраивалась 6–7 раз в секунду: кнопки окна и меню отвечали через секунды.
+    /// Свёрнутое или спрятанное в трей окно не перерисовывается вовсе — только когда его откроют.
+    /// </summary>
     void OnStateChanged()
     {
         if (_pointerDown) { _rebuildWaiting = true; return; }
-        RenderRail();
-        _current?.Build();
-        RenderAside();
+        if (WindowState == WindowState.Minimized || !IsVisible) { _staleWhileHidden = true; return; }
+        var wait = Math.Min(1500, Math.Max(400, _lastRebuildMs * 4)) - _sinceRebuild.Elapsed.TotalMilliseconds;
+        if (wait > 0)
+        {
+            if (_rebuildQueued) return;
+            _rebuildQueued = true;
+            DispatcherTimer.RunOnce(() => { _rebuildQueued = false; OnStateChanged(); }, TimeSpan.FromMilliseconds(wait));
+            return;
+        }
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        using (UiWatch.Mark("state " + _current?.GetType().Name))
+        {
+            RenderRail();
+            _current?.Build();
+            RenderAside();
+        }
+        _lastRebuildMs = sw.Elapsed.TotalMilliseconds;
+        _sinceRebuild.Restart();
     }
+
+    double _lastRebuildMs;
+    bool _rebuildQueued, _staleWhileHidden;
+    readonly System.Diagnostics.Stopwatch _sinceRebuild = System.Diagnostics.Stopwatch.StartNew();
 
     // ---------------------------------------------------------------- шапка, правая панель, свечение
 
@@ -473,7 +516,7 @@ public sealed partial class MainWindow : Window
     /// <summary>Перерисовать рамку окна после смены настроек интерфейса.</summary>
     public void Refresh()
     {
-        Classes.Set("juicy", Animate.On);
+        Classes.Set("juicy", Juicy);
         Settings.Save();
         ApplyScale();
         RenderRail();
@@ -598,7 +641,7 @@ public sealed partial class MainWindow : Window
             ("Minecraft", Icons.Cube, () => Navigate(() => new MinecraftPage())),
             ("Minecraft · " + I18n.T("mine.tab.catalog"), Icons.Bag, () => Navigate(() => new MinecraftPage("catalog"))),
             ("Minecraft · " + I18n.T("mine.build.new"), Icons.Plus, () => { Navigate(() => new MinecraftPage("builds")); MinecraftPage.CreateDialog(); }),
-            (I18n.T("cp.title"), Icons.Grid, () => Navigate(() => new ControlPanelPage())),
+            (I18n.T("cp.title"), Icons.Grid, () => Navigate(() => new SettingsPage("panel"))),
             (I18n.T("new.title"), Icons.Sparkles, WhatsNew.Show),
             (I18n.T("cmd.rail"), Icons.Layers, () => ToggleRail()),
             (I18n.T("cmd.theme"), Icons.Eye, () => Look.SetTheme(Look.Themes[(Array.IndexOf(Look.Themes, Look.Theme) + 1) % Look.Themes.Length])),
@@ -718,6 +761,7 @@ public sealed partial class MainWindow : Window
         var tile = gameFx ? TileUnderPress() : null;
         var origin = ClickInPage();
         _current = page;
+        UiWatch.Doing = "page " + page.GetType().Name;
         if (page.GameId is string gid) { Settings.Data["lastGame"] = gid; Settings.Save(); }
         page.Build();
         page.Shown = true;
@@ -850,7 +894,7 @@ public sealed partial class MainWindow : Window
         else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.L) Navigate(() => new LibraryPage());
         else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.U) Navigate(() => new ModsCenterPage());
         else if (e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift) && e.Key == Key.C) Navigate(() => new MarketPage());
-        else if (e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift) && e.Key == Key.P) Navigate(() => new ControlPanelPage());
+        else if (e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift) && e.Key == Key.P) Navigate(() => new SettingsPage("panel"));
         else if (e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift) && e.Key == Key.M) Navigate(() => new MinecraftPage());
         else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.H) Navigate(() => new HomePage());
         // 12.0: Ctrl+1…9 — открыть свою игру по порядку, как на боковой панели (Ctrl+Enter — в обработчике выше).

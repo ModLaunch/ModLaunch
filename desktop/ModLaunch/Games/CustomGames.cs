@@ -328,17 +328,24 @@ public static partial class CustomGames
 
     // ---------------------------------------------------------------- справочник в интерфейсе
 
-    sealed record CountFor(IReadOnlyList<DirGame> Source, int Count);
+    sealed record CountFor(IReadOnlyList<DirGame> Source, int Steam, int Count);
     static CountFor? _supported;
 
-    /// <summary>Сколько игр поддерживается: встроенные и справочник без повторов встроенных.</summary>
+    /// <summary>
+    /// Сколько игр поддерживается: встроенные, справочник без повторов встроенных и (15.0) все игры Steam,
+    /// которых нет ни там, ни там.
+    /// </summary>
     public static int SupportedCount
     {
         get
         {
             var all = GameDirectory.All;
             var c = _supported;
-            if (c is null || !ReferenceEquals(c.Source, all)) _supported = c = new CountFor(all, all.Count(g => !GameDirectory.IsBuiltin(g)) + GameCatalog.Builtin.Length);
+            if (c is null || !ReferenceEquals(c.Source, all) || c.Steam != SteamCatalog.Count)
+            {
+                var known = all.Select(g => g.SteamAppId).Concat(GameCatalog.Builtin.Select(g => g.SteamAppId)).Where(id => id > 0);
+                _supported = c = new CountFor(all, SteamCatalog.Count, all.Count(g => !GameDirectory.IsBuiltin(g)) + GameCatalog.Builtin.Length + SteamCatalog.ExtraOver(known));
+            }
             return c.Count;
         }
     }

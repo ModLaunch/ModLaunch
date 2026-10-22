@@ -130,7 +130,7 @@ public sealed partial class MainWindow
         // недавние игры посередине, друзья, настройки и аккаунт — внизу.
         var rail = new DockPanel { Width = RailWidth, LastChildFill = true };
         var top = new StackPanel { Spacing = 2, Margin = new Thickness(0, 4, 0, 2), HorizontalAlignment = HorizontalAlignment.Center };
-        foreach (var b in new[] { _homeButton, _feedButton, _libraryButton, _steamButton, _modsButton, _creatorButton, _panelButton }) top.Children.Add(b);
+        foreach (var b in new[] { _homeButton, _feedButton, _libraryButton, _modsButton, _creatorButton }) top.Children.Add(b);
         top.Children.Add(RailLine(new Thickness(0, 8, 0, 2)));
         DockPanel.SetDock(top, Dock.Top);
         var bottom = new StackPanel { Spacing = 2, Margin = new Thickness(0, 4, 0, 10), HorizontalAlignment = HorizontalAlignment.Center };
@@ -284,7 +284,7 @@ public sealed partial class MainWindow
             Ctx.Item(I18n.T("ctx.forward"), Icons.Forward, GoForward, _index < _history.Count - 1, "Alt+Right"),
             Ctx.Item(I18n.T("ctx.reload"), Icons.Refresh, () => _current?.Build(), gesture: "F5"),
             "-",
-            Ctx.Item(I18n.T("cp.title"), Icons.Grid, () => Navigate(() => new ControlPanelPage()), gesture: "Ctrl+Shift+P"),
+            Ctx.Item(I18n.T("cp.title"), Icons.Grid, () => Navigate(() => new SettingsPage("panel")), gesture: "Ctrl+Shift+P"),
             Ctx.Item(I18n.T("nav.menu"), Icons.Home, () => Navigate(() => new HomePage())),
             Ctx.Item("Creator Hub", Icons.Creator, () => Navigate(() => new MarketPage()), gesture: "Ctrl+Shift+C"),
             Ctx.Item("Minecraft", Icons.Cube, () => Navigate(() => new MinecraftPage()), gesture: "Ctrl+Shift+M"),
@@ -431,13 +431,13 @@ public sealed partial class MainWindow
         SetNav(_feedButton, _current is AiBuildsPage);
         // 9.3: «Игры» и «Моды» на панели — по желанию (Настройки → Внешний вид → Рамка окна);
         // без них их место занимает «Панель», и она подсвечена на страницах библиотеки и модов.
-        var sections = Settings.Data.Bool("railGamesMods");
-        _libraryButton.IsVisible = _modsButton.IsVisible = sections;
+        // 15.0: «Панель» ушла в настройки — «Игры» и «Моды» на панели всегда.
+        _libraryButton.IsVisible = _modsButton.IsVisible = true;
         SetNav(_libraryButton, _current is LibraryPage or AddGamePage or GamePage or MinecraftPage || _current is ModPage);
         SetNav(_creatorButton, _current is MarketPage or CreatorPage or ListingPage or AuthorPage);
         SetNav(_modsButton, _current is ModsCenterPage);
-        SetNav(_steamButton, _current is SteamLibraryPage or SteamGamesPage);
-        SetNav(_panelButton, _current is ControlPanelPage || !sections && _current is LibraryPage or ModsCenterPage);
+
+
         var view = Social.Friends.View();
         _friendsBadge.IsVisible = view.Incoming.Count > 0 || view.Friends.Any(f => f.State != "offline");
         _friendsBadge.Background = view.Incoming.Count > 0 ? Ui.Res("Warn") : Ui.Res("Good");

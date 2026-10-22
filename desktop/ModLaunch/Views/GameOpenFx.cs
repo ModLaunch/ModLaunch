@@ -40,7 +40,8 @@ public enum GameFx
 /// </summary>
 public static class GameOpenFx
 {
-    public static bool Enabled => Animate.On && Style != "off";
+    /// <summary>15.0: во «взрослом» виде страница игры просто появляется — без снимка всего окна (он стоил кадров).</summary>
+    public static bool Enabled => Animate.On && Style != "off" && !Look.Mature;
     /// <summary>Яркие анимации 9.3 (случайная из восьми); «Спокойная» в их число не входит.</summary>
     public static readonly GameFx[] All = Enum.GetValues<GameFx>().Where(k => k != GameFx.Calm).ToArray();
 

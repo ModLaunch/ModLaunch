@@ -29,7 +29,7 @@ public sealed record FxCard(string Title, string Subtitle, string? IconUrl = nul
 /// </summary>
 public static class InstallFx
 {
-    public static bool Enabled => Look.Animations && Settings.Data.Bool("installFx", true);
+    public static bool Enabled => Look.Animations && Settings.Data.Bool("installFx", true) && !Look.Mature;
 
     static readonly Random Rng = new();
     static FxKind? _last;

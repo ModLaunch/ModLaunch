@@ -29,7 +29,7 @@ public sealed partial class MainWindow
         return Ctx.Menu(
             hasAside ? Ctx.Item(asideOpen ? I18n.T("top.aside.hide") : I18n.T("top.aside.show"), Icons.Sidebar, ToggleAside, gesture: "Ctrl+I") : null,
             Ctx.Item(I18n.T("bp.open"), Icons.Tv, BigPictureWindow.Open, gesture: "F11"),
-            Ctx.Item(I18n.T("cp.title"), Icons.Grid, () => Navigate(() => new ControlPanelPage()), gesture: "Ctrl+Shift+P"),
+            Ctx.Item(I18n.T("cp.title"), Icons.Grid, () => Navigate(() => new SettingsPage("panel")), gesture: "Ctrl+Shift+P"),
             Ctx.Item(I18n.T("lib.title"), Icons.Layers, () => Navigate(() => new LibraryPage()), gesture: "Ctrl+L"),
             Ctx.Item(I18n.T("mc.title"), Icons.Package, () => Navigate(() => new ModsCenterPage()), gesture: "Ctrl+U"),
             Ctx.Item(Settings.Data.Bool("railHidden") ? I18n.T("top.rail.show") : I18n.T("top.rail.hide"), Icons.Layers, ToggleRail, gesture: "Ctrl+B"),

@@ -27,6 +27,14 @@ public sealed partial class SettingsPage
         _ => tab,
     };
 
+    /// <summary>15.0: панель управления — раздел настроек, а не пункт боковой панели.</summary>
+    static Control Panel()
+    {
+        var cp = new ControlPanelPage(embedded: true);
+        cp.Build();
+        return cp;
+    }
+
     /// <summary>
     /// Подпись раздела: у пересобранных в 11.0 — новая (v11.set.d.*), у остальных — прежняя.
     /// Новой нет на языке интерфейса — прежняя на нём же, а если нет и её — новая по-английски (не ключ «set.d.general»).
@@ -304,7 +312,6 @@ public sealed partial class SettingsPage
             Toggle(I18n.T("look.home.popular"), I18n.T("look.home.popular.hint"), Settings.Data.Bool("homePopular", true), v => Settings.Data["homePopular"] = v),
             Toggle(I18n.T("look.rail"), I18n.T("look.rail.hint"), !Settings.Data.Bool("railHidden"), v => { Settings.Data["railHidden"] = !v; Chrome(); }),
             Toggle(I18n.T("look.railFriends"), I18n.T("look.railFriends.hint"), Settings.Data.Bool("railFriends", true), v => { Settings.Data["railFriends"] = v; Chrome(); MainWindow.Current?.RefreshFriendsDock(); }),
-            Toggle(I18n.T("v93.set.railSections"), I18n.T("v93.set.railSections.hint"), Settings.Data.Bool("railGamesMods"), v => { Settings.Data["railGamesMods"] = v; Chrome(); }),
             Toggle(I18n.T("look.friendsDock"), I18n.T("look.friendsDock.hint"), Settings.Data.Bool("friendsDock", true), v => { Settings.Data["friendsDock"] = v; MainWindow.Current?.RefreshFriendsDock(); }),
             Toggle(I18n.T("look.compact"), I18n.T("look.compact.hint"), Settings.Data.Bool("compactLists"), v => Settings.Data["compactLists"] = v));
     }

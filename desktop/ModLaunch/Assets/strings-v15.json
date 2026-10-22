@@ -1,0 +1,12 @@
+{
+  "ru": {
+    "v15.mc.search": "Найти в каталоге…",
+    "v15.all.hint": "Сверху — игры с модами из Nexus и Thunderstore, дальше — все игры Steam. Нет на компьютере — поставьте через Steam или укажите папку.",
+    "v11.set.d.panel": "Сводка программы: игры, моды, загрузки, место на диске и быстрые действия."
+  },
+  "en": {
+    "v15.mc.search": "Search the catalog…",
+    "v15.all.hint": "Games with Nexus and Thunderstore mods first, then every game on Steam. Not on this PC? Install it via Steam or pick its folder.",
+    "v11.set.d.panel": "App overview: games, mods, downloads, disk space and quick actions."
+  }
+}

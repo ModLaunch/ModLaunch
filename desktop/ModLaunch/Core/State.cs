@@ -126,7 +126,8 @@ public static class AppState
         Notify();
         try
         {
-            var found = await Locator.Locate(g.Def, deep, new Progress<string>(where => { g.SearchingWhere = where; Notify(); }));
+            // 15.0: без Progress<T> — он отправлял в поток интерфейса каждую из десятков тысяч папок.
+            var found = await Locator.Locate(g.Def, deep, new Where(g));
             if (found is not null)
             {
                 g.Path = found.Path;
@@ -148,5 +149,11 @@ public static class AppState
         Settings.SetGamePath(g.Def.Id, path);
         g.Refresh();
         Notify();
+    }
+
+    /// <summary>Где сейчас ищем игру: просто запомнить и попросить перерисовку (Notify сам склеивает частые вызовы).</summary>
+    sealed class Where(GameState g) : IProgress<string>
+    {
+        public void Report(string value) { g.SearchingWhere = value; Notify(); }
     }
 }

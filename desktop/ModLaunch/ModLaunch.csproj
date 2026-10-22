@@ -15,7 +15,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <AssemblyName>ModLaunch</AssemblyName>
     <RootNamespace>ModLaunch</RootNamespace>
-    <Version>14.0.0</Version>
+    <Version>15.0.0</Version>
     <Product>ModLaunch</Product>
     <Company>ModLaunch</Company>
     <Copyright>© 2026 ModLaunch</Copyright>
@@ -41,10 +41,14 @@
          JsonSerializer.Serialize или JsonArray.Add(строка) роняло программу в выпуске. -->
     <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
     <DebugType>none</DebugType>
+    <!-- 15.0: код заранее переведён в машинный (ReadyToRun) — и свой, и Avalonia. Без этого каждое
+         первое нажатие (страница, меню, кнопка окна) ждало, пока .NET скомпилирует код на лету. -->
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <TieredPGO>true</TieredPGO>
   </PropertyGroup>
 
   <ItemGroup>
-    <AvaloniaResource Include="Assets/**" />
+    <AvaloniaResource Include="Assets/**" Exclude="Assets/*.tsv.gz" />
     <!-- 9.7: ModScript X — инжектор .modx (desktop/ModScript), встроен в Creator Hub. -->
     <Compile Include="../ModScript/Modx.cs;../ModScript/Lang.cs;../ModScript/Targets.cs;../ModScript/Engines.cs;../ModScript/Injector.cs;../ModScript/Runtime.cs" Link="ModScriptX/%(Filename)%(Extension)" />
     <AvaloniaResource Include="../ModScript/Examples/gold-boost.modx" Link="Assets/modscriptx/gold-boost.modx" />
@@ -53,6 +57,8 @@
     <AvaloniaResource Include="../../firebase/firestore.rules" Link="Assets/firestore.rules" />
     <!-- Настройки служб читаются и без запущенного интерфейса (самопроверка, установщик). -->
     <EmbeddedResource Include="Assets/*.config.json" LogicalName="%(Filename)%(Extension)" />
+    <!-- 15.0: все игры Steam (100 тыс.+) — снимок собирает CI (gamedir.yml); пока его нет, сборка без него. -->
+    <EmbeddedResource Include="Assets/*.tsv.gz" LogicalName="%(Filename)%(Extension)" />
     <TrimmerRootAssembly Include="ModLaunch" />
   </ItemGroup>
 

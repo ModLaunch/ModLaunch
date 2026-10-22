@@ -89,16 +89,24 @@ public sealed partial class MinecraftPage
             Detect.Searching => (Ui.Res("Muted"), I18n.T("games.searching")),
             _ => (Ui.Res("Faint"), I18n.T("games.notDetected")),
         };
-        var status = Ui.Row(8, Ui.Dot(dot), Ui.Text(line, color: Ui.Res("Text")));
+        // 15.0: строка статуса — сетка, а не StackPanel: длинный путь обрезается «…», а не заезжает под «Играть».
+        var status = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,Auto,*"), ColumnSpacing = 8 };
+        var dotHost = Ui.Dot(dot);
+        dotHost.VerticalAlignment = VerticalAlignment.Center;
+        status.Children.Add(dotHost);
+        var lineText = new TextBlock { Text = line, Foreground = Ui.Res("Text"), TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center };
+        Grid.SetColumn(lineText, 1);
+        status.Children.Add(lineText);
         if ((active?.Dir ?? G.Path) is { } dir)
         {
             var path = new Button
             {
-                Classes = { "ghost" }, Padding = new Thickness(6, 2), Margin = new Thickness(6, 0, 0, 0),
-                Content = Ui.Row(6, Ui.Icon(Icons.Folder, 13, Ui.Res("Muted")), new TextBlock { Text = Ui.ShortPath(dir), FontSize = 13, Foreground = Ui.Res("Muted"), VerticalAlignment = VerticalAlignment.Center }),
+                Classes = { "ghost" }, Padding = new Thickness(6, 2), Margin = new Thickness(6, 0, 0, 0), HorizontalAlignment = HorizontalAlignment.Left,
+                Content = new DockPanel { Children = { Ui.Icon(Icons.Folder, 13, Ui.Res("Muted")), new TextBlock { Text = Ui.ShortPath(dir), FontSize = 13, Foreground = Ui.Res("Muted"), Margin = new Thickness(6, 0, 0, 0), TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center } } },
             };
             ToolTip.SetTip(path, dir);
             path.Click += (_, _) => Actions.OpenFolder(dir);
+            Grid.SetColumn(path, 2);
             status.Children.Add(path);
         }
 
@@ -400,14 +408,15 @@ public sealed partial class MinecraftPage
             Ui.Button("", () => Go("settings"), "icon ghost", Icons.Sliders, I18n.T("mine.tab.settings")));
         buttons.VerticalAlignment = VerticalAlignment.Center;
 
-        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"), ColumnSpacing = 20 };
+        // 15.0: кнопки — под названием, а не третьей колонкой: имя сборки больше не режется до «Выживан…».
+        buttons.Margin = new Thickness(0, 6, 0, 0);
+        words.Children.Add(buttons);
+        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*"), ColumnSpacing = 20 };
         var icon = InstanceIcon(a, 96, 22);
         icon.VerticalAlignment = VerticalAlignment.Center;
         grid.Children.Add(icon);
         Grid.SetColumn(words, 1);
         grid.Children.Add(words);
-        Grid.SetColumn(buttons, 2);
-        grid.Children.Add(buttons);
 
         // Мягкий отсвет цветом загрузчика — сборки отличаются с первого взгляда.
         var tint = Color.Parse(a.Loader switch { "fabric" => "#DBB98A", "quilt" => "#9E6CE8", "forge" => "#E07C4E", "neoforge" => "#E8A04B", _ => "#3FB950" });
@@ -427,8 +436,10 @@ public sealed partial class MinecraftPage
     Control BuildTile(McInstance i, bool selected)
     {
         var name = new TextBlock { Text = i.Name, FontWeight = FontWeight.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = 150 };
+        var tileIcon = InstanceIcon(i, 56, 14);
+        tileIcon.HorizontalAlignment = HorizontalAlignment.Left;
         var col = Ui.Col(10,
-            InstanceIcon(i, 56, 14),
+            tileIcon,
             Ui.Col(2, name, Ui.Text(i.Label, "tiny muted")),
             Ui.Text(selected ? I18n.T("v101.mc.selected") : i.LastPlayed is null ? I18n.T("mine.aside.never") : Ui.Ago(i.LastPlayed), selected ? "tiny" : "tiny muted", color: selected ? Ui.Res("Good") : null));
         var play = Ui.Button("", () => Play(i), "icon", Icons.Play, I18n.T("games.play"));

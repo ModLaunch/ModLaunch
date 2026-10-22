@@ -176,8 +176,8 @@ public sealed class AddGamePage : Page
         DockPanel.SetDock(box, Dock.Right);
         searchHead.Children.Add(box);
         searchHead.Children.Add(Ui.Col(2,
-            Ui.Row(10, Ui.Text(I18n.T("v12g.all"), "h2"), Ui.Text(GameDirectory.Count.ToString("N0", I18n.Culture), "h2", color: Ui.Res("Faint"))),
-            Ui.Text(I18n.T("v12g.all.hint"), "small muted", wrap: true)));
+            Ui.Row(10, Ui.Text(I18n.T("v12g.all"), "h2"), Ui.Text(Math.Max(GameDirectory.Count, CustomGames.SupportedCount).ToString("N0", I18n.Culture), "h2", color: Ui.Res("Faint"))),
+            Ui.Text(I18n.T(SteamCatalog.Ready && SteamCatalog.Count > 0 ? "v15.all.hint" : "v12g.all.hint"), "small muted", wrap: true)));
         content.Children.Add(searchHead);
         content.Children.Add(Detach(_list));
         RenderList();
@@ -200,11 +200,31 @@ public sealed class AddGamePage : Page
         return s.List;
     }
 
+    sealed record SteamIds(IReadOnlyList<DirGame> Source, HashSet<int> Ids);
+    static SteamIds? _dirSteam;
+
+    /// <summary>Номера Steam справочника: без поиска игры Steam идут после него и не повторяют его.</summary>
+    static HashSet<int> DirectorySteamIds()
+    {
+        var all = GameDirectory.All;
+        var s = _dirSteam;
+        if (s is null || !ReferenceEquals(s.Source, all)) _dirSteam = s = new SteamIds(all, all.Where(g => g.SteamAppId > 0).Select(g => g.SteamAppId).ToHashSet());
+        return s.Ids;
+    }
+
     /// <summary>Перестроить только список справочника (поиск, «Показать ещё»), не трогая остальную страницу.</summary>
     void RenderList()
     {
         _list.Children.Clear();
         var rows = _filter == "" ? Popular().Take(_shown + 1).ToList() : GameDirectory.Search(_filter, _shown + 1);
+        // 15.0: справочник моддируемых кончился — дальше все игры Steam. Совпала игра справочника — берём её запись (с каталогами).
+        var need = _shown + 1 - rows.Count;
+        if (need > 0 && SteamCatalog.Ready)
+        {
+            var shown = rows.Where(r => r.SteamAppId > 0).Select(r => r.SteamAppId).ToHashSet();
+            var more = _filter == "" ? SteamCatalog.Popular(0, need, DirectorySteamIds()) : SteamCatalog.Search(_filter, need, shown);
+            rows.AddRange(more.Select(g => GameDirectory.BySteam(g.SteamAppId) ?? g).Where(g => g.SteamAppId <= 0 || shown.Add(g.SteamAppId)));
+        }
         if (rows.Count == 0)
         {
             _list.Children.Add(Ui.Card(Ui.Text(I18n.T("v12g.all.none", ("query", _filter)), "muted", wrap: true), 18));

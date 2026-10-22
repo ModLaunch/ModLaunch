@@ -25,7 +25,7 @@ public enum OpenKind
 /// </summary>
 public static class ModOpenFx
 {
-    public static bool Enabled => Animate.On && Settings.Data.Bool("modOpenFx", true);
+    public static bool Enabled => Animate.On && Settings.Data.Bool("modOpenFx", true) && !Look.Mature;
 
     static readonly Random Rng = new();
     static OpenKind? _last;

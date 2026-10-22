@@ -36,6 +36,8 @@ public static class Program
         if (args.Contains("--catalog-report")) return CatalogReport.Run().GetAwaiter().GetResult();
         // 12.0: справочник игр из живых списков → снимок Assets/gamedir.config.json (CI: gamedir.yml).
         if (args.Contains("--gen-directory")) return Games.GameDirectory.Generate(args).GetAwaiter().GetResult();
+        // 15.0: все игры Steam → снимок Assets/steamgames.tsv.gz (CI: gamedir.yml).
+        if (args.Contains("--gen-steam")) return Games.SteamCatalog.Generate(args).GetAwaiter().GetResult();
         if (args.Contains("--selfcheck")) return SelfCheck.Run().GetAwaiter().GetResult();
         if (args.Contains("--selftest")) { Hooks.PrepareSelfTest(); StartHeadless(); return Hooks.SelfTest(); }
         var shot = Array.IndexOf(args, "--screenshot");
@@ -69,7 +71,10 @@ public static class Program
     }
 
     public static AppBuilder BuildAvaloniaApp() =>
-        AppBuilder.Configure<App>().UsePlatformDetect().WithInterFont().LogToTrace();
+        AppBuilder.Configure<App>().UsePlatformDetect().WithInterFont().LogToTrace()
+            // 15.0: кэш картинок на видеокарте — 512 МБ вместо 28 МБ по умолчанию: обложки и арты
+            // не выгружаются и не грузятся заново на каждом кадре прокрутки.
+            .With(new SkiaOptions { MaxGpuResourceSizeBytes = 512L * 1024 * 1024 });
 
     /// <summary>Интерфейс без окна на экране: для снимков и быстрых проверок.</summary>
     static void StartHeadless() =>
