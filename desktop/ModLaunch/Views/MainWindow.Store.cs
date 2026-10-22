@@ -130,7 +130,7 @@ public sealed partial class MainWindow
         // недавние игры посередине, друзья, настройки и аккаунт — внизу.
         var rail = new DockPanel { Width = RailWidth, LastChildFill = true };
         var top = new StackPanel { Spacing = 2, Margin = new Thickness(0, 4, 0, 2), HorizontalAlignment = HorizontalAlignment.Center };
-        foreach (var b in new[] { _homeButton, _feedButton, _libraryButton, _modsButton, _creatorButton, _panelButton }) top.Children.Add(b);
+        foreach (var b in new[] { _homeButton, _feedButton, _libraryButton, _steamButton, _modsButton, _creatorButton, _panelButton }) top.Children.Add(b);
         top.Children.Add(RailLine(new Thickness(0, 8, 0, 2)));
         DockPanel.SetDock(top, Dock.Top);
         var bottom = new StackPanel { Spacing = 2, Margin = new Thickness(0, 4, 0, 10), HorizontalAlignment = HorizontalAlignment.Center };
@@ -221,7 +221,8 @@ public sealed partial class MainWindow
         _more.Click += (_, _) => MoreMenu().ShowAt(_more, true);
         _asideToggle = new Button { Classes = { "icon" }, Content = Ui.Icon(Icons.Sidebar, 18) };
         _asideToggle.Click += (_, _) => ToggleAside();
-        _adWrap = new Border { Child = AdSlot.Pill(), VerticalAlignment = VerticalAlignment.Center };
+        // 14.0: в шапке рекламы нет — только колонка справа (_adRail).
+        _adWrap = new Border { VerticalAlignment = VerticalAlignment.Center, IsVisible = false };
         foreach (var b in new[] { _bell, _downloads, _more }) { b.Width = b.Height = 36; b.CornerRadius = new CornerRadius(6); }
         var tools = Ui.Row(4, _updatePill, _adWrap, _bell, _downloads, _more);
         tools.VerticalAlignment = VerticalAlignment.Center;
@@ -266,6 +267,11 @@ public sealed partial class MainWindow
         _asideHost.Child = new ScrollViewer { Content = new Border { Padding = new Thickness(20, 22, 20, 22), Child = _aside }, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
         DockPanel.SetDock(_asideHost, Dock.Right);
         main.Children.Add(_asideHost);
+        // 14.0: место под рекламу — узкая колонка у правого края, левее панели сведений.
+        _adRail.Child = AdSlot.Side(() => { AdSlot.SideClosed = true; UpdateAdVisibility(); });
+        _adRail.Padding = new Thickness(0, 18, 16, 18);
+        DockPanel.SetDock(_adRail, Dock.Right);
+        main.Children.Add(_adRail);
         main.Children.Add(new Panel { ClipToBounds = true, Children = { _glow, _pageUnder, _page, _pageFx } });
         _sheet = new Border
         {
@@ -430,6 +436,7 @@ public sealed partial class MainWindow
         SetNav(_libraryButton, _current is LibraryPage or AddGamePage or GamePage or MinecraftPage || _current is ModPage);
         SetNav(_creatorButton, _current is MarketPage or CreatorPage or ListingPage or AuthorPage);
         SetNav(_modsButton, _current is ModsCenterPage);
+        SetNav(_steamButton, _current is SteamLibraryPage or SteamGamesPage);
         SetNav(_panelButton, _current is ControlPanelPage || !sections && _current is LibraryPage or ModsCenterPage);
         var view = Social.Friends.View();
         _friendsBadge.IsVisible = view.Incoming.Count > 0 || view.Friends.Any(f => f.State != "offline");

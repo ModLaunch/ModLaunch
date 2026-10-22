@@ -353,6 +353,7 @@ public sealed partial class SettingsPage
             Ui.Col(8, Ui.Text(I18n.T("v10.set.colors"), "h3"), colors),
             Ui.Row(28, Ui.Col(8, Ui.Text(I18n.T("look.radius"), "h3"), radius), Ui.Col(8, Ui.Text(I18n.T("look.glow"), "h3"), glow)),
             Ui.Col(8, Ui.Text(I18n.T("look.bg"), "h3"), backdrops),
+            Toggle(I18n.T("v14.mature"), I18n.T("v14.mature.hint"), Look.Mature, v => { Look.SetMature(v); Settings.Data.Remove("config"); }),
             Toggle(I18n.T("v10.fx.scan"), I18n.T("v10.fx.scan.hint"), Look.Scanlines, v => { Look.SetEffect("fxScanlines", v); Settings.Data.Remove("config"); }),
             Toggle(I18n.T("v10.fx.vignette"), I18n.T("v10.fx.vignette.hint"), Look.Vignette, v => { Look.SetEffect("fxVignette", v); Settings.Data.Remove("config"); }),
             // Только оформление: раскладка главной, картинка на ней и анимации остаются свои.

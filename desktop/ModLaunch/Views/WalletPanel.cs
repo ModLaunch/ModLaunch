@@ -227,6 +227,7 @@ public sealed class WalletPanel : UserControl
             "payout" => (Icons.Upload, Ui.Res("Warn"), I18n.T("v95.w.k.payout"), ""),
             "payout-return" => (Icons.Undo, Ui.Res("Good"), I18n.T("v95.w.k.return"), e.Note),
             "topup" => (Icons.Plus, Ui.Res("Good"), I18n.T("v95.w.k.topup"), ""),
+            "fee" => (Icons.Percent, Ui.Res("Good"), I18n.T("v14.w.k.fee", ("title", e.Note != "" ? e.Note : ListingTitle())), I18n.T("v14.w.k.fee.sub")),
             "grant" => (Icons.Sparkles, Ui.Res("Brand2"), I18n.T("v95.w.k.grant"), e.Note),
             _ => (Icons.Info, Ui.Res("Muted"), e.Kind, e.Note),
         };

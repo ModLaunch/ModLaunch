@@ -287,7 +287,10 @@ service cloud.firestore {
     // Продавец получает деньги сам («забирает» продажу), поэтому покупатель никогда
     // не пишет в чужой кошелёк, а у популярного продавца нет «горячего» документа.
 
-    function mFee() { return 10; }
+    // 14.0: процент комиссии задаёт владелец в приложении (config/market.fee, 0–50);
+    // документа нет — 10 %, как раньше. Комиссию владелец забирает себе записью «fee».
+    function mCfg() { return /databases/$(database)/documents/config/market; }
+    function mFee() { return exists(mCfg()) ? get(mCfg()).data.get('fee', 10) : 10; }
     function mAdmin() {
       // Почта админа должна быть подтверждена: иначе любой, кто первым зарегистрирует
       // адрес из admins/, получил бы права админа.
@@ -329,7 +332,7 @@ service cloud.firestore {
         && after.balance is int && after.balance >= 0
         && after.balance == before.get('balance', 0) + e.amount
         && e.balance == after.balance
-        && after.earned == before.get('earned', 0) + (e.kind == 'sale' ? e.amount : 0)
+        && after.earned == before.get('earned', 0) + ((e.kind == 'sale' || e.kind == 'fee') ? e.amount : 0)
         && after.spent == before.get('spent', 0) + (e.kind == 'purchase' ? 0 - e.amount : 0)
         && after.paidOut == before.get('paidOut', 0) + ((e.kind == 'payout' || e.kind == 'payout-return') ? 0 - e.amount : 0)
         && after.toppedUp == before.get('toppedUp', 0) + (e.kind == 'topup' ? e.amount : 0)
@@ -346,6 +349,13 @@ service cloud.firestore {
       let after = getAfter(mSale(e.ref, e.party)).data;
       return before.seller == w && before.get('claimed', true) == false && after.claimed == true
         && e.amount == before.price - before.fee;
+    }
+    // 14.0: админ забирает комиссию площадки с продажи (один раз).
+    function mFeeOk(w, e) {
+      let before = get(mSale(e.ref, e.party)).data;
+      let after = getAfter(mSale(e.ref, e.party)).data;
+      return before.get('feeTaken', false) == false && after.feeTaken == true
+        && before.fee > 0 && e.amount == before.fee;
     }
     function mPayoutOk(w, e) {
       let p = getAfter(mPayout(e.ref)).data;
@@ -375,7 +385,8 @@ service cloud.firestore {
           || (e.kind == 'payout' && w == request.auth.uid && mPayoutOk(w, e))
           || (e.kind == 'payout-return' && mAdmin() && mPayoutReturnOk(w, e))
           || (e.kind == 'topup' && mAdmin() && mTopUpOk(w, e))
-          || (e.kind == 'grant' && mAdmin() && e.note.size() > 0));
+          || (e.kind == 'grant' && mAdmin() && e.note.size() > 0)
+          || (e.kind == 'fee' && w == request.auth.uid && mAdmin() && mFeeOk(w, e)));
     }
 
     function mValid(d) {
@@ -441,6 +452,10 @@ service cloud.firestore {
         allow update: if request.auth != null && resource.data.seller == request.auth.uid
           && mOnly(['claimed']) && resource.data.get('claimed', true) == false && request.resource.data.claimed == true
           && mEntryIs(request.auth.uid, 'sale', id) && mNewEntry(request.auth.uid).party == buyer;
+        // 14.0: админ забирает комиссию — только вместе с записью «fee» в своём журнале.
+        allow update: if mAdmin() && mOnly(['feeTaken'])
+          && resource.data.get('feeTaken', false) == false && request.resource.data.feeTaken == true
+          && mEntryIs(request.auth.uid, 'fee', id) && mNewEntry(request.auth.uid).party == buyer;
       }
 
       match /reviews/{uid} {
@@ -452,6 +467,20 @@ service cloud.firestore {
           && request.resource.data.created == request.time;
         allow delete: if request.auth != null && (uid == request.auth.uid || mAdmin());
       }
+    }
+
+    // 14.0: все продажи сразу (сводка комиссии) — только админу.
+    match /{path=**}/sales/{buyer} {
+      allow list: if mAdmin();
+    }
+
+    // 14.0: настройки рынка. Читают все (приложение считает комиссию), пишет админ.
+    match /config/{name} {
+      allow get: if true;
+      allow create, update: if mAdmin() && name == 'market'
+        && request.resource.data.keys().hasOnly(['fee', 'updated', 'by'])
+        && request.resource.data.fee is int && request.resource.data.fee >= 0 && request.resource.data.fee <= 50
+        && request.resource.data.updated == request.time && request.resource.data.by == request.auth.uid;
     }
 
     match /wallets/{w} {

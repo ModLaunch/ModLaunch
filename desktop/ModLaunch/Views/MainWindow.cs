@@ -58,7 +58,8 @@ public sealed partial class MainWindow : Window
         StrokeLineCap = PenLineCap.Round, IsHitTestVisible = false, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
     };
     Border? _adWrap;
-    readonly Button _back, _forward, _downloads, _settingsButton, _friendsButton, _statsButton, _donateButton, _creatorButton, _libraryButton, _modsButton, _panelButton, _homeButton, _feedButton;
+    readonly Border _adRail = new() { IsVisible = false };
+    readonly Button _back, _forward, _downloads, _settingsButton, _friendsButton, _statsButton, _donateButton, _creatorButton, _libraryButton, _steamButton, _modsButton, _panelButton, _homeButton, _feedButton;
     readonly LayoutTransformControl _scale = new();
     Control? _railHost;
     Panel? _layers;
@@ -124,6 +125,8 @@ public sealed partial class MainWindow : Window
         _homeButton = NavButton(LogoIcon, "v93.nav.home", () => Navigate(() => new HomePage()));
         _feedButton = NavButton(Icons.Sparkles, "v98.nav.ai", () => Navigate(() => new AiBuildsPage()));
         _libraryButton = NavButton(Icons.Gamepad, "v92.nav.games", () => Navigate(() => new LibraryPage()));
+        // 14.0: библиотека Steam — свой пункт, как в клиенте Steam.
+        _steamButton = NavButton(Icons.Shelf, "v14.nav.steam", () => Navigate(() => new SteamLibraryPage()));
         _modsButton = NavButton(Icons.Package, "v92.nav.mods", () => Navigate(() => new ModsCenterPage()));
         _panelButton = NavButton(Icons.Grid, "v92.nav.panel", () => Navigate(() => new ControlPanelPage()));
         _settingsButton = NavButton(Icons.Settings, "v92.nav.settings", () => Navigate(() => new SettingsPage()));
@@ -418,8 +421,11 @@ public sealed partial class MainWindow : Window
         return has;
     }
 
-    void UpdateAsideVisibility() =>
+    void UpdateAsideVisibility()
+    {
         _asideHost.IsVisible = _aside.Content is not null && Settings.Data.Bool("asideOpen", false) && Bounds.Width / Math.Max(0.5, _appliedScale) >= 1180;
+        UpdateAdVisibility();
+    }
 
     void RenderGlow()
     {

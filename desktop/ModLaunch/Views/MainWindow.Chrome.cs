@@ -52,11 +52,14 @@ public sealed partial class MainWindow
 
     static void Reveal(Control c) => Animate.From(c, "translateY(-8px)", 260, 0, new QuinticEaseOut());
 
-    /// <summary>Реклама в шапке — только когда окну хватает ширины, чтобы не теснить поиск.</summary>
+    /// <summary>
+    /// 14.0: колонка рекламы справа — только на широком окне, когда не открыта панель сведений
+    /// и не скрыта «×». На узком окне страница важнее.
+    /// </summary>
     void UpdateAdVisibility()
     {
-        if (_adWrap is null) return;
-        _adWrap.IsVisible = Ads.Enabled && Bounds.Width / Math.Max(0.5, _appliedScale) >= 1400;
+        _adRail.IsVisible = Ads.Enabled && !AdSlot.SideClosed && !_asideHost.IsVisible
+            && Bounds.Width / Math.Max(0.5, _appliedScale) >= 1360 && _current is not null;
     }
 
     /// <summary>Кольцо на кнопке загрузок: общий прогресс всего, что сейчас качается.</summary>
