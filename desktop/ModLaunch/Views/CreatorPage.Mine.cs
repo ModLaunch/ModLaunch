@@ -12,7 +12,10 @@ public sealed partial class CreatorPage
 {
     // ---------------------------------------------------------------- мои моды
 
-    /// <summary>Мои моды: проекты мастерской и опубликованные в Hub — на одной вкладке.</summary>
+    /// <summary>
+    /// 13.0: «Проекты» — бывшие «Обзор» и «Мои проекты» одним экраном: плитки проектов (первая — «Новый проект»),
+    /// а пока проектов мало — ещё и «Начни с шаблона». «Опубликованные» — вкладкой в шапке.
+    /// </summary>
     Control Mine()
     {
         var col = new StackPanel { Spacing = 16 };
@@ -33,10 +36,10 @@ public sealed partial class CreatorPage
         var projects = Projects.List().Where(p => _filter == "" || p.Name.Contains(_filter, StringComparison.OrdinalIgnoreCase)).ToList();
         if (projects.Count == 0)
         {
-            col.Children.Add(Ui.Card(Ui.Col(10,
-                Ui.Text(I18n.T("cr.empty"), "h3"),
-                Ui.Text(I18n.T("cr.empty.text"), "muted", wrap: true),
-                Ui.Row(8, Ui.Button(I18n.T("cr.home.create"), NewProjectDialog, "primary", Icons.Plus), Ui.Button(I18n.T("cr.tab.examples"), () => Go("examples"), "", Icons.Wand))), 28));
+            col.Children.Add(HubLook.Frame(Ui.Col(10,
+                Ui.Text(_filter == "" ? I18n.T("cr.empty") : I18n.T("cr.lib.none"), "h3"),
+                Ui.Text(I18n.T("cr.empty.text"), "muted", wrap: true)), new Thickness(24, 20)));
+            if (_filter == "") col.Children.Add(StartFromTemplate());
             return col;
         }
         var grid = new UniformGrid { Columns = 4 };
@@ -51,8 +54,9 @@ public sealed partial class CreatorPage
         // 12.0: новый проект — через мастер (имя, игра, шаблон или импорт), см. CreatorPage.NewProject.cs.
         add.Click += (_, _) => NewProjectDialog();
         grid.Children.Add(add);
-        foreach (var p in projects) grid.Children.Add(ProjectCard(p));
+        foreach (var p in projects.OrderByDescending(p => p.Updated)) grid.Children.Add(ProjectCard(p));
         col.Children.Add(grid);
+        if (projects.Count < 4 && _filter == "") col.Children.Add(StartFromTemplate());
         return col;
     }
 
@@ -142,5 +146,13 @@ public sealed partial class CreatorPage
         w.Dialog(I18n.T("ctx.delete"), Ui.Text(I18n.T("cr.deleteProject", ("name", p.Name)), "muted", wrap: true),
             Ui.Button(I18n.T("common.cancel"), w.CloseDialog),
             Ui.Button(I18n.T("ctx.delete"), () => { w.CloseDialog(); Projects.Delete(p); if (_open?.Id == p.Id) _open = null; Build(); }, "primary", Icons.Trash));
+    }
+
+    /// <summary>«Начни с шаблона»: три шаблона и «Все шаблоны».</summary>
+    Control StartFromTemplate()
+    {
+        var templates = new UniformGrid { Columns = 3 };
+        foreach (var t in Templates.All.Take(3)) templates.Children.Add(TemplateCard(t));
+        return Section(I18n.T("cr.home.templates"), () => Go("examples"), templates, eyebrow: I18n.T("v91.cr.tab.templates"));
     }
 }

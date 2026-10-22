@@ -3,7 +3,7 @@
 import { test, before, after, beforeEach } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp, increment, collection, getDocs, query, where } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp, increment, collection, getDocs, query, where, arrayUnion, arrayRemove, deleteField } from 'firebase/firestore';
 
 const FEE = 10;
 let env;
@@ -396,4 +396,105 @@ test('серверы: чужой owner, неверный id, «created» не с
   await assertSucceeds(setDoc(doc(db(BUYER), 'servers', SRV), server(BUYER)));
   await assertFails(updateDoc(doc(db(BUYER), 'servers', SRV), { created: serverTimestamp(), updated: serverTimestamp() }));
   await assertFails(updateDoc(doc(db(BUYER), 'servers', SRV), { players: 1 }));
+});
+
+// ---------------------------------------------------------------- 13.0: группы разработчиков
+
+const TEAM = 'TeAmTeAmTeAmTeAmTeAm';
+const CODE = 'ABCD2345';
+const team = (who, over = {}) => ({
+  name: 'Ночная студия', tag: 'NITE', color: 'violet', about: '', owner: who.uid, members: [who.uid], names: { [who.uid]: 'Owner' },
+  invites: [], code: CODE, created: serverTimestamp(), updated: serverTimestamp(), ...over,
+});
+
+async function makeTeam() {
+  const d = db(SELLER);
+  const b = writeBatch(d);
+  b.set(doc(d, 'teams', TEAM), team(SELLER));
+  b.set(doc(d, 'teamcodes', CODE), { team: TEAM, owner: SELLER.uid });
+  await assertSucceeds(b.commit());
+}
+
+const joinByCode = (who, code = CODE) => updateDoc(doc(db(who), 'teams', TEAM), {
+  members: arrayUnion(who.uid), [`names.${who.uid}`]: 'Joiner', invites: arrayRemove(who.uid), joined: code, updated: serverTimestamp(),
+});
+
+test('группы: владелец создаёт группу с кодом; код находит группу; посторонний группу не видит', async () => {
+  await makeTeam();
+  await assertSucceeds(getDoc(doc(db(BUYER), 'teamcodes', CODE)));
+  await assertFails(getDocs(collection(db(BUYER), 'teamcodes')));
+  await assertFails(getDoc(doc(db(BUYER), 'teams', TEAM)));
+  await assertSucceeds(getDoc(doc(db(SELLER), 'teams', TEAM)));
+  await assertSucceeds(getDocs(query(collection(db(SELLER), 'teams'), where('members', 'array-contains', SELLER.uid))));
+  await assertFails(getDocs(collection(db(BUYER), 'teams')));
+});
+
+test('группы: вход по нынешнему коду — да, по старому или без кода — нет; лишнего при входе не поменять', async () => {
+  await makeTeam();
+  await assertFails(joinByCode(BUYER, 'WRONG234'));
+  await assertFails(updateDoc(doc(db(BUYER), 'teams', TEAM), { members: arrayUnion(BUYER.uid), [`names.${BUYER.uid}`]: 'B', updated: serverTimestamp() }));
+  await assertFails(updateDoc(doc(db(BUYER), 'teams', TEAM), { members: arrayUnion(BUYER.uid), [`names.${BUYER.uid}`]: 'B', joined: CODE, name: 'Моя', updated: serverTimestamp() }));
+  await assertFails(updateDoc(doc(db(BUYER), 'teams', TEAM), { members: arrayUnion(BUYER.uid, OTHER.uid), [`names.${BUYER.uid}`]: 'B', joined: CODE, updated: serverTimestamp() }));
+  await assertFails(updateDoc(doc(db(BUYER), 'teams', TEAM), { members: arrayUnion(BUYER.uid), [`names.${SELLER.uid}`]: 'Взлом', [`names.${BUYER.uid}`]: 'B', joined: CODE, updated: serverTimestamp() }));
+  await assertSucceeds(joinByCode(BUYER));
+  await assertSucceeds(getDoc(doc(db(BUYER), 'teams', TEAM)));
+  // Владелец сменил код: старый больше не пускает.
+  const d = db(SELLER);
+  const b = writeBatch(d);
+  b.update(doc(d, 'teams', TEAM), { code: 'ZZZZ2345', updated: serverTimestamp() });
+  b.delete(doc(d, 'teamcodes', CODE));
+  b.set(doc(d, 'teamcodes', 'ZZZZ2345'), { team: TEAM, owner: SELLER.uid });
+  await assertSucceeds(b.commit());
+  await assertFails(joinByCode(OTHER, CODE));
+  await assertSucceeds(joinByCode(OTHER, 'ZZZZ2345'));
+});
+
+test('группы: приглашение — принять или отклонить; участник выходит сам; убирает только владелец', async () => {
+  await makeTeam();
+  await assertSucceeds(updateDoc(doc(db(SELLER), 'teams', TEAM), { invites: [BUYER.uid, OTHER.uid], updated: serverTimestamp() }));
+  await assertSucceeds(getDocs(query(collection(db(BUYER), 'teams'), where('invites', 'array-contains', BUYER.uid))));
+  await assertSucceeds(updateDoc(doc(db(BUYER), 'teams', TEAM), { members: arrayUnion(BUYER.uid), [`names.${BUYER.uid}`]: 'B', invites: arrayRemove(BUYER.uid), updated: serverTimestamp() }));
+  await assertSucceeds(updateDoc(doc(db(OTHER), 'teams', TEAM), { invites: arrayRemove(OTHER.uid), updated: serverTimestamp() }));
+  await assertFails(getDoc(doc(db(OTHER), 'teams', TEAM)));
+  // Участник не может убрать другого, сменить название или код.
+  await assertFails(updateDoc(doc(db(BUYER), 'teams', TEAM), { name: 'Моя', updated: serverTimestamp() }));
+  await assertFails(updateDoc(doc(db(BUYER), 'teams', TEAM), { code: 'QQQQ2345', updated: serverTimestamp() }));
+  await assertFails(updateDoc(doc(db(BUYER), 'teams', TEAM), { members: arrayRemove(SELLER.uid), updated: serverTimestamp() }));
+  await assertFails(deleteDoc(doc(db(BUYER), 'teams', TEAM)));
+  // Выход: только себя.
+  await assertSucceeds(updateDoc(doc(db(BUYER), 'teams', TEAM), { members: arrayRemove(BUYER.uid), [`names.${BUYER.uid}`]: deleteField(), updated: serverTimestamp() }));
+  // Владелец не добавляет людей сам (только приглашает) и не отдаёт группу.
+  await assertFails(updateDoc(doc(db(SELLER), 'teams', TEAM), { members: arrayUnion(OTHER.uid), updated: serverTimestamp() }));
+  await assertFails(updateDoc(doc(db(SELLER), 'teams', TEAM), { owner: BUYER.uid, updated: serverTimestamp() }));
+  await assertSucceeds(updateDoc(doc(db(SELLER), 'teams', TEAM), { name: 'Новое имя', tag: 'NEW', color: 'green', updated: serverTimestamp() }));
+  await assertSucceeds(deleteDoc(doc(db(SELLER), 'teams', TEAM)));
+});
+
+test('группы: неверный тег, цвет, чужой owner, лишнее поле, без почты, код чужой группы — отказ', async () => {
+  await assertFails(setDoc(doc(db(SELLER), 'teams', TEAM), team(SELLER, { tag: 'nite' })));
+  await assertFails(setDoc(doc(db(SELLER), 'teams', TEAM), team(SELLER, { color: 'gold' })));
+  await assertFails(setDoc(doc(db(SELLER), 'teams', TEAM), team(BUYER)));
+  await assertFails(setDoc(doc(db(SELLER), 'teams', TEAM), team(SELLER, { members: [SELLER.uid, BUYER.uid] })));
+  await assertFails(setDoc(doc(db(SELLER), 'teams', TEAM), team(SELLER, { secret: 1 })));
+  await assertFails(setDoc(doc(anon('anon5'), 'teams', TEAM), team({ uid: 'anon5' })));
+  await makeTeam();
+  await assertFails(setDoc(doc(db(BUYER), 'teamcodes', 'BBBB2345'), { team: TEAM, owner: BUYER.uid }));
+  await assertFails(deleteDoc(doc(db(BUYER), 'teamcodes', CODE)));
+});
+
+test('группы: проекты команды — участники читают и выкладывают, посторонние нет; by — только свой', async () => {
+  await makeTeam();
+  await assertSucceeds(joinByCode(BUYER));
+  const proj = (who, over = {}) => ({ name: 'Дешёвые семена', game: 'stardew-valley', version: '1.0.0', by: who.uid, byName: 'B', script: 'mod "x"', updated: serverTimestamp(), ...over });
+  await assertSucceeds(setDoc(doc(db(BUYER), 'teams', TEAM, 'projects', 'seeds'), proj(BUYER)));
+  await assertSucceeds(getDocs(collection(db(SELLER), 'teams', TEAM, 'projects')));
+  await assertSucceeds(setDoc(doc(db(SELLER), 'teams', TEAM, 'projects', 'seeds'), proj(SELLER, { version: '1.1.0' })));
+  await assertFails(getDocs(collection(db(OTHER), 'teams', TEAM, 'projects')));
+  await assertFails(setDoc(doc(db(OTHER), 'teams', TEAM, 'projects', 'evil'), proj(OTHER)));
+  await assertFails(setDoc(doc(db(BUYER), 'teams', TEAM, 'projects', 'seeds'), proj(SELLER)));
+  await assertFails(setDoc(doc(db(BUYER), 'teams', TEAM, 'projects', 'big'), proj(BUYER, { script: 'x'.repeat(100001) })));
+  await assertFails(setDoc(doc(db(BUYER), 'teams', TEAM, 'projects', 'bad id!'), proj(BUYER)));
+  // Удалить: тот, кто выложил последним, или владелец.
+  await assertFails(deleteDoc(doc(db(BUYER), 'teams', TEAM, 'projects', 'seeds')));
+  await assertSucceeds(deleteDoc(doc(db(SELLER), 'teams', TEAM, 'projects', 'seeds')));
 });

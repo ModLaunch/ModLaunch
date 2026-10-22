@@ -75,6 +75,8 @@ public static class Firebase
         int or long => new JsonObject { ["integerValue"] = Convert.ToInt64(value).ToString() },
         double d => new JsonObject { ["doubleValue"] = d },
         IEnumerable<string> list => new JsonObject { ["arrayValue"] = new JsonObject { ["values"] = new JsonArray(list.Select(x => ToValue(x)).ToArray()) } },
+        // 13.0: словарь строк (имена участников команды) — mapValue.
+        IDictionary<string, string> map => new JsonObject { ["mapValue"] = new JsonObject { ["fields"] = ToFields(map.ToDictionary(kv => kv.Key, kv => (object?)kv.Value)) } },
         _ => new JsonObject { ["stringValue"] = value.ToString() },
     };
 

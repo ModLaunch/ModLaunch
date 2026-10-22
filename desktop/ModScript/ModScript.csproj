@@ -34,6 +34,7 @@
   <ItemGroup>
     <Compile Include="..\ModLaunch\Creator\ModScript.cs" Link="Core\ModScript.cs" />
     <Compile Include="..\ModLaunch\Creator\ModScript.Lib.cs" Link="Core\ModScript.Lib.cs" />
+    <Compile Include="..\ModLaunch\Creator\ModScript.More.cs" Link="Core\ModScript.More.cs" />
     <None Include="Examples\*.modx" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

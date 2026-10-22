@@ -37,14 +37,32 @@ public sealed partial class CreatorPage
         state.VerticalAlignment = VerticalAlignment.Center;
         ToolTip.SetTip(state, I18n.T($"v12.pj.st.{status}"));
         _testAction = new ContentControl { VerticalAlignment = VerticalAlignment.Center };
-        // 12.0: главная кнопка — «Собрать и проверить»; сохранить и просто установить — значками (Ctrl+S и сборка сохраняют и так).
-        var actions = Ui.Row(6,
-            Ui.Button("", () => Actions.OpenFolder(Directory.CreateDirectory(Path.Combine(p.Dir, "files")).FullName), "icon ghost", Icons.Folder, I18n.T("cr.files")),
-            Ui.Button("", Delete, "icon ghost", Icons.Trash, I18n.T("cr.delete")),
-            Ui.Button("", () => Save(), "icon ghost", Icons.Save, I18n.T("cr.save") + " (Ctrl+S)"),
-            Ui.Button("", () => _ = InstallOpen(), "icon ghost", Icons.Download, I18n.T("cr.install")),
+        // 13.0: две кнопки — «Опубликовать» и главная «Запустить в игре» (F5); остальное — в меню «⋯» (Ctrl+S и сборка сохраняют и так).
+        var more = Ui.Button("", () => { }, "icon ghost", Icons.More, I18n.T("v13.ed.more"));
+        var teams = Social.Teams.Mine;
+        var menu = Ctx.Menu(
+            Ctx.Item(I18n.T("cr.save"), Icons.Save, () => Save(), gesture: "Ctrl+S"),
+            Ctx.Item(I18n.T("cr.install"), Icons.Download, () => _ = InstallOpen()),
+            Ctx.Item(I18n.T("cr.export"), Icons.Package, () => _ = Export()),
+            Ctx.Item(I18n.T("cr.files"), Icons.Folder, () => Actions.OpenFolder(Directory.CreateDirectory(Path.Combine(p.Dir, "files")).FullName)),
+            "-",
+            Ctx.Item(I18n.T("cr.delete"), Icons.Trash, Delete));
+        // Есть команда — «Выложить в команду» прямо отсюда.
+        foreach (var t in teams.Take(3))
+        {
+            var team = t;
+            var share = new MenuItem { Header = I18n.T("v13.team.shareTo", ("name", t.Name)), Icon = Ui.Icon(Icons.Users, 14) };
+            share.Click += async (_, _) =>
+            {
+                Save(quiet: true);
+                try { await Social.Teams.Share(team, p); MainWindow.Current?.Toast(I18n.T("v13.team.shared", ("name", p.Name))); _teamProjects.Remove(team.Id); }
+                catch (Exception e) { MainWindow.Current?.Toast(Social.Teams.Explain(e), bad: true); }
+            };
+            menu.Items.Insert(4, share);
+        }
+        more.Flyout = menu;
+        var actions = Ui.Row(6, more,
             new Border { Width = 1, Height = 22, Background = HubLook.Edge, Margin = new Thickness(4, 0), VerticalAlignment = VerticalAlignment.Center },
-            Ui.Button(I18n.T("cr.export"), () => _ = Export(), "", Icons.Package),
             Ui.Button(I18n.T("cr.publish"), Publish, "", Icons.Upload),
             _testAction, HubLook.Key("F5"));
         actions.VerticalAlignment = VerticalAlignment.Center;
@@ -246,7 +264,7 @@ public sealed partial class CreatorPage
     void OnTestChanged()
     {
         // Список проектов на экране — точки статуса обновить, но только по итогу (шаги список не меняют).
-        if (_open is null) { if (_tab == "mine" && _minePart == "projects" && Playtest.Current is { Active: false }) Build(); return; }
+        if (_open is null) { if (_tab is "home" or "mine" && _minePart == "projects" && Playtest.Current is { Active: false }) Build(); return; }
         // Обзор целиком из истории проекта — перестраиваем; в редакторе — только панель проверки (курсор и правка не теряются).
         if (_pane == "overview") Build();
         else RenderTest();

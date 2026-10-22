@@ -226,6 +226,13 @@ public abstract class Target
                 ["clamp"] = "def mx_clamp(x, lo, hi): return max(lo, min(hi, x))",
                 ["range"] = "def mx_range(a, b=None): return list(range(int(a))) if b is None else list(range(int(a), int(b)))",
                 ["contains"] = "def mx_contains(a, x): return x in a", ["upper"] = "def mx_upper(s): return str(s).upper()", ["lower"] = "def mx_lower(s): return str(s).lower()",
+                ["floor"] = "def mx_floor(x): return int(__import__('math').floor(x))", ["ceil"] = "def mx_ceil(x): return int(__import__('math').ceil(x))",
+                ["sqrt"] = "def mx_sqrt(x): return __import__('math').sqrt(x)", ["pow"] = "def mx_pow(a, b): return a ** b",
+                ["sign"] = "def mx_sign(x): return (x > 0) - (x < 0)", ["lerp"] = "def mx_lerp(a, b, t): return a + (b - a) * t",
+                ["pick"] = "def mx_pick(a): return __import__('random').choice(a)", ["sum"] = "def mx_sum(a): return sum(a)",
+                ["join"] = "def mx_join(a, sep): return sep.join(str(x) for x in a)", ["split"] = "def mx_split(s, sep): return str(s).split(sep)",
+                ["trim"] = "def mx_trim(s): return str(s).strip()", ["replace"] = "def mx_replace(s, a, b): return str(s).replace(a, b)",
+                ["startswith"] = "def mx_startswith(s, p): return str(s).startswith(p)", ["endswith"] = "def mx_endswith(s, p): return str(s).endswith(p)",
             },
             "javascript" => new Dictionary<string, string>
             {
@@ -236,6 +243,12 @@ public abstract class Target
                 ["range"] = "const mx_range = (a, b) => { if (b === undefined) { b = a; a = 0; } const r = []; for (let i = a; i < b; i++) r.push(i); return r; };",
                 ["contains"] = "const mx_contains = (a, x) => (typeof a === \"string\" ? a.includes(String(x)) : a.includes(x));",
                 ["upper"] = "const mx_upper = s => String(s).toUpperCase();", ["lower"] = "const mx_lower = s => String(s).toLowerCase();",
+                ["floor"] = "const mx_floor = Math.floor;", ["ceil"] = "const mx_ceil = Math.ceil;", ["sqrt"] = "const mx_sqrt = Math.sqrt;", ["pow"] = "const mx_pow = Math.pow;",
+                ["sign"] = "const mx_sign = Math.sign;", ["lerp"] = "const mx_lerp = (a, b, t) => a + (b - a) * t;",
+                ["pick"] = "const mx_pick = a => a[Math.floor(Math.random() * a.length)];", ["sum"] = "const mx_sum = a => a.reduce((x, y) => x + y, 0);",
+                ["join"] = "const mx_join = (a, sep) => a.join(sep);", ["split"] = "const mx_split = (s, sep) => String(s).split(sep);",
+                ["trim"] = "const mx_trim = s => String(s).trim();", ["replace"] = "const mx_replace = (s, a, b) => (a === \"\" ? String(s) : String(s).split(a).join(b));",
+                ["startswith"] = "const mx_startswith = (s, p) => String(s).startsWith(p);", ["endswith"] = "const mx_endswith = (s, p) => String(s).endsWith(p);",
             },
             "lua" => new Dictionary<string, string>
             {
@@ -247,6 +260,17 @@ public abstract class Target
                 ["range"] = "local function mx_range(a, b) if b == nil then a, b = 0, a end local r = {} for i = a, b - 1 do r[#r + 1] = i end return r end",
                 ["contains"] = "local function mx_contains(t, x) if type(t) == \"string\" then return string.find(t, tostring(x), 1, true) ~= nil end for _, v in ipairs(t) do if v == x then return true end end return false end",
                 ["upper"] = "local function mx_upper(s) return string.upper(tostring(s)) end", ["lower"] = "local function mx_lower(s) return string.lower(tostring(s)) end",
+                ["floor"] = "local function mx_floor(x) return math.floor(x) end", ["ceil"] = "local function mx_ceil(x) return math.ceil(x) end",
+                ["sqrt"] = "local mx_sqrt = math.sqrt", ["pow"] = "local function mx_pow(a, b) return a ^ b end",
+                ["sign"] = "local function mx_sign(x) if x > 0 then return 1 elseif x < 0 then return -1 end return 0 end",
+                ["lerp"] = "local function mx_lerp(a, b, t) return a + (b - a) * t end", ["pick"] = "local function mx_pick(t) return t[math.random(#t)] end",
+                ["sum"] = "local function mx_sum(t) local n = 0 for _, v in ipairs(t) do n = n + v end return n end",
+                ["join"] = "local function mx_join(t, sep) local r = {} for i, v in ipairs(t) do r[i] = tostring(v) end return table.concat(r, sep) end",
+                ["split"] = "local function mx_split(s, sep) s = tostring(s) local r = {} if sep == \"\" then for c in string.gmatch(s, \".\") do r[#r + 1] = c end return r end local i = 1 while true do local j = string.find(s, sep, i, true) if not j then r[#r + 1] = string.sub(s, i) return r end r[#r + 1] = string.sub(s, i, j - 1) i = j + #sep end end",
+                ["trim"] = "local function mx_trim(s) return (string.gsub(tostring(s), \"^%s*(.-)%s*$\", \"%1\")) end",
+                ["replace"] = "local function mx_replace(s, a, b) s = tostring(s) if a == \"\" then return s end local r, i = {}, 1 while true do local j = string.find(s, a, i, true) if not j then r[#r + 1] = string.sub(s, i) return table.concat(r) end r[#r + 1] = string.sub(s, i, j - 1) .. b i = j + #a end end",
+                ["startswith"] = "local function mx_startswith(s, p) return string.sub(tostring(s), 1, #p) == p end",
+                ["endswith"] = "local function mx_endswith(s, p) s = tostring(s) return p == \"\" or string.sub(s, -#p) == p end",
             },
             "csharp" => new Dictionary<string, string>
             {
@@ -262,6 +286,17 @@ public abstract class Target
                 ["range"] = "static System.Collections.Generic.List<long> mx_range(long a, long? b = null) { var r = new System.Collections.Generic.List<long>(); long from = b == null ? 0 : a, to = b ?? a; for (var i = from; i < to; i++) r.Add(i); return r; }",
                 ["contains"] = "static bool mx_contains(object a, object x) => a is string s ? s.Contains(System.Convert.ToString(x)) : a is System.Collections.IList l && l.Contains(x);",
                 ["upper"] = "static string mx_upper(object s) => System.Convert.ToString(s).ToUpperInvariant();", ["lower"] = "static string mx_lower(object s) => System.Convert.ToString(s).ToLowerInvariant();",
+                ["floor"] = "static long mx_floor(double x) => (long)System.Math.Floor(x);", ["ceil"] = "static long mx_ceil(double x) => (long)System.Math.Ceiling(x);",
+                ["sqrt"] = "static double mx_sqrt(double x) => System.Math.Sqrt(x);", ["pow"] = "static double mx_pow(double a, double b) => System.Math.Pow(a, b);",
+                ["sign"] = "static long mx_sign(double x) => System.Math.Sign(x);", ["lerp"] = "static double mx_lerp(double a, double b, double t) => a + (b - a) * t;",
+                ["pick"] = "static object mx_pick(System.Collections.IList a) => a[new System.Random().Next(a.Count)];",
+                ["sum"] = "static double mx_sum(System.Collections.IEnumerable a) { double n = 0; foreach (var x in a) n += System.Convert.ToDouble(x, System.Globalization.CultureInfo.InvariantCulture); return n; }",
+                ["join"] = "static string mx_join(System.Collections.IEnumerable a, string sep) { var r = new System.Collections.Generic.List<string>(); foreach (var x in a) r.Add(System.Convert.ToString(x, System.Globalization.CultureInfo.InvariantCulture)); return string.Join(sep, r.ToArray()); }",
+                ["split"] = "static System.Collections.Generic.List<object> mx_split(object s, string sep) => new System.Collections.Generic.List<object>(System.Convert.ToString(s).Split(new[] { sep }, System.StringSplitOptions.None));",
+                ["trim"] = "static string mx_trim(object s) => System.Convert.ToString(s).Trim();",
+                ["replace"] = "static string mx_replace(object s, string a, string b) => a == \"\" ? System.Convert.ToString(s) : System.Convert.ToString(s).Replace(a, b);",
+                ["startswith"] = "static bool mx_startswith(object s, string p) => System.Convert.ToString(s).StartsWith(p, System.StringComparison.Ordinal);",
+                ["endswith"] = "static bool mx_endswith(object s, string p) => System.Convert.ToString(s).EndsWith(p, System.StringComparison.Ordinal);",
             },
             _ => new Dictionary<string, string>
             {
@@ -271,6 +306,13 @@ public abstract class Target
                 ["abs"] = "func mx_abs(x):\n\treturn abs(x)", ["round"] = "func mx_round(x):\n\treturn int(round(x))", ["clamp"] = "func mx_clamp(x, lo, hi):\n\treturn clamp(x, lo, hi)",
                 ["range"] = "func mx_range(a, b = null):\n\treturn range(a) if b == null else range(a, b)", ["contains"] = "func mx_contains(a, x):\n\treturn x in a",
                 ["upper"] = "func mx_upper(s):\n\treturn str(s).to_upper()", ["lower"] = "func mx_lower(s):\n\treturn str(s).to_lower()",
+                ["floor"] = "func mx_floor(x):\n\treturn int(floor(x))", ["ceil"] = "func mx_ceil(x):\n\treturn int(ceil(x))", ["sqrt"] = "func mx_sqrt(x):\n\treturn sqrt(x)",
+                ["pow"] = "func mx_pow(a, b):\n\treturn pow(a, b)", ["sign"] = "func mx_sign(x):\n\treturn sign(x)", ["lerp"] = "func mx_lerp(a, b, t):\n\treturn a + (b - a) * t",
+                ["pick"] = "func mx_pick(a):\n\treturn a[randi() % a.size()]", ["sum"] = "func mx_sum(a):\n\tvar n = 0\n\tfor x in a:\n\t\tn += x\n\treturn n",
+                ["join"] = "func mx_join(a, sep):\n\tvar r = \"\"\n\tfor i in range(a.size()):\n\t\tif i > 0:\n\t\t\tr += sep\n\t\tr += str(a[i])\n\treturn r",
+                ["split"] = "func mx_split(s, sep):\n\treturn Array(str(s).split(sep))", ["trim"] = "func mx_trim(s):\n\treturn str(s).strip_edges()",
+                ["replace"] = "func mx_replace(s, a, b):\n\treturn str(s).replace(a, b)", ["startswith"] = "func mx_startswith(s, p):\n\treturn str(s).begins_with(p)",
+                ["endswith"] = "func mx_endswith(s, p):\n\treturn str(s).ends_with(p)",
             },
         };
         foreach (var name in ModxDoc.Builtins.Where(used.Contains))

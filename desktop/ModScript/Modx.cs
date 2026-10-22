@@ -61,7 +61,9 @@ public sealed partial class ModxDoc
     private static partial Regex FnStart();
 
     /// <summary>Встроенные функции языка: одинаково работают в песочнице и в каждом движке (через mx_…).</summary>
-    public static readonly string[] Builtins = ["len", "str", "int", "num", "rand", "chance", "min", "max", "abs", "round", "clamp", "range", "contains", "upper", "lower"];
+    public static readonly string[] Builtins = ["len", "str", "int", "num", "rand", "chance", "min", "max", "abs", "round", "clamp", "range", "contains", "upper", "lower",
+        // 13.0: математика, случайный элемент и строки.
+        "floor", "ceil", "sqrt", "pow", "sign", "lerp", "pick", "sum", "join", "split", "trim", "replace", "startswith", "endswith"];
 
     [GeneratedRegex(@"^\s*engine\s+([\p{L}\w-]+)\s*(#.*)?$")]
     private static partial Regex EngineLine();

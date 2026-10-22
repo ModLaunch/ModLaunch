@@ -49,9 +49,9 @@ public sealed partial class HomePage
         foreach (var k in Widgets.Catalog)
         {
             var name = I18n.T("v10.w.name." + k.Id);
-            if (k.Sizes.Length == 1) { add.Items.Add(Item(name, IconOf(k), () => Widgets.Add(k.Id, k.Sizes[0], at))); continue; }
+            if (k.Sizes.Length == 1 && Widgets.SizesOf(k).Count() == 1) { add.Items.Add(Item(name, IconOf(k), () => Widgets.Add(k.Id, k.Sizes[0], at))); continue; }
             var sub = new MenuItem { Header = name, Icon = Ui.Icon(IconOf(k), 14) };
-            foreach (var size in k.Sizes)
+            foreach (var size in Widgets.SizesOf(k))
             {
                 var s = size;
                 sub.Items.Add(Item(SizeName(s), Icons.Maximize, () => Widgets.Add(k.Id, s, at)));
@@ -69,6 +69,20 @@ public sealed partial class HomePage
         menu.Items.Add(AddMenu(-1));
         menu.Items.Add(new Separator());
         menu.Items.Add(Item(_editWidgets ? I18n.T("v10.w.done") : I18n.T("v10.w.edit"), _editWidgets ? Icons.Check : Icons.Grid, () => { _editWidgets = !_editWidgets; Build(); }));
+        // 13.0: сетка — размер клетки и зазор.
+        var grid = new MenuItem { Header = I18n.T("v13.w.grid"), Icon = Ui.Icon(Icons.Grid, 14) };
+        foreach (var d in Widgets.Densities)
+        {
+            var one = d;
+            grid.Items.Add(Item((one == Widgets.Density ? "✓  " : "") + I18n.T("v13.w.cell") + ": " + I18n.T("v13.w.cell." + one), Icons.Maximize, () => Widgets.SetGrid(one, null)));
+        }
+        grid.Items.Add(new Separator());
+        foreach (var g in Widgets.Gaps)
+        {
+            var one = g;
+            grid.Items.Add(Item((one == Widgets.Gap ? "✓  " : "") + I18n.T("v13.w.gap") + ": " + I18n.T("v13.w.gap." + one), Icons.Layers, () => Widgets.SetGrid(null, one)));
+        }
+        menu.Items.Add(grid);
         menu.Items.Add(new Separator());
         menu.Items.Add(Item(I18n.T("v10.cfg.short"), Icons.Palette, () => MainWindow.Current?.Navigate(() => new SettingsPage("configs"))));
         menu.Items.Add(Item(I18n.T("v10.w.reset"), Icons.Undo, Widgets.Reset));
@@ -94,20 +108,19 @@ public sealed partial class HomePage
             }
             menu.Items.Add(games);
         }
-        if (kind?.Options.Any(o => o.Key == "tint") == true)
+        // 13.0: цвет и вид — у любого виджета.
+        var colors = new MenuItem { Header = I18n.T("v12w.opt.tint"), Icon = Ui.Icon(Icons.Palette, 14) };
+        foreach (var t in Widgets.Tints)
         {
-            var colors = new MenuItem { Header = I18n.T("v12w.opt.tint"), Icon = Ui.Icon(Icons.Palette, 14) };
-            foreach (var t in Widgets.Tints)
-            {
-                var one = t;
-                colors.Items.Add(Item((one == e.Get("tint") ? "✓  " : "") + I18n.T("v12w.tint." + one), Icons.Palette, () => SetOpt(index, e, "tint", one)));
-            }
-            menu.Items.Add(colors);
+            var one = t;
+            colors.Items.Add(Item((one == e.Get("tint") ? "✓  " : "") + I18n.T("v12w.tint." + one), Icons.Palette, () => SetOpt(index, e, "tint", one)));
         }
-        if (Widgets.Find(id) is { Sizes.Length: > 1 } k)
+        menu.Items.Add(colors);
+        menu.Items.Add(LookMenu(index, e));
+        if (Widgets.Find(id) is { } k && Widgets.SizesOf(k).Count() > 1)
         {
             var sizes = new MenuItem { Header = I18n.T("v10.w.size"), Icon = Ui.Icon(Icons.Maximize, 14) };
-            foreach (var s in k.Sizes)
+            foreach (var s in Widgets.SizesOf(k))
             {
                 var one = s;
                 sizes.Items.Add(Item((one == size ? "✓  " : "") + SizeName(one), Icons.Maximize, () => Widgets.SetSize(index, one)));
@@ -117,9 +130,36 @@ public sealed partial class HomePage
         if (index > 0) menu.Items.Add(Item(I18n.T("v10.w.left"), Icons.ChevronLeft, () => Widgets.Move(index, -1)));
         if (index < count - 1) menu.Items.Add(Item(I18n.T("v10.w.right"), Icons.ChevronRight, () => Widgets.Move(index, 1)));
         menu.Items.Add(Item(I18n.T("v12w.addNear") + "…", Icons.Plus, () => OpenStudio(at: index + 1)));
+        if (count < 24) menu.Items.Add(Item(I18n.T("v13.w.duplicate"), Icons.Copy, () => Widgets.Duplicate(index)));
         menu.Items.Add(new Separator());
         menu.Items.Add(Item(I18n.T("v10.w.remove"), Icons.Close, () => Widgets.Remove(index)));
         return menu;
+    }
+
+    /// <summary>13.0: «Вид ›» — фон, углы, прозрачность, подпись и «такой вид всем».</summary>
+    static MenuItem LookMenu(int index, Widgets.Entry e)
+    {
+        var look = new MenuItem { Header = I18n.T("v13.w.look"), Icon = Ui.Icon(Icons.Sparkles, 14) };
+        foreach (var key in new[] { "style", "corner", "opacity" })
+        {
+            var opt = Widgets.Look.First(o => o.Key == key);
+            var sub = new MenuItem { Header = I18n.T("v12w.opt." + key) };
+            foreach (var c in opt.Choices)
+            {
+                var one = c;
+                sub.Items.Add(Item((one == e.Get(key) ? "✓  " : "") + I18n.T($"v12w.opt.{key}.{one}"), Icons.Sparkles, () => SetOpt(index, e, key, one)));
+            }
+            look.Items.Add(sub);
+        }
+        var shown = e.Get("caption") != "0";
+        look.Items.Add(Item((shown ? "✓  " : "") + I18n.T("v12w.opt.caption.on"), Icons.Edit, () => SetOpt(index, e, "caption", shown ? "0" : "1")));
+        look.Items.Add(new Separator());
+        look.Items.Add(Item(I18n.T("v13.w.lookAll"), Icons.Layers, () =>
+        {
+            Widgets.ApplyLookToAll(e.Opts);
+            MainWindow.Current?.Toast(I18n.T("v13.w.lookAll.done"));
+        }));
+        return look;
     }
 
     static void SetOpt(int index, Widgets.Entry e, string key, string value)

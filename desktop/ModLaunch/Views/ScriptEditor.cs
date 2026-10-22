@@ -19,6 +19,9 @@ namespace ModLaunch.Views;
 /// </summary>
 public sealed partial class ScriptEditor : UserControl
 {
+    /// <summary>13.0: слова-команды ModScript — старые и новые (подсветка и подсказки).</summary>
+    internal static readonly HashSet<string> Commands = new(ModScript.Keywords.Concat(ModScriptCommands.All.Select(c => c.Name)), StringComparer.Ordinal);
+
     readonly TextEditor _editor;
     readonly Colorizer _colors = new();
     CompletionWindow? _completion;
@@ -178,7 +181,7 @@ public sealed partial class ScriptEditor : UserControl
             .Select(m => (ICompletionData)new Item(m.Groups[1].Value, $"{m.Groups[1].Value}({m.Groups[2].Value})", I18n.T("cr.lib.mine"), call: true, priority: 3));
         var vars = Regex.Matches(text, @"^\s*(?:let|var|const|auto|for)\s+([A-Za-z_]\w*)", RegexOptions.Multiline).Select(m => m.Groups[1].Value).Distinct()
             .Select(v => (ICompletionData)new Item(v, v, I18n.T("cr.lib.var"), priority: 2));
-        var keywords = ModScript.Keywords.Select(k => (ICompletionData)new Item(k, I18n.Has($"cr.doc.{k}.syntax") ? I18n.T($"cr.doc.{k}.syntax") : k, I18n.Has($"cr.doc.{k}") ? I18n.T($"cr.doc.{k}") : "", priority: 1));
+        var keywords = Commands.Select(k => (ICompletionData)new Item(k, I18n.Has($"cr.doc.{k}.syntax") ? I18n.T($"cr.doc.{k}.syntax") : k, I18n.Has($"cr.doc.{k}") ? I18n.T($"cr.doc.{k}") : "", priority: 1));
         var library = ModScript.Library.Select(kv => (ICompletionData)new Item(kv.Key, kv.Value.Sig, $"{kv.Value.Doc}\n[{kv.Value.Group}]", call: true));
         var items = mine.Concat(vars).Concat(keywords).Concat(library)
             .Where(i => typed == "" || i.Text.StartsWith(typed, StringComparison.OrdinalIgnoreCase) || i.Text.Contains("." + typed, StringComparison.OrdinalIgnoreCase) || i.Text.Contains("::" + typed, StringComparison.OrdinalIgnoreCase))
@@ -213,7 +216,7 @@ public sealed partial class ScriptEditor : UserControl
         public void Complete(TextArea textArea, ISegment completionSegment, EventArgs insertionRequestEventArgs)
         {
             // Функция: вставляем «имя()» и ставим курсор между скобками.
-            textArea.Document.Replace(completionSegment, text + (call ? "()" : ModScript.Keywords.Contains(text) ? " " : ""));
+            textArea.Document.Replace(completionSegment, text + (call ? "()" : Commands.Contains(text) ? " " : ""));
             if (call) textArea.Caret.Offset -= 1;
         }
     }
@@ -231,7 +234,7 @@ public sealed partial class ScriptEditor : UserControl
         static readonly IBrush Keyword = B("#C792EA"), Str = B("#C3E88D"), Var = B("#82AAFF"), Num = B("#F78C6C"),
             Comment = B("#6B7385"), Section = B("#FFCB6B"), Op = B("#89DDFF"), Word = B("#E8EBF2"), Func = B("#7FDBCA");
         static readonly IBrush ErrorBg = new SolidColorBrush(Color.FromArgb(46, 255, 107, 107));
-        static readonly HashSet<string> Words = new(ModScript.Keywords.Concat(ModScriptX.ModxDoc.Keywords).Concat(["to", "from", "in", "mod", "version", "engine", "var"]), StringComparer.OrdinalIgnoreCase);
+        static readonly HashSet<string> Words = new(Commands.Concat(ModScriptX.ModxDoc.Keywords).Concat(["to", "from", "in", "mod", "version", "engine", "var"]), StringComparer.OrdinalIgnoreCase);
 
         protected override void ColorizeLine(DocumentLine line)
         {

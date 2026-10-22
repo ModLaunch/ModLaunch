@@ -578,6 +578,119 @@ service cloud.firestore {
       allow delete: if friendsMember() && resource.data.owner == request.auth.uid;
     }
 
+    // 13.0: группы разработчиков. teams/{id} — название, тег, цвет, участники (members — uid, names — uid → имя),
+    // приглашённые (invites) и код входа (code). Владелец меняет всё, кроме владельца и даты создания.
+    // Посторонний может только добавить себя: по приглашению или записав joined = нынешний код
+    // (id группы он узнаёт из teamcodes/{код}; саму группу и её код видят только участники и приглашённые,
+    // так что убранный участник без нового кода не вернётся). Участник может только выйти.
+    function teamColor(c) {
+      return c in ['violet', 'blue', 'green', 'orange', 'pink', 'cyan', 'red', 'yellow'];
+    }
+    function teamValid(d) {
+      return d.keys().hasOnly(['name', 'tag', 'color', 'about', 'owner', 'members', 'names', 'invites', 'code', 'joined', 'created', 'updated'])
+        && d.keys().hasAll(['name', 'tag', 'color', 'about', 'owner', 'members', 'names', 'invites', 'code', 'created', 'updated'])
+        && d.name is string && d.name.size() > 0 && d.name.size() <= 40
+        && d.tag is string && d.tag.matches('^[A-Z0-9]{2,5}$')
+        && teamColor(d.color)
+        && d.about is string && d.about.size() <= 200
+        && d.members is list && d.members.size() >= 1 && d.members.size() <= 25
+        && d.owner in d.members
+        && d.names is map && d.names.size() <= 25
+        && d.invites is list && d.invites.size() <= 25
+        && d.code is string && d.code.matches('^[A-Z0-9]{8}$')
+        && d.created is timestamp
+        && d.updated == request.time;
+    }
+    function onlySelfAdded(before, after) {
+      return after.toSet().difference(before.toSet()) == [request.auth.uid].toSet()
+        && before.toSet().difference(after.toSet()).size() == 0;
+    }
+    function onlySelfRemoved(before, after) {
+      return before.toSet().difference(after.toSet()) == [request.auth.uid].toSet()
+        && after.toSet().difference(before.toSet()).size() == 0;
+    }
+    match /teams/{id} {
+      allow get, list: if friendsMember()
+        && (request.auth.uid in resource.data.members || request.auth.uid in resource.data.invites);
+      allow create: if friendsMember()
+        && id.matches('^[A-Za-z0-9]{20}$')
+        && teamValid(request.resource.data)
+        && request.resource.data.owner == request.auth.uid
+        && request.resource.data.members == [request.auth.uid]
+        && request.resource.data.names.keys().hasOnly([request.auth.uid])
+        && friendsName(request.resource.data.names[request.auth.uid])
+        && request.resource.data.invites.size() == 0
+        && !('joined' in request.resource.data)
+        && request.resource.data.created == request.time;
+      allow update: if friendsMember()
+        && teamValid(request.resource.data)
+        && request.resource.data.owner == resource.data.owner
+        && request.resource.data.created == resource.data.created
+        && (
+          // Владелец: название, тег, цвет, описание, код, участники (убрать), приглашения.
+          (request.auth.uid == resource.data.owner
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'tag', 'color', 'about', 'members', 'names', 'invites', 'code', 'updated'])
+            && request.resource.data.members.toSet().difference(resource.data.members.toSet()).size() == 0)
+          // Вход: себя — в участники и имена, своё приглашение — убрать; по коду — joined = нынешний код.
+          || (!(request.auth.uid in resource.data.members)
+            && (request.auth.uid in resource.data.invites || request.resource.data.get('joined', '') == resource.data.code)
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members', 'names', 'invites', 'joined', 'updated'])
+            && onlySelfAdded(resource.data.members, request.resource.data.members)
+            && request.resource.data.names.diff(resource.data.names).affectedKeys().hasOnly([request.auth.uid])
+            && friendsName(request.resource.data.names[request.auth.uid])
+            && resource.data.invites.toSet().difference(request.resource.data.invites.toSet()).hasOnly([request.auth.uid])
+            && request.resource.data.invites.toSet().difference(resource.data.invites.toSet()).size() == 0)
+          // Отказ от приглашения: убрать себя из invites — и только.
+          || (!(request.auth.uid in resource.data.members)
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['invites', 'updated'])
+            && onlySelfRemoved(resource.data.invites, request.resource.data.invites))
+          // Выход: себя — из участников и имён, больше ничего.
+          || (request.auth.uid in resource.data.members && request.auth.uid != resource.data.owner
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members', 'names', 'updated'])
+            && onlySelfRemoved(resource.data.members, request.resource.data.members)
+            && resource.data.names.diff(request.resource.data.names).affectedKeys().hasOnly([request.auth.uid]))
+        );
+      allow delete: if friendsMember() && resource.data.owner == request.auth.uid;
+
+      // Общие проекты: читают и выкладывают участники; by — кто выложил последним.
+      match /projects/{pid} {
+        function member() {
+          return request.auth.uid in get(/databases/$(database)/documents/teams/$(id)).data.members;
+        }
+        function projectValid(d) {
+          return d.keys().hasOnly(['name', 'game', 'version', 'by', 'byName', 'script', 'updated'])
+            && d.keys().hasAll(['name', 'game', 'version', 'by', 'byName', 'script', 'updated'])
+            && d.name is string && d.name.size() > 0 && d.name.size() <= 60
+            && d.game is string && d.game.size() <= 60
+            && d.version is string && d.version.size() <= 24
+            && d.by == request.auth.uid
+            && friendsName(d.byName)
+            && d.script is string && d.script.size() <= 100000
+            && d.updated == request.time;
+        }
+        allow get, list: if friendsMember() && member();
+        allow create, update: if friendsMember() && member()
+          && pid.matches('^[A-Za-z0-9_-]{1,64}$')
+          && projectValid(request.resource.data);
+        allow delete: if friendsMember()
+          && (member() && resource.data.by == request.auth.uid
+            || get(/databases/$(database)/documents/teams/$(id)).data.owner == request.auth.uid);
+      }
+    }
+
+    // Код входа → id группы. Узнать можно только по точному коду; заводит и удаляет владелец группы.
+    match /teamcodes/{code} {
+      allow get: if friendsMember();
+      allow create: if friendsMember()
+        && code.matches('^[A-Z0-9]{8}$')
+        && request.resource.data.keys().hasOnly(['team', 'owner'])
+        && request.resource.data.owner == request.auth.uid
+        && request.resource.data.team is string
+        && getAfter(/databases/$(database)/documents/teams/$(request.resource.data.team)).data.owner == request.auth.uid
+        && getAfter(/databases/$(database)/documents/teams/$(request.resource.data.team)).data.code == code;
+      allow delete: if friendsMember() && resource.data.owner == request.auth.uid;
+    }
+
     // Всё остальное закрыто.
   }
 }
