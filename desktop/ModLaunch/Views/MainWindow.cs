@@ -491,7 +491,7 @@ public sealed partial class MainWindow : Window
         var hidden = Settings.Data.Arr("hiddenGames").Select(x => x?.ToString()).ToHashSet();
         return OrderedGames()
             .Where(g => !hidden.Contains(g.Def.Id) && g.Status == Detect.Found)
-            .OrderByDescending(g => Features.PlayTime.Get(g.Def.Id).LastPlayed ?? DateTime.MinValue)
+            .OrderByDescending(g => Features.NewGames.Recent(g))
             .Take(Look.Store ? 5 : 8);
     }
 
@@ -870,7 +870,7 @@ public sealed partial class MainWindow : Window
     /// <summary>n-я игра для Ctrl+1…9: найденные, как на боковой панели — недавно запущенные сверху.</summary>
     static GameState? QuickGame(int n) => OrderedGames()
         .Where(g => g.Status == Detect.Found && !Settings.Data.Arr("hiddenGames").Any(x => x?.ToString() == g.Def.Id))
-        .OrderByDescending(g => Features.PlayTime.Get(g.Def.Id).LastPlayed ?? DateTime.MinValue)
+        .OrderByDescending(g => Features.NewGames.Recent(g))
         .Skip(n).FirstOrDefault();
 
     /// <summary>Игра «на экране»: открытая страница игры или выбранная на сцене главной.</summary>
@@ -960,6 +960,9 @@ public sealed partial class MainWindow : Window
         try { await AppState.DetectAll(); }
         finally { _splash?.Finish(() => _splash = null); }
         _started = true;
+        // 15.1: игры, установленные с прошлого раза, — сразу в библиотеку; потом — каждый раз, когда окно снова активно.
+        _ = Features.NewGames.Check(force: true);
+        Activated += (_, _) => { if (_started) _ = Features.NewGames.Check(); };
         // 11.0: инжекты, оставшиеся от ModLaunch, закрытого посреди игры, — снять; сеть — под присмотром (авто-офлайн).
         try { Features.Inject.Recover(); } catch { }
         Offline.StartWatching();

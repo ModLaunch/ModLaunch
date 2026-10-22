@@ -15,7 +15,7 @@ public sealed partial class HomePage
     /// <summary>Свои игры: найденные и не скрытые, сначала те, во что играли недавно.</summary>
     static List<GameState> MyGames() => MainWindow.OrderedGames()
         .Where(g => g.Status == Detect.Found && !Features.GameCollections.IsHidden(g.Def.Id))
-        .OrderByDescending(g => Features.PlayTime.Get(g.Def.Id).LastPlayed ?? DateTime.MinValue).ToList();
+        .OrderByDescending(g => Features.NewGames.Recent(g)).ToList();
 
     static Border Tile(Control content, Action open, string? extra = null)
     {

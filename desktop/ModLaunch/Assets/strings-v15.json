@@ -124,7 +124,20 @@
     "v15.ms.kw.log": "log \"текст\" — строка в журнал",
     "v15.ms.kw.engine": "engine renpy | rpgmaker | unity | godot | lua",
     "v15.ms.kw.mod": "mod \"Название\" — имя мода",
-    "v11.set.d.panel.long": "Сводка по играм, модам и загрузкам и быстрые действия — то, что раньше было отдельным пунктом слева."
+    "v11.set.d.panel.long": "Сводка по играм, модам и загрузкам и быстрые действия — то, что раньше было отдельным пунктом слева.",
+    "v151.new": "Новая",
+    "v151.new.game": "Новая игра",
+    "v151.new.toast": "{game} появилась на компьютере — уже в библиотеке, на главной и на панели слева",
+    "v151.new.toast.many": "Новые игры на компьютере: {games} — уже в библиотеке",
+    "v151.lib.sub": "Найдено на компьютере: {found} · поддерживается игр: {all}",
+    "v151.lib.catalog": "Каталог игр",
+    "v151.lib.catalog.open": "Весь каталог",
+    "v151.lib.catalog.find": "Искать «{query}» во всём каталоге",
+    "v151.lib.catalog.hint": "Все игры Steam и справочник игр с модами. Здесь — популярные игры с модами, которых ещё нет в библиотеке; наберите название в поиске, чтобы найти любую.",
+    "v151.lib.catalog.hint.query": "Совпадения во всём каталоге. Нажмите на игру, чтобы добавить её: ModLaunch найдёт её на диске или предложит установить.",
+    "v151.lib.catalog.nomods": "Запуск и ModScript",
+    "v151.set.autoAdd": "Новые игры — в библиотеку сами",
+    "v151.set.autoAdd.hint": "Игра, установленная в Steam, Epic или GOG, сразу появляется в библиотеке, на главной и на панели слева."
   },
   "en": {
     "v15.mc.search": "Search the catalog…",
@@ -251,6 +264,19 @@
     "v15.ms.kw.log": "log \"text\": a log line",
     "v15.ms.kw.engine": "engine renpy | rpgmaker | unity | godot | lua",
     "v15.ms.kw.mod": "mod \"Name\": the mod's name",
-    "v11.set.d.panel.long": "Games, mods and downloads at a glance plus quick actions: what used to be a separate item on the left."
+    "v11.set.d.panel.long": "Games, mods and downloads at a glance plus quick actions: what used to be a separate item on the left.",
+    "v151.new": "New",
+    "v151.new.game": "New game",
+    "v151.new.toast": "{game} appeared on this PC — it's already in your library, on Home and in the sidebar",
+    "v151.new.toast.many": "New games on this PC: {games} — already in your library",
+    "v151.lib.sub": "Found on this PC: {found} · supported games: {all}",
+    "v151.lib.catalog": "Game catalog",
+    "v151.lib.catalog.open": "Whole catalog",
+    "v151.lib.catalog.find": "Search “{query}” in the whole catalog",
+    "v151.lib.catalog.hint": "Every Steam game plus the directory of moddable games. Shown here: popular moddable games not in your library yet; type a name in search to find any game.",
+    "v151.lib.catalog.hint.query": "Matches in the whole catalog. Click a game to add it: ModLaunch finds it on disk or offers to install it.",
+    "v151.lib.catalog.nomods": "Launch and ModScript",
+    "v151.set.autoAdd": "Add new games automatically",
+    "v151.set.autoAdd.hint": "A game installed in Steam, Epic or GOG shows up in your library, on Home and in the sidebar right away."
   }
 }

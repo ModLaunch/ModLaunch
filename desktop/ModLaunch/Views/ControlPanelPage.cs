@@ -173,7 +173,7 @@ public sealed class ControlPanelPage : Page
         {
             col.Children.Add(Ui.Text(I18n.T("cp.games"), "h2"));
             var games = Ui.Col(8);
-            foreach (var g in found.OrderByDescending(g => PlayTime.Get(g.Def.Id).LastPlayed ?? DateTime.MinValue).Take(8))
+            foreach (var g in found.OrderByDescending(g => Features.NewGames.Recent(g)).Take(8))
             {
                 var game = g;
                 var p = PlayTime.Get(g.Def.Id);

@@ -114,8 +114,7 @@ public sealed class AddGamePage : Page
         var head = new DockPanel();
         var actions = Ui.Row(8,
             Ui.Button(I18n.T("add.exe"), PickExe, "", Icons.FilePlus),
-            Ui.Button(I18n.T("add.rescan"), () => _ = Rescan(), "ghost", Icons.Refresh),
-            Ui.Button(I18n.T("v12w.steam.link"), () => MainWindow.Current?.Navigate(() => new SteamGamesPage(_filter)), "ghost", Icons.Layers));
+            Ui.Button(I18n.T("add.rescan"), () => _ = Rescan(), "ghost", Icons.Refresh));
         actions.VerticalAlignment = VerticalAlignment.Top;
         DockPanel.SetDock(actions, Dock.Right);
         head.Children.Add(actions);
@@ -191,6 +190,8 @@ public sealed class AddGamePage : Page
     static Sorted? _sorted;
 
     /// <summary>Справочник без поиска: игры с наибольшим числом модов сверху. Сортировка — раз на версию справочника.</summary>
+    internal static List<DirGame> PopularDirectory() => Popular();
+
     static List<DirGame> Popular()
     {
         var all = GameDirectory.All;

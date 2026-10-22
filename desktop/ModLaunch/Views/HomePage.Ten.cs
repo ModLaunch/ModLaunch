@@ -83,8 +83,22 @@ public sealed partial class HomePage
 
     // ---------------------------------------------------------------- сцена
 
-    Control Stage(List<GameState> mine, bool compact)
+    /// <summary>Части сцены, нужные для смены игры: сама сцена, фон, цветная дымка, название, строка и кнопки.</summary>
+    sealed record StageParts(Panel Stage, Border Art, Border Tint, Control[] Text, Control? Cover);
+    StageParts? _parts;
+    /// <summary>Новые игры, которые уже показали на сцене в этом сеансе (новая игра выходит на сцену сама один раз).</summary>
+    static readonly HashSet<string> Presented = [];
+
+    static Avalonia.Media.Transformation.TransformOperations Tf(string s) => Avalonia.Media.Transformation.TransformOperations.Parse(s);
+
+    Control Stage(List<GameState> mine, bool compact, bool switching = false)
     {
+        // 15.1: только что появившаяся игра выходит на сцену сама — один раз за сеанс.
+        if (mine.FirstOrDefault(x => NewGames.IsNew(x) && !Presented.Contains(x.Def.Id)) is { } newest)
+        {
+            Presented.Add(newest.Def.Id);
+            _stage = newest.Def.Id;
+        }
         var g = mine.FirstOrDefault(x => x.Def.Id == _stage) ?? mine[0];
         _stage = g.Def.Id;
         var id = g.Def.Id;
@@ -94,10 +108,31 @@ public sealed partial class HomePage
         var art = new Border { Child = Ui.GameImage(g.Def, 1600, art: Images.Art.Hero), ClipToBounds = true };
         if (Animate.On && !Program.Screenshot)
         {
-            // Медленный наезд камеры — едва заметный, как на экране консоли.
-            art.RenderTransform = Avalonia.Media.Transformation.TransformOperations.Parse("scale(1.0)");
-            art.Transitions = [new TransformOperationsTransition { Property = RenderTransformProperty, Duration = TimeSpan.FromSeconds(16), Easing = new SineEaseOut() }];
-            art.AttachedToVisualTree += (_, _) => Dispatcher.UIThread.Post(() => art.RenderTransform = Avalonia.Media.Transformation.TransformOperations.Parse("scale(1.06)"), DispatcherPriority.Background);
+            // Медленный наезд камеры — едва заметный, как на экране консоли. 15.1: при смене игры новый фон
+            // проявляется поверх прежнего, приближаясь (всё внутри рамки сцены: она обрезает края).
+            var slow = new Transitions { new TransformOperationsTransition { Property = RenderTransformProperty, Duration = TimeSpan.FromSeconds(16), Easing = new SineEaseOut() } };
+            if (switching)
+            {
+                art.Opacity = 0;
+                art.RenderTransform = Tf("scale(1.14)");
+                art.Transitions =
+                [
+                    new DoubleTransition { Property = OpacityProperty, Duration = TimeSpan.FromMilliseconds(520), Easing = new CubicEaseOut() },
+                    new TransformOperationsTransition { Property = RenderTransformProperty, Duration = TimeSpan.FromMilliseconds(1100), Easing = new QuinticEaseOut() },
+                ];
+                art.AttachedToVisualTree += (_, _) => Dispatcher.UIThread.Post(() =>
+                {
+                    art.Opacity = 1;
+                    art.RenderTransform = Tf("scale(1.0)");
+                    DispatcherTimer.RunOnce(() => { art.Transitions = slow; art.RenderTransform = Tf("scale(1.06)"); }, TimeSpan.FromMilliseconds(1150));
+                }, DispatcherPriority.Background);
+            }
+            else
+            {
+                art.RenderTransform = Tf("scale(1.0)");
+                art.Transitions = slow;
+                art.AttachedToVisualTree += (_, _) => Dispatcher.UIThread.Post(() => art.RenderTransform = Tf("scale(1.06)"), DispatcherPriority.Background);
+            }
         }
 
         var logo = Images.GameAsset(g.Def, Images.Art.Logo, 900);
@@ -106,7 +141,8 @@ public sealed partial class HomePage
             : new Image { Source = logo, MaxHeight = compact ? 64 : 120, MaxWidth = compact ? 300 : 480, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Left };
         if (logo is not null) ToolTip.SetTip(title, g.Def.Name);
 
-        var when = running ? I18n.T("time.running") : played.LastPlayed is not null ? I18n.T("time.last", ("when", Ui.Ago(played.LastPlayed))) : I18n.T("v93.home.notPlayed");
+        var when = running ? I18n.T("time.running") : played.LastPlayed is not null ? I18n.T("time.last", ("when", Ui.Ago(played.LastPlayed)))
+            : NewGames.IsNew(g) ? I18n.T("v151.new.game") : I18n.T("v93.home.notPlayed");
         var meta = new TextBlock { Text = string.Join("  ·  ", new[] { when, g.ModCount > 0 ? StoreKit.Mods(g.ModCount) : null, played.TotalMs >= 3_600_000 ? I18n.T("v93.home.hours", ("n", played.TotalMs / 3_600_000)) : null }.OfType<string>()), FontSize = 13.5, Foreground = Ui.Hex("#D5D9E2") };
         var accent = Color.TryParse(g.Def.Accent, out var ac) ? ac : Gx.Accent;
 
@@ -142,8 +178,23 @@ public sealed partial class HomePage
 
         // Полка обложек внизу справа: выбранная — крупнее, с кольцом акцента.
         var shelf = Ui.Row(10);
-        foreach (var x in mine.Where(x => !x.Def.IsMinecraft || true).Take(compact ? 6 : 7))
-            shelf.Children.Add(StageCover(x, x.Def.Id == id, compact));
+        Control? current = null;
+        foreach (var x in mine.Take(compact ? 6 : 7))
+        {
+            var c = StageCover(x, x.Def.Id == id, compact);
+            if (x.Def.Id == id) current = c;
+            shelf.Children.Add(c);
+        }
+        // 15.1: дымка цветом игры снизу слева — при смене игры меняется вместе с фоном.
+        var tint = new Border
+        {
+            IsHitTestVisible = false,
+            Background = new LinearGradientBrush
+            {
+                StartPoint = new RelativePoint(0, 1, RelativeUnit.Relative), EndPoint = new RelativePoint(0.75, 0, RelativeUnit.Relative),
+                GradientStops = { new GradientStop(Color.FromArgb(Look.Mature ? (byte)70 : (byte)105, accent.R, accent.G, accent.B), 0), new GradientStop(Color.FromArgb(0, accent.R, accent.G, accent.B), 1) },
+            },
+        };
         shelf.HorizontalAlignment = HorizontalAlignment.Right;
         shelf.VerticalAlignment = VerticalAlignment.Bottom;
         shelf.Margin = new Thickness(0, 0, compact ? 24 : 32, compact ? 22 : 34);
@@ -156,15 +207,35 @@ public sealed partial class HomePage
                 art,
                 new Border { Background = Gx.ShadeLeft(0.78, 240) },
                 new Border { Background = Gx.ShadeUp(0.45, 230) },
+                tint,
                 left,
                 shelf,
             },
         };
+        _parts = new StageParts(stage, art, tint, [title, meta, buttons], current);
 
         var radius = new CornerRadius(Look.Radius == "sharp" ? 4 : 22);
         var frame = new Border { CornerRadius = radius, ClipToBounds = true, Child = stage, ContextFlyout = GameCard.Menu(g) };
-        // Если места мало, полка прячется — сцена не налезает сама на себя.
-        frame.SizeChanged += (_, e) => shelf.IsVisible = e.NewSize.Width > 1080;
+        // Если места мало, полка прячется — сцена не налезает сама на себя. 15.1: не целиком — на полке
+        // столько обложек, сколько помещается справа от названия и кнопок (выбранная — всегда); с колонкой
+        // рекламы сцена уже, и раньше полка пропадала совсем — выбирать игру было не из чего.
+        void FitShelf()
+        {
+            var free = frame.Bounds.Width - left.Margin.Left - left.Bounds.Width - shelf.Margin.Right - 40;
+            var covers = shelf.Children.ToList();
+            var on = Math.Max(0, covers.IndexOf(current!));
+            double used = 0;
+            var order = covers.Select((c, i) => (c, i)).OrderBy(x => x.i == on ? -1 : Math.Abs(x.i - on) * 2 + (x.i < on ? 1 : 0)).ToList();
+            foreach (var (c, _) in order)
+            {
+                var w = c.Width + 10;
+                c.IsVisible = used + w <= free;
+                if (c.IsVisible) used += w;
+            }
+            shelf.IsVisible = covers.Count(c => c.IsVisible) >= 2;
+        }
+        frame.SizeChanged += (_, _) => FitShelf();
+        left.SizeChanged += (_, _) => FitShelf();
         // 12.0: мягкое свечение цветом игры под сценой — на обёртке: у Border с ClipToBounds тень обрезается.
         // 15.0: во «взрослом» виде свечения нет — оно расплывалось за край сцены.
         if (Look.Mature) return new Border { CornerRadius = radius, Child = frame };
@@ -190,13 +261,51 @@ public sealed partial class HomePage
         {
             if (e.InitialPressMouseButton != Avalonia.Input.MouseButton.Left) return;
             if (on) { MainWindow.Current?.Navigate(() => new GamePage(g.Def.Id)); return; }
-            _stage = g.Def.Id;
-            if (_stageHost is not null)
-            {
-                _stageHost.Child = Stage(MyGames(), Settings.Data.Str("homeHero") == "compact");
-                if (Animate.On) Animate.From(_stageHost, "scale(0.995)", 260, 0, new CubicEaseOut(), 0.6);
-            }
+            SwitchStage(g.Def.Id);
         };
+        // 15.1: обложка на полке приподнимается под курсором — внутри сцены, соседей не задевает.
+        if (!on && Animate.On)
+        {
+            cover.Transitions =
+            [
+                new DoubleTransition { Property = OpacityProperty, Duration = TimeSpan.FromMilliseconds(160) },
+                new TransformOperationsTransition { Property = RenderTransformProperty, Duration = TimeSpan.FromMilliseconds(200), Easing = new CubicEaseOut() },
+            ];
+            cover.PointerEntered += (_, _) => cover.RenderTransform = Tf("translateY(-8px)");
+            cover.PointerExited += (_, _) => cover.RenderTransform = Tf("none");
+        }
         return cover;
+    }
+
+    /// <summary>Для снимков: переключить сцену на следующую игру полки.</summary>
+    internal void ShotSwitch()
+    {
+        var mine = MyGames();
+        if (mine.Count < 2) return;
+        var at = mine.FindIndex(x => x.Def.Id == _stage);
+        SwitchStage(mine[(at + 1) % mine.Count].Def.Id);
+    }
+
+    /// <summary>
+    /// 15.1: смена игры на сцене — не мигание, а переход: прежний фон остаётся под новым, новый проявляется
+    /// с приближением, дымка меняет цвет, название, строка и кнопки въезжают слева по очереди, выбранная
+    /// обложка поднимается на полке. Всё внутри рамки сцены.
+    /// </summary>
+    void SwitchStage(string id)
+    {
+        if (_stageHost is null) return;
+        var old = _parts;
+        _stage = id;
+        var compact = Settings.Data.Str("homeHero") == "compact";
+        var animate = Animate.On && old is not null;
+        _stageHost.Child = Stage(MyGames(), compact, switching: animate);
+        if (!animate || _parts is not { } now) return;
+        old!.Stage.Children.Remove(old.Art);
+        now.Stage.Children.Insert(0, old.Art);
+        DispatcherTimer.RunOnce(() => now.Stage.Children.Remove(old.Art), TimeSpan.FromMilliseconds(700));
+        Animate.From(now.Tint, "none", 700, 0, new CubicEaseOut());
+        for (var i = 0; i < now.Text.Length; i++)
+            Animate.From(now.Text[i], "translateX(-36px)", 520, 70 + i * 70, new QuinticEaseOut());
+        if (now.Cover is { } c) Animate.From(c, "translateY(16px)", 420, 0, new QuinticEaseOut(), 0.4);
     }
 }

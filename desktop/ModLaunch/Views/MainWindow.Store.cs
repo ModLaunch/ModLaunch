@@ -130,7 +130,8 @@ public sealed partial class MainWindow
         // недавние игры посередине, друзья, настройки и аккаунт — внизу.
         var rail = new DockPanel { Width = RailWidth, LastChildFill = true };
         var top = new StackPanel { Spacing = 2, Margin = new Thickness(0, 4, 0, 2), HorizontalAlignment = HorizontalAlignment.Center };
-        foreach (var b in new[] { _homeButton, _feedButton, _libraryButton, _modsButton, _creatorButton }) top.Children.Add(b);
+        // 15.1: «Моды» — не на панели: моды открываются у игры, общий центр — Ctrl+U и меню «…».
+        foreach (var b in new[] { _homeButton, _feedButton, _libraryButton, _creatorButton }) top.Children.Add(b);
         top.Children.Add(RailLine(new Thickness(0, 8, 0, 2)));
         DockPanel.SetDock(top, Dock.Top);
         var bottom = new StackPanel { Spacing = 2, Margin = new Thickness(0, 4, 0, 10), HorizontalAlignment = HorizontalAlignment.Center };
@@ -362,7 +363,7 @@ public sealed partial class MainWindow
         var games = RailGames().ToList();
         // 9.5: игры на панели перестраиваются, только когда изменился их список или состояние
         // (запущена, нужен загрузчик), тема или язык. При переходе между страницами — только подсветка.
-        var key = string.Join("|", games.Select(g => $"{g.Def.Id}:{g.Def.Name}:{Features.Launcher.IsRunning(g.Def.Id)}:{g.LoaderInstalled}")) + $"#{Look.Theme}{Look.Accent}{I18n.Lang}";
+        var key = string.Join("|", games.Select(g => $"{g.Def.Id}:{g.Def.Name}:{Features.Launcher.IsRunning(g.Def.Id)}:{g.LoaderInstalled}:{Features.NewGames.IsNew(g)}")) + $"#{Look.Theme}{Look.Accent}{I18n.Lang}";
         if (key == _railKey && _railPlus is not null)
         {
             foreach (var (id, slot, button) in _railGameSlots)
@@ -375,6 +376,7 @@ public sealed partial class MainWindow
         else
         {
         _railKey = key;
+        var before = _railGameSlots.Count > 0 ? _railGameSlots.Select(x => x.Id).ToHashSet() : null;
         _railGameSlots.Clear();
         _railGames.Children.Clear();
         // Подпись раздела — панель читается блоками, а не сплошным столбцом значков.
@@ -391,11 +393,13 @@ public sealed partial class MainWindow
             var running = Features.Launcher.IsRunning(id);
             // 9.3: точка — только когда есть что сказать: игра запущена (зелёная, мигает) или нужен загрузчик (жёлтая).
             var ready = g.LoaderInstalled || g.Def.Loader is Games.LoaderKind.None or Games.LoaderKind.Minecraft;
+            // 15.1: новая игра — точка цвета акцента, пока в неё не сыграли.
+            var fresh = Features.NewGames.IsNew(g);
             var dot = new Border
             {
-                Width = running ? 12 : 10, Height = running ? 12 : 10, CornerRadius = new CornerRadius(6), Background = running ? Ui.Res("Good") : Ui.Res("Warn"),
+                Width = running ? 12 : 10, Height = running ? 12 : 10, CornerRadius = new CornerRadius(6), Background = running ? Ui.Res("Good") : !ready ? Ui.Res("Warn") : Ui.Res("Brand"),
                 BorderBrush = Ui.Res("Rail"), BorderThickness = new Thickness(2), Margin = new Thickness(0, 0, -3, -3),
-                HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom, IsVisible = running || !ready,
+                HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom, IsVisible = running || !ready || fresh,
             };
             if (running) dot.Classes.Add("pulse");
             var b = new Button
@@ -407,13 +411,15 @@ public sealed partial class MainWindow
             if (_current?.GameId == id || running) b.Classes.Add("active");
             b.Click += (_, _) => Navigate(() => new GamePage(id));
             b.ContextFlyout = GameCard.Menu(g);
-            ToolTip.SetTip(b, running ? $"{g.Def.Name} · {I18n.T("run.running")}" : g.Def.Name);
+            ToolTip.SetTip(b, running ? $"{g.Def.Name} · {I18n.T("run.running")}" : fresh ? $"{g.Def.Name} · {I18n.T("v151.new")}" : g.Def.Name);
             ToolTip.SetPlacement(b, PlacementMode.Right);
             b.HorizontalAlignment = HorizontalAlignment.Center;
             var slot = new Panel { Classes = { "rail-item" }, Width = RailWidth, Children = { new Border { Classes = { "rail-pip" } }, b } };
             slot.Classes.Set("active", _current?.GameId == id);
             _railGames.Children.Add(slot);
             _railGameSlots.Add((id, slot, b));
+            // Игра только что появилась на панели — обложка вырастает на своём месте (не шире своей кнопки).
+            if (before is not null && !before.Contains(id)) Animate.From(b, "scale(0.4)", 460, 80, new Avalonia.Animation.Easings.QuinticEaseOut());
         }
         var plus = RailIcon(Icons.Plus, () => Navigate(() => new AddGamePage()), I18n.T("add.title"));
         plus.Width = plus.Height = 34;
@@ -432,10 +438,9 @@ public sealed partial class MainWindow
         // 9.3: «Игры» и «Моды» на панели — по желанию (Настройки → Внешний вид → Рамка окна);
         // без них их место занимает «Панель», и она подсвечена на страницах библиотеки и модов.
         // 15.0: «Панель» ушла в настройки — «Игры» и «Моды» на панели всегда.
-        _libraryButton.IsVisible = _modsButton.IsVisible = true;
-        SetNav(_libraryButton, _current is LibraryPage or AddGamePage or GamePage or MinecraftPage || _current is ModPage);
+        _libraryButton.IsVisible = true;
+        SetNav(_libraryButton, _current is LibraryPage or AddGamePage or GamePage or MinecraftPage or ModsCenterPage || _current is ModPage);
         SetNav(_creatorButton, _current is MarketPage or CreatorPage or ListingPage or AuthorPage);
-        SetNav(_modsButton, _current is ModsCenterPage);
 
 
         var view = Social.Friends.View();

@@ -192,12 +192,14 @@ public static class StoreKit
             play.Margin = new Thickness(8);
             layers.Children.Add(play);
         }
-        if (g.Def.Custom)
+        // 15.1: только что появившаяся игра — метка «Новая» цветом акцента (вместо «своя»).
+        var fresh = Features.NewGames.IsNew(g);
+        if (g.Def.Custom || fresh)
             layers.Children.Add(new Border
             {
-                Background = new SolidColorBrush(Color.FromArgb(190, 10, 10, 12)), CornerRadius = new CornerRadius(5), Padding = new Thickness(6, 2),
+                Background = fresh ? Ui.Res("Brand") : new SolidColorBrush(Color.FromArgb(190, 10, 10, 12)), CornerRadius = new CornerRadius(5), Padding = new Thickness(6, 2),
                 Margin = new Thickness(8), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top,
-                Child = new TextBlock { Text = I18n.T("lib.custom"), FontSize = 11, Foreground = White },
+                Child = new TextBlock { Text = fresh ? I18n.T("v151.new") : I18n.T("lib.custom"), FontSize = 11, FontWeight = fresh ? FontWeight.SemiBold : FontWeight.Normal, Foreground = White },
             });
         if (Features.GameCollections.IsFavorite(g.Def.Id))
             layers.Children.Add(new Border

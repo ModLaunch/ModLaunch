@@ -301,6 +301,7 @@ public sealed partial class SettingsPage : Page
             Ui.Text(I18n.T("guide.repack"), "small muted", wrap: true), Ui.Text(I18n.T("guide.check"), "small muted", wrap: true));
         return Ui.Col(16, Section(I18n.T("settings.games"), I18n.T("settings.games.hint"), list,
             Ui.Button(I18n.T("games.deep"), () => _ = AppState.DetectMany(AppState.Games.Where(x => x.Status != Detect.Found).ToList(), deep: true), "", Icons.Search),
+            Toggle(I18n.T("v151.set.autoAdd"), I18n.T("v151.set.autoAdd.hint"), Features.NewGames.AutoAdd, v => Features.NewGames.AutoAdd = v),
             guide), GamesOrderSection(), HiddenSection());
     }
 
