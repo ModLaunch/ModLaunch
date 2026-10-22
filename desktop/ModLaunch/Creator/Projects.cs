@@ -88,7 +88,24 @@ public static partial class Projects
     }
 
     public static string UniqueId(ModBuild b) =>
-        $"{PackageName(b.Author == "" ? "ModLaunch" : b.Author)}.{PackageName(b.Name)}";
+        b.UniqueIdOverride ?? $"{PackageName(b.Author == "" ? "ModLaunch" : b.Author)}.{PackageName(b.Name)}";
+
+    /// <summary>13.0: README из readme, license и credits (null — нечего писать сверх обычного).</summary>
+    static string? Readme(ModBuild b, bool always)
+    {
+        if (!always && b.Readme.Count == 0 && b.License is null && b.Credits.Count == 0) return null;
+        var sb = new StringBuilder($"# {b.Name}\n\n");
+        if (b.About != "") sb.Append(b.About).Append("\n\n");
+        foreach (var r in b.Readme) sb.Append(r).Append("\n\n");
+        if (b.Tags.Count > 0) sb.Append(string.Join(" ", b.Tags.Select(x => "`" + x + "`"))).Append("\n\n");
+        if (b.Credits.Count > 0) sb.Append("## Credits\n\n").Append(string.Join("\n", b.Credits.Select(c => "- " + c))).Append("\n\n");
+        if (b.License is not null) sb.Append("License: ").Append(b.License).Append("\n\n");
+        sb.Append("_Made with ModLaunch Creator Hub (ModScript)._\n");
+        return sb.ToString();
+    }
+
+    static string? Changelog(ModBuild b) => b.Changelog.Count == 0 ? null
+        : "# Changelog\n\n" + string.Join("\n", b.Changelog.Select(c => $"## {c.Version}\n\n{c.Text}\n"));
 
     // ---------------------------------------------------------------- сборка
 
@@ -134,7 +151,8 @@ public static partial class Projects
         {
             format = "Content Patcher";
             var folder = $"[CP] {Regex.Replace(b.Name, "[<>:\"/\\\\|?*]", "")}/";
-            var deps = new JsonArray(b.Needs.Select(n => (JsonNode)new JsonObject { ["UniqueID"] = n, ["IsRequired"] = true }).ToArray());
+            var deps = new JsonArray(b.Needs.Select(n => (JsonNode)new JsonObject { ["UniqueID"] = n, ["IsRequired"] = true })
+                .Concat(b.Optional.Where(o => !b.Needs.Contains(o)).Select(n => (JsonNode)new JsonObject { ["UniqueID"] = n, ["IsRequired"] = false })).ToArray());
             var manifest = new JsonObject
             {
                 ["Name"] = b.Name,
@@ -142,15 +160,22 @@ public static partial class Projects
                 ["Version"] = b.Version,
                 ["Description"] = b.About,
                 ["UniqueID"] = UniqueId(b),
-                ["UpdateKeys"] = new JsonArray(),
+                ["UpdateKeys"] = new JsonArray(b.UpdateKeys.Select(k => (JsonNode)k).ToArray()),
                 ["ContentPackFor"] = new JsonObject { ["UniqueID"] = "Pathoschild.ContentPatcher" },
                 ["Dependencies"] = deps,
             };
-            var content = new JsonObject { ["Format"] = "2.0.0", ["Changes"] = new JsonArray(b.Changes.Select(c => (JsonNode)c.DeepClone()).ToArray()) };
+            if (b.MinApi is not null) manifest["MinimumApiVersion"] = b.MinApi;
+            var content = new JsonObject { ["Format"] = "2.0.0" };
+            // 13.0: настройки для игрока (option) и свои токены (token) — до Changes, как в документации Content Patcher.
+            if (b.Options.Count > 0) content["ConfigSchema"] = new JsonObject(b.Options.Select(o => new KeyValuePair<string, JsonNode?>(o.Name, o.Schema.DeepClone())));
+            if (b.Tokens.Count > 0) content["DynamicTokens"] = new JsonArray(b.Tokens.Select(x => (JsonNode)x.DeepClone()).ToArray());
+            content["Changes"] = new JsonArray(b.Changes.Select(c => (JsonNode)c.DeepClone()).ToArray());
             files[folder + "manifest.json"] = Utf8(manifest.ToJsonString(Pretty));
             files[folder + "content.json"] = Utf8(content.ToJsonString(Pretty));
             foreach (var c in b.Copies) files[folder + c.To] = ReadCopy(c);
             foreach (var (path, text) in b.Writes) files[folder + path] = Utf8(text);
+            if (Readme(b, false) is { } readme) files[folder + "README.md"] = Utf8(readme);
+            if (Changelog(b) is { } log) files[folder + "CHANGELOG.md"] = Utf8(log);
             if (b.Configs.Count > 0) warnings.Add(I18n.T("cr.warn.configSmapi"));
             if (b.Changes.Count == 0 && b.Copies.Count == 0) warnings.Add(I18n.T("cr.warn.empty"));
         }
@@ -183,7 +208,8 @@ public static partial class Projects
                 ["dependencies"] = new JsonArray(deps.Select(x => (JsonNode)x).ToArray()),
             };
             files["manifest.json"] = Utf8(manifest.ToJsonString(Pretty));
-            files["README.md"] = Utf8($"# {b.Name}\n\n{b.About}\n\n_Made with ModLaunch Creator Hub (ModScript)._\n");
+            files["README.md"] = Utf8(Readme(b, true)!);
+            if (Changelog(b) is { } log) files["CHANGELOG.md"] = Utf8(log);
             files["icon.png"] = Icon(b, dir) ?? [];
             if (files["icon.png"].Length == 0) { files.Remove("icon.png"); warnings.Add(I18n.T("cr.warn.icon")); }
             foreach (var group in b.Configs.GroupBy(c => c.File))
@@ -203,8 +229,11 @@ public static partial class Projects
             format = "zip";
             foreach (var c in b.Copies) files[c.To] = ReadCopy(c);
             foreach (var (path, text) in b.Writes) files[path] = Utf8(text);
+            if (Readme(b, false) is { } readme) files["README.md"] = Utf8(readme);
+            if (Changelog(b) is { } log) files["CHANGELOG.md"] = Utf8(log);
             if (b.Changes.Count > 0 || b.Configs.Count > 0) warnings.Add(I18n.T("cr.warn.onlyFiles"));
         }
+        if (game.Loader != LoaderKind.Smapi && b.Options.Count + b.Tokens.Count > 0) warnings.Add(I18n.T("v13.ms.warn.options"));
         if (b.Inis.Count > 0)
         {
             var edits = new JsonArray(b.Inis.Select(i => (JsonNode)new JsonObject { ["file"] = i.File, ["section"] = i.Section, ["key"] = i.Key, ["value"] = i.Value }).ToArray());

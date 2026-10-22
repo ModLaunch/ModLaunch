@@ -36,6 +36,24 @@ public sealed class ModBuild
 
     public bool Ok => Diags.All(d => d.Warning);
     public int Statements;
+
+    // 13.0: описание пакета и настройки для игрока (команды id, tags, license, update_key, option, token…).
+    /// <summary>Свой UniqueID (id) вместо «Автор.Имя».</summary>
+    public string? UniqueIdOverride;
+    public string? License;
+    /// <summary>Минимальная версия SMAPI (min_api).</summary>
+    public string? MinApi;
+    public readonly List<string> Tags = [];
+    public readonly List<string> UpdateKeys = [];
+    /// <summary>Необязательные зависимости (optional): IsRequired = false.</summary>
+    public readonly List<string> Optional = [];
+    public readonly List<string> Credits = [];
+    public readonly List<string> Readme = [];
+    public readonly List<(string Version, string Text)> Changelog = [];
+    /// <summary>Настройки для игрока (option) — ConfigSchema в content.json.</summary>
+    public readonly List<(string Name, JsonObject Schema)> Options = [];
+    /// <summary>Свои токены Content Patcher (token) — DynamicTokens.</summary>
+    public readonly List<JsonObject> Tokens = [];
 }
 
 /// <summary>
@@ -277,7 +295,9 @@ public static partial class ModScript
         var build = new ModBuild();
         var tree = Parse(source, build.Diags);
         var env = new Env { Build = build };
-        Run(tree, env, build);
+        try { Run(tree, env, build); }
+        catch (StopSignal) { } // stop — дальше скрипт не выполняется, собранное до него остаётся
+        catch (FlowSignal) { build.Diags.Add(new Diag(1, "err.flowTop")); }
         foreach (var (k, v) in env.Vars) build.Vars[k] = v;
         if (build.Name == "") build.Diags.Add(new Diag(1, "err.noName"));
         if (build.Game == "") build.Diags.Add(new Diag(1, "err.noGame"));
@@ -292,12 +312,30 @@ public static partial class ModScript
     static void Run(List<Node> nodes, Env env, ModBuild b)
     {
         bool? last = null; // результат последнего if в этом блоке — для else
+        bool? failed = null; // 13.0: была ли ошибка в последнем try — для catch
         foreach (var node in nodes)
         {
             if (b.Statements++ > 50000) { b.Diags.Add(new Diag(node.Line, "err.tooMuch")); return; }
             var head = node.Toks[0].Text.ToLowerInvariant();
             try
             {
+                if (head == "try")
+                {
+                    if (node.Body is null) throw new ScriptError("err.tryBlock");
+                    failed = Attempt(node.Body, env, b);
+                    last = null;
+                    continue;
+                }
+                if (head == "catch")
+                {
+                    if (failed is null) throw new ScriptError("err.catch");
+                    if (node.Body is null) throw new ScriptError("err.tryBlock");
+                    if (failed == true) Run(node.Body, env, b);
+                    failed = null;
+                    last = null;
+                    continue;
+                }
+                failed = null;
                 if (head == "if")
                 {
                     if (node.Body is null) throw new ScriptError("err.ifBlock");
@@ -339,6 +377,8 @@ public static partial class ModScript
         var text = string.Join(" ", t.Select(x => x.Kind == T.Str ? Quote(x.Text) : x.Text));
         switch (head)
         {
+            case "include" when t.Count == 2 && t[1].Kind == T.Str && t[1].Text.EndsWith(".json", StringComparison.OrdinalIgnoreCase):
+                return false; // 13.0: include "more.json" — Include в Content Patcher (Exec → More)
             case "import" or "using" or "#include" or "include":
                 return true; // всё уже подключено — строки для привычки из Python и C++
             case "from" when text.Contains(" import "):
@@ -420,11 +460,12 @@ public static partial class ModScript
         var d = b.Diags;
         var cmd = t[0].Text.ToLowerInvariant();
         if (cmd is "var" or "auto" or "const" or "local") cmd = "let";
+        if (Aliases.TryGetValue(cmd, out var canon)) cmd = canon;
         string S(int i) => i < t.Count ? Subst(t[i].Text, env, line, d) : "";
         int Eq() => t.FindIndex(x => x is { Kind: T.Sym, Text: "=" });
         void Need(int count) { if (t.Count < count) throw new ScriptError("err.args|" + cmd); }
 
-        if (n.Body is not null && cmd is not ("for" or "when" or "while" or "def"))
+        if (n.Body is not null && cmd is not ("for" or "when" or "while" or "def" or "repeat" or "switch"))
         {
             d.Add(new Diag(line, "err.blockHere|" + cmd));
             return;
@@ -576,7 +617,7 @@ public static partial class ModScript
             }
 
             default:
-                d.Add(new Diag(line, "err.unknown|" + t[0].Text));
+                if (!More(n, cmd, env, b)) d.Add(new Diag(line, "err.unknown|" + t[0].Text));
                 break;
         }
     }
