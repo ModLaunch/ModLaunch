@@ -235,12 +235,13 @@ public static class Inject
                 if (!r.Doc.Ok || r.Target is null) return null;
                 if (r.Target.Id == "unity")
                 {
-                    // C# нужно собрать. Нет .NET SDK / BepInEx или ошибка сборки — dll не появится: инжект не применён.
-                    var dll = Path.Combine(root, "BepInEx", "plugins", $"ModScript_{r.Doc.Id}.dll");
-                    if (!File.Exists(dll))
+                    // C# нужно собрать. Нет BepInEx или ошибка сборки — dll не появится: инжект не применён.
+                    // 15.0: сборка кладёт dll в свою папку plugins/ModScript_<id>/ — раньше её искали прямо в plugins/,
+                    // не находили и снимали каждый Unity-инжект как «не собрался».
+                    if (!Built(root, r.Doc.Id))
                     {
                         try { MX.Injector.Eject(r.Doc.Id, root); } catch { }
-                        notes.Add(I18n.T("v11fix.inj.buildFailed", ("title", item.Title)));
+                        notes.Add(I18n.T("v11fix.inj.buildFailed", ("title", item.Title)) + Reason(r.Note));
                         return null;
                     }
                     // Покупателю — без исходника: после сборки остаётся только dll.
@@ -286,6 +287,22 @@ public static class Inject
                 return new JsonObject { ["id"] = item.Id, ["kind"] = item.Kind, ["folder"] = Path.GetRelativePath(root, folder), ["files"] = files };
             }
         }
+    }
+
+    /// <summary>Собранный Unity-мод: dll в своей папке плагина (15.0) или прямо в plugins (старая раскладка).</summary>
+    internal static bool Built(string root, string id)
+    {
+        var plugins = Path.Combine(root, "BepInEx", "plugins");
+        return File.Exists(Path.Combine(plugins, $"ModScript_{id}", $"ModScript_{id}.dll")) || File.Exists(Path.Combine(plugins, $"ModScript_{id}.dll"));
+    }
+
+    /// <summary>Почему не собралось — первая строка ошибки, коротко, для уведомления.</summary>
+    internal static string Reason(string? note)
+    {
+        if (note is null) return "";
+        var line = note.Replace("build failed:", "").Trim().Split('\n').FirstOrDefault(l => l.Trim() != "")?.Trim() ?? "";
+        if (line.Contains("BepInEx is not installed")) return ": " + I18n.T("v15.inj.noBepinex");
+        return line == "" ? "" : ": " + (line.Length > 140 ? line[..140] + "…" : line);
     }
 
     /// <summary>Имя мода дополняем меткой инжекта, чтобы ModScript id сеанса был уникальным (см. Apply).</summary>

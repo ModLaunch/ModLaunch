@@ -59,7 +59,7 @@ public sealed partial class MainWindow
     void UpdateAdVisibility()
     {
         _adRail.IsVisible = Ads.Enabled && !AdSlot.SideClosed && !_asideHost.IsVisible
-            && Bounds.Width / Math.Max(0.5, _appliedScale) >= 1360 && _current is not null;
+            && Bounds.Width / Math.Max(0.5, _appliedScale) >= 1360 && _current is { Workspace: false };
     }
 
     /// <summary>Кольцо на кнопке загрузок: общий прогресс всего, что сейчас качается.</summary>

@@ -29,6 +29,12 @@ public abstract class Target
 
     /// <summary>Шаг после копирования файлов (например, запись в plugins.js). Возвращает, что сделано.</summary>
     public virtual string? AfterInstall(ModxDoc doc, string gameDir) => null;
+
+    /// <summary>
+    /// 15.0: встроенная сборка C# для Unity: (исходник, имя сборки, папка вывода, папка игры) → null или текст ошибок.
+    /// Не задана (консольный ModScript X) — собирает dotnet build, если установлен .NET SDK.
+    /// </summary>
+    public static Func<string, string, string, string, string?>? CompileCSharp;
     public virtual void AfterEject(string id, string gameDir) { }
 
     protected Lang L => Lang.For(Language);
@@ -208,6 +214,17 @@ public abstract class Target
         foreach (var s in body.Where(s => s.Kind is "let" or "for")) locals.Add(s.Target);
         return body.Where(s => s.Kind is "set" or "add" && !s.Target.Contains('.') && !s.Target.Contains('[') && !locals.Contains(s.Target))
             .Select(s => s.Target).Distinct().ToList();
+    }
+
+    /// <summary>
+    /// 15.0: «переменные игры» — им присваивают в хуках и функциях, но нигде не объявляют (gold += 5).
+    /// В C# и GDScript необъявленное имя — ошибка сборки, поэтому моду они заводятся полями (с нуля).
+    /// </summary>
+    protected static List<string> GameVars(ModxDoc d)
+    {
+        var shared = d.Shared.Select(s => s.Name).Concat(d.Functions.Select(f => f.Name)).ToHashSet();
+        return d.Hooks.SelectMany(h => Globals(h.Body, [])).Concat(d.Functions.SelectMany(f => Globals(f.Body, f.Params)))
+            .Where(n => !shared.Contains(n) && System.Text.RegularExpressions.Regex.IsMatch(n, @"^[\p{L}_][\p{L}\w]*$")).Distinct().ToList();
     }
 
     /// <summary>Пролог: встроенные функции языка ModScript X на языке движка.</summary>
@@ -540,6 +557,7 @@ public abstract class Target
             w.Line("{");
             w.In();
             foreach (var (name, v) in d.Shared) w.Line($"public static {Lang.CSharp.TypeOf(v)} {name} = {L.Literal(v)};");
+            foreach (var name in GameVars(d)) w.Line($"public static dynamic {name} = 0;");
             Prelude(w, d);
             foreach (var code in NativeCode(d)) w.Block(code);
             Functions(w, d, e => $"Logger.LogMessage({e})", e => $"Logger.LogInfo({e})");
@@ -602,11 +620,21 @@ public abstract class Target
         static string? FindManaged(string? gameDir) =>
             gameDir == null ? null : Directory.EnumerateDirectories(gameDir, "*_Data").Select(p => Path.Combine(p, "Managed")).FirstOrDefault(Directory.Exists)?.Replace('\\', '/');
 
-        /// <summary>C# нужно собрать: если .NET SDK есть, собираем сразу в BepInEx/plugins/ModScript_&lt;id&gt;.</summary>
+        /// <summary>
+        /// C# нужно собрать в BepInEx/plugins/ModScript_&lt;id&gt;. 15.0: сначала встроенным компилятором
+        /// (<see cref="Target.CompileCSharp"/>, ModLaunch подставляет Roslyn — .NET SDK не нужен), иначе — dotnet build.
+        /// </summary>
         public override string? AfterInstall(ModxDoc d, string gameDir)
         {
             if (!Directory.Exists(Path.Combine(gameDir, "BepInEx", "core"))) return "BepInEx is not installed in this game: install BepInEx 5 first";
-            var proj = Path.Combine(gameDir, "BepInEx", "modscript", d.Id, $"ModScript_{d.Id}.csproj");
+            var cls = $"ModScript_{d.Id}";
+            if (CompileCSharp is { } compile)
+            {
+                var source = File.ReadAllText(Path.Combine(gameDir, "BepInEx", "modscript", d.Id, cls + ".cs"));
+                var error = compile(source, cls, Path.Combine(gameDir, "BepInEx", "plugins", cls), gameDir);
+                return error is null ? $"built into BepInEx/plugins/{cls}" : "build failed:\n" + error;
+            }
+            var proj = Path.Combine(gameDir, "BepInEx", "modscript", d.Id, cls + ".csproj");
             try
             {
                 var psi = new System.Diagnostics.ProcessStartInfo("dotnet", $"build \"{proj}\" -c Release -nologo -v q") { RedirectStandardOutput = true, RedirectStandardError = true };
@@ -655,6 +683,7 @@ public abstract class Target
             w.Line("extends Node");
             w.Line("");
             foreach (var (name, v) in d.Shared) w.Line($"var {name} = {L.Literal(v)}");
+            foreach (var name in GameVars(d)) w.Line($"var {name} = 0");
             Prelude(w, d);
             foreach (var code in NativeCode(d)) w.Block(code);
             Functions(w, d, e => $"print({e})", e => $"print({e})");

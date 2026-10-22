@@ -30,6 +30,8 @@ public abstract class Page : UserControl
     public virtual bool SameScreenAs(Page? previous) => false;
     /// <summary>Цвет свечения фона: у страниц игры — цвет игры.</summary>
     public virtual string? Accent => GameId is string id ? AppState.Game(id).Def.Accent : null;
+    /// <summary>15.0: рабочее место (Creator Hub, среда разработки) — колонку рекламы справа не показываем.</summary>
+    public virtual bool Workspace => false;
 }
 
 /// <summary>

@@ -333,15 +333,20 @@ public static partial class Actions
         }
         if (!animate || !Animate.On || !visible || Settings.Data.Str("launchFx") == "off")
         {
-            var r = StartGame(g, vanilla);
-            if (!r.Ok) { W.Toast(r.Error ?? "", bad: true); return; }
-            W.Toast(I18n.T(vanilla ? "vanilla.launched" : "toast.launched") + (r.Backup is null ? "" : " · " + I18n.T("bak.created")) + (r.Note is null ? "" : " · " + r.Note));
-            AfterLaunch();
+            _ = Quiet();
             return;
         }
         var screen = W.ShowLaunch(g);
         screen.Closed += () => { if (Launcher.IsRunning(g.Def.Id)) AfterLaunch(); };
         _ = screen.RunAsync(() => StartGame(g, vanilla));
+
+        async Task Quiet()
+        {
+            var r = await StartGame(g, vanilla);
+            if (!r.Ok) { W.Toast(r.Error ?? "", bad: true); return; }
+            W.Toast(I18n.T(vanilla ? "vanilla.launched" : "toast.launched") + (r.Backup is null ? "" : " · " + I18n.T("bak.created")) + (r.Note is null ? "" : " · " + r.Note));
+            AfterLaunch();
+        }
     }
 
     /// <summary>«Нашли 2 проблемы»: исправить, играть всё равно или без модов.</summary>
@@ -367,23 +372,29 @@ public static partial class Actions
             Ui.Col(12, Ui.Text(I18n.T("gate.text", ("game", g.Def.Name)), "muted", wrap: true), list), actions.ToArray());
     }
 
-    /// <summary>Запустить игру; ошибку вернуть текстом, а не исключением.</summary>
-    static LaunchScreen.Result StartGame(GameState g, bool vanilla = false)
+    /// <summary>
+    /// Запустить игру; ошибку вернуть текстом, а не исключением. 15.0: инжект, копия сохранений и сам запуск —
+    /// в фоне: раньше всё это шло в потоке окна, и на «Играть» программа замирала на секунды.
+    /// </summary>
+    static async Task<LaunchScreen.Result> StartGame(GameState g, bool vanilla = false)
     {
         try
         {
-            // 10.0: чистая загрузка — прибрать кэш и мусор загрузчика перед запуском.
-            // 11.0: в режиме инжектора уборка — после игры, а перед запуском только инжект (миллисекунды).
-            string? note = null;
-            if (!vanilla && CleanBoot.On && !Inject.On)
-                try { if (CleanBoot.Run(g) is { Any: true } c) note = I18n.T("v10.clean.note", ("n", c.Files + c.Quarantined)); } catch { }
-            if (!vanilla && Inject.On)
+            var (note, backup) = await Task.Run(() =>
             {
-                var r = Inject.Prepare(g);
-                note = r.Applied > 0 ? I18n.T("v11.inj.note.n", ("ms", r.Ms), ("n", r.Applied)) : I18n.T("v11.inj.note", ("ms", r.Ms));
-                if (r.Notes.Count > 0) note += " · " + string.Join(" · ", r.Notes);
-            }
-            var backup = Launcher.Launch(g.Def, g.Path!, vanilla);
+                // 10.0: чистая загрузка — прибрать кэш и мусор загрузчика перед запуском.
+                // 11.0: в режиме инжектора уборка — после игры, а перед запуском только инжект.
+                string? note = null;
+                if (!vanilla && CleanBoot.On && !Inject.On)
+                    try { if (CleanBoot.Run(g) is { Any: true } c) note = I18n.T("v10.clean.note", ("n", c.Files + c.Quarantined)); } catch { }
+                if (!vanilla && Inject.On)
+                {
+                    var r = Inject.Prepare(g);
+                    note = r.Applied > 0 ? I18n.T("v11.inj.note.n", ("ms", r.Ms), ("n", r.Applied)) : I18n.T("v11.inj.note", ("ms", r.Ms));
+                    if (r.Notes.Count > 0) note += " · " + string.Join(" · ", r.Notes);
+                }
+                return (note, Launcher.Launch(g.Def, g.Path!, vanilla));
+            });
             try { PlayStreak.Note(); } catch { }
             CloudFlow.PushSoon();
             if (g.Registry is not null) try { Social.PlayLog.NoteLaunch(g.Def, g.Registry); } catch { }
@@ -396,7 +407,7 @@ public static partial class Actions
         catch (Exception e)
         {
             // Игра не запустилась — инжекты не должны остаться в папке.
-            if (!vanilla && Inject.On) try { Inject.Cleanup(g.Def.Id); } catch { }
+            if (!vanilla && Inject.On) try { await Task.Run(() => Inject.Cleanup(g.Def.Id)); } catch { }
             return new LaunchScreen.Result(false, null, Jobs.Explain(e));
         }
     }

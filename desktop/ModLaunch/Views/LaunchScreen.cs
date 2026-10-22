@@ -154,7 +154,7 @@ public sealed class LaunchScreen : Panel
     }
 
     /// <summary>Пройти шаги по-настоящему: проверка модов, копия сохранений, запуск.</summary>
-    public async Task RunAsync(Func<Result> launch)
+    public async Task RunAsync(Func<Task<Result>> launch)
     {
         var registry = _g.Registry;
         SetStep(0, State.Working, null);
@@ -179,7 +179,7 @@ public sealed class LaunchScreen : Panel
         await Task.Delay(backups ? 140 : 60);
         if (_closed) return; // закрыли до запуска — значит, передумали
         SetStep(2, State.Working, I18n.T("v10.launch.starting", ("game", _g.Def.ShortName)));
-        var r = launch();
+        var r = await launch();
         if (backups) SetStep(1, r.Ok ? State.Done : State.Skipped, null);
         if (!r.Ok)
         {

@@ -16,4 +16,16 @@ public static class V15Shots
     [DemoShots] static void V15McBuilds(Shots s) => Shot(s, "v15-mc-4-builds", () => new MinecraftPage("builds"));
     [DemoShots] static void V15McSettings(Shots s) => Shot(s, "v15-mc-5-settings", () => new MinecraftPage("settings"));
     [DemoShots] static void V15Panel(Shots s) => Shot(s, "v15-panel", () => new SettingsPage("panel"));
+
+    static void Studio(Shots s, string name, string panel)
+    {
+        ModStudio.Demo(panel);
+        Shot(s, name, () => new CreatorPage("ide"), 1500);
+    }
+
+    [DemoShots] static void V15Studio(Shots s) => Studio(s, "v15-studio-1-problems", "problems");
+    [DemoShots] static void V15StudioRun(Shots s) => Studio(s, "v15-studio-2-run", "output");
+    [DemoShots] static void V15StudioCode(Shots s) => Studio(s, "v15-studio-3-code", "code");
+    [DemoShots] static void V15StudioInject(Shots s) => Studio(s, "v15-studio-4-inject", "inject");
+    [DemoShots] static void V15Games(Shots s) => Shot(s, "v15-games", () => new AddGamePage(), 2500);
 }

@@ -18,6 +18,7 @@ namespace ModLaunch.Views;
 public sealed partial class CreatorPage : Page
 {
     public override string Title => "Creator Hub";
+    public override bool Workspace => true;
 
     /// <summary>12.0: подсказка поиска — о том, что ищется на этой вкладке (см. <see cref="SearchTab"/>).</summary>
     public override string SearchHint => _tab switch
@@ -51,10 +52,10 @@ public sealed partial class CreatorPage : Page
             "market" or "studio" or "mine" or "projects" => "home",
             "docs" or "commands" => "modscript",
             "inject" or "lang" or "x" => "modscript",
-            "console" or "functions" => "modscript",
+            "console" or "functions" or "ide" => "modscript",
             _ => tab,
         };
-        _ms = tab switch { "docs" or "commands" => "commands", "inject" or "lang" or "x" => "x", "functions" => "functions", _ => _ms };
+        _ms = tab switch { "docs" or "commands" => "commands", "inject" or "lang" or "x" => "x", "functions" => "functions", "console" => "console", "ide" => "studio", _ => _ms };
         if (tab == "published") { _tab = "home"; _minePart = "published"; }
         if (project is not null) { _tab = "mine"; Open(Projects.Get(project)); }
         _code.TextChanged += () =>
@@ -221,7 +222,7 @@ public sealed partial class CreatorPage : Page
         // Открытый проект: в шапке — его имя и вкладки «Код · Обзор»; в «Проектах» — «Проекты · Опубликованные»; в ModScript — его вкладки.
         var sub = editing ? PaneTabs() : _tab is "home" or "mine" ? MineTabs() : _tab == "modscript" ? MsTabs() : null;
         Content = HubNav.Frame(HubTabOf(_tab), HubNav.RailOf(_tab, creator: true), editing ? _open!.Name : HubTitle(), body, sold: () => _ = LoadMarket(force: true), local: Rail, sub: sub,
-            action: _tab == "team" ? TeamAction() : null, lead: _tab == "modscript" ? I18n.T("v13.ms.lead", ("n", ModScriptCommands.All.Length), ("new", ModScriptCommands.NewCount)) : null);
+            action: _tab == "team" ? TeamAction() : null, lead: _tab == "modscript" && _ms != "studio" ? I18n.T("v13.ms.lead", ("n", ModScriptCommands.All.Length), ("new", ModScriptCommands.NewCount)) : null);
     }
 
     /// <summary>Название раздела в шапке Hub — так же, как пункт боковой панели.</summary>

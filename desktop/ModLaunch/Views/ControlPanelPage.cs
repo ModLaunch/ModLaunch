@@ -148,7 +148,8 @@ public sealed class ControlPanelPage : Page
         head.Children.Add(Ui.Col(4, Ui.Text(hello, "h1"), Ui.Text(DateTime.Now.ToString("D", I18n.Culture), "muted")));
         col.Children.Add(head);
 
-        var stats = new UniformGrid { Columns = 5 };
+        // 15.0: в настройках места меньше — плитки в три колонки, чтобы подписи и цифры не обрезались.
+        var stats = new UniformGrid { Columns = _embedded ? 3 : 5 };
         stats.Children.Add(Stat(Icons.Gamepad, I18n.T("cp.s.games"), found.Count.ToString(I18n.Culture), () => W.Navigate(() => new LibraryPage())));
         stats.Children.Add(Stat(Icons.Package, I18n.T("cp.s.mods"), mods.ToString(I18n.Culture), () => W.Navigate(() => new ModsCenterPage())));
         stats.Children.Add(Stat(Icons.ArrowUp, I18n.T("cp.s.updates"), _checking ? "…" : _updates < 0 ? "—" : _updates.ToString(I18n.Culture), CheckUpdates,

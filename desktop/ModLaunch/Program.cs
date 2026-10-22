@@ -38,6 +38,8 @@ public static class Program
         if (args.Contains("--gen-directory")) return Games.GameDirectory.Generate(args).GetAwaiter().GetResult();
         // 15.0: все игры Steam → снимок Assets/steamgames.tsv.gz (CI: gamedir.yml).
         if (args.Contains("--gen-steam")) return Games.SteamCatalog.Generate(args).GetAwaiter().GetResult();
+        // 15.0: C#-моды для Unity собирает встроенный компилятор (без .NET SDK).
+        Creator.UnityCompiler.Register();
         if (args.Contains("--selfcheck")) return SelfCheck.Run().GetAwaiter().GetResult();
         if (args.Contains("--selftest")) { Hooks.PrepareSelfTest(); StartHeadless(); return Hooks.SelfTest(); }
         var shot = Array.IndexOf(args, "--screenshot");

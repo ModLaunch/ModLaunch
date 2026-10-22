@@ -28,6 +28,11 @@ public sealed partial class ScriptEditor : UserControl
 
     public event Action? TextChanged;
     public event Action? SaveRequested;
+    /// <summary>15.0: курсор сдвинулся — (строка, столбец), для строки состояния студии.</summary>
+    public event Action<int, int>? CaretMoved;
+
+    /// <summary>15.0: файл ModScript X (.modx) — подсказки его слов и встроенных функций, а не команд ModScript.</summary>
+    public bool Modx { get; init; }
 
     public ScriptEditor()
     {
@@ -61,9 +66,24 @@ public sealed partial class ScriptEditor : UserControl
             else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.OemQuestion) { ToggleComment(); e.Handled = true; }
             else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.D) { DuplicateLine(); e.Handled = true; }
         };
+        _editor.TextArea.Caret.PositionChanged += (_, _) => CaretMoved?.Invoke(_editor.TextArea.Caret.Line, _editor.TextArea.Caret.Column);
         _editor.ContextFlyout = EditorMenu();
         Content = _editor;
     }
+
+    /// <summary>15.0: поиск (Ctrl+F) и замена (Ctrl+H) — панель AvaloniaEdit поверх текста.</summary>
+    public void Find(bool replace = false)
+    {
+        if (_editor.SearchPanel is not { } panel) return;
+        panel.IsReplaceMode = replace;
+        panel.Open();
+        if (_editor.SelectionLength > 0 && !_editor.SelectedText.Contains('\n')) panel.SearchPattern = _editor.SelectedText;
+    }
+
+    public int CaretLine => _editor.TextArea.Caret.Line;
+    public void FocusText() => _editor.TextArea.Focus();
+    public void Undo() => _editor.Undo();
+    public void Redo() => _editor.Redo();
 
     public string Text
     {
@@ -181,8 +201,19 @@ public sealed partial class ScriptEditor : UserControl
             .Select(m => (ICompletionData)new Item(m.Groups[1].Value, $"{m.Groups[1].Value}({m.Groups[2].Value})", I18n.T("cr.lib.mine"), call: true, priority: 3));
         var vars = Regex.Matches(text, @"^\s*(?:let|var|const|auto|for)\s+([A-Za-z_]\w*)", RegexOptions.Multiline).Select(m => m.Groups[1].Value).Distinct()
             .Select(v => (ICompletionData)new Item(v, v, I18n.T("cr.lib.var"), priority: 2));
-        var keywords = Commands.Select(k => (ICompletionData)new Item(k, I18n.Has($"cr.doc.{k}.syntax") ? I18n.T($"cr.doc.{k}.syntax") : k, I18n.Has($"cr.doc.{k}") ? I18n.T($"cr.doc.{k}") : "", priority: 1));
-        var library = ModScript.Library.Select(kv => (ICompletionData)new Item(kv.Key, kv.Value.Sig, $"{kv.Value.Doc}\n[{kv.Value.Group}]", call: true));
+        IEnumerable<ICompletionData> keywords, library;
+        if (Modx)
+        {
+            // ModScript X: слова языка, заголовки файла, события хуков и встроенные функции.
+            keywords = ModScriptX.ModxDoc.Keywords.Concat(["mod", "version", "author", "about", "game", "engine"]).Concat(ModScriptX.ModxDoc.Events)
+                .Select(k => (ICompletionData)new Item(k, k, I18n.Has($"v15.ms.kw.{k}") ? I18n.T($"v15.ms.kw.{k}") : "", priority: 1));
+            library = ModScriptX.ModxDoc.Builtins.Select(b => (ICompletionData)new Item(b, b + "()", I18n.Has($"v15.ms.fn.{b}") ? I18n.T($"v15.ms.fn.{b}") : "", call: true));
+        }
+        else
+        {
+            keywords = Commands.Select(k => (ICompletionData)new Item(k, I18n.Has($"cr.doc.{k}.syntax") ? I18n.T($"cr.doc.{k}.syntax") : k, I18n.Has($"cr.doc.{k}") ? I18n.T($"cr.doc.{k}") : "", priority: 1));
+            library = ModScript.Library.Select(kv => (ICompletionData)new Item(kv.Key, kv.Value.Sig, $"{kv.Value.Doc}\n[{kv.Value.Group}]", call: true));
+        }
         var items = mine.Concat(vars).Concat(keywords).Concat(library)
             .Where(i => typed == "" || i.Text.StartsWith(typed, StringComparison.OrdinalIgnoreCase) || i.Text.Contains("." + typed, StringComparison.OrdinalIgnoreCase) || i.Text.Contains("::" + typed, StringComparison.OrdinalIgnoreCase))
             .DistinctBy(i => i.Text, StringComparer.OrdinalIgnoreCase)

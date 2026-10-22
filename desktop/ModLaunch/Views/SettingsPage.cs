@@ -24,6 +24,7 @@ public sealed partial class SettingsPage : Page
     public SettingsPage(string tab = "general") => _tab = MapTab(tab);
 
     public override string Title => I18n.T("nav.settings");
+    public override bool Workspace => true;
 
     /// <summary>Разделы настроек по группам: id, название, иконка, цвет значка.</summary>
     /// <summary>10.0: «Состояние сервисов» (сервер, правила, консоль Firebase) — только владельцу.</summary>

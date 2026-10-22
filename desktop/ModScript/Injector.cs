@@ -57,9 +57,13 @@ public static class Injector
         if (t == null || !doc.Ok) return new Result(doc, t, [], null);
         var outFiles = t.Emit(doc, gameDir);
         if (!doc.Ok) return new Result(doc, t, [], null);
-        var files = Write(outFiles, gameDir);
-        var note = t.AfterInstall(doc, gameDir);
+        // 15.0: сначала записать, что поставлено, потом собирать: упадёт сборка — eject всё равно снимет файлы
+        // (раньше Remember шёл после AfterInstall, и при исключении исходники оставались в игре навсегда).
         Remember(gameDir, doc.Id, t.Id, outFiles.Select(f => f.Path).ToList());
+        var files = Write(outFiles, gameDir);
+        string? note;
+        try { note = t.AfterInstall(doc, gameDir); }
+        catch (Exception e) { note = "build failed:\n" + e.Message; }
         return new Result(doc, t, files, note);
     }
 

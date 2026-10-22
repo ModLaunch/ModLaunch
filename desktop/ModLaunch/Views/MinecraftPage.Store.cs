@@ -102,7 +102,9 @@ public sealed partial class MinecraftPage
             var path = new Button
             {
                 Classes = { "ghost" }, Padding = new Thickness(6, 2), Margin = new Thickness(6, 0, 0, 0), HorizontalAlignment = HorizontalAlignment.Left,
-                Content = new DockPanel { Children = { Ui.Icon(Icons.Folder, 13, Ui.Res("Muted")), new TextBlock { Text = Ui.ShortPath(dir), FontSize = 13, Foreground = Ui.Res("Muted"), Margin = new Thickness(6, 0, 0, 0), TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center } } },
+                // В узкой шапке вкладок — только значок папки (путь в подсказке): строка не обрывается на «……».
+                Content = compact ? Ui.Icon(Icons.Folder, 13, Ui.Res("Muted"))
+                    : new DockPanel { Children = { Ui.Icon(Icons.Folder, 13, Ui.Res("Muted")), new TextBlock { Text = Ui.ShortPath(dir), FontSize = 13, Foreground = Ui.Res("Muted"), Margin = new Thickness(6, 0, 0, 0), TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center } } },
             };
             ToolTip.SetTip(path, dir);
             path.Click += (_, _) => Actions.OpenFolder(dir);
