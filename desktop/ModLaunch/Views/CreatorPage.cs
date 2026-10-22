@@ -23,6 +23,7 @@ public sealed partial class CreatorPage : Page
     public override string SearchHint => _tab switch
     {
         "examples" => I18n.T("v12h2.search.templates"),
+        "modscript" => I18n.T("v13.ms.search"),
         "codes" or "models" or "hub" => I18n.T("cr.search"),
         _ => I18n.T("v12h2.search.projects"),
     };
@@ -44,8 +45,17 @@ public sealed partial class CreatorPage : Page
     public CreatorPage(string tab = "home", string? project = null)
     {
         // 12.0: витрина и студия продаж живут на странице рынка (Go туда и ведёт); старые ссылки — на обзор проектов.
-        _tab = tab is "market" or "studio" ? "home" : tab;
-        if (tab == "published") { _tab = "mine"; _minePart = "published"; }
+        // 13.0: четыре раздела. Старые вкладки ведут в свои: справка и язык — в ModScript, «Мои» — в «Проекты».
+        _tab = tab switch
+        {
+            "market" or "studio" or "mine" or "projects" => "home",
+            "docs" or "commands" => "modscript",
+            "inject" or "lang" or "x" => "modscript",
+            "console" or "functions" => "modscript",
+            _ => tab,
+        };
+        _ms = tab switch { "docs" or "commands" => "commands", "inject" or "lang" or "x" => "x", "functions" => "functions", _ => _ms };
+        if (tab == "published") { _tab = "home"; _minePart = "published"; }
         if (project is not null) { _tab = "mine"; Open(Projects.Get(project)); }
         _code.TextChanged += () =>
         {
@@ -66,7 +76,7 @@ public sealed partial class CreatorPage : Page
     /// с Обзора и «Моих» уводил в старый вид Hub, и фильтр проектов был недостижим.
     /// </summary>
     internal static string SearchTab(string tab, bool editing, string query) =>
-        query == "" || !editing && tab is "mine" or "codes" or "models" or "examples" or "hub" ? tab : "mine";
+        query == "" ? tab : !editing && tab is "codes" or "models" or "examples" or "hub" or "modscript" ? tab : "home";
 
     public override void Search(string text)
     {
@@ -144,16 +154,16 @@ public sealed partial class CreatorPage : Page
     /// 9.1 (по эскизу): главные вкладки — «Главная · Мои · Коды · Модели · Шаблоны».
     /// Hub, маркет, студия продавца и справка — справа «Ещё» и в выдвижной полоске у левого края.
     /// </summary>
+    /// <summary>Названия вкладок мастерской (для крошек и шапки). 13.0: «Проекты», «ModScript», «Команда» и редкие страницы.</summary>
     public static readonly (string Id, string Key, string Icon)[] MainTabs =
     [
-        ("home", "cr.tab.home", Icons.Home), ("mine", "v91.cr.tab.my", Icons.Edit), ("codes", "v91.cr.tab.codes", Icons.Code),
-        ("models", "v91.cr.tab.models", Icons.Cube), ("inject", "v11.cr.tab.lang", Icons.Code), ("examples", "v91.cr.tab.templates", Icons.Wand),
+        ("home", "v13.hub.projects", Icons.Folder), ("modscript", "v13.hub.modscript", Icons.Code), ("team", "v13.hub.team", Icons.Users),
+        ("codes", "v91.cr.tab.codes", Icons.Code), ("models", "v91.cr.tab.models", Icons.Cube), ("examples", "v91.cr.tab.templates", Icons.Wand),
     ];
 
     public static readonly (string Id, string Key, string Icon)[] MoreTabs =
     [
-        ("hub", "hub.tab", Icons.Globe), ("docs", "cr.tab.docs", Icons.Book),
-        ("injects", "v11.hub.injects", Icons.Zap), ("mxdev", "v97.cr.tab.inject", Icons.Zap),
+        ("hub", "hub.tab", Icons.Globe), ("injects", "v11.hub.injects", Icons.Zap), ("mxdev", "v97.cr.tab.inject", Icons.Zap),
     ];
 
     public string Tab => _tab;
@@ -174,11 +184,8 @@ public sealed partial class CreatorPage : Page
     /// <summary>9.5: та же шапка и навигация, что у рынка (HubNav): мастерская — это раздел «Автору».</summary>
     internal static string HubTabOf(string tab) => tab switch
     {
-        "examples" => "templates",
-        "docs" => "docs",
         "hub" => "workshop",
-        "inject" or "mxdev" => "lang",
-        "injects" => "injects",
+        "injects" or "codes" or "models" or "modscript" or "team" or "mxdev" => tab,
         _ => "projects",
     };
 
@@ -196,40 +203,40 @@ public sealed partial class CreatorPage : Page
         if (Social.Account.SignedIn && MarketData.Wallet is null && !MarketData.Loading && !_walletAsked && !Program.Screenshot) { _walletAsked = true; _ = MarketData.Load(); }
         _hadWallet = MarketData.Wallet is not null;
 
+        // 13.0: открытый проект — только у «Проектов» (_tab mine); остальные вкладки показывают своё, даже если проект запомнен.
+        var editing = _open is not null && _tab == "mine";
         var body = _tab switch
         {
-            "home" => Home(),
+            "modscript" => ModScriptHub(),
+            "team" => Team(),
             "examples" => Examples(),
             "codes" => Shelf("codes"),
             "models" => Shelf("models"),
             "hub" => HubView(),
-            "docs" => Docs(),
-            "inject" => Lang(),
             "mxdev" => Injector(),
             "injects" => Injects(),
-            _ => _open is null ? Mine() : Editor(),
+            _ => editing ? Editor() : Mine(),
         };
-        // 12.1: своё пространство Hub — боковая панель, шапка с цифрами автора и «Новым проектом», сетка чертежа.
-        // Открытый проект: в шапке — его имя и вкладки «Код · Обзор»; в «Моих проектах» — «Проекты · Опубликованные».
-        var editing = _open is not null && _tab is not ("home" or "examples" or "codes" or "models" or "hub" or "docs" or "inject" or "mxdev" or "injects");
-        var sub = editing ? PaneTabs() : _tab == "mine" ? MineTabs() : null;
-        Content = HubNav.Frame(HubTabOf(_tab), HubNav.RailOf(_tab, creator: true), editing ? _open!.Name : HubTitle(), body, sold: () => _ = LoadMarket(force: true), local: Rail, sub: sub);
+        // Своё пространство Hub: четыре раздела слева, шапка с одной главной кнопкой, сетка чертежа.
+        // Открытый проект: в шапке — его имя и вкладки «Код · Обзор»; в «Проектах» — «Проекты · Опубликованные»; в ModScript — его вкладки.
+        var sub = editing ? PaneTabs() : _tab is "home" or "mine" ? MineTabs() : _tab == "modscript" ? MsTabs() : null;
+        Content = HubNav.Frame(HubTabOf(_tab), HubNav.RailOf(_tab, creator: true), editing ? _open!.Name : HubTitle(), body, sold: () => _ = LoadMarket(force: true), local: Rail, sub: sub,
+            action: _tab == "team" ? TeamAction() : null, lead: _tab == "modscript" ? I18n.T("v13.ms.lead", ("n", ModScriptCommands.All.Length), ("new", ModScriptCommands.NewCount)) : null);
     }
 
     /// <summary>Название раздела в шапке Hub — так же, как пункт боковой панели.</summary>
     string HubTitle() => _tab switch
     {
-        "home" => I18n.T("v12d.rail.overview"),
-        "mine" => I18n.T("v12d.rail.projects"),
-        "inject" => I18n.T("v11.hub.lang"),
+        "home" or "mine" => I18n.T("v13.hub.projects"),
+        "modscript" => "ModScript",
         _ => TabTitle(_tab),
     };
 
-    /// <summary>12.1: пункты боковой панели, что живут в мастерской, открываются здесь же, без новой страницы.</summary>
+    /// <summary>Разделы «Проекты», «ModScript» и «Команда» открываются здесь же, без новой страницы.</summary>
     bool Rail(string rail)
     {
-        var tab = rail switch { "lang" => "inject", "templates" => "examples", _ => rail };
-        if (tab is not ("home" or "mine" or "codes" or "models" or "inject" or "examples" or "docs")) return false;
+        var tab = rail switch { "projects" => "home", _ => rail };
+        if (tab is not ("home" or "modscript" or "team")) return false;
         if (_dirty) Save(quiet: true);
         // «Мои проекты» из редактора — к списку (как «Назад»).
         _open = null;
