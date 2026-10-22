@@ -197,7 +197,8 @@ public sealed partial class CreatorPage
     {
         var search = new TextBox { Watermark = I18n.T("v13.ms.search"), Text = _filter, Width = 360, HorizontalAlignment = HorizontalAlignment.Left };
         var chips = new WrapPanel();
-        var grid = new UniformGrid { Columns = 2 };
+        // Две колонки, высота — по паре карточек (а не по самой длинной команде, как у UniformGrid).
+        var grid = new StackPanel();
         var count = Ui.Text("", "small muted");
 
         void Fill()
@@ -205,7 +206,18 @@ public sealed partial class CreatorPage
             grid.Children.Clear();
             var q = (search.Text ?? "").Trim();
             var list = ModScriptCommands.All.Where(c => (_msGroup == "" || c.Group == _msGroup) && (!_msNewOnly || c.New) && ModScriptCommands.Matches(c, q)).ToList();
-            foreach (var c in list) grid.Children.Add(CommandCard(c));
+            for (var i = 0; i < list.Count; i += 2)
+            {
+                var row = new Grid { ColumnDefinitions = new ColumnDefinitions("*,*") };
+                row.Children.Add(CommandCard(list[i]));
+                if (i + 1 < list.Count)
+                {
+                    var second = CommandCard(list[i + 1]);
+                    Grid.SetColumn(second, 1);
+                    row.Children.Add(second);
+                }
+                grid.Children.Add(row);
+            }
             count.Text = I18n.T("v13.ms.count", ("n", list.Count));
             if (list.Count == 0) grid.Children.Add(Ui.Text(I18n.T("cr.lib.none"), "muted"));
         }

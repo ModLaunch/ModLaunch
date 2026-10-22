@@ -13,6 +13,9 @@ public sealed record UiConfig(string Id, string Name, string Author, string Abou
     public List<(string Id, string Size)> Widgets() => Lines.Where(l => l.Key == "widget")
         .Select(l => l.Value.Split(' ', 3, StringSplitOptions.RemoveEmptyEntries))
         .Where(p => p.Length > 0).Select(p => (p[0], p.Length > 1 ? p[1] : "s")).ToList();
+
+    /// <summary>13.0: строки виджетов целиком — вид, размер и настройки (widget friends xl style=glass;corner=soft).</summary>
+    public List<string> WidgetLines() => Lines.Where(l => l.Key == "widget").Select(l => l.Value.Trim()).Where(v => v != "").ToList();
 }
 
 /// <summary>
@@ -321,8 +324,14 @@ public static class Configs
         // Конфиги 10.0 не знают заголовков и свечения — у них вид 10.0 (широкие заголовки, свечение).
         if (c.Get("headings") is null) d["headings"] = "wide";
         if (c.Get("glow") is null) d["glow"] = 1;
-        var widgets = c.Widgets();
-        if (widgets.Count > 0) Widgets.Set(widgets);
+        var widgets = c.WidgetLines().Select(Widgets.Parse).OfType<Widgets.Entry>().ToList();
+        if (widgets.Count > 0) Widgets.SetEntries(widgets);
+        // 13.0: плотность и зазор сетки виджетов: widget_grid compact tight.
+        if (c.Get("widget_grid")?.Split(' ', StringSplitOptions.RemoveEmptyEntries) is [var cell, .. var rest])
+        {
+            if (Widgets.Densities.Contains(cell)) d["widgetCell"] = cell;
+            if (rest is [var gap, ..] && Widgets.Gaps.Contains(gap)) d["widgetGap"] = gap;
+        }
         d["design"] = "store";
         d["config"] = c.Id;
         Settings.Save();
@@ -359,7 +368,8 @@ public static class Configs
         sb.AppendLine("home_hero " + (d.Str("homeHero") ?? "stage"));
         sb.AppendLine("headings " + (Look.WideHeadings ? "wide" : "ui"));
         sb.AppendLine("glow " + Look.Glow.ToString(CultureInfo.InvariantCulture));
-        foreach (var (id, size) in Widgets.Layout()) sb.AppendLine($"widget {id} {size}");
+        sb.AppendLine($"widget_grid {Widgets.Density} {Widgets.Gap}");
+        foreach (var e in Widgets.Entries()) sb.AppendLine("widget " + Widgets.Format(e));
         return sb.ToString();
     }
 
@@ -415,10 +425,14 @@ public static class Configs
             accent #FF0000
             widget clock m
             widget level
+            widget friends xl style=glass;corner=soft
+            widget_grid roomy wide
             """, "x");
         if (c.Name != "Мой // стиль" || c.Get("color_bg") != "#101010" || c.Get("accent") != "#FF0000") throw new Exception("parse: " + string.Join(";", c.Lines));
         var w = c.Widgets();
-        if (w.Count != 2 || w[0] != ("clock", "m") || w[1] != ("level", "s")) throw new Exception("widgets");
+        if (w.Count != 3 || w[0] != ("clock", "m") || w[1] != ("level", "s")) throw new Exception("widgets");
+        if (c.WidgetLines().Select(Widgets.Parse).ElementAtOrDefault(2) is not { Size: "xl" } f || f.Get("style") != "glass" || f.Get("corner") != "soft" || c.Get("widget_grid") != "roomy wide")
+            throw new Exception("widget look in configs");
         if (BuiltIn().Any(b => b.Lines.Count < 5)) throw new Exception("built-in config is empty");
         return $"cfg parsed, {BuiltIn().Count} built-in configs";
     }

@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
+using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using ModLaunch.Core;
@@ -12,6 +13,7 @@ namespace ModLaunch.Views;
 /// <summary>
 /// 10.0: сетка виджетов главной — квадратные клетки, виджеты 1×1, 2×1 и 2×2 встают плотно,
 /// как на iPhone. Число столбцов зависит от ширины окна (клетка не уже MinCell).
+/// 13.0: ещё 1×2, 3×1 и 4×2; клетка и зазор — из настроек сетки; IndexAt — куда бросили перетаскиваемый виджет.
 /// </summary>
 public sealed class WidgetGrid : Panel
 {
@@ -58,6 +60,21 @@ public sealed class WidgetGrid : Panel
         for (var i = 0; i < Children.Count; i++) Children[i].Arrange(Slot(i, at, m));
         return final;
     }
+
+    /// <summary>Номер виджета под точкой (или ближайшего по центру) — для перетаскивания.</summary>
+    public int IndexAt(Point p)
+    {
+        var best = -1;
+        var bestDistance = double.MaxValue;
+        for (var i = 0; i < Children.Count; i++)
+        {
+            var r = Children[i].Bounds;
+            if (r.Contains(p)) return i;
+            var d = Math.Pow(r.Center.X - p.X, 2) + Math.Pow(r.Center.Y - p.Y, 2);
+            if (d < bestDistance) (best, bestDistance) = (i, d);
+        }
+        return best;
+    }
 }
 
 public sealed partial class HomePage
@@ -65,13 +82,13 @@ public sealed partial class HomePage
     static bool _editWidgets;
 
     /// <summary>Открыть главную сразу в режиме правки виджетов (из настроек).</summary>
-    public static void EditWidgets() => _editWidgets = true;
+    public static void EditWidgets(bool on = true) => _editWidgets = on;
 
     /// <summary>Сетка виджетов; в режиме правки у каждого — «убрать», «размер» и стрелки.</summary>
     Control WidgetsArea(List<GameState> mine)
     {
         var layout = Widgets.Entries();
-        var grid = new WidgetGrid();
+        var grid = new WidgetGrid { MinCell = Widgets.CellSize, Gap = Widgets.GapSize };
         for (var i = 0; i < layout.Count; i++)
         {
             var e = layout[i];
@@ -81,7 +98,7 @@ public sealed partial class HomePage
             grid.Sizes.Add(e.Size);
             // 12.0: правая кнопка по виджету — изменить, размер, игра, сдвиг, убрать (свои меню внутри виджета важнее).
             if (!_editWidgets && w.ContextFlyout is null) w.ContextFlyout = WidgetMenu(i, e, layout.Count);
-            grid.Children.Add(_editWidgets ? EditChrome(w, i, layout.Count) : w);
+            grid.Children.Add(_editWidgets ? EditChrome(w, i, layout.Count, grid, e) : w);
         }
         var col = Ui.Col(14);
         if (_editWidgets) col.Children.Add(Gallery(layout));
@@ -92,22 +109,87 @@ public sealed partial class HomePage
         return col;
     }
 
+    /// <summary>13.0: вид виджета, который сейчас строится, — Shell и Cap берут из него фон, цвет, углы и подпись.</summary>
+    static Widgets.Entry? _dress;
+
     /// <summary>Рамка виджета: скругление как у iOS, мягкая поверхность, нажатие — переход.</summary>
     static Border Shell(Control body, Action? open, IBrush? background = null, double pad = 16)
     {
         var b = new Border
         {
-            Classes = { "store-tile", "widget" }, CornerRadius = new CornerRadius(Look.Radius == "sharp" ? 4 : Look.Radius == "round" ? 28 : Look.Calm ? 14 : 22),
+            Classes = { "store-tile", "widget" }, CornerRadius = new CornerRadius(Corner("auto")),
             Padding = new Thickness(pad), Background = background ?? Ui.Res("Surface"), ClipToBounds = true, Child = body,
         };
+        if (_dress is { } e) Dress(b, e, background is not null);
         if (open is not null && !_editWidgets) StoreKit.OnClick(b, open);
         else b.Cursor = Avalonia.Input.Cursor.Default;
         return b;
     }
 
-    /// <summary>Подпись виджета: значок цвета акцента и маленькое слово капсом, как в «Погоде» на iPhone.</summary>
-    static Control Cap(string icon, string text, IBrush? tint = null) =>
-        Ui.Row(6, Ui.Icon(icon, 13, tint ?? Ui.Res("Brand2")), new TextBlock { Text = text.ToUpper(I18n.Culture), FontSize = 10.5, FontWeight = FontWeight.Bold, LetterSpacing = 0.9, Foreground = tint ?? Ui.Res("Muted"), VerticalAlignment = VerticalAlignment.Center });
+    static double Corner(string corner) => corner switch
+    {
+        "round" => 28, "soft" => 14, "square" => 4,
+        _ => Look.Radius == "sharp" ? 4 : Look.Radius == "round" ? 28 : Look.Calm ? 14 : 22,
+    };
+
+    /// <summary>
+    /// 13.0: вид любого виджета — фон (сплошной, стекло, цветной, контур, без фона), цвет, углы и прозрачность.
+    /// own — у вида свой фон (цветная заметка, свой цвет): «сплошной» его не трогает.
+    /// </summary>
+    static void Dress(Border b, Widgets.Entry e, bool own)
+    {
+        var tint = TintOf(e.Get("tint"));
+        var surface = (Ui.Res("Surface") as ISolidColorBrush)?.Color ?? Colors.Black;
+        var color = (tint as ISolidColorBrush)?.Color ?? (Ui.Res("Brand") as ISolidColorBrush)?.Color ?? Colors.SlateBlue;
+        b.CornerRadius = new CornerRadius(Corner(e.Get("corner")));
+        if (int.TryParse(e.Get("opacity"), out var opacity) && opacity is >= 40 and < 100) b.Opacity = opacity / 100.0;
+        switch (e.Get("style"))
+        {
+            case "glass":
+                b.Background = new SolidColorBrush(Mix(surface, color, tint is null ? 0 : 0.18), 0.58);
+                b.BorderBrush = new SolidColorBrush(Colors.White, 0.16);
+                b.BorderThickness = new Thickness(1);
+                break;
+            case "tinted":
+                b.Background = new LinearGradientBrush
+                {
+                    StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
+                    GradientStops = { new GradientStop(Mix(surface, color, 0.62), 0), new GradientStop(Mix(surface, color, 0.34), 1) },
+                };
+                b.BorderBrush = new SolidColorBrush(color, 0.5);
+                break;
+            case "outline":
+                b.Background = Brushes.Transparent;
+                b.BorderBrush = tint ?? Ui.Res("Line");
+                b.BorderThickness = new Thickness(1.5);
+                break;
+            case "clear":
+                b.Background = Brushes.Transparent;
+                b.BorderThickness = new Thickness(0);
+                break;
+            default:
+                if (!own && Wash(tint) is { } wash) b.Background = wash;
+                break;
+        }
+    }
+
+    static Color Mix(Color a, Color b, double t) =>
+        Color.FromRgb((byte)(a.R + (b.R - a.R) * t), (byte)(a.G + (b.G - a.G) * t), (byte)(a.B + (b.B - a.B) * t));
+
+    /// <summary>
+    /// Подпись виджета: значок цвета акцента и маленькое слово капсом, как в «Погоде» на iPhone.
+    /// 13.0: подпись можно спрятать или написать свою; цвет виджета красит и её.
+    /// </summary>
+    static Control Cap(string icon, string text, IBrush? tint = null)
+    {
+        if (_dress is { } e)
+        {
+            if (e.Get("caption") == "0") return new Border { IsVisible = false };
+            if (e.Get("label").Trim() is { Length: > 0 } label) text = label;
+            tint ??= TintOf(e.Get("tint"));
+        }
+        return Ui.Row(6, Ui.Icon(icon, 13, tint ?? Ui.Res("Brand2")), new TextBlock { Text = text.ToUpper(I18n.Culture), FontSize = 10.5, FontWeight = FontWeight.Bold, LetterSpacing = 0.9, Foreground = tint ?? Ui.Res("Muted"), VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis });
+    }
 
     static TextBlock Big(string text, double size = 34, IBrush? color = null) => new()
     {
@@ -135,7 +217,8 @@ public sealed partial class HomePage
     static IBrush? TintOf(string tint) => tint switch
     {
         "blue" => Ui.Hex("#4C8DFF"), "violet" => Ui.Hex("#9B7BFF"), "green" => Ui.Hex("#3FCB7E"),
-        "orange" => Ui.Hex("#FF9640"), "pink" => Ui.Hex("#FF6FB1"), "mono" => Ui.Res("Text"), _ => null,
+        "orange" => Ui.Hex("#FF9640"), "pink" => Ui.Hex("#FF6FB1"), "red" => Ui.Hex("#FF5A5F"), "cyan" => Ui.Hex("#3CC8E6"),
+        "yellow" => Ui.Hex("#F5C542"), "mint" => Ui.Hex("#5EE0B5"), "mono" => Ui.Res("Text"), _ => null,
     };
 
     /// <summary>Фон цветного виджета: цвет сверху слева мягко уходит в обычную поверхность, как у виджетов iPhone.</summary>
@@ -159,10 +242,19 @@ public sealed partial class HomePage
         return (fallback, null);
     }
 
+    /// <summary>13.0: виджет в своём виде; высокий, длинный и огромный рисуются как маленький, широкий и большой.</summary>
     Control Widget(Widgets.Entry e, List<GameState> mine, int index = -1)
     {
+        var outer = _dress;
+        _dress = e;
+        try { return WidgetBody(e, mine, index); }
+        finally { _dress = outer; }
+    }
+
+    Control WidgetBody(Widgets.Entry e, List<GameState> mine, int index)
+    {
         var id = e.Id;
-        var size = e.Size;
+        var size = Widgets.Base(e.Size);
         var wide = size != "s";
         var large = size == "l";
         var tint = TintOf(e.Get("tint"));
@@ -480,7 +572,11 @@ public sealed partial class HomePage
 
     // ---------------------------------------------------------------- правка
 
-    Control EditChrome(Control w, int index, int count)
+    /// <summary>
+    /// Виджет в режиме правки: «убрать» и «размер» на нём, правая кнопка — всё остальное.
+    /// 13.0: стрелки сдвига заменило перетаскивание мышью — тянете виджет на место другого.
+    /// </summary>
+    Control EditChrome(Control w, int index, int count, WidgetGrid grid, Widgets.Entry e)
     {
         Button Mini(string icon, Action run, string tip)
         {
@@ -498,16 +594,67 @@ public sealed partial class HomePage
         remove.VerticalAlignment = VerticalAlignment.Top;
         remove.Margin = new Thickness(-6, -6, 0, 0);
         var tools = Ui.Row(4);
-        if (index > 0) tools.Children.Add(Mini(Icons.ChevronLeft, () => Widgets.Move(index, -1), I18n.T("v10.w.left")));
-        if (index < count - 1) tools.Children.Add(Mini(Icons.ChevronRight, () => Widgets.Move(index, 1), I18n.T("v10.w.right")));
-        if (Widgets.Find(Widgets.Layout()[index].Id) is { Sizes.Length: > 1 }) tools.Children.Add(Mini(Icons.Maximize, () => Widgets.Resize(index), I18n.T("v10.w.size")));
+        tools.Children.Add(Mini(Icons.Sliders, () => OpenStudio(edit: index), I18n.T("v12w.edit")));
+        if (Widgets.Find(e.Id) is { } k && Widgets.SizesOf(k).Count() > 1) tools.Children.Add(Mini(Icons.Maximize, () => Widgets.Resize(index), I18n.T("v10.w.size") + " · " + SizeName(e.Size)));
         tools.HorizontalAlignment = HorizontalAlignment.Right;
         tools.VerticalAlignment = VerticalAlignment.Bottom;
         tools.Margin = new Thickness(0, 0, 8, 8);
         var outline = new Border { BorderBrush = Ui.Res("Brand"), BorderThickness = new Thickness(2), CornerRadius = new CornerRadius(24), IsHitTestVisible = false, Margin = new Thickness(-3) };
         w.IsHitTestVisible = false;
-        w.Opacity = 0.92;
-        return new Panel { Children = { w, outline, tools, remove } };
+        var chrome = new Panel { Background = Brushes.Transparent, Cursor = new Cursor(StandardCursorType.SizeAll), Children = { w, outline, tools, remove } };
+        ToolTip.SetTip(chrome, I18n.T("v13.w.drag"));
+        chrome.ContextFlyout = WidgetMenu(index, e, count);
+        Draggable(chrome, index, grid);
+        return chrome;
+    }
+
+    /// <summary>Перетаскивание: виджет едет за мышью, место, куда он встанет, подсвечено; отпустили — переставлен.</summary>
+    static void Draggable(Panel chrome, int index, WidgetGrid grid)
+    {
+        Point? start = null;
+        var moving = false;
+        var target = -1;
+        void Mark(int to)
+        {
+            if (to == target) return;
+            target = to;
+            for (var i = 0; i < grid.Children.Count; i++)
+                if (i != index) grid.Children[i].Opacity = i == to ? 0.45 : 1;
+        }
+        void Drop()
+        {
+            chrome.RenderTransform = null;
+            chrome.ZIndex = 0;
+            Mark(-1);
+            moving = false;
+            start = null;
+        }
+        chrome.PointerPressed += (_, e) =>
+        {
+            if (!e.GetCurrentPoint(chrome).Properties.IsLeftButtonPressed) return;
+            start = e.GetPosition(grid);
+            e.Pointer.Capture(chrome);
+        };
+        chrome.PointerMoved += (_, e) =>
+        {
+            if (start is not { } from) return;
+            var now = e.GetPosition(grid);
+            var shift = now - from;
+            if (!moving && Math.Abs(shift.X) + Math.Abs(shift.Y) < 8) return;
+            moving = true;
+            chrome.ZIndex = 10;
+            chrome.RenderTransform = new TranslateTransform(shift.X, shift.Y);
+            Mark(grid.IndexAt(now) is var to && to != index ? to : -1);
+        };
+        chrome.PointerReleased += (_, e) =>
+        {
+            if (start is null) return;
+            var (was, to) = (moving, target);
+            Drop();
+            e.Pointer.Capture(null);
+            if (was && to >= 0) Guard.Later(() => Widgets.MoveTo(index, to));
+        };
+        chrome.PointerCaptureLost += (_, _) => { if (start is not null) Drop(); };
     }
 
     /// <summary>«Добавить виджет»: все виды.</summary>
@@ -528,7 +675,30 @@ public sealed partial class HomePage
         var right = Ui.Row(8, reset, done);
         DockPanel.SetDock(right, Dock.Right);
         head.Children.Add(right);
-        head.Children.Add(Ui.Col(2, Ui.Text(I18n.T("v10.w.add"), "h3"), Ui.Text(I18n.T("v10.w.add.text"), "small muted", wrap: true)));
-        return Ui.Card(Ui.Col(12, head, row), 18);
+        head.Children.Add(Ui.Col(2, Ui.Text(I18n.T("v10.w.add"), "h3"), Ui.Text(I18n.T("v13.w.add.text"), "small muted", wrap: true)));
+        return Ui.Card(Ui.Col(12, head, row, GridSettings()), 18);
+    }
+
+    /// <summary>13.0: сетка главной — размер клетки и зазор между виджетами.</summary>
+    static Control GridSettings()
+    {
+        Control Segment(string title, string[] values, string current, Action<string> pick)
+        {
+            var seg = Ui.Row(4);
+            foreach (var v in values)
+            {
+                var one = v;
+                var b = Ui.Button(I18n.T($"v13.w.{title}.{one}"), () => pick(one), one == current ? "primary" : "ghost");
+                b.Padding = new Thickness(12, 5);
+                seg.Children.Add(b);
+            }
+            return Ui.Row(10, new TextBlock { Text = I18n.T($"v13.w.{title}"), MinWidth = 56, VerticalAlignment = VerticalAlignment.Center, Foreground = Ui.Res("Muted"), FontSize = 12.5 }, seg);
+        }
+        var wrap = new WrapPanel();
+        var a = Segment("cell", Widgets.Densities, Widgets.Density, v => Widgets.SetGrid(v, null));
+        a.Margin = new Thickness(0, 0, 24, 6);
+        wrap.Children.Add(a);
+        wrap.Children.Add(Segment("gap", Widgets.Gaps, Widgets.Gap, v => Widgets.SetGrid(null, v)));
+        return wrap;
     }
 }

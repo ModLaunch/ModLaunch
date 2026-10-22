@@ -11,6 +11,7 @@ namespace ModLaunch.Views;
 /// 12.0: «Добавить виджет» как на iPhone. Слева — все виды, в середине — живой предпросмотр в настоящем размере
 /// (под ним — S, M, L), справа — настройки вида: игра (своя или из Steam), цвет, текст, формат. Тот же экран —
 /// «Изменить виджет»: вид уже выбран, меняются размер и настройки.
+/// 13.0: шесть размеров и «Вид» у любого виджета — фон, цвет, углы, прозрачность и подпись.
 /// </summary>
 public sealed partial class HomePage
 {
@@ -41,8 +42,7 @@ public sealed partial class HomePage
                 GradientStops = { new GradientStop(((Ui.Res("Surface3") as ISolidColorBrush)?.Color ?? Colors.DimGray), 0), new GradientStop(((Ui.Res("Surface2") as ISolidColorBrush)?.Color ?? Colors.Black), 1) },
             },
         };
-        var sizes = Ui.Row(6);
-        sizes.HorizontalAlignment = HorizontalAlignment.Center;
+        var sizes = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Center, MaxWidth = 2 * Cell + CellGap + 40 };
         var settings = new StackPanel { Spacing = 14 };
         var name = Ui.Text("", "h3");
         var about = Ui.Text("", "small muted", wrap: true);
@@ -55,17 +55,22 @@ public sealed partial class HomePage
             var (cw, ch) = Widgets.Cells(size);
             widget.Width = cw * Cell + (cw - 1) * CellGap;
             widget.Height = ch * CellH + (ch - 1) * CellGap;
-            widget.HorizontalAlignment = HorizontalAlignment.Center;
-            widget.VerticalAlignment = VerticalAlignment.Center;
             // Предпросмотр — картинка: кнопки внутри не жмутся.
             widget.IsHitTestVisible = false;
-            stage.Child = widget;
+            // 13.0: длинный и огромный не влезают в сцену — показываются уменьшенными, в своих пропорциях.
+            stage.Child = new Viewbox
+            {
+                Stretch = Stretch.Uniform, StretchDirection = StretchDirection.DownOnly, Margin = new Thickness(20),
+                HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Child = widget,
+            };
             sizes.Children.Clear();
-            foreach (var sz in Widgets.Find(id)!.Sizes)
+            foreach (var sz in Widgets.SizesOf(Widgets.Find(id)!))
             {
                 var one = sz;
+                var (w0, h0) = Widgets.Cells(one);
                 var b = Ui.Button(SizeName(one), () => { size = one; Preview(); }, one == size ? "primary" : "ghost");
-                b.MinWidth = 70;
+                ToolTip.SetTip(b, $"{w0}×{h0}");
+                b.Margin = new Thickness(0, 0, 6, 6);
                 sizes.Children.Add(b);
             }
         }
@@ -76,10 +81,21 @@ public sealed partial class HomePage
             var k = Widgets.Find(id)!;
             name.Text = I18n.T("v10.w.name." + id);
             about.Text = I18n.T("v12w.desc." + id);
-            if (k.Options.Length == 0) settings.Children.Add(Ui.Text(I18n.T("v12w.noopts"), "small muted", wrap: true));
-            foreach (var o in k.Options)
+            // 13.0: сначала свои настройки вида, потом «Вид» — общий для всех виджетов.
+            var lookStarted = false;
+            foreach (var o in Widgets.OptionsOf(k))
             {
                 var opt = o;
+                if (!lookStarted && !k.Options.Contains(opt))
+                {
+                    lookStarted = true;
+                    var lookHead = new DockPanel { Margin = new Thickness(0, k.Options.Length > 0 ? 8 : 0, 0, 0) };
+                    var all = Ui.Button(I18n.T("v13.w.lookAll"), () => { Widgets.ApplyLookToAll(opts); MainWindow.Current?.Toast(I18n.T("v13.w.lookAll.done")); }, "ghost", Icons.Layers);
+                    DockPanel.SetDock(all, Dock.Right);
+                    lookHead.Children.Add(all);
+                    lookHead.Children.Add(new TextBlock { Text = I18n.T("v13.w.look"), FontWeight = FontWeight.Bold, FontSize = 14, VerticalAlignment = VerticalAlignment.Center });
+                    settings.Children.Add(lookHead);
+                }
                 string Value() => opts.TryGetValue(opt.Key, out var v) ? v : opt.Default;
                 Control control;
                 switch (opt.Type)
@@ -137,6 +153,13 @@ public sealed partial class HomePage
                         control = row;
                         break;
                     }
+                    case "text" when opt.Key == "label":
+                    {
+                        var box = new TextBox { Text = Value(), MaxLength = 32, Watermark = I18n.T("v13.w.label.hint") };
+                        box.TextChanged += (_, _) => { opts[opt.Key] = box.Text ?? ""; Preview(); };
+                        control = box;
+                        break;
+                    }
                     case "text":
                     {
                         var box = new TextBox { Text = Value(), AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MaxLength = 400, Height = 110, Watermark = I18n.T("v12w.note.hint") };
@@ -175,8 +198,9 @@ public sealed partial class HomePage
                     if (one == id) return;
                     id = one;
                     var nk = Widgets.Find(id)!;
-                    if (!nk.Sizes.Contains(size)) size = DefaultSize(nk);
-                    opts.Clear();
+                    if (!Widgets.SizesOf(nk).Contains(size)) size = DefaultSize(nk);
+                    // Вид (фон, цвет, углы) остаётся при смене вида виджета; свои настройки — нет.
+                    foreach (var key in opts.Keys.Where(key => Widgets.Look.All(o => o.Key != key)).ToList()) opts.Remove(key);
                     Kinds();
                     Preview();
                     Settings();
@@ -190,7 +214,7 @@ public sealed partial class HomePage
         Settings();
 
         var middle = Ui.Col(12, stage, sizes);
-        var right = Ui.Col(10, Ui.Col(2, name, about), new ScrollViewer { MaxHeight = 300, Content = settings });
+        var right = Ui.Col(10, Ui.Col(2, name, about), new ScrollViewer { MaxHeight = 400, Content = settings });
         var body = new Grid { ColumnDefinitions = new ColumnDefinitions(current is null ? "200,18,Auto,18,*" : "0,0,Auto,18,*") };
         var list = new ScrollViewer { MaxHeight = 380, Content = kinds, IsVisible = current is null };
         Grid.SetColumn(list, 0);

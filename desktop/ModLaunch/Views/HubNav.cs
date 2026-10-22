@@ -181,7 +181,7 @@ public static class HubNav
         var words = Ui.Col(4,
             HubLook.Eyebrow("Creator Hub · " + I18n.T(section.Key), HubLook.Violet),
             new TextBlock { Text = title, FontFamily = Look.Display, FontSize = 26, FontWeight = FontWeight.Bold, LetterSpacing = -0.6, TextTrimming = TextTrimming.CharacterEllipsis });
-        if (lead is not null) words.Children.Add(new TextBlock { Text = lead, FontSize = 13, Foreground = Ui.Res("Muted"), TextWrapping = TextWrapping.Wrap, MaxWidth = 760 });
+        if (lead is not null) words.Children.Add(new TextBlock { Text = lead, FontSize = 13, Foreground = Ui.Res("Muted"), TextWrapping = TextWrapping.Wrap, MaxWidth = 760, HorizontalAlignment = HorizontalAlignment.Left });
         words.VerticalAlignment = VerticalAlignment.Bottom;
 
         action ??= rail switch
