@@ -36,13 +36,14 @@ public static class HubLook
     /// <summary>Линия под курсором.</summary>
     public static IBrush EdgeHi => B(Light ? "#9AA6C8" : "#454E72");
     /// <summary>Акцент для текста и значков: фиолетовый и бирюзовый, читаемые на своём фоне.</summary>
-    public static IBrush Violet => B(Light ? "#5B3FD0" : "#A48BFF");
-    public static IBrush Cyan => B(Light ? "#0E7490" : "#45D3EE");
+    /// 14.0: во «взрослом» виде — сталь и холодный серо-голубой, без неона.
+    public static IBrush Violet => Look.Mature ? B(Light ? "#3B4A6B" : "#A9B6D3") : B(Light ? "#5B3FD0" : "#A48BFF");
+    public static IBrush Cyan => Look.Mature ? B(Light ? "#3E5F73" : "#8FB3C4") : B(Light ? "#0E7490" : "#45D3EE");
     /// <summary>Уголки рамок.</summary>
     static IBrush Tick => B(Light ? "#7A86B8" : "#6D62B8");
 
     /// <summary>Фирменная полоса: фиолетовый → бирюзовый (белый текст на ней читается).</summary>
-    public static IBrush Signature(byte alpha = 255) => new LinearGradientBrush
+    public static IBrush Signature(byte alpha = 255) => Look.Mature ? new SolidColorBrush(Color.FromArgb(alpha, 0x3A, 0x4A, 0x66)) : new LinearGradientBrush
     {
         StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
         GradientStops = { new GradientStop(Color.FromArgb(alpha, 0x70, 0x48, 0xE8), 0), new GradientStop(Color.FromArgb(alpha, 0x0B, 0x8F, 0xB3), 1) },
@@ -183,7 +184,7 @@ public static class HubLook
                 RadiusX = new RelativeScalar(0.55, RelativeUnit.Relative), RadiusY = new RelativeScalar(0.75, RelativeUnit.Relative),
                 GradientStops = { new GradientStop(Color.FromArgb((byte)(light ? 22 : 34), 0x70, 0x48, 0xE8), 0), new GradientStop(Color.FromArgb(0, 0x0B, 0x8F, 0xB3), 1) },
             };
-            ctx.FillRectangle(glow, new Rect(0, 0, w, h));
+            if (!Look.Mature) ctx.FillRectangle(glow, new Rect(0, 0, w, h));
             var line = light ? Color.FromRgb(0x2B, 0x4C, 0x9B) : Color.FromRgb(0x8C, 0x9A, 0xFF);
             var minor = new Pen(new SolidColorBrush(Color.FromArgb((byte)(light ? 16 : 13), line.R, line.G, line.B)), 1);
             var major = new Pen(new SolidColorBrush(Color.FromArgb((byte)(light ? 30 : 25), line.R, line.G, line.B)), 1);

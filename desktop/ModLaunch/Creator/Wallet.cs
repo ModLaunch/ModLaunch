@@ -23,12 +23,12 @@ public sealed record LedgerEntry(long Seq, string Kind, long Amount, long Balanc
 /// </summary>
 public static class Ledger
 {
-    public static readonly string[] Kinds = ["purchase", "sale", "payout", "payout-return", "topup", "grant"];
+    public static readonly string[] Kinds = ["purchase", "sale", "payout", "payout-return", "topup", "grant", "fee"];
 
     /// <summary>Новое состояние после записи — та же арифметика, что в правилах (mWalletOk).</summary>
     public static WalletState Next(WalletState prev, string kind, long amount) => new(
         prev.Balance + amount,
-        prev.Earned + (kind == "sale" ? amount : 0),
+        prev.Earned + (kind is "sale" or "fee" ? amount : 0),
         prev.Spent + (kind == "purchase" ? -amount : 0),
         prev.PaidOut + (kind is "payout" or "payout-return" ? -amount : 0),
         prev.ToppedUp + (kind == "topup" ? amount : 0),
@@ -146,8 +146,10 @@ public static class Ledger
         var text = new StreamReader(stream).ReadToEnd();
         foreach (var part in new[] { "rules_version = '2'", "match /friendships/", "match /creations/", "match /reviews/", "function mWalletOk", "match /ledger/" })
             if (!text.Contains(part)) throw new Exception("rules file misses " + part);
-        if (!text.Contains($"function mFee() {{ return {Market.FeePercent}; }}")) throw new Exception("fee in rules differs from market.config.json");
-        return $"complete rules file inside the app ({text.Length / 1024} KB), fee {Market.FeePercent}% matches";
+        // 14.0: процент — в config/market; без документа правила берут те же 10 %, что market.config.json.
+        if (!text.Contains($"get(mCfg()).data.get('fee', {Market.FeePercent}) : {Market.FeePercent}; }}")) throw new Exception("default fee in rules differs from market.config.json");
+        if (!text.Contains("e.kind == 'fee'") || !Ledger.Kinds.Contains("fee")) throw new Exception("fee ledger kind missing");
+        return $"complete rules file inside the app ({text.Length / 1024} KB), default fee {Market.FeePercent}% matches, owner fee kind present";
     }
 
     [SelfTest]

@@ -66,7 +66,7 @@ public sealed class BigPictureWindow : Window
         Icon = MainWindow.Current?.Icon;
 
         _games = AppState.Games.Where(g => g.Status == Detect.Found)
-            .OrderByDescending(g => PlayTime.Get(g.Def.Id).LastPlayed ?? DateTime.MinValue).ToList();
+            .OrderByDescending(g => Features.NewGames.Recent(g)).ToList();
 
         _carouselScroll = new ScrollViewer
         {

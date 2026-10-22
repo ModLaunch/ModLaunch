@@ -29,7 +29,7 @@ public sealed partial class CreatorPage
     static Verdict? _lxVerdict;
     ScriptEditor? _lxEditor;
 
-    static string Example(string name)
+    internal static string Example(string name)
     {
         using var s = AssetLoader.Open(new Uri($"avares://ModLaunch/Assets/modscriptx/{name}.modx"));
         using var r = new StreamReader(s);
@@ -52,7 +52,7 @@ public sealed partial class CreatorPage
         _lxVerdict = Moderation.CheckModx(_lxText);
     }
 
-    static string ScriptsDir()
+    internal static string ScriptsDir()
     {
         var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
         return Directory.CreateDirectory(Path.Combine(docs != "" ? docs : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "ModScript X")).FullName;
@@ -175,7 +175,7 @@ public sealed partial class CreatorPage
     }
 
     /// <summary>Сообщение ModScript X: ключи err.* — переводом (cr.err.*, как в редакторе), остальное и непереведённое — как есть.</summary>
-    static string LxMsg(Diag d)
+    internal static string LxMsg(Diag d)
     {
         if (!d.Message.StartsWith("err.")) return d.Message;
         var text = Msg(d);

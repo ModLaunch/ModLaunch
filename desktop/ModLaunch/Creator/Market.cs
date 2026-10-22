@@ -66,8 +66,41 @@ public static class Market
     public static readonly string[] Kinds = ["model", "code", "script", "asset", "pack"];
     public static readonly string[] Licenses = ["personal", "commercial", "open"];
 
-    /// <summary>Комиссия площадки, %. Должна совпадать с FEE в firebase/firestore.rules.</summary>
-    public static readonly int FeePercent;
+    /// <summary>
+    /// Комиссия площадки, %. 14.0: её задаёт владелец (документ config/market, правила базы читают его же);
+    /// до первой загрузки и без сети — feePercent из market.config.json (10).
+    /// </summary>
+    public static int FeePercent => _fee ?? DefaultFee;
+    static readonly int DefaultFee;
+    static int? _fee;
+    static DateTime _feeAt;
+
+    /// <summary>Процент поменялся (загрузили или владелец сохранил) — цены «вы получите» пересчитаются.</summary>
+    public static event Action? FeeChanged;
+
+    /// <summary>Прочитать процент из config/market (раз в 10 минут; force — сейчас, перед покупкой).</summary>
+    public static async Task<int> LoadFee(bool force = false)
+    {
+        if (Program.Demo || !Firebase.Configured) return FeePercent;
+        if (!force && _fee is not null && DateTime.UtcNow - _feeAt < TimeSpan.FromMinutes(10)) return FeePercent;
+        try
+        {
+            var doc = await Hub.Call(Firebase.Url("/config/market"), HttpMethod.Get, null, null) as JsonObject;
+            var f = Firebase.FromFields(doc?["fields"] as JsonObject);
+            SetFee(f.ContainsKey("fee") ? (int)Math.Clamp(f.L("fee"), 0, 50) : 10);
+        }
+        catch (ServiceError e) when (e.Code == "NOT_FOUND") { SetFee(10); }
+        catch { }
+        return FeePercent;
+    }
+
+    internal static void SetFee(int percent)
+    {
+        var changed = _fee != percent;
+        _fee = percent;
+        _feeAt = DateTime.UtcNow;
+        if (changed) FeeChanged?.Invoke();
+    }
     public static readonly string Currency;
     public static readonly long MinPayout;
     public static readonly string TopUpUrl;
@@ -75,7 +108,7 @@ public static class Market
     static Market()
     {
         var json = Resources.Json("market.config.json");
-        FeePercent = (int)Math.Clamp(json.Long("feePercent") is > 0 and var f ? f : 10, 0, 90);
+        DefaultFee = (int)Math.Clamp(json.Long("feePercent") is > 0 and var f ? f : 10, 0, 50);
         Currency = json.Str("currency") ?? "₽";
         MinPayout = json.Long("minPayout") is > 0 and var m ? m : 50000;
         TopUpUrl = json.Str("topUpUrl") ?? "";
@@ -296,6 +329,8 @@ public static class Market
         var fresh = await Get(l.Id) ?? throw new ServiceError("NOT_FOUND");
         if (!fresh.Active) throw new ServiceError("NOT_FOUND");
         var price = fresh.Price;
+        // Процент мог смениться: правила базы сверяют комиссию с config/market прямо сейчас.
+        await LoadFee(force: true);
         var fee = Fee(price);
 
         JsonObject[] Docs() =>

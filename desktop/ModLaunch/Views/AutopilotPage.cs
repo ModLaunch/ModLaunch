@@ -30,7 +30,7 @@ public sealed class AutopilotPage : Page
 
     static List<GameState> Games() => MainWindow.OrderedGames()
         .Where(g => g.Status == Detect.Found && !g.Def.IsMinecraft && g.Registry is not null && !GameCollections.IsHidden(g.Def.Id))
-        .OrderByDescending(g => PlayTime.Get(g.Def.Id).LastPlayed ?? DateTime.MinValue).ToList();
+        .OrderByDescending(g => Features.NewGames.Recent(g)).ToList();
 
     public override void Build()
     {

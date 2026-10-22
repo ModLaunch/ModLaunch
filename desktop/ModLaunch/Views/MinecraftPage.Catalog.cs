@@ -80,7 +80,7 @@ public sealed partial class MinecraftPage
         types.VerticalAlignment = VerticalAlignment.Center;
         var sort = new ComboBox { Width = 190, ItemsSource = McModrinth.Sorts.Select(s => I18n.T("mr.sort." + s)).ToList(), SelectedIndex = Math.Max(0, Array.IndexOf(McModrinth.Sorts, _sort)), VerticalAlignment = VerticalAlignment.Center };
         sort.SelectionChanged += (_, _) => { var v = McModrinth.Sorts[Math.Max(0, sort.SelectedIndex)]; if (v != _sort) { _sort = v; _ = LoadCatalog(reset: true); } };
-        var search = new TextBox { Width = 260, Watermark = I18n.T("mine.search"), Text = _query, VerticalAlignment = VerticalAlignment.Center };
+        var search = new TextBox { Width = 240, Watermark = I18n.T("v15.mc.search"), Text = _query, VerticalAlignment = VerticalAlignment.Center };
         search.KeyDown += (_, e) => { if (e.Key == Avalonia.Input.Key.Enter) { _query = search.Text?.Trim() ?? ""; _ = LoadCatalog(reset: true); } };
         var right = Ui.Row(8, search, sort);
         var bar = new DockPanel();
@@ -135,7 +135,8 @@ public sealed partial class MinecraftPage
             col.Children.Add(Ui.Card(Ui.Col(8, Ui.Text(I18n.T("mr.error"), "h3"), Ui.Text(_error, "muted", wrap: true),
                 Ui.Button(I18n.T("cr.refresh"), () => _ = LoadCatalog(reset: true), "primary", Icons.Refresh)), 22));
 
-        var grid = new UniformGrid { Columns = 3 };
+        // У карточек отступ справа 14 — сдвигаем сетку, чтобы правый край совпал с фильтрами.
+        var grid = new UniformGrid { Columns = 3, Margin = new Thickness(0, 0, -14, 0) };
         var installed = a is null ? [] : McContent.InstalledProjects(a);
         foreach (var p in _hits) grid.Children.Add(Card(p, a, installed.Contains(p.Id)));
         if (_loading) for (var n = 0; n < (_hits.Count == 0 ? 9 : 3); n++) grid.Children.Add(new Border { Classes = { "card", "skeleton" }, Height = 168, Margin = new Thickness(0, 0, 14, 14) });
@@ -163,8 +164,20 @@ public sealed partial class MinecraftPage
             : pack ? (I18n.T("mr.install"), Icons.Plus, "primary")
             : a is null ? (I18n.T("mine.build.new"), Icons.Plus, "")
             : (I18n.T("mr.install"), Icons.Download, "primary");
-        var install = Ui.Button(label, () => Install(p), cls, icon, pack ? I18n.T("mine.catalog.packs") : null);
-        install.IsEnabled = !busy && !installed;
+        // 15.0: «Установлен» — тихая пометка, а не широкая неактивная кнопка: так цифры внизу карточки не обрезаются.
+        Control install;
+        if (installed && !busy)
+            install = new Border
+            {
+                Background = Ui.Hex("#1A3FB950"), CornerRadius = new CornerRadius(8), Padding = new Thickness(9, 5), VerticalAlignment = VerticalAlignment.Center,
+                Child = Ui.Row(5, Ui.Icon(Icons.Check, 12, Ui.Res("Good")), new TextBlock { Text = label, FontSize = 12, FontWeight = FontWeight.SemiBold, Foreground = Ui.Res("Good"), VerticalAlignment = VerticalAlignment.Center }),
+            };
+        else
+        {
+            var b = Ui.Button(label, () => Install(p), cls, icon, pack ? I18n.T("mine.catalog.packs") : null);
+            b.IsEnabled = !busy;
+            install = b;
+        }
         // 9.5: стрелка рядом — поставить в другую сборку.
         Control action = install;
         var others = pack ? [] : Mc.Instances().Where(b => b.Id != a?.Id).ToList();
@@ -179,6 +192,7 @@ public sealed partial class MinecraftPage
                 menu.ShowAt(more);
             };
             action = Ui.Row(2, install, more);
+            ((StackPanel)action).VerticalAlignment = VerticalAlignment.Center;
         }
 
         var cats = new WrapPanel();

@@ -197,7 +197,7 @@ public static class Look
     public static readonly string[] Radii = ["sharp", "normal", "round"];
     public static readonly string[] Backdrops = ["aurora", "soft", "grid", "plain"];
     /// <summary>Фон окна: aurora — живые пятна и сетка, soft — пятна без движения, grid — сетка, plain — ровный.</summary>
-    public static string Backdrop => Backdrops.Contains(Settings.Data.Str("backdrop")) ? Settings.Data.Str("backdrop")! : "aurora";
+    public static string Backdrop => Backdrops.Contains(Settings.Data.Str("backdrop")) ? Settings.Data.Str("backdrop")! : Mature ? "soft" : "aurora";
     public static void SetBackdrop(string value) { Settings.Data["backdrop"] = value; Settings.Save(); Apply(); }
 
     /// <summary>Шрифт интерфейса (Inter встроен, остальные — из Windows).</summary>
@@ -314,6 +314,13 @@ public static class Look
     public static void SetAutoScale() { Settings.Data["uiScale"] = "auto"; Settings.Save(); Changed?.Invoke(); }
     public static double Scale => Settings.Data["uiScale"] is { } v && double.TryParse(v.ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var s) && s is >= 0.7 and <= 1.6 ? s : 1.0;
     public static bool Animations => Settings.Data.Bool("animations", true);
+
+    /// <summary>
+    /// 14.0: «взрослый» вид — по умолчанию у всех. Цвета виджетов приглушены, цифры не кричат,
+    /// в Creator Hub — сталь вместо фиолетово-бирюзового, без свечения. Выключается в «Тонкой настройке».
+    /// </summary>
+    public static bool Mature => Settings.Data.Bool("mature", true);
+    public static void SetMature(bool on) { Settings.Data["mature"] = on; Settings.Save(); Changed?.Invoke(); }
 
     public static event Action? Changed;
 

@@ -53,7 +53,8 @@ public static class MarketData
         }
         var m = M();
         var h = H();
-        await Task.WhenAll(m, h);
+        var fee = Market.LoadFee(force);
+        await Task.WhenAll(m, h, fee);
         Listings = m.Result;
         Workshop = h.Result;
         if (Social.Account.SignedIn && !Program.Demo)

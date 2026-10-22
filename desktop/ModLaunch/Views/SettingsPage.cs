@@ -24,6 +24,7 @@ public sealed partial class SettingsPage : Page
     public SettingsPage(string tab = "general") => _tab = MapTab(tab);
 
     public override string Title => I18n.T("nav.settings");
+    public override bool Workspace => true;
 
     /// <summary>Разделы настроек по группам: id, название, иконка, цвет значка.</summary>
     /// <summary>10.0: «Состояние сервисов» (сервер, правила, консоль Firebase) — только владельцу.</summary>
@@ -34,6 +35,7 @@ public sealed partial class SettingsPage : Page
     [
         ("v11.set.g.app", [
             ("general", "v11.set.general", Icons.Settings, "#94A3B8"),
+            ("panel", "cp.title", Icons.Grid, "#60A5FA"),
             ("look", "settings.tab.look", Icons.Palette, "#A78BFA"),
         ]),
         ("set.g.games", [
@@ -146,6 +148,7 @@ public sealed partial class SettingsPage : Page
             "accounts" => AccountsTab(),
             "about" => AboutTab(),
             "look" => LookTab(),
+            "panel" => Panel(),
             "services" when Social.Account.Owner => ServicesTab(),
             _ => GeneralTab(),
         };
@@ -298,6 +301,7 @@ public sealed partial class SettingsPage : Page
             Ui.Text(I18n.T("guide.repack"), "small muted", wrap: true), Ui.Text(I18n.T("guide.check"), "small muted", wrap: true));
         return Ui.Col(16, Section(I18n.T("settings.games"), I18n.T("settings.games.hint"), list,
             Ui.Button(I18n.T("games.deep"), () => _ = AppState.DetectMany(AppState.Games.Where(x => x.Status != Detect.Found).ToList(), deep: true), "", Icons.Search),
+            Toggle(I18n.T("v151.set.autoAdd"), I18n.T("v151.set.autoAdd.hint"), Features.NewGames.AutoAdd, v => Features.NewGames.AutoAdd = v),
             guide), GamesOrderSection(), HiddenSection());
     }
 

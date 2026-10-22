@@ -41,7 +41,7 @@ public sealed class AiBuildsPage : Page
 
     static List<GameState> Games() => AppState.Games
         .Where(g => g.Status == Detect.Found && !g.Def.IsMinecraft && g.Def.HasExternalCatalog)
-        .OrderByDescending(g => PlayTime.Get(g.Def.Id).LastPlayed ?? DateTime.MinValue).ToList();
+        .OrderByDescending(g => Features.NewGames.Recent(g)).ToList();
 
     static string IconOf(string name) => typeof(Icons).GetField(name)?.GetValue(null) as string ?? Icons.Star;
 

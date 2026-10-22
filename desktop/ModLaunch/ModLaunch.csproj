@@ -15,7 +15,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <AssemblyName>ModLaunch</AssemblyName>
     <RootNamespace>ModLaunch</RootNamespace>
-    <Version>13.0.0</Version>
+    <Version>15.1.0</Version>
     <Product>ModLaunch</Product>
     <Company>ModLaunch</Company>
     <Copyright>© 2026 ModLaunch</Copyright>
@@ -25,6 +25,8 @@
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <BuiltInComInteropSupport>false</BuiltInComInteropSupport>
     <InvariantGlobalization>false</InvariantGlobalization>
+    <!-- Переводы сообщений компилятора — только нужных языков. -->
+    <SatelliteResourceLanguages>en;ru</SatelliteResourceLanguages>
   </PropertyGroup>
 
   <!-- Выпуск: один exe со своей средой .NET, урезанный от лишнего. -->
@@ -41,10 +43,14 @@
          JsonSerializer.Serialize или JsonArray.Add(строка) роняло программу в выпуске. -->
     <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
     <DebugType>none</DebugType>
+    <!-- 15.0: код заранее переведён в машинный (ReadyToRun) — и свой, и Avalonia. Без этого каждое
+         первое нажатие (страница, меню, кнопка окна) ждало, пока .NET скомпилирует код на лету. -->
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <TieredPGO>true</TieredPGO>
   </PropertyGroup>
 
   <ItemGroup>
-    <AvaloniaResource Include="Assets/**" />
+    <AvaloniaResource Include="Assets/**" Exclude="Assets/*.tsv.gz" />
     <!-- 9.7: ModScript X — инжектор .modx (desktop/ModScript), встроен в Creator Hub. -->
     <Compile Include="../ModScript/Modx.cs;../ModScript/Lang.cs;../ModScript/Targets.cs;../ModScript/Engines.cs;../ModScript/Injector.cs;../ModScript/Runtime.cs" Link="ModScriptX/%(Filename)%(Extension)" />
     <AvaloniaResource Include="../ModScript/Examples/gold-boost.modx" Link="Assets/modscriptx/gold-boost.modx" />
@@ -53,7 +59,12 @@
     <AvaloniaResource Include="../../firebase/firestore.rules" Link="Assets/firestore.rules" />
     <!-- Настройки служб читаются и без запущенного интерфейса (самопроверка, установщик). -->
     <EmbeddedResource Include="Assets/*.config.json" LogicalName="%(Filename)%(Extension)" />
+    <!-- 15.0: все игры Steam (100 тыс.+) — снимок собирает CI (gamedir.yml); пока его нет, сборка без него. -->
+    <EmbeddedResource Include="Assets/*.tsv.gz" LogicalName="%(Filename)%(Extension)" />
     <TrimmerRootAssembly Include="ModLaunch" />
+    <EmbeddedResource Include="$(PkgMicrosoft_CSharp)/lib/netstandard2.0/Microsoft.CSharp.dll" LogicalName="modscript-Microsoft.CSharp.dll" Condition="'$(PkgMicrosoft_CSharp)' != ''" />
+    <!-- Компилятор нужен редко (сборка Unity-инжекта) — без ReadyToRun, чтобы не раздувать установщик. -->
+    <PublishReadyToRunExclude Include="Microsoft.CodeAnalysis.dll;Microsoft.CodeAnalysis.CSharp.dll" />
   </ItemGroup>
 
   <ItemGroup>
@@ -64,6 +75,10 @@
     <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.*" />
     <PackageReference Include="Avalonia.Headless" Version="11.3.*" />
     <PackageReference Include="SharpCompress" Version="1.0.*" />
+    <!-- 15.0: C#-моды для Unity собираются прямо в программе (Roslyn) — .NET SDK у игрока не нужен. -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.11.0" />
+    <!-- Microsoft.CSharp под netstandard2.0 кладётся рядом с собранным плагином (dynamic в ModScript X 2). -->
+    <PackageReference Include="Microsoft.CSharp" Version="4.7.0" GeneratePathProperty="true" ExcludeAssets="all" PrivateAssets="all" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.*" />
   </ItemGroup>
 

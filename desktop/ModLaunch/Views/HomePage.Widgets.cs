@@ -146,7 +146,7 @@ public sealed partial class HomePage
         switch (e.Get("style"))
         {
             case "glass":
-                b.Background = new SolidColorBrush(Mix(surface, color, tint is null ? 0 : 0.18), 0.58);
+                b.Background = new SolidColorBrush(Mix(surface, color, tint is null ? 0 : Look.Mature ? 0.08 : 0.18), 0.58);
                 b.BorderBrush = new SolidColorBrush(Colors.White, 0.16);
                 b.BorderThickness = new Thickness(1);
                 break;
@@ -154,9 +154,11 @@ public sealed partial class HomePage
                 b.Background = new LinearGradientBrush
                 {
                     StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
-                    GradientStops = { new GradientStop(Mix(surface, color, 0.62), 0), new GradientStop(Mix(surface, color, 0.34), 1) },
+                    GradientStops = Look.Mature
+                        ? new GradientStops { new GradientStop(Mix(surface, color, 0.22), 0), new GradientStop(Mix(surface, color, 0.08), 1) }
+                        : new GradientStops { new GradientStop(Mix(surface, color, 0.62), 0), new GradientStop(Mix(surface, color, 0.34), 1) },
                 };
-                b.BorderBrush = new SolidColorBrush(color, 0.5);
+                b.BorderBrush = new SolidColorBrush(color, Look.Mature ? 0.28 : 0.5);
                 break;
             case "outline":
                 b.Background = Brushes.Transparent;
@@ -188,12 +190,15 @@ public sealed partial class HomePage
             if (e.Get("label").Trim() is { Length: > 0 } label) text = label;
             tint ??= TintOf(e.Get("tint"));
         }
-        return Ui.Row(6, Ui.Icon(icon, 13, tint ?? Ui.Res("Brand2")), new TextBlock { Text = text.ToUpper(I18n.Culture), FontSize = 10.5, FontWeight = FontWeight.Bold, LetterSpacing = 0.9, Foreground = tint ?? Ui.Res("Muted"), VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis });
+        // 14.0: во «взрослом» виде подпись всегда серая, цвет — только у значка.
+        return Ui.Row(6, Ui.Icon(icon, 13, tint ?? Ui.Res("Brand2")), new TextBlock { Text = text.ToUpper(I18n.Culture), FontSize = 10.5, FontWeight = Look.Mature ? FontWeight.SemiBold : FontWeight.Bold, LetterSpacing = 0.9, Foreground = Look.Mature ? Ui.Res("Muted") : tint ?? Ui.Res("Muted"), VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis });
     }
 
     static TextBlock Big(string text, double size = 34, IBrush? color = null) => new()
     {
-        Text = text, FontFamily = Look.Display, FontSize = size, FontWeight = FontWeight.Bold, LetterSpacing = -0.8, Foreground = color ?? Ui.Res("Text"), TextTrimming = TextTrimming.CharacterEllipsis,
+        // 14.0: крупные цифры — цветом текста и полужирным: цветные и жирные смотрелись игрушечно.
+        Text = text, FontFamily = Look.Display, FontSize = Look.Mature ? size * 0.9 : size, FontWeight = Look.Mature ? FontWeight.SemiBold : FontWeight.Bold, LetterSpacing = -0.8,
+        Foreground = Look.Mature ? Ui.Res("Text") : color ?? Ui.Res("Text"), TextTrimming = TextTrimming.CharacterEllipsis,
     };
 
     static TextBlock Small(string text, IBrush? color = null, int lines = 2) => new()
@@ -229,7 +234,7 @@ public sealed partial class HomePage
         return new LinearGradientBrush
         {
             StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
-            GradientStops = { new GradientStop(Color.FromArgb(70, c.Color.R, c.Color.G, c.Color.B), 0), new GradientStop(surface, 0.85) },
+            GradientStops = { new GradientStop(Color.FromArgb((byte)(Look.Mature ? 26 : 70), c.Color.R, c.Color.G, c.Color.B), 0), new GradientStop(surface, Look.Mature ? 0.6 : 0.85) },
         };
     }
 
@@ -477,7 +482,7 @@ public sealed partial class HomePage
                 DockPanel.SetDock(count, Dock.Right);
                 top.Children.Add(count);
                 top.Children.Add(Cap(Icons.Layers, I18n.T("v10.w.name.steam")));
-                if (apps.Count == 0) return Shell(Stack(top, Small(I18n.T("v12w.steam.none"))), () => Go(() => new SteamGamesPage()));
+                if (apps.Count == 0) return Shell(Stack(top, Small(I18n.T("v12w.steam.none"))), () => Go(() => new SteamLibraryPage()));
                 var wrap = new Avalonia.Controls.Primitives.UniformGrid { Columns = large ? 4 : 5, Rows = large ? 2 : 1 };
                 foreach (var a in apps.Take(large ? 8 : 5))
                 {
@@ -487,7 +492,7 @@ public sealed partial class HomePage
                     if (!_editWidgets) StoreKit.OnClick(cover, () => PlaySteam(app));
                     wrap.Children.Add(cover);
                 }
-                return Shell(Stack(top, wrap), () => Go(() => new SteamGamesPage()), pad: 14);
+                return Shell(Stack(top, wrap), () => Go(() => new SteamLibraryPage()), pad: 14);
             }
         }
         return Shell(Small(id), null);

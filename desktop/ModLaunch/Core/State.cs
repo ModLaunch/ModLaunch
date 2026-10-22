@@ -82,6 +82,7 @@ public static class AppState
         }
         Notify();
         await DetectMany(Games.Where(g => g.Status != Detect.Found).ToList());
+        Features.NewGames.StartTracking();
     }
 
     /// <summary>Найти несколько игр за один обход дисков; каждая показывается, как только нашлась.</summary>
@@ -99,6 +100,7 @@ public static class AppState
             g.Status = Detect.Found;
             g.SearchingWhere = null;
             Settings.SetGamePath(def.Id, where.Path);
+            if (Features.NewGames.Tracking) Features.NewGames.Mark(def.Id);
             g.Refresh();
             Notify();
         });
@@ -126,7 +128,8 @@ public static class AppState
         Notify();
         try
         {
-            var found = await Locator.Locate(g.Def, deep, new Progress<string>(where => { g.SearchingWhere = where; Notify(); }));
+            // 15.0: без Progress<T> — он отправлял в поток интерфейса каждую из десятков тысяч папок.
+            var found = await Locator.Locate(g.Def, deep, new Where(g));
             if (found is not null)
             {
                 g.Path = found.Path;
@@ -143,10 +146,18 @@ public static class AppState
 
     public static void SetPath(GameState g, string? path)
     {
+        // 15.1: игра появилась (добавили или показали папку) — она «новая» и первая в недавних списках.
+        if (path is not null && g.Status != Detect.Found) Features.NewGames.Mark(g.Def.Id);
         g.Path = path;
         g.Status = path is null ? Detect.NotFound : Detect.Found;
         Settings.SetGamePath(g.Def.Id, path);
         g.Refresh();
         Notify();
+    }
+
+    /// <summary>Где сейчас ищем игру: просто запомнить и попросить перерисовку (Notify сам склеивает частые вызовы).</summary>
+    sealed class Where(GameState g) : IProgress<string>
+    {
+        public void Report(string value) { g.SearchingWhere = value; Notify(); }
     }
 }

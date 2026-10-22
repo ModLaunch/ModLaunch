@@ -12,6 +12,12 @@ public static class WhatsNew
 {
     static readonly (string Icon, string Key, Func<Page>? Open)[] Items =
     [
+        (Icons.Code, "new.v15.studio", () => new CreatorPage("ide")),
+        (Icons.Zap, "new.v15.inject", () => new CreatorPage("ide")),
+        (Icons.Gamepad, "new.v15.games", () => new AddGamePage()),
+        (Icons.Activity, "new.v15.fast", null),
+        (Icons.Bag, "new.v14.market", () => new MarketPage("studio")),
+        (Icons.Palette, "new.v14.look", () => new SettingsPage("look")),
         (Icons.Creator, "new.v13.hub", () => new CreatorPage("home")),
         (Icons.Code, "new.v13.modscript", () => new CreatorPage("console")),
         (Icons.Users, "new.v13.team", () => new CreatorPage("team")),
@@ -138,7 +144,7 @@ public static class WhatsNew
             },
             Child = Ui.Col(2,
                 new TextBlock { Text = $"ModLaunch {Http.Version}", FontSize = 24, FontWeight = FontWeight.Bold, Foreground = Brushes.White },
-                new TextBlock { Text = I18n.T("new.v13.subtitle"), Foreground = new SolidColorBrush(Color.FromArgb(220, 255, 255, 255)), TextWrapping = TextWrapping.Wrap }),
+                new TextBlock { Text = I18n.T("new.v15.subtitle"), Foreground = new SolidColorBrush(Color.FromArgb(220, 255, 255, 255)), TextWrapping = TextWrapping.Wrap }),
         };
         w.Dialog(I18n.T("new.title"), new ScrollViewer { MaxHeight = 560, Content = Ui.Col(12, hero, list) }, 620,
             Ui.Button(I18n.T("new.ok"), w.CloseDialog, "primary", Icons.Check));

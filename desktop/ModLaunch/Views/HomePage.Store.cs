@@ -26,7 +26,7 @@ public sealed partial class HomePage
         // Недавние — первыми: карусель начинается с игры, в которую играли последней.
         // «Продолжить игру» выключено в настройках — карусель просто по порядку игр.
         var byRecent = Settings.Data.Bool("homeContinue", true)
-            ? mine.OrderByDescending(g => Features.PlayTime.Get(g.Def.Id).LastPlayed ?? DateTime.MinValue).ToList()
+            ? mine.OrderByDescending(g => Features.NewGames.Recent(g)).ToList()
             : mine;
 
         if (Starter(mine) is { } starter) col.Children.Add(Intro(starter, 0));

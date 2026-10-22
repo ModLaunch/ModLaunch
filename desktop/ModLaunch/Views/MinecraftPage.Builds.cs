@@ -37,8 +37,13 @@ public sealed partial class MinecraftPage
 
         // Сборки других лаунчеров: подключаем на месте, ничего не копируя.
         if (_found is null && !_scanning) _ = Scan();
-        var others = Ui.Col(10, Ui.Row(10, Ui.Text(I18n.T("mine.import.title"), "h3"),
-            Ui.Button("", () => _ = Scan(), "icon ghost", Icons.Refresh, I18n.T("cr.refresh"))));
+        var othersTitle = Ui.Text(I18n.T("mine.import.title"), "h3");
+        othersTitle.VerticalAlignment = VerticalAlignment.Center;
+        var rescan = Ui.Button("", () => _ = Scan(), "icon ghost", Icons.Refresh, I18n.T("cr.refresh"));
+        rescan.VerticalAlignment = VerticalAlignment.Center;
+        rescan.Width = rescan.Height = 30;
+        var others = Ui.Col(10, Ui.Row(8, othersTitle, rescan));
+        others.Margin = new Thickness(0, 6, 0, 0);
         others.Children.Add(Ui.Text(I18n.T("mine.import.text"), "small muted", wrap: true));
         if (_scanning && _found is null) others.Children.Add(Ui.Text(I18n.T("games.searching"), "small muted"));
         else if (_found is { Count: 0 }) others.Children.Add(Ui.Text(I18n.T("mine.import.none"), "small muted"));

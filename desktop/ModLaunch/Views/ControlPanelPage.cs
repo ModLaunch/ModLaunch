@@ -19,6 +19,11 @@ public sealed class ControlPanelPage : Page
 {
     public override string Title => I18n.T("cp.title");
 
+    /// <summary>15.0: панель живёт разделом в «Настройках» — без своей прокрутки и полей.</summary>
+    readonly bool _embedded;
+
+    public ControlPanelPage(bool embedded = false) => _embedded = embedded;
+
     bool _editing;
     static List<Storage.Part>? _parts;
     static DateTime _measuredAt;
@@ -126,7 +131,7 @@ public sealed class ControlPanelPage : Page
 
     public override void Build()
     {
-        var col = StoreKit.Fit(new StackPanel { Spacing = 22, Margin = new Thickness(40, 26, 40, 40), MaxWidth = 1640 });
+        var col = StoreKit.Fit(new StackPanel { Spacing = 22, Margin = _embedded ? new Thickness(0) : new Thickness(40, 26, 40, 40), MaxWidth = 1640 });
 
         // Приветствие и сводка.
         var hour = DateTime.Now.Hour;
@@ -143,7 +148,8 @@ public sealed class ControlPanelPage : Page
         head.Children.Add(Ui.Col(4, Ui.Text(hello, "h1"), Ui.Text(DateTime.Now.ToString("D", I18n.Culture), "muted")));
         col.Children.Add(head);
 
-        var stats = new UniformGrid { Columns = 5 };
+        // 15.0: в настройках места меньше — плитки в три колонки, чтобы подписи и цифры не обрезались.
+        var stats = new UniformGrid { Columns = _embedded ? 3 : 5 };
         stats.Children.Add(Stat(Icons.Gamepad, I18n.T("cp.s.games"), found.Count.ToString(I18n.Culture), () => W.Navigate(() => new LibraryPage())));
         stats.Children.Add(Stat(Icons.Package, I18n.T("cp.s.mods"), mods.ToString(I18n.Culture), () => W.Navigate(() => new ModsCenterPage())));
         stats.Children.Add(Stat(Icons.ArrowUp, I18n.T("cp.s.updates"), _checking ? "…" : _updates < 0 ? "—" : _updates.ToString(I18n.Culture), CheckUpdates,
@@ -167,7 +173,7 @@ public sealed class ControlPanelPage : Page
         {
             col.Children.Add(Ui.Text(I18n.T("cp.games"), "h2"));
             var games = Ui.Col(8);
-            foreach (var g in found.OrderByDescending(g => PlayTime.Get(g.Def.Id).LastPlayed ?? DateTime.MinValue).Take(8))
+            foreach (var g in found.OrderByDescending(g => Features.NewGames.Recent(g)).Take(8))
             {
                 var game = g;
                 var p = PlayTime.Get(g.Def.Id);
@@ -232,7 +238,7 @@ public sealed class ControlPanelPage : Page
         col.Children.Add(grid);
 
         col.Children.Add(Ui.Text(I18n.T("cp.keys"), "small muted", wrap: true));
-        Content = new ScrollViewer { Content = col, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+        Content = _embedded ? col : new ScrollViewer { Content = col, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
     }
 
     static Control Stat(string icon, string label, string value, Action? click, IBrush? color = null)

@@ -11,7 +11,7 @@ public static class Images
 {
     static readonly ConcurrentDictionary<string, Bitmap?> Memory = new();
     static readonly ConcurrentDictionary<string, Task<Bitmap?>> Pending = new();
-    static readonly SemaphoreSlim Parallel = new(6);
+    static readonly SemaphoreSlim Parallel = new(12);
 
     public static Bitmap? Asset(string name, int decodeWidth = 0)
     {
@@ -109,11 +109,19 @@ public static class Images
         return def.ArtUrl is null ? null : await FromUrl(def.ArtUrl, width);
     }
 
+    /// <summary>
+    /// Картинка по ссылке: память → диск → сеть. 15.0: своё соединение для картинок (12 одновременно,
+    /// на подключение 8 с, на всю картинку 20 с, одна повторная попытка). Раньше картинки шли по общему
+    /// клиенту с 30-минутным лимитом: несколько «зависших» адресов (часто — CDN, который медленно отвечает
+    /// из России) занимали все 6 мест, и остальные обложки модов не загружались вовсе. Неудача больше не
+    /// запоминается до перезапуска — через 2 минуты картинку можно попробовать снова.
+    /// </summary>
     public static Task<Bitmap?> FromUrl(string? url, int decodeWidth = 160)
     {
         if (string.IsNullOrEmpty(url)) return Task.FromResult<Bitmap?>(null);
         var key = $"{url}:{decodeWidth}";
-        if (Memory.TryGetValue(key, out var hit)) return Task.FromResult(hit);
+        if (Memory.TryGetValue(key, out var hit)) return Task.FromResult<Bitmap?>(hit);
+        if (Failed.TryGetValue(key, out var at) && DateTime.UtcNow - at < TimeSpan.FromMinutes(2)) return Task.FromResult<Bitmap?>(null);
         return Pending.GetOrAdd(key, _ => Task.Run(async () =>
         {
             var file = Path.Combine(Paths.CacheDir, "img", Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes(url))) + ".bin");
@@ -126,18 +134,66 @@ public static class Images
                     try
                     {
                         Directory.CreateDirectory(Path.GetDirectoryName(file)!);
-                        var bytes = await Http.Client.GetByteArrayAsync(url);
-                        await File.WriteAllBytesAsync(file, bytes);
+                        var bytes = await Fetch(url);
+                        if (bytes is not null && bytes.Length > 0)
+                        {
+                            var part = file + ".part";
+                            await File.WriteAllBytesAsync(part, bytes);
+                            File.Move(part, file, true);
+                        }
                     }
                     finally { Parallel.Release(); }
                 }
-                await using var stream = File.OpenRead(file);
-                bmp = Bitmap.DecodeToWidth(stream, decodeWidth);
+                if (File.Exists(file))
+                {
+                    await using var stream = File.OpenRead(file);
+                    bmp = Bitmap.DecodeToWidth(stream, decodeWidth);
+                }
             }
-            catch { try { File.Delete(file); } catch { } }
-            Memory[key] = bmp;
+            catch { try { File.Delete(file); } catch { } bmp = null; }
+            if (bmp is not null) { Memory[key] = bmp; Failed.TryRemove(key, out DateTime _); }
+            else Failed[key] = DateTime.UtcNow;
             Pending.TryRemove(key, out Task<Bitmap?>? _);
             return bmp;
         }));
+    }
+
+    static readonly ConcurrentDictionary<string, DateTime> Failed = new();
+
+    /// <summary>Клиент только для картинок: короткие лимиты, много соединений к одному CDN, браузерный Accept.</summary>
+    static readonly HttpClient Pictures = CreatePictures();
+
+    static HttpClient CreatePictures()
+    {
+        var handler = new SocketsHttpHandler
+        {
+            AutomaticDecompression = System.Net.DecompressionMethods.All,
+            ConnectTimeout = TimeSpan.FromSeconds(8),
+            PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+            MaxConnectionsPerServer = 8,
+        };
+        var client = new HttpClient(new Offline.Gate(handler)) { Timeout = TimeSpan.FromSeconds(20) };
+        client.DefaultRequestHeaders.UserAgent.ParseAdd($"Mozilla/5.0 (Windows NT 10.0; Win64; x64) ModLaunch/{Http.Version}");
+        client.DefaultRequestHeaders.Accept.ParseAdd("image/avif,image/webp,image/png,image/jpeg,image/*;q=0.8,*/*;q=0.5");
+        return client;
+    }
+
+    /// <summary>Скачать картинку: до двух попыток; 404 — сразу «нет».</summary>
+    static async Task<byte[]?> Fetch(string url)
+    {
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            try
+            {
+                using var response = await Pictures.GetAsync(url);
+                if (response.StatusCode is System.Net.HttpStatusCode.NotFound or System.Net.HttpStatusCode.Gone) return null;
+                if (!response.IsSuccessStatusCode) { await Task.Delay(400); continue; }
+                return await response.Content.ReadAsByteArrayAsync();
+            }
+            catch (OfflineException) { return null; }
+            catch when (attempt == 0) { await Task.Delay(400); }
+            catch { return null; }
+        }
+        return null;
     }
 }

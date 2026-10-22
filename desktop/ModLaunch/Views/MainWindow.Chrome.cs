@@ -29,7 +29,7 @@ public sealed partial class MainWindow
         return Ctx.Menu(
             hasAside ? Ctx.Item(asideOpen ? I18n.T("top.aside.hide") : I18n.T("top.aside.show"), Icons.Sidebar, ToggleAside, gesture: "Ctrl+I") : null,
             Ctx.Item(I18n.T("bp.open"), Icons.Tv, BigPictureWindow.Open, gesture: "F11"),
-            Ctx.Item(I18n.T("cp.title"), Icons.Grid, () => Navigate(() => new ControlPanelPage()), gesture: "Ctrl+Shift+P"),
+            Ctx.Item(I18n.T("cp.title"), Icons.Grid, () => Navigate(() => new SettingsPage("panel")), gesture: "Ctrl+Shift+P"),
             Ctx.Item(I18n.T("lib.title"), Icons.Layers, () => Navigate(() => new LibraryPage()), gesture: "Ctrl+L"),
             Ctx.Item(I18n.T("mc.title"), Icons.Package, () => Navigate(() => new ModsCenterPage()), gesture: "Ctrl+U"),
             Ctx.Item(Settings.Data.Bool("railHidden") ? I18n.T("top.rail.show") : I18n.T("top.rail.hide"), Icons.Layers, ToggleRail, gesture: "Ctrl+B"),
@@ -52,11 +52,14 @@ public sealed partial class MainWindow
 
     static void Reveal(Control c) => Animate.From(c, "translateY(-8px)", 260, 0, new QuinticEaseOut());
 
-    /// <summary>Реклама в шапке — только когда окну хватает ширины, чтобы не теснить поиск.</summary>
+    /// <summary>
+    /// 14.0: колонка рекламы справа — только на широком окне, когда не открыта панель сведений
+    /// и не скрыта «×». На узком окне страница важнее.
+    /// </summary>
     void UpdateAdVisibility()
     {
-        if (_adWrap is null) return;
-        _adWrap.IsVisible = Ads.Enabled && Bounds.Width / Math.Max(0.5, _appliedScale) >= 1400;
+        _adRail.IsVisible = Ads.Enabled && !AdSlot.SideClosed && !_asideHost.IsVisible
+            && Bounds.Width / Math.Max(0.5, _appliedScale) >= 1360 && _current is { Workspace: false };
     }
 
     /// <summary>Кольцо на кнопке загрузок: общий прогресс всего, что сейчас качается.</summary>

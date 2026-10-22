@@ -4,6 +4,7 @@ using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using ModLaunch.Core;
 
 namespace ModLaunch.Views;
@@ -105,8 +106,70 @@ public static class AdSlot
         return button;
     }
 
-    /// <summary>Широкий баннер: картинка или значок, заголовок, текст, кнопка и точки.</summary>
-    public static Control Banner()
+    /// <summary>
+    /// 14.0: на главной баннера больше нет — реклама живёт только в узкой колонке справа (Side),
+    /// чтобы не падать в глаза. Старые места вызова получают пустой невидимый элемент.
+    /// </summary>
+    public static Control Banner() => new Border { IsVisible = false };
+
+    /// <summary>Скрыто до перезапуска кнопкой «×» на самой колонке.</summary>
+    public static bool SideClosed { get; set; }
+
+    /// <summary>Ширина колонки (без отступов). Под неё рассчитаны картинки рекламодателей: 3:4, например 600×800.</summary>
+    public const double SideWidth = 184;
+
+    /// <summary>
+    /// 14.0: место под рекламу справа — тихая карточка у края окна: серая подпись «Реклама»,
+    /// картинка 3:4, заголовок и строка текста; без кнопок-призывов и движения, пока на неё не навели.
+    /// </summary>
+    public static Control Side(Action close)
+    {
+        var host = new Border
+        {
+            Classes = { "ad-side" }, Width = SideWidth, CornerRadius = new CornerRadius(10), ClipToBounds = true,
+            Background = Ui.Res("Surface"), BorderBrush = Ui.Res("Line"), BorderThickness = new Thickness(1),
+            Cursor = new Cursor(StandardCursorType.Hand), Opacity = 0.82, VerticalAlignment = VerticalAlignment.Top,
+        };
+        host.PointerEntered += (_, _) => host.Opacity = 1;
+        host.PointerExited += (_, _) => host.Opacity = 0.82;
+        Ad? current = null;
+        host.PointerPressed += (_, e) =>
+        {
+            if (current is not null && e.GetCurrentPoint(host).Properties.IsLeftButtonPressed && e.Source is Visual v && v.FindAncestorOfType<Button>(true) is null) Open(current);
+        };
+        Rotate(host, (ad, index, count) =>
+        {
+            current = ad;
+            var x = Ui.Button("", close, "icon ghost", Icons.Close, I18n.T("v14.ad.hide"));
+            x.Width = x.Height = 22;
+            x.Padding = new Thickness(0);
+            var head = new DockPanel { Margin = new Thickness(10, 6, 4, 6) };
+            DockPanel.SetDock(x, Dock.Right);
+            head.Children.Add(x);
+            head.Children.Add(new TextBlock
+            {
+                Text = (ad.House ? I18n.T("v14.ad.house") : I18n.T("ad.label")).ToUpper(I18n.Culture), FontSize = 9.5, LetterSpacing = 1, FontWeight = FontWeight.SemiBold,
+                Foreground = Ui.Res("Faint"), VerticalAlignment = VerticalAlignment.Center,
+            });
+            Control art = ad.Image is not null
+                ? new Border { Height = SideWidth * 4 / 3, ClipToBounds = true, Child = HomePage.WebArt(ad.Image, null, ad.Title, 400) }
+                : new Border { Height = 96, Background = Ui.Res("Surface2"), Child = Ui.Icon(IconFor(ad), 30, Ui.Res("Muted")) };
+            var title = new TextBlock { Text = ad.Title, FontSize = 13, FontWeight = FontWeight.SemiBold, TextWrapping = TextWrapping.Wrap, MaxLines = 2, TextTrimming = TextTrimming.CharacterEllipsis };
+            var text = new TextBlock { Text = ad.Text, FontSize = 11.5, Foreground = Ui.Res("Muted"), TextWrapping = TextWrapping.Wrap, MaxLines = 3, TextTrimming = TextTrimming.CharacterEllipsis };
+            var dots = Ui.Row(4);
+            for (var i = 0; i < count && count > 1; i++)
+                dots.Children.Add(new Border { Width = 4, Height = 4, CornerRadius = new CornerRadius(2), Background = i == index ? Ui.Res("Muted") : Ui.Res("Line") });
+            var words = Ui.Col(5, title, text, dots);
+            words.Margin = new Thickness(12, 10, 12, 12);
+            var col = new StackPanel { Children = { head, art, words } };
+            host.Child = col;
+            ToolTip.SetTip(host, ad.Url is not null && ad.Go is null ? ad.Url : null);
+        });
+        return host;
+    }
+
+    /// <summary>Широкий баннер 8.4 (оставлен для витрины «Разместить рекламу»).</summary>
+    public static Control WideBanner()
     {
         var host = new Border { Classes = { "ad-banner" }, ClipToBounds = true, Cursor = new Cursor(StandardCursorType.Hand) };
         Ad? current = null;

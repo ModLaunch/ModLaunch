@@ -42,7 +42,7 @@ public static class HubNav
     ];
 
     /// <summary>Вкладки, которые живут на странице рынка (остальные — в мастерской).</summary>
-    public static bool IsMarketTab(string id) => id is "store" or "browse" or "workshop" or "authors" or "queue" or "library" or "wishlist" or "wallet" or "studio";
+    public static bool IsMarketTab(string id) => id is "store" or "browse" or "workshop" or "authors" or "queue" or "library" or "wishlist" or "wallet" or "studio" or "commission";
 
     /// <summary>Все разделы и вкладки (для палитры команд): id, ключ названия, значок.</summary>
     public static IEnumerable<(string Id, string Key, string Icon)> Tabs =>
@@ -216,6 +216,13 @@ public static class HubNav
                 var b = Ui.Button(I18n.T(key), () => Open(tab, inPage), "hub-tab");
                 if (current == id) b.Classes.Add("active");
                 tabs.Children.Add(b);
+            }
+            // 14.0: комиссия рынка — вкладка владельца, остальные её не видят.
+            if (Social.Account.Owner)
+            {
+                var fee = Ui.Button(I18n.T("v14.mk.tab.commission"), () => Open("commission", inPage), "hub-tab");
+                if (current == "commission") fee.Classes.Add("active");
+                tabs.Children.Add(fee);
             }
             var inMore = ShopMore.FirstOrDefault(m => m.Id == current);
             var label = inMore.Id is null ? I18n.T("v13.hub.more") : I18n.T(inMore.Key);

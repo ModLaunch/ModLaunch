@@ -3,7 +3,7 @@
 import { test, before, after, beforeEach } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp, increment, collection, getDocs, query, where, arrayUnion, arrayRemove, deleteField } from 'firebase/firestore';
+import { collectionGroup, doc, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp, increment, collection, getDocs, query, where, arrayUnion, arrayRemove, deleteField } from 'firebase/firestore';
 
 const FEE = 10;
 let env;
@@ -42,7 +42,7 @@ async function walletOf(uid) {
 function next(prev, kind, amount) {
   const n = {
     balance: (prev.balance ?? 0) + amount,
-    earned: (prev.earned ?? 0) + (kind === 'sale' ? amount : 0),
+    earned: (prev.earned ?? 0) + (kind === 'sale' || kind === 'fee' ? amount : 0),
     spent: (prev.spent ?? 0) + (kind === 'purchase' ? -amount : 0),
     paidOut: (prev.paidOut ?? 0) + (kind === 'payout' || kind === 'payout-return' ? -amount : 0),
     toppedUp: (prev.toppedUp ?? 0) + (kind === 'topup' ? amount : 0),
@@ -81,12 +81,12 @@ beforeEach(async () => {
 });
 
 /** Покупка платного лота — одна пачка, как Market.Buy. */
-async function buy(who = BUYER, { amount = -PRICE, price = PRICE, claimed = false, withWallet = true, lot = LOT } = {}) {
+async function buy(who = BUYER, { amount = -PRICE, price = PRICE, claimed = false, withWallet = true, lot = LOT, feeValue = fee(price) } = {}) {
   const d = db(who);
   const prev = await walletOf(who.uid);
   const b = writeBatch(d);
   b.set(doc(d, 'market', lot, 'sales', who.uid), {
-    buyerName: 'Buyer', seller: SELLER.uid, title: 'Lot', price, fee: fee(price), claimed, created: serverTimestamp(),
+    buyerName: 'Buyer', seller: SELLER.uid, title: 'Lot', price, fee: feeValue, claimed, created: serverTimestamp(),
   });
   if (withWallet) ledger(b, d, who.uid, prev, 'purchase', amount, { ref: lot, party: SELLER.uid, by: who.uid });
   b.update(doc(d, 'market', lot), { sales: increment(1) });
@@ -497,4 +497,48 @@ test('группы: проекты команды — участники чит�
   // Удалить: тот, кто выложил последним, или владелец.
   await assertFails(deleteDoc(doc(db(BUYER), 'teams', TEAM, 'projects', 'seeds')));
   await assertSucceeds(deleteDoc(doc(db(SELLER), 'teams', TEAM, 'projects', 'seeds')));
+});
+
+// ---------------------------------------------------------------- 14.0: комиссия владельца
+
+async function takeFee(who = ADMIN, { amount = fee(PRICE), buyer = BUYER.uid } = {}) {
+  const d = db(who);
+  const prev = await walletOf(who.uid);
+  const b = writeBatch(d);
+  b.update(doc(d, 'market', LOT, 'sales', buyer), { feeTaken: true });
+  ledger(b, d, who.uid, prev, 'fee', amount, { ref: LOT, party: buyer, note: 'Lot', by: who.uid });
+  return b.commit();
+}
+
+test('комиссия: процент меняет только админ, 0–50, и покупка считается по нему', async () => {
+  const cfg = (who, over = {}) => setDoc(doc(db(who), 'config', 'market'), { fee: 20, by: who.uid, updated: serverTimestamp(), ...over });
+  await assertFails(cfg(SELLER, { by: SELLER.uid }));
+  await assertFails(cfg(ADMIN, { fee: 51 }));
+  await assertFails(cfg(ADMIN, { fee: 12.5 }));
+  await assertFails(cfg(ADMIN, { by: SELLER.uid }));
+  await assertFails(setDoc(doc(db(ADMIN), 'config', 'other'), { fee: 20, by: ADMIN.uid, updated: serverTimestamp() }));
+  await assertSucceeds(cfg(ADMIN));
+  await assertSucceeds(getDoc(doc(anon('anon9'), 'config', 'market')));
+  // Старые 10 % больше не проходят, новые 20 % — да.
+  await assertFails(buy());
+  await assertSucceeds(buy(BUYER, { feeValue: Math.floor(PRICE * 20 / 100) }));
+});
+
+test('комиссия: админ забирает долю с продажи один раз и ровно fee', async () => {
+  await assertSucceeds(buy());
+  await assertFails(takeFee(ADMIN, { amount: fee(PRICE) + 1 }));
+  await assertFails(takeFee(SELLER));
+  await assertSucceeds(takeFee(ADMIN));
+  const w = await walletOf(ADMIN.uid);
+  if (w.balance !== fee(PRICE) || w.earned !== fee(PRICE)) throw new Error(JSON.stringify(w));
+  await assertFails(takeFee(ADMIN));
+  // Продавец по-прежнему забирает свою выручку.
+  await assertSucceeds(claim());
+});
+
+test('комиссия: все продажи разом видит только админ', async () => {
+  await assertSucceeds(buy());
+  await assertSucceeds(getDocs(collectionGroup(db(ADMIN), 'sales')));
+  await assertFails(getDocs(collectionGroup(db(SELLER), 'sales')));
+  await assertFails(getDocs(collectionGroup(db(BUYER), 'sales')));
 });

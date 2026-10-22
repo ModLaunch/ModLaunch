@@ -12,7 +12,8 @@ using ModLaunch.Creator;
 namespace ModLaunch.Views;
 
 /// <summary>
-/// 13.0: раздел «ModScript» — язык снова на виду, отдельным пунктом слева. Четыре вкладки:
+/// 13.0: раздел «ModScript» — язык снова на виду, отдельным пунктом слева. 15.0: первой — «Студия»
+/// (<see cref="ModStudio"/>, среда разработки с инжектом), дальше прежние четыре:
 /// «Консоль» (пишете команды — справа сразу вывод, переменные и что получится в моде),
 /// «Команды» (все команды с поиском, «новое в 13.0», копировать или отправить в консоль),
 /// «Функции» (стандартная библиотека) и «ModScript X» (язык инжектов с песочницей, как в 11.0).
@@ -20,7 +21,7 @@ namespace ModLaunch.Views;
 public sealed partial class CreatorPage
 {
     /// <summary>Вкладка раздела ModScript: console, commands, functions, x.</summary>
-    string _ms = "console";
+    string _ms = "studio";
     string _msGroup = "";
     bool _msNewOnly;
     static string? _msText;
@@ -46,7 +47,7 @@ public sealed partial class CreatorPage
     List<Control> MsTabs()
     {
         var tabs = new List<Control>();
-        foreach (var (id, key) in new[] { ("console", "v13.ms.tab.console"), ("commands", "v13.ms.tab.commands"), ("functions", "v13.ms.tab.functions"), ("x", "v13.ms.tab.x") })
+        foreach (var (id, key) in new[] { ("studio", "v15.ms.tab.studio"), ("console", "v13.ms.tab.console"), ("commands", "v13.ms.tab.commands"), ("functions", "v13.ms.tab.functions"), ("x", "v13.ms.tab.x") })
         {
             var tab = id;
             var b = Ui.Button(I18n.T(key), () => { if (_ms == tab) return; _ms = tab; Build(); }, "hub-tab");
@@ -58,6 +59,7 @@ public sealed partial class CreatorPage
 
     Control ModScriptHub() => _ms switch
     {
+        "studio" => ModStudio.Host(),
         "commands" => Commands(),
         "functions" => LibraryDocs(),
         "x" => Lang(),

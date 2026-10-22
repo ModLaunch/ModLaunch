@@ -1,6 +1,7 @@
 # 12.0: справочник моддируемых игр (1000+) — снимок desktop/ModLaunch/Assets/gamedir.config.json.
 # Программа сама собирает его из открытых списков (игры Nexus, сообщества и схема Thunderstore):
 # ModLaunch --gen-directory. Раз в неделю, вручную и при правке сборщика; коммит — только если файл изменился.
+# 15.0: и все игры Steam (100 тыс.+) — Assets/steamgames.tsv.gz (ModLaunch --gen-steam).
 name: gamedir
 on:
   workflow_dispatch:
@@ -22,7 +23,7 @@ concurrency:
 jobs:
   generate:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -42,12 +43,25 @@ jobs:
         env:
           MODLAUNCH_DATA: ${{ runner.temp }}/modlaunch-data
         run: ./bin/Release/net8.0/linux-x64/ModLaunch --gen-directory Assets/gamedir.config.json
+      # Долго (поиск магазина по 100 игр за запрос), поэтому по расписанию — только в первый понедельник месяца.
+      # Секрет STEAM_API_KEY (необязательный) даёт официальный список магазина — быстрее и точнее.
+      # Сбой здесь не мешает обновить справочник: файл просто не меняется.
+      - name: Generate the Steam games list
+        continue-on-error: true
+        working-directory: desktop/ModLaunch
+        env:
+          MODLAUNCH_DATA: ${{ runner.temp }}/modlaunch-data
+          STEAM_API_KEY: ${{ secrets.STEAM_API_KEY }}
+        run: |
+          if [ "${{ github.event_name }}" = schedule ] && [ "$(date -u +%-d)" -gt 7 ]; then echo "monthly: skipped"; exit 0; fi
+          ./bin/Release/net8.0/linux-x64/ModLaunch --gen-steam Assets/steamgames.tsv.gz
       - name: Commit
         run: |
           git config user.name "$(git log -1 --format=%an)"
           git config user.email "$(git log -1 --format=%ae)"
           git add desktop/ModLaunch/Assets/gamedir.config.json
+          [ -f desktop/ModLaunch/Assets/steamgames.tsv.gz ] && git add desktop/ModLaunch/Assets/steamgames.tsv.gz
           git diff --cached --quiet && exit 0
-          git commit -m "Game directory: refresh snapshot from Nexus and Thunderstore"
+          git commit -m "Game directory: refresh snapshots (Nexus, Thunderstore, Steam)"
           # Пока шла сборка, в ветку могли запушить — догоняем и пушим ещё раз.
           git push || (git pull --rebase -q && git push)

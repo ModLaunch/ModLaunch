@@ -30,7 +30,7 @@ public sealed partial class LibraryPage : Page
     {
         "name" => games.OrderBy(g => g.Def.Name, StringComparer.CurrentCultureIgnoreCase),
         "time" => games.OrderByDescending(g => PlayTime.Get(g.Def.Id).TotalMs).ThenBy(g => g.Def.Name),
-        _ => games.OrderByDescending(g => PlayTime.Get(g.Def.Id).LastPlayed ?? DateTime.MinValue).ThenBy(g => g.Def.Name),
+        _ => games.OrderByDescending(g => Features.NewGames.Recent(g)).ThenBy(g => g.Def.Name),
     };
 
     bool InCollection(GameState g) => _collection switch
@@ -138,10 +138,7 @@ public sealed partial class LibraryPage : Page
                 : I18n.T("v12g.lib.more." + I18n.Plural(more, "one", "few", "many"), ("n", more.ToString("N0", I18n.Culture)));
             row.Children.Add(Link(query != "" ? Icons.Search : Icons.Plus, title, I18n.T("v12g.lib.more.hint"), () => MainWindow.Current?.Navigate(() => new AddGamePage(query))));
         }
-        // Все игры Steam — и без модов: играть через Steam, искать по всему магазину.
-        var steam = Games.SteamLibrary.Installed.Count;
-        if (steam > 0)
-            row.Children.Add(Link(Icons.Layers, I18n.T("v12w.steam.link") + " · " + steam.ToString("N0", I18n.Culture), I18n.T("v12w.steam.link.hint"), () => MainWindow.Current?.Navigate(() => new SteamGamesPage(query))));
+        // 15.1: отдельной страницы Steam нет — все игры Steam в каталоге ниже и в «Добавить игру».
         return row.Children.Count == 0 ? null : row;
     }
 
