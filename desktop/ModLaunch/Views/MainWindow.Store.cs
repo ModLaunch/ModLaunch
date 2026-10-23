@@ -287,7 +287,7 @@ public sealed partial class MainWindow
             "-",
             Ctx.Item(I18n.T("cp.title"), Icons.Grid, () => Navigate(() => new SettingsPage("panel")), gesture: "Ctrl+Shift+P"),
             Ctx.Item(I18n.T("nav.menu"), Icons.Home, () => Navigate(() => new HomePage())),
-            Ctx.Item("Creator Hub", Icons.Creator, () => Navigate(() => new MarketPage()), gesture: "Ctrl+Shift+C"),
+            Ctx.Item("Creator Hub", Icons.Creator, () => Navigate(() => new CreatorPage()), gesture: "Ctrl+Shift+C"),
             Ctx.Item("Minecraft", Icons.Cube, () => Navigate(() => new MinecraftPage()), gesture: "Ctrl+Shift+M"),
             Ctx.Item(I18n.T("acc.page"), Icons.User, () => Navigate(() => new AccountPage())),
             "-",
@@ -440,7 +440,7 @@ public sealed partial class MainWindow
         // 15.0: «Панель» ушла в настройки — «Игры» и «Моды» на панели всегда.
         _libraryButton.IsVisible = true;
         SetNav(_libraryButton, _current is LibraryPage or AddGamePage or GamePage or MinecraftPage or ModsCenterPage || _current is ModPage);
-        SetNav(_creatorButton, _current is MarketPage or CreatorPage or ListingPage or AuthorPage);
+        SetNav(_creatorButton, _current is MarketPage or CreatorPage or XStudio or ListingPage or AuthorPage);
 
 
         var view = Social.Friends.View();

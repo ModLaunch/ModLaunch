@@ -12,16 +12,16 @@ using ModLaunch.Creator;
 namespace ModLaunch.Views;
 
 /// <summary>
-/// 13.0: раздел «ModScript» — язык снова на виду, отдельным пунктом слева. 16.0: среда разработки — своя страница
-/// проекта (<see cref="XStudio"/>, кнопка «Среда ModScript X» в шапке раздела), здесь — четыре вкладки:
-/// «Консоль» (пишете команды — справа сразу вывод, переменные и что получится в моде),
-/// «Команды» (все команды с поиском, «новое в 13.0», копировать или отправить в консоль),
-/// «Функции» (стандартная библиотека) и «ModScript X» (язык инжектов с песочницей, как в 11.0).
+/// 13.0: раздел «ModScript» — язык снова на виду, отдельным пунктом слева. 18.0: вкладки раздела «Скрипты»
+/// после библиотеки — «Консоль» (пишете команды — справа сразу вывод, переменные и что получится в моде),
+/// «Команды» (все команды с поиском, «новое в 13.0», копировать или отправить в консоль) и «Функции»
+/// (стандартная библиотека). Среда ModScript X — только у проектов («Мои проекты»); старая вкладка «ModScript X»
+/// (песочница инжектов 11.0) и кнопка «Среда ModScript X» здесь повторяли её и убраны.
 /// </summary>
 public sealed partial class CreatorPage
 {
-    /// <summary>Вкладка раздела ModScript: console, commands, functions, x.</summary>
-    string _ms = "console";
+    /// <summary>Вкладка раздела «Скрипты»: library, console, commands, functions.</summary>
+    string _ms = "library";
     string _msGroup = "";
     bool _msNewOnly;
     static string? _msText;
@@ -47,25 +47,15 @@ public sealed partial class CreatorPage
     List<Control> MsTabs()
     {
         var tabs = new List<Control>();
-        foreach (var (id, key) in new[] { ("console", "v13.ms.tab.console"), ("commands", "v13.ms.tab.commands"), ("functions", "v13.ms.tab.functions"), ("x", "v13.ms.tab.x") })
+        foreach (var (id, key) in new[] { ("library", "v18.lib.tab"), ("console", "v13.ms.tab.console"), ("commands", "v13.ms.tab.commands"), ("functions", "v13.ms.tab.functions") })
         {
             var tab = id;
             var b = Ui.Button(I18n.T(key), () => { if (_ms == tab) return; _ms = tab; Build(); }, "hub-tab");
             if (_ms == id) b.Classes.Add("active");
             tabs.Add(b);
         }
-        // 16.0: среда ModScript X — последний проект или анкета нового.
-        tabs.Add(Ui.Button(I18n.T("v16.x.open"), () => MainWindow.Current?.Navigate(XStudio.Entry), "hub-tab", Icons.Code));
         return tabs;
     }
-
-    Control ModScriptHub() => _ms switch
-    {
-        "commands" => Commands(),
-        "functions" => LibraryDocs(),
-        "x" => Lang(),
-        _ => Console(),
-    };
 
     // ---------------------------------------------------------------- консоль
 
@@ -88,7 +78,6 @@ public sealed partial class CreatorPage
         };
         Render();
 
-        var run = Ui.Button(I18n.T("v13.ms.run"), Render, "primary", Icons.Play);
         var example = Ui.Button(I18n.T("v13.ms.example"), () => { ConsoleText = ConsoleExample(); Settings.Save(); Build(); }, "ghost", Icons.Undo);
         var toProject = Ui.Button(I18n.T("v13.ms.toProject"), () =>
         {
@@ -100,7 +89,8 @@ public sealed partial class CreatorPage
         }, "ghost", Icons.FilePlus);
         var file = Ui.Row(8, Ui.Dot(HubLook.Violet, 6), HubLook.MonoText("console.mls", 12, Ui.Res("Text")));
         var strip = new DockPanel { Margin = new Thickness(0, 0, 0, 8) };
-        var actions = Ui.Row(6, example, toProject, run);
+        // 18.0: «Запустить» убрана — консоль и так выполняется на лету, пока вы пишете.
+        var actions = Ui.Row(6, example, toProject);
         DockPanel.SetDock(actions, Dock.Right);
         strip.Children.Add(actions);
         file.VerticalAlignment = VerticalAlignment.Center;

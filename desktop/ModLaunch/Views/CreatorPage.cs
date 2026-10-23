@@ -24,7 +24,7 @@ public sealed partial class CreatorPage : Page
     public override string SearchHint => _tab switch
     {
         "examples" => I18n.T("v12h2.search.templates"),
-        "modscript" => I18n.T("v13.ms.search"),
+        "scripts" => _ms == "library" ? I18n.T("v18.lib.search") : I18n.T("v13.ms.search"),
         "codes" or "models" or "hub" => I18n.T("cr.search"),
         _ => I18n.T("v12h2.search.projects"),
     };
@@ -46,16 +46,17 @@ public sealed partial class CreatorPage : Page
     public CreatorPage(string tab = "home", string? project = null)
     {
         // 12.0: витрина и студия продаж живут на странице рынка (Go туда и ведёт); старые ссылки — на обзор проектов.
-        // 13.0: четыре раздела. Старые вкладки ведут в свои: справка и язык — в ModScript, «Мои» — в «Проекты».
+        // 18.0: «Мои проекты» → «Создать» (form) и «Доступные» (home); «Скрипты» — библиотека, консоль и справка.
+        // Старая среда ModScript X (x, inject, mxdev, ide) ведёт в «Доступные»: среда теперь только у проектов.
         _tab = tab switch
         {
-            "market" or "studio" or "mine" or "projects" => "home",
-            "docs" or "commands" => "modscript",
-            "inject" or "lang" or "x" => "modscript",
-            "console" or "functions" or "ide" => "modscript",
+            "market" or "studio" or "mine" or "projects" or "available" => "home",
+            "inject" or "lang" or "x" or "mxdev" or "ide" => "home",
+            "create" => "form",
+            "modscript" or "docs" or "commands" or "console" or "functions" or "injects" or "library" => "scripts",
             _ => tab,
         };
-        _ms = tab switch { "docs" or "commands" => "commands", "inject" or "lang" or "x" => "x", "functions" => "functions", "console" => "console", _ => _ms };
+        _ms = tab switch { "docs" or "commands" => "commands", "functions" => "functions", "console" => "console", _ => _ms };
         if (tab == "published") { _tab = "home"; _minePart = "published"; }
         if (project is not null) { _tab = "mine"; Open(Projects.Get(project)); }
         _code.TextChanged += () =>
@@ -77,7 +78,7 @@ public sealed partial class CreatorPage : Page
     /// с Обзора и «Моих» уводил в старый вид Hub, и фильтр проектов был недостижим.
     /// </summary>
     internal static string SearchTab(string tab, bool editing, string query) =>
-        query == "" ? tab : !editing && tab is "codes" or "models" or "examples" or "hub" or "modscript" ? tab : "home";
+        query == "" ? tab : !editing && tab is "codes" or "models" or "examples" or "hub" or "scripts" ? tab : "home";
 
     public override void Search(string text)
     {
@@ -155,16 +156,16 @@ public sealed partial class CreatorPage : Page
     /// 9.1 (по эскизу): главные вкладки — «Главная · Мои · Коды · Модели · Шаблоны».
     /// Hub, маркет, студия продавца и справка — справа «Ещё» и в выдвижной полоске у левого края.
     /// </summary>
-    /// <summary>Названия вкладок мастерской (для крошек и шапки). 13.0: «Проекты», «ModScript», «Команда» и редкие страницы.</summary>
+    /// <summary>Названия вкладок мастерской (для крошек и шапки). 18.0: «Создать», «Доступные», «Скрипты», «Команда» и редкие страницы.</summary>
     public static readonly (string Id, string Key, string Icon)[] MainTabs =
     [
-        ("home", "v13.hub.projects", Icons.Folder), ("modscript", "v13.hub.modscript", Icons.Code), ("team", "v13.hub.team", Icons.Users),
+        ("form", "v18.hub.create", Icons.Plus), ("home", "v18.hub.available", Icons.Grid), ("scripts", "v18.hub.scripts", Icons.Shield), ("team", "v13.hub.team", Icons.Users),
         ("codes", "v91.cr.tab.codes", Icons.Code), ("models", "v91.cr.tab.models", Icons.Cube), ("examples", "v91.cr.tab.templates", Icons.Wand),
     ];
 
     public static readonly (string Id, string Key, string Icon)[] MoreTabs =
     [
-        ("hub", "hub.tab", Icons.Globe), ("injects", "v11.hub.injects", Icons.Zap), ("mxdev", "v97.cr.tab.inject", Icons.Zap),
+        ("hub", "hub.tab", Icons.Globe),
     ];
 
     public string Tab => _tab;
@@ -175,11 +176,12 @@ public sealed partial class CreatorPage : Page
     {
         get
         {
-            // 9.3: Creator Hub — это рынок; здесь — «Создать» (свои моды, код, модели, шаблоны).
-            Action market = () => MainWindow.Current?.Navigate(() => new MarketPage());
-            if (_tab == "home") return [("Creator Hub", market), (I18n.T("v93.mk.create"), null)];
-            if (_tab == "form") return [("Creator Hub", market), (I18n.T("v13.hub.projects"), () => MainWindow.Current?.Navigate(() => new CreatorPage())), (I18n.T("v16.form.title"), null)];
-            return [("Creator Hub", market), (I18n.T("v93.mk.create"), () => MainWindow.Current?.Navigate(() => new CreatorPage())), (TabTitle(_tab), null)];
+            // 18.0: Creator Hub › Мои проекты › Создать / Доступные (› проект); остальные разделы — Creator Hub › раздел.
+            Action projects = () => MainWindow.Current?.Navigate(() => new CreatorPage());
+            var market = projects;
+            if (_tab is "home" or "mine" && _open is not null) return [("Creator Hub", market), (I18n.T("v18.hub.projects"), projects), (_open.Name, null)];
+            if (_tab is "home" or "mine" or "form" or "examples") return [("Creator Hub", market), (I18n.T("v18.hub.projects"), projects), (TabTitle(_tab), null)];
+            return [("Creator Hub", market), (TabTitle(_tab), null)];
         }
     }
 
@@ -187,7 +189,7 @@ public sealed partial class CreatorPage : Page
     internal static string HubTabOf(string tab) => tab switch
     {
         "hub" => "workshop",
-        "injects" or "codes" or "models" or "modscript" or "team" or "mxdev" => tab,
+        "codes" or "models" or "scripts" or "team" => tab,
         _ => "projects",
     };
 
@@ -209,38 +211,45 @@ public sealed partial class CreatorPage : Page
         var editing = _open is not null && _tab == "mine";
         var body = _tab switch
         {
-            "modscript" => ModScriptHub(),
+            "scripts" => ScriptsHub(),
             "team" => Team(),
             "examples" => Examples(),
             "codes" => Shelf("codes"),
             "models" => Shelf("models"),
             "hub" => HubView(),
-            "mxdev" => Injector(),
-            "injects" => Injects(),
-            "form" => Form(),
-            _ => editing ? Editor() : Mine(),
+            "form" => CreateView(),
+            _ => editing ? Editor() : Available(),
         };
-        // Своё пространство Hub: четыре раздела слева, шапка с одной главной кнопкой, сетка чертежа.
-        // Открытый проект: в шапке — его имя и вкладки «Код · Обзор»; в «Проектах» — «Проекты · Опубликованные»; в ModScript — его вкладки.
-        var sub = editing ? PaneTabs() : _tab is "home" or "mine" ? MineTabs() : _tab == "modscript" ? MsTabs() : null;
+        // Своё пространство Hub: «Мои проекты» и разделы слева, шапка с одной главной кнопкой, сетка чертежа.
+        // Открытый проект: в шапке — его имя и вкладки «Код · Обзор»; в «Доступных» — «Проекты · Опубликованные»; в «Скриптах» — его вкладки.
+        var sub = editing ? PaneTabs() : _tab is "home" or "mine" ? MineTabs() : _tab == "scripts" ? MsTabs() : null;
         Content = HubNav.Frame(HubTabOf(_tab), HubNav.RailOf(_tab, creator: true), editing ? _open!.Name : HubTitle(), body, sold: () => _ = LoadMarket(force: true), local: Rail, sub: sub,
-            action: _tab == "team" ? TeamAction() : _tab == "form" ? new Border() : null, lead: _tab == "form" ? I18n.T("v16.form.lead") : _tab == "modscript" ? I18n.T("v13.ms.lead", ("n", ModScriptCommands.All.Length), ("new", ModScriptCommands.NewCount)) : null);
+            action: _tab == "team" ? TeamAction() : _tab == "scripts" && _ms == "library" ? ImportAction() : null, lead: Lead());
     }
+
+    /// <summary>Строка под названием раздела — там, где без неё непонятно, что делать.</summary>
+    string? Lead() => _tab switch
+    {
+        "form" => I18n.T("v18.create.lead"),
+        "scripts" when _ms == "library" => I18n.T("v18.lib.lead"),
+        "scripts" => I18n.T("v13.ms.lead", ("n", ModScriptCommands.All.Length), ("new", ModScriptCommands.NewCount)),
+        _ => null,
+    };
 
     /// <summary>Название раздела в шапке Hub — так же, как пункт боковой панели.</summary>
     string HubTitle() => _tab switch
     {
-        "home" or "mine" => I18n.T("v13.hub.projects"),
-        "modscript" => "ModScript",
-        "form" => I18n.T("v16.form.title"),
+        "home" or "mine" => I18n.T("v18.hub.available"),
+        "scripts" => I18n.T("v18.hub.scripts"),
+        "form" => I18n.T("v18.hub.create"),
         _ => TabTitle(_tab),
     };
 
-    /// <summary>Разделы «Проекты», «ModScript» и «Команда» открываются здесь же, без новой страницы.</summary>
+    /// <summary>«Создать», «Доступные», «Скрипты» и «Команда» открываются здесь же, без новой страницы.</summary>
     bool Rail(string rail)
     {
-        var tab = rail switch { "projects" => "home", _ => rail };
-        if (tab is not ("home" or "modscript" or "team")) return false;
+        var tab = HubNav.CreatorTab(rail);
+        if (tab is not ("home" or "form" or "scripts" or "team")) return false;
         if (_dirty) Save(quiet: true);
         // «Мои проекты» из редактора — к списку (как «Назад»).
         _open = null;
@@ -251,8 +260,8 @@ public sealed partial class CreatorPage : Page
     }
 
     /// <summary>
-    /// «Создать» (шапка, «путь автора», палитра команд). 16.0: анкета нового проекта (<see cref="OpenForm"/>),
-    /// после неё — новая среда ModScript X. Старый мастер (main.mls, импорт) — ссылка внизу анкеты.
+    /// «Создать» (палитра команд, пустые «Доступные»). 16.0: анкета нового проекта (<see cref="OpenForm"/>),
+    /// после неё — среда ModScript X. 18.0: анкета — раздел «Мои проекты → Создать».
     /// </summary>
     public static void CreateNew() => OpenForm();
 }

@@ -140,7 +140,8 @@ public sealed partial class MainWindow : Window
         _statsButton = NavButton(Icons.Chart, "v92.nav.stats", () => Navigate(() => new StatsPage()));
         _donateButton = NavButton(Icons.Coffee, "v92.nav.donate", () => Navigate(() => new DonatePage()));
         // 9.3: Creator Hub снова на боковой панели — это рынок креаторов (MarketPage).
-        _creatorButton = NavButton(Icons.Creator, "Creator Hub", () => Navigate(() => new MarketPage()));
+        // 18.0: «Мои проекты» — главный пункт Creator Hub, кнопка ведёт в «Доступные» (магазин — пунктом слева).
+        _creatorButton = NavButton(Icons.Creator, "Creator Hub", () => Navigate(() => new CreatorPage()));
         _friendsBadge.Width = 9; _friendsBadge.Height = 9; _friendsBadge.CornerRadius = new CornerRadius(5);
         _friendsBadge.Background = Ui.Res("Good"); _friendsBadge.HorizontalAlignment = HorizontalAlignment.Right; _friendsBadge.VerticalAlignment = VerticalAlignment.Top;
         _updatePill.Click += (_, _) => ShowUpdate();
@@ -634,7 +635,7 @@ public sealed partial class MainWindow : Window
         var commands = new List<(string Title, string Icon, Action Run)>
         {
             (I18n.T("nav.menu"), Icons.Home, () => Navigate(() => new HomePage())),
-            ("Creator Hub", Icons.Creator, () => Navigate(() => new MarketPage())),
+            ("Creator Hub", Icons.Creator, () => Navigate(() => new CreatorPage())),
             (I18n.T("add.title"), Icons.Plus, () => Navigate(() => new AddGamePage())),
             (I18n.T("nav.settings"), Icons.Settings, () => Navigate(() => new SettingsPage())),
             (I18n.T("look.title"), Icons.Palette, () => Navigate(() => new SettingsPage("look"))),
@@ -895,7 +896,7 @@ public sealed partial class MainWindow : Window
         else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.OemComma) Navigate(() => new SettingsPage());
         else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.L) Navigate(() => new LibraryPage());
         else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.U) Navigate(() => new ModsCenterPage());
-        else if (e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift) && e.Key == Key.C) Navigate(() => new MarketPage());
+        else if (e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift) && e.Key == Key.C) Navigate(() => new CreatorPage());
         else if (e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift) && e.Key == Key.P) Navigate(() => new SettingsPage("panel"));
         else if (e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift) && e.Key == Key.M) Navigate(() => new MinecraftPage());
         else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.H) Navigate(() => new HomePage());
