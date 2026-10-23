@@ -306,7 +306,7 @@ public static partial class ScriptGuard
     }
 
     /// <summary>Тот же мод после разбора: шапка, общие переменные, хуки, функции и вставки (выражения — без учёта пробелов).</summary>
-    static bool Same(MX.ModxDoc a, MX.ModxDoc b) =>
+    internal static bool Same(MX.ModxDoc a, MX.ModxDoc b) =>
         a.Name == b.Name && a.Version == b.Version && a.Author == b.Author && a.About == b.About && a.Game == b.Game && a.Engine == b.Engine
         && a.Shared.Select(s => s.Name + "=" + s.Value?.ToJsonString()).SequenceEqual(b.Shared.Select(s => s.Name + "=" + s.Value?.ToJsonString()))
         && a.Hooks.Count == b.Hooks.Count && a.Hooks.Zip(b.Hooks).All(p => p.First.Event == p.Second.Event && SameBody(p.First.Body, p.Second.Body))

@@ -20,6 +20,22 @@ public sealed class Sandbox
         public bool Ok => Errors.All(e => e.Warning);
     }
 
+    /// <summary>
+    /// 19.0: кадр записи для отладчика среды — строка перед выполнением, где (событие и такт), цепочка функций,
+    /// значения переменных (кратко) и сколько строк вывода было к этому шагу. По кадрам можно идти назад и вперёд.
+    /// </summary>
+    public sealed record Frame(int Line, string Where, IReadOnlyList<string> Stack, IReadOnlyList<(string Name, string Value, bool Local)> Vars, int Output);
+
+    /// <summary>19.0: запись хода мода: первые Limit кадров и сколько раз выполнилась каждая строка (профилировщик).</summary>
+    public sealed class Trace(int limit = 5000)
+    {
+        public readonly int Limit = limit;
+        public readonly List<Frame> Frames = [];
+        public readonly Dictionary<int, int> Hits = [];
+        /// <summary>Кадров было больше Limit: дальше считаются только строки.</summary>
+        public bool Cut;
+    }
+
     enum Flow { Normal, Break, Continue, Return }
 
     sealed class StepLimit(string message = "too many steps: an endless loop?") : Exception(message);
@@ -45,6 +61,8 @@ public sealed class Sandbox
     readonly Stopwatch _clock = Stopwatch.StartNew();
     int _steps, _depth, _nest, _line;
     string _where = "";
+    Trace? _trace;
+    readonly List<string> _calls = [];
 
     Sandbox(ModxDoc doc, int maxSteps, int seed)
     {
@@ -55,9 +73,9 @@ public sealed class Sandbox
     }
 
     /// <summary>Выполнить мод. game — переменные игры до запуска; ticks — сколько раз вызвать tick.</summary>
-    public static Result Run(ModxDoc doc, IDictionary<string, object?>? game = null, int ticks = 3, int maxSteps = 200_000, int seed = 1)
+    public static Result Run(ModxDoc doc, IDictionary<string, object?>? game = null, int ticks = 3, int maxSteps = 200_000, int seed = 1, Trace? trace = null)
     {
-        var s = new Sandbox(doc, maxSteps, seed);
+        var s = new Sandbox(doc, maxSteps, seed) { _trace = trace };
         foreach (var (name, v) in doc.Shared) s._globals[name] = FromJson(v);
         if (game is not null) foreach (var (k, v) in game) s._globals[k] = v;
         if (doc.Natives.Count > 0) s._out.Add($"(native {string.Join(", ", doc.Natives.Select(n => n.Lang).Distinct())}: runs only inside the game)");
@@ -158,6 +176,7 @@ public sealed class Sandbox
         {
             Step();
             _line = n.S.Line;
+            if (_trace is not null) Record(locals);
             var s = n.S;
             switch (s.Kind)
             {
@@ -217,6 +236,31 @@ public sealed class Sandbox
         }
         return Flow.Normal;
     }
+
+    /// <summary>19.0: кадр для отладчика. Значения — кратко (длинный список не копируется целиком на каждом шаге).</summary>
+    void Record(Dictionary<string, object?> locals)
+    {
+        var t = _trace!;
+        t.Hits[_line] = t.Hits.GetValueOrDefault(_line) + 1;
+        if (t.Frames.Count >= t.Limit) { t.Cut = true; return; }
+        var vars = new List<(string, string, bool)>(locals.Count + _globals.Count);
+        foreach (var (k, v) in locals) vars.Add((k, Brief(v), true));
+        foreach (var (k, v) in _globals.Take(80)) if (!locals.ContainsKey(k)) vars.Add((k, Brief(v), false));
+        t.Frames.Add(new Frame(_line, _where, [.. _calls], vars, _out.Count));
+    }
+
+    /// <summary>Значение для отладчика: строка до 60 знаков, список и словарь — до 8 элементов и 3 уровней (список может содержать сам себя).</summary>
+    public static string Brief(object? v) => Brief(v, 0);
+
+    static string Brief(object? v, int depth) => v switch
+    {
+        string s => "\"" + (s.Length > 60 ? s[..60] + "…" : s) + "\"",
+        List<object?> when depth > 2 => "[…]",
+        Dictionary<string, object?> when depth > 2 => "{…}",
+        List<object?> l => "[" + string.Join(", ", l.Take(8).Select(x => Brief(x, depth + 1))) + (l.Count > 8 ? $", … {l.Count}]" : "]"),
+        Dictionary<string, object?> d => "{" + string.Join(", ", d.Take(8).Select(kv => kv.Key + ": " + Brief(kv.Value, depth + 1))) + (d.Count > 8 ? $", … {d.Count}}}" : "}"),
+        _ => Text(v),
+    };
 
     /// <summary>Тело if, while или for: ещё один уровень вложенности.</summary>
     Flow Block(List<Node> body, Dictionary<string, object?> locals)
@@ -556,12 +600,13 @@ public sealed class Sandbox
             var locals = new Dictionary<string, object?>(StringComparer.Ordinal);
             for (var i = 0; i < fn.Params.Count; i++) locals[fn.Params[i]] = i < a.Count ? a[i] : null;
             var line = _line;
+            _calls.Add(name);
             try
             {
                 _returned = null;
                 return Exec(Tree(fn.Body), locals) == Flow.Return ? _returned : null;
             }
-            finally { _depth--; _line = line; }
+            finally { _depth--; _line = line; _calls.RemoveAt(_calls.Count - 1); }
         }
         object? A(int i) => i < a.Count ? a[i] : throw new RunError($"{name}() needs {i + 1} arguments");
         switch (name)

@@ -12,6 +12,10 @@ public static class WhatsNew
 {
     static readonly (string Icon, string Key, Func<Page>? Open)[] Items =
     [
+        (Icons.Code, "new.v19.ide", XStudio.Entry),
+        (Icons.Bug, "new.v19.debug", XStudio.Entry),
+        (Icons.Alert, "new.v19.lint", XStudio.Entry),
+        (Icons.Keyboard, "new.v19.tools", XStudio.Entry),
         (Icons.Folder, "new.v18.projects", () => new CreatorPage("home")),
         (Icons.Code, "new.v18.studio", () => CreatorPage.NewForm()),
         (Icons.Shield, "new.v18.guard", () => new CreatorPage("scripts")),
@@ -157,7 +161,7 @@ public static class WhatsNew
             },
             Child = Ui.Col(2,
                 new TextBlock { Text = $"ModLaunch {Http.Version}", FontSize = 24, FontWeight = FontWeight.Bold, Foreground = Brushes.White },
-                new TextBlock { Text = I18n.T("new.v18.subtitle"), Foreground = new SolidColorBrush(Color.FromArgb(220, 255, 255, 255)), TextWrapping = TextWrapping.Wrap }),
+                new TextBlock { Text = I18n.T("new.v19.subtitle"), Foreground = new SolidColorBrush(Color.FromArgb(220, 255, 255, 255)), TextWrapping = TextWrapping.Wrap }),
         };
         w.Dialog(I18n.T("new.title"), new ScrollViewer { MaxHeight = 560, Content = Ui.Col(12, hero, list) }, 620,
             Ui.Button(I18n.T("new.ok"), w.CloseDialog, "primary", Icons.Check));

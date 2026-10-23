@@ -31,8 +31,19 @@ public sealed partial class ScriptEditor : UserControl
     /// <summary>15.0: курсор сдвинулся — (строка, столбец), для строки состояния студии.</summary>
     public event Action<int, int>? CaretMoved;
 
-    /// <summary>15.0: файл ModScript X (.modx) — подсказки его слов и встроенных функций, а не команд ModScript.</summary>
-    public bool Modx { get; init; }
+    /// <summary>
+    /// 15.0: файл ModScript X (.modx) — подсказки его слов и встроенных функций, а не команд ModScript.
+    /// 19.0: и всё понимание кода среды (ScriptEditor.Ide.cs).
+    /// </summary>
+    public bool Modx
+    {
+        get => _modx;
+        init
+        {
+            _modx = value;
+            if (value) SetupIde();
+        }
+    }
 
     public ScriptEditor()
     {
@@ -88,7 +99,13 @@ public sealed partial class ScriptEditor : UserControl
     public string Text
     {
         get => _editor.Text ?? "";
-        set => _editor.Document = new TextDocument(value ?? "");
+        set
+        {
+            // 19.0: у .modx документ тот же (к нему привязаны свёртки и точки останова) — меняется только текст.
+            if (!_modx) { _editor.Document = new TextDocument(value ?? ""); return; }
+            _editor.Document.Text = value ?? "";
+            _editor.Document.UndoStack.ClearAll();
+        }
     }
 
     public int CaretIndex
@@ -130,6 +147,7 @@ public sealed partial class ScriptEditor : UserControl
         var doc = _editor.Document;
         var line = doc.GetLineByOffset(_editor.CaretOffset);
         var before = doc.GetText(line.Offset, _editor.CaretOffset - line.Offset);
+        if (_modx) { IdeEntered(e.Text ?? "", before); return; }
         // Подсказываем команды, функции библиотеки, свои функции и переменные — по мере набора слова.
         if (e.Text == "$") { ShowVariables(); return; }
         var word = Regex.Match(before, @"(?<![\w$""])([A-Za-z_][\w.:]*)$");
@@ -187,6 +205,7 @@ public sealed partial class ScriptEditor : UserControl
     /// <summary>Ctrl+Пробел — подсказки по слову под курсором.</summary>
     public void Suggest()
     {
+        if (_modx) { IdeSuggest(force: true); return; }
         var doc = _editor.Document;
         var line = doc.GetLineByOffset(_editor.CaretOffset);
         var before = doc.GetText(line.Offset, _editor.CaretOffset - line.Offset);

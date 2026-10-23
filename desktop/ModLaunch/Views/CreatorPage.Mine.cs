@@ -187,7 +187,7 @@ public sealed partial class CreatorPage
         var w = MainWindow.Current;
         if (w is null) return;
         w.Dialog(I18n.T("v16.x.delete.title", ("name", p.Name)), Ui.Text(I18n.T("v16.x.delete.text"), "muted", wrap: true),
-            Ui.Button(I18n.T("cr.cancel"), w.CloseDialog, "ghost"),
+            Ui.Button(I18n.T("common.cancel"), w.CloseDialog, "ghost"),
             Ui.Button(I18n.T("ctx.delete"), () => { w.CloseDialog(); XProjects.Delete(p); Build(); }, "danger", Icons.Trash));
     }
 

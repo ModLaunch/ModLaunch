@@ -101,7 +101,7 @@ public sealed partial class CreatorPage
         },
     };
 
-    /// <summary>ModScript X против обычного редактора кода: шесть вещей, которых у редактора нет.</summary>
+    /// <summary>ModScript X против обычного редактора кода: восемь вещей, которых у редактора нет.</summary>
     static Control Compare()
     {
         var table = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,72,72"), RowSpacing = 0 };
@@ -120,10 +120,12 @@ public sealed partial class CreatorPage
         x.Margin = other.Margin = new Thickness(0, 0, 0, 8);
         Cell(x, 0, 1);
         Cell(other, 0, 2);
-        for (var i = 1; i <= 6; i++)
+        // 19.0: ещё две строки — отладчик с шагами назад и проверка до запуска.
+        string[] rows = ["v18.cmp.1", "v18.cmp.2", "v18.cmp.3", "v19.cmp.debug", "v19.cmp.lint", "v18.cmp.4", "v18.cmp.5", "v18.cmp.6"];
+        for (var i = 1; i <= rows.Length; i++)
         {
             table.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
-            var line = new Border { BorderBrush = HubLook.Edge, BorderThickness = new Thickness(0, 1, 0, 0), Padding = new Thickness(0, 6), Child = Ui.Text(I18n.T($"v18.cmp.{i}"), "small") };
+            var line = new Border { BorderBrush = HubLook.Edge, BorderThickness = new Thickness(0, 1, 0, 0), Padding = new Thickness(0, 6), Child = Ui.Text(I18n.T(rows[i - 1]), "small") };
             Cell(line, i, 0);
             var yes = new Border { BorderBrush = HubLook.Edge, BorderThickness = new Thickness(0, 1, 0, 0), Child = Ui.Icon(Icons.Check, 15, HubLook.Cyan) };
             var no = new Border { BorderBrush = HubLook.Edge, BorderThickness = new Thickness(0, 1, 0, 0), Child = HubLook.MonoText("—", 12, Ui.Res("Faint")) };
