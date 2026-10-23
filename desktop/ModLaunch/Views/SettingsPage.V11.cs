@@ -165,12 +165,13 @@ public sealed partial class SettingsPage
             };
             var th = theme;
             var b = new Button { Padding = new Thickness(0), Background = Brushes.Transparent, BorderThickness = new Thickness(0), Content = sample };
-            b.Click += (_, _) => { Look.SetTheme(th); Settings.Data.Remove("config"); Settings.Save(); Build(); };
+            // 17.0: смена темы сама перерисовывает страницу (Look.Changed) — второй Build() удваивал задержку клика.
+            b.Click += (_, _) => { Settings.Data.Remove("config"); Look.SetTheme(th); };
             themes.Children.Add(b);
         }
 
         var accents = new WrapPanel();
-        var list = Look.Accents.Take(20).ToList();
+        var list = Look.Accents.ToList();
         list.Insert(0, GoldAccent);
         foreach (var hex in list.Distinct())
         {
@@ -181,7 +182,7 @@ public sealed partial class SettingsPage
                 Width = 28, Height = 28, CornerRadius = new CornerRadius(14), Background = Ui.Hex(hex), Margin = new Thickness(0, 0, 8, 8),
                 BorderBrush = on ? Ui.Res("Text") : Brushes.Transparent, BorderThickness = new Thickness(on ? 3 : 0), Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand),
             };
-            StoreKit.OnClick(dot, () => { Look.SetAccent(h); Settings.Data.Remove("config"); Settings.Save(); Build(); });
+            StoreKit.OnClick(dot, () => { Settings.Data.Remove("config"); Look.SetAccent(h); });
             accents.Children.Add(dot);
         }
         var accentBox = new TextBox { Text = Look.Accent, Width = 100, FontFamily = new FontFamily("Consolas, monospace"), VerticalAlignment = VerticalAlignment.Top };
@@ -189,7 +190,7 @@ public sealed partial class SettingsPage
         {
             var hex = (accentBox.Text ?? "").Trim();
             if (!hex.StartsWith('#')) hex = "#" + hex;
-            if (hex.Length == 7 && Color.TryParse(hex, out _) && !hex.Equals(Look.Accent, StringComparison.OrdinalIgnoreCase)) { Look.SetAccent(hex.ToUpperInvariant()); Settings.Data.Remove("config"); Settings.Save(); Build(); }
+            if (hex.Length == 7 && Color.TryParse(hex, out _) && !hex.Equals(Look.Accent, StringComparison.OrdinalIgnoreCase)) { Settings.Data.Remove("config"); Look.SetAccent(hex.ToUpperInvariant()); }
         };
         accents.Children.Add(accentBox);
         return Section(I18n.T("v11.set.theme"), I18n.T("look.theme.hint"), themes, Ui.Col(8, Ui.Text(I18n.T("look.accent"), "h3"), accents));
@@ -199,14 +200,14 @@ public sealed partial class SettingsPage
     Control SizeSection()
     {
         var scales = new WrapPanel();
-        var auto = Ui.Button(I18n.T("look.scale.auto"), () => { Look.SetAutoScale(); Build(); }, Look.AutoScale ? "chip active" : "chip", Icons.Sparkles);
+        var auto = Ui.Button(I18n.T("look.scale.auto"), Look.SetAutoScale, Look.AutoScale ? "chip active" : "chip", Icons.Sparkles);
         auto.Margin = new Thickness(0, 0, 6, 6);
         ToolTip.SetTip(auto, I18n.T("look.scale.auto.hint"));
         scales.Children.Add(auto);
         foreach (var k in Look.Scales.Concat([1.4]))
         {
             var kk = k;
-            var chip = Ui.Button($"{k * 100:0}%", () => { Look.SetScale(kk); Build(); }, "chip");
+            var chip = Ui.Button($"{k * 100:0}%", () => Look.SetScale(kk), "chip");
             if (!Look.AutoScale && Math.Abs(Look.Scale - k) < 0.001) chip.Classes.Add("active");
             chip.Margin = new Thickness(0, 0, 6, 6);
             scales.Children.Add(chip);
@@ -345,12 +346,12 @@ public sealed partial class SettingsPage
             cell.Width = 196;
             colors.Children.Add(cell);
         }
-        var radius = Segments(Look.Radii.Select(x => (x, I18n.T("v10.radius." + x))).ToArray(), Look.Radius, v => { Look.SetRadius(v); Settings.Data.Remove("config"); Settings.Save(); Build(); });
+        var radius = Segments(Look.Radii.Select(x => (x, I18n.T("v10.radius." + x))).ToArray(), Look.Radius, v => { Settings.Data.Remove("config"); Look.SetRadius(v); });
         var backdrops = new WrapPanel();
         foreach (var bd in Look.Backdrops)
         {
             var v = bd;
-            var chip = Ui.Button(I18n.T("look.bg." + bd), () => { Look.SetBackdrop(v); Build(); }, Look.Backdrop == bd ? "chip active" : "chip");
+            var chip = Ui.Button(I18n.T("look.bg." + bd), () => Look.SetBackdrop(v), Look.Backdrop == bd ? "chip active" : "chip");
             chip.Margin = new Thickness(0, 0, 6, 6);
             backdrops.Children.Add(chip);
         }
@@ -364,7 +365,7 @@ public sealed partial class SettingsPage
             Toggle(I18n.T("v10.fx.scan"), I18n.T("v10.fx.scan.hint"), Look.Scanlines, v => { Look.SetEffect("fxScanlines", v); Settings.Data.Remove("config"); }),
             Toggle(I18n.T("v10.fx.vignette"), I18n.T("v10.fx.vignette.hint"), Look.Vignette, v => { Look.SetEffect("fxVignette", v); Settings.Data.Remove("config"); }),
             // Только оформление: раскладка главной, картинка на ней и анимации остаются свои.
-            Ui.Button(I18n.T("look.reset"), () => { Configs.Apply(Look.Pro("widget", "home_hero", "anim_open", "anim_launch")); Build(); }, "ghost", Icons.Undo));
+            Ui.Button(I18n.T("look.reset"), () => Configs.Apply(Look.Pro("widget", "home_hero", "anim_open", "anim_launch")), "ghost", Icons.Undo));
         var expander = new Expander
         {
             Header = Ui.Col(2, Ui.Text(I18n.T("v11.set.fine"), "h3"), Ui.Text(I18n.T("v11.set.fine.hint"), "small muted", wrap: true)),

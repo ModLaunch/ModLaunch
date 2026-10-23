@@ -187,13 +187,14 @@ public sealed partial class ProfilePage : Page
         var name = ProfileKit.PlayerName();
         var col = Ui.Col(18, Ui.Text(I18n.T("v99.rewards.text"), "muted", wrap: true));
         var catalog = Cosmetics.Catalog(all);
-        foreach (var kind in Cosmetics.Kinds)
+        foreach (var kind in Cosmetics.Shelves)
         {
             var items = catalog.Where(x => x.Reward.Kind == kind).OrderByDescending(x => unlocked.Contains(x.Reward.Key)).ToList();
             if (items.Count == 0) continue;
             var open = items.Count(x => unlocked.Contains(x.Reward.Key));
             var wrap = new WrapPanel();
-            foreach (var (r, from) in items) wrap.Children.Add(RewardCard(r, from, unlocked, name));
+            // 17.0: сотня карточек — порциями: первые ряды сразу, остальные между кадрами.
+            Ui.Fill(wrap, items.Select(x => (Func<Control>)(() => RewardCard(x.Reward, x.From, unlocked, name))).ToList(), first: 8, step: 8);
             col.Children.Add(Ui.Col(10, Ui.Row(10, Ui.Text(I18n.T($"v99.kind.{kind}.many"), "h2"), Gx.Tag($"{open} / {items.Count}", Ui.Res("Surface3"))), wrap));
         }
         return col;
@@ -214,10 +215,17 @@ public sealed partial class ProfilePage : Page
                 : have ? (from is null ? I18n.T("v99.rewards.starter") : from.Title) : I18n.T("v99.rewards.locked", ("ach", from?.Title ?? "")),
             FontSize = 11.5, Foreground = Ui.Res("Muted"), TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap, MaxLines = 2, TextTrimming = TextTrimming.CharacterEllipsis,
         };
-        Control action = have
-            ? Ui.Button(on ? I18n.T(r.Kind == "badge" ? "v99.rewards.remove" : "v99.rewards.on") : I18n.T(r.Kind == "badge" ? "v99.rewards.show" : "v99.rewards.wear"),
-                () => { if (on && r.Kind != "badge") return; Cosmetics.Toggle(r); MainWindow.Current?.CurrentPage?.Build(); MainWindow.Current?.RefreshAccount(); }, on ? "" : "primary", on ? Icons.Check : null)
-            : Ui.Row(6, Ui.Icon(Icons.Lock, 13, Ui.Res("Faint")), Ui.Text(I18n.T("v99.rewards.closed"), "small muted"));
+        Control action = !have ? Ui.Row(6, Ui.Icon(Icons.Lock, 13, Ui.Res("Faint")), Ui.Text(I18n.T("v99.rewards.closed"), "small muted"))
+            // 17.0: сборка создателя применяется (как конфиг); страницу перерисует смена оформления.
+            : r.Kind == "config"
+                ? Ui.Button(on ? I18n.T("v17.cb.on") : I18n.T("v10.set.apply"), () =>
+                {
+                    if (on) return;
+                    Cosmetics.Toggle(r);
+                    MainWindow.Current?.Toast(I18n.T("v17.cb.applied", ("name", Cosmetics.Name(r))));
+                }, on ? "" : "primary", on ? Icons.Check : null)
+                : Ui.Button(on ? I18n.T(r.Kind == "badge" ? "v99.rewards.remove" : "v99.rewards.on") : I18n.T(r.Kind == "badge" ? "v99.rewards.show" : "v99.rewards.wear"),
+                    () => { if (on && r.Kind != "badge") return; Cosmetics.Toggle(r); MainWindow.Current?.CurrentPage?.Build(); MainWindow.Current?.RefreshAccount(); }, on ? "" : "primary", on ? Icons.Check : null);
         action.HorizontalAlignment = HorizontalAlignment.Center;
         var body = Ui.Col(8, new Border { Height = 70, Child = preview }, title, sub, action);
         return new Border

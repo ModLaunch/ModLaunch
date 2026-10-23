@@ -36,17 +36,30 @@ public static class LevelRoad
         return list;
     }
 
+    /// <summary>
+    /// 17.0: вторая дорожка — личные сборки настроек от создателей (Core/CreatorBuilds). На своих уровнях они
+    /// открываются вместе с обычной наградой, на пути видны значком-шестерёнкой у ступени.
+    /// </summary>
+    public static readonly IReadOnlyList<(int Level, Reward Reward)> Bonus =
+        CreatorBuilds.All.Select(b => (b.Level, new Reward("config", b.Id))).ToList();
+
+    /// <summary>Обе дорожки по порядку уровней.</summary>
+    static IEnumerable<(int Level, Reward Reward)> Both => Road.Concat(Bonus).OrderBy(x => x.Level);
+
+    /// <summary>Сборка создателя на этом уровне (null — нет).</summary>
+    public static Reward? BonusAt(int level) => Bonus.FirstOrDefault(x => x.Level == level).Reward;
+
     /// <summary>На каком уровне открывается награда (null — не с пути уровней).</summary>
     public static int? LevelOf(Reward r)
     {
-        foreach (var (level, reward) in Road) if (reward == r) return level;
+        foreach (var (level, reward) in Both) if (reward == r) return level;
         return null;
     }
 
     /// <summary>Большие ступени (каждый 5-й уровень) — для подсветки на пути.</summary>
     public static bool Milestone(int level) => level % 5 == 0;
 
-    public static IEnumerable<Reward> Unlocked(int level) => Road.Where(x => x.Level <= level).Select(x => x.Reward);
+    public static IEnumerable<Reward> Unlocked(int level) => Both.Where(x => x.Level <= level).Select(x => x.Reward);
 
     /// <summary>До какого уровня награды уже забраны. В первый раз — текущий: старые уровни не сыплют «новыми».</summary>
     public static int Seen(int level)
@@ -64,7 +77,7 @@ public static class LevelRoad
     public static List<(int Level, Reward Reward)> Fresh(int level)
     {
         var seen = Seen(level);
-        return Road.Where(x => x.Level > seen && x.Level <= level).ToList();
+        return Both.Where(x => x.Level > seen && x.Level <= level).ToList();
     }
 
     /// <summary>Забрать всё открытое; лучшее новое надевается само, если ничего своего не надето.</summary>
@@ -97,7 +110,10 @@ public static class LevelRoad
             || Road.Count(x => x.Reward.Kind == "title") != Titles.Length || Road.Count(x => x.Reward.Kind == "badge") != Badges.Length)
             throw new Exception("every name used once");
         if (LevelOf(new Reward("frame", "ruby")) != 5 || LevelOf(new Reward("frame", "gold")) is not null) throw new Exception("level of");
-        if (Unlocked(4).Count() != 3 || Around(1, 6)[0].Level != 2 || Around(Max, 6).Count != 6 || Around(12, 6)[0].Level != 11) throw new Exception("around");
-        return $"{Road.Count} rewards on levels 2–{Max}, each once";
+        if (Unlocked(4).Count() != 3 + Bonus.Count(x => x.Level <= 4) || Around(1, 6)[0].Level != 2 || Around(Max, 6).Count != 6 || Around(12, 6)[0].Level != 11) throw new Exception("around");
+        if (LevelOf(new Reward("config", CreatorBuilds.All[0].Id)) != CreatorBuilds.All[0].Level || BonusAt(CreatorBuilds.All[0].Level) is null || BonusAt(2) is not null)
+            throw new Exception("creator builds on the road");
+        if (Unlocked(Max).Count() != Road.Count + Bonus.Count) throw new Exception("both tracks unlock");
+        return $"{Road.Count} rewards on levels 2–{Max}, each once; {Bonus.Count} creator builds on the second track";
     }
 }

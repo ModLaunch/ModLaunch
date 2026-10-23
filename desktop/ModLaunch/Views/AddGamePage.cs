@@ -235,11 +235,14 @@ public sealed class AddGamePage : Page
         var installed = new Dictionary<string, FoundGame>(StringComparer.OrdinalIgnoreCase);
         foreach (var f in _found ?? []) if (f.Dir is not null) installed.TryAdd(f.Dir.Key, f);
         var lines = new StackPanel();
-        foreach (var d in rows.Take(_shown))
+        // 17.0: строки справочника — порциями (видимые сразу, остальные между кадрами).
+        var make = rows.Take(_shown).Select((d, i) => (Func<Control>)(() =>
         {
-            if (lines.Children.Count > 0) lines.Children.Add(new Border { Height = 1, Background = Ui.Res("Line"), Margin = new Thickness(62, 0, 0, 0) });
-            lines.Children.Add(new Border { Padding = new Thickness(2, 10), Child = DirRow(d, installed.GetValueOrDefault(d.Key), existing(d)) });
-        }
+            var row = new Border { Padding = new Thickness(2, 10), Child = DirRow(d, installed.GetValueOrDefault(d.Key), existing(d)) };
+            if (i == 0) return row;
+            return new StackPanel { Children = { new Border { Height = 1, Background = Ui.Res("Line"), Margin = new Thickness(62, 0, 0, 0) }, row } };
+        })).ToList();
+        Ui.Fill(lines, make);
         _list.Children.Add(Ui.Card(lines, 12));
         if (rows.Count > _shown)
         {

@@ -146,25 +146,40 @@ public static class Ui
     /// <summary>Иконка: контур в квадрате 24×24, масштабируется целиком (и прямые линии тоже).</summary>
     public static Control Icon(string data, double size = 18, IBrush? stroke = null, bool fill = false)
     {
-        var path = new Path
+        var icon = new IconView(data) { Width = size, Height = size, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
+        if (fill) icon.Fill = stroke ?? Res("Text");
+        else icon.Stroke = stroke;
+        return icon;
+    }
+
+    static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Panel, object> Fills = new();
+
+    /// <summary>
+    /// 17.0: длинный список — порциями. Первые first строк сразу (их видно на экране), остальные — по step
+    /// в фоне, между кадрами: клик по разделу отзывается сразу, а не после постройки сотни карточек.
+    /// Новый вызов для той же панели (перестройка, поиск) останавливает прежнюю досборку.
+    /// </summary>
+    public static void Fill(Panel host, IReadOnlyList<Func<Control>> rows, int first = 12, int step = 10)
+    {
+        var run = new object();
+        Fills.AddOrUpdate(host, run);
+        // Перестройка прокрученной страницы (нашлась игра, пришли данные) — всё сразу, иначе короткий
+        // поначалу список сбросил бы прокрутку. Порциями — только при открытии страницы.
+        var scrolled = MainWindow.Current?.CurrentPage is { } page
+            && Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(page).OfType<ScrollViewer>().Any(sv => sv.Offset.Y > 150);
+        var next = scrolled ? rows.Count : Math.Min(first, rows.Count);
+        for (var i = 0; i < next; i++) host.Children.Add(rows[i]());
+        if (next >= rows.Count) return;
+        void Step()
         {
-            Data = Geometry.Parse(data),
-            StrokeThickness = 2,
-            StrokeLineCap = PenLineCap.Round,
-            StrokeJoin = PenLineJoin.Round,
-        };
-        if (fill) path.Fill = stroke ?? Res("Text");
-        else if (stroke is not null) path.Stroke = stroke;
-        else path.Bind(Shape.StrokeProperty, new Avalonia.Data.Binding("Foreground") { RelativeSource = new Avalonia.Data.RelativeSource(Avalonia.Data.RelativeSourceMode.FindAncestor) { AncestorType = typeof(TemplatedControl) } });
-        return new Viewbox
-        {
-            Width = size,
-            Height = size,
-            Stretch = Stretch.Uniform,
-            VerticalAlignment = VerticalAlignment.Center,
-            HorizontalAlignment = HorizontalAlignment.Center,
-            Child = new Canvas { Width = 24, Height = 24, Children = { path } },
-        };
+            if (!Fills.TryGetValue(host, out var now) || now != run) return;
+            // Страницу уже сменили — дособирать некому.
+            if (Avalonia.VisualTree.VisualExtensions.GetVisualRoot(host) is null) return;
+            var end = Math.Min(rows.Count, next + step);
+            for (; next < end; next++) host.Children.Add(rows[next]());
+            if (next < rows.Count) Avalonia.Threading.Dispatcher.UIThread.Post(Step, Avalonia.Threading.DispatcherPriority.Background);
+        }
+        Avalonia.Threading.Dispatcher.UIThread.Post(Step, Avalonia.Threading.DispatcherPriority.Background);
     }
 
     public static TextBlock Text(string text, string classes = "", double? size = null, IBrush? color = null, bool wrap = false)

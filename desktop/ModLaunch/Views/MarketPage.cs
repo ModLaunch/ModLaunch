@@ -133,14 +133,18 @@ public sealed partial class MarketPage : Page
             return col;
         }
         var forYou = MarketLocal.ForYou(all, MyGames());
-        col.Children.Add(Featured(forYou.Take(6).ToList()));
-        col.Children.Add(Categories(all));
-        col.Children.Add(Ui.Col(14, Section(I18n.T("v93.mk.forYou"), () => { _sort = "popular"; Go("browse"); }, eyebrow: I18n.T("v93.mk.forYou.eyebrow")),
-            StoreKit.Shelf(forYou.Skip(2).Take(12).Select(l => MarketTiles.Card(l)))));
-        col.Children.Add(Tabbed(all));
+        // 17.0: витрина — полки порциями: первые две (их видно сразу) строятся сразу, остальные между кадрами.
+        var parts = new List<Func<Control>>
+        {
+            () => Featured(forYou.Take(6).ToList()),
+            () => Categories(all),
+            () => Ui.Col(14, Section(I18n.T("v93.mk.forYou"), () => { _sort = "popular"; Go("browse"); }, eyebrow: I18n.T("v93.mk.forYou.eyebrow")),
+                StoreKit.Shelf(forYou.Skip(2).Take(12).Select(l => MarketTiles.Card(l)))),
+            () => Tabbed(all),
+        };
         var authors = MarketLocal.Authors(all, MarketData.Mods);
-        if (authors.Count > 0) col.Children.Add(Ui.Col(14, Section(I18n.T("v93.mk.authorsWeek"), () => Go("authors")), AuthorRow(authors.Take(4).ToList())));
-        if (MarketData.Mods.Any()) col.Children.Add(WorkshopShelf());
+        if (authors.Count > 0) parts.Add(() => Ui.Col(14, Section(I18n.T("v93.mk.authorsWeek"), () => Go("authors")), AuthorRow(authors.Take(4).ToList())));
+        if (MarketData.Mods.Any()) parts.Add(WorkshopShelf);
         var mine = MyGames();
         var byGame = all.Where(l => mine.Contains(l.Game)).GroupBy(l => l.Game).OrderByDescending(g => g.Count()).Take(3).ToList();
         foreach (var g in byGame)
@@ -148,10 +152,11 @@ public sealed partial class MarketPage : Page
             var id = g.Key;
             var def = GameCatalog.ById(id);
             if (def is null) continue;
-            col.Children.Add(Ui.Col(14, Section(I18n.T("v93.mk.forGame", ("game", def.Name)), () => { _game = id; _kinds.Clear(); _price = "all"; Go("browse"); }),
+            parts.Add(() => Ui.Col(14, Section(I18n.T("v93.mk.forGame", ("game", def.Name)), () => { _game = id; _kinds.Clear(); _price = "all"; Go("browse"); }),
                 StoreKit.Shelf(g.OrderByDescending(l => l.Sales).Select(l => MarketTiles.Card(l, 248)))));
         }
-        col.Children.Add(Become());
+        parts.Add(Become);
+        Ui.Fill(col, parts, first: 2, step: 1);
         return col;
     }
 

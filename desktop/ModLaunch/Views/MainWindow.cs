@@ -1122,7 +1122,9 @@ public sealed partial class MainWindow : Window
             BoxShadow = BoxShadows.Parse("0 24 70 0 #99000000"),
             // Диалог — всегда непрозрачный, даже при стеклянных карточках.
             Background = Ui.Res("Surface"),
-            Child = Ui.Col(16, Ui.Text(title, "h2", wrap: true), body, buttons),
+            // 17.0: длинное окно не уходит за край — заголовок и кнопки на месте, середина прокручивается.
+            MaxHeight = Math.Max(320, Bounds.Height - 72),
+            Child = DialogLayout(Ui.Text(title, "h2", wrap: true), body, buttons),
         };
         var shade = new Border { Background = new SolidColorBrush(Color.Parse("#99000000")) };
         shade.PointerPressed += (_, _) => CloseDialog();
@@ -1132,6 +1134,16 @@ public sealed partial class MainWindow : Window
         _overlay.IsVisible = true;
         Animate.Pop(card);
         Animate.From(shade, "none", 220);
+    }
+
+    static DockPanel DialogLayout(Control title, Control body, Control buttons)
+    {
+        title.Margin = new Thickness(0, 0, 0, 16);
+        buttons.Margin = new Thickness(0, 16, 0, 0);
+        DockPanel.SetDock(title, Dock.Top);
+        DockPanel.SetDock(buttons, Dock.Bottom);
+        var middle = body is ScrollViewer ? body : new ScrollViewer { Content = body, HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled };
+        return new DockPanel { LastChildFill = true, Children = { title, buttons, middle } };
     }
 
     public void CloseDialog()

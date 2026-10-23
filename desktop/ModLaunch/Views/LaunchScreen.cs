@@ -112,9 +112,8 @@ public sealed class LaunchScreen : Panel
             _art.RenderTransform = TransformOperations.Parse("scale(1.04)");
             if (Animate.On)
             {
-                Opacity = 0;
-                Transitions = [new DoubleTransition { Property = OpacityProperty, Duration = TimeSpan.FromMilliseconds(260), Easing = new CubicEaseOut() }];
-                Dispatcher.UIThread.Post(() => Opacity = 1, DispatcherPriority.Background);
+                // 17.0: экран запуска проявляется по кадрам (переход не успевал сыграть — экран появлялся рывком).
+                Animate.From(this, "none", 340);
                 Animate.From(left, "translateY(12px)", 420, 60, new CubicEaseOut());
             }
             _tick.Start();

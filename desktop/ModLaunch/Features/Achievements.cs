@@ -167,6 +167,8 @@ public static class Achievements
 public static class Cosmetics
 {
     public static readonly string[] Kinds = ["frame", "banner", "title", "badge"];
+    /// <summary>Разделы «Наград»: косметика и (17.0) сборки настроек от создателей.</summary>
+    public static readonly string[] Shelves = [.. Kinds, "config"];
 
     /// <summary>То, что есть у всех с самого начала.</summary>
     static readonly Reward[] Starter = [new("frame", "basic"), new("banner", "accent"), new("title", "newbie")];
@@ -188,6 +190,7 @@ public static class Cosmetics
         var list = Starter.Select(r => (r, (Achievement?)null)).ToList();
         foreach (var a in all) if (a.Reward is { } r) list.Add((r, a));
         foreach (var (_, r) in LevelRoad.Road) list.Add((r, null));
+        foreach (var (_, r) in LevelRoad.Bonus) list.Add((r, null));
         return list;
     }
 
@@ -206,11 +209,19 @@ public static class Cosmetics
     }
 
     public static bool IsOn(Reward r, HashSet<string>? unlocked = null) =>
-        r.Kind == "badge" ? Badges(unlocked).Contains(r.Id) : Equipped(r.Kind, unlocked) == r.Id;
+        r.Kind == "config" ? Configs.CurrentId == CreatorBuilds.Prefix + r.Id
+        : r.Kind == "badge" ? Badges(unlocked).Contains(r.Id) : Equipped(r.Kind, unlocked) == r.Id;
 
     /// <summary>Надеть награду; значок — добавить на витрину или убрать с неё (не больше трёх).</summary>
     public static void Toggle(Reward r)
     {
+        // 17.0: сборка создателя не «надевается» — применяется как конфиг оформления и настроек.
+        if (r.Kind == "config")
+        {
+            if (CreatorBuilds.Find(r.Id) is { } build) CreatorBuilds.Apply(build);
+            Changed?.Invoke();
+            return;
+        }
         var profile = Settings.Data.Obj("profile");
         if (r.Kind == "badge")
         {
