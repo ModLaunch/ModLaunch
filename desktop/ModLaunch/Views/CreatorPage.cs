@@ -55,7 +55,7 @@ public sealed partial class CreatorPage : Page
             "console" or "functions" or "ide" => "modscript",
             _ => tab,
         };
-        _ms = tab switch { "docs" or "commands" => "commands", "inject" or "lang" or "x" => "x", "functions" => "functions", "console" => "console", "ide" => "studio", _ => _ms };
+        _ms = tab switch { "docs" or "commands" => "commands", "inject" or "lang" or "x" => "x", "functions" => "functions", "console" => "console", _ => _ms };
         if (tab == "published") { _tab = "home"; _minePart = "published"; }
         if (project is not null) { _tab = "mine"; Open(Projects.Get(project)); }
         _code.TextChanged += () =>
@@ -178,6 +178,7 @@ public sealed partial class CreatorPage : Page
             // 9.3: Creator Hub — это рынок; здесь — «Создать» (свои моды, код, модели, шаблоны).
             Action market = () => MainWindow.Current?.Navigate(() => new MarketPage());
             if (_tab == "home") return [("Creator Hub", market), (I18n.T("v93.mk.create"), null)];
+            if (_tab == "form") return [("Creator Hub", market), (I18n.T("v13.hub.projects"), () => MainWindow.Current?.Navigate(() => new CreatorPage())), (I18n.T("v16.form.title"), null)];
             return [("Creator Hub", market), (I18n.T("v93.mk.create"), () => MainWindow.Current?.Navigate(() => new CreatorPage())), (TabTitle(_tab), null)];
         }
     }
@@ -216,13 +217,14 @@ public sealed partial class CreatorPage : Page
             "hub" => HubView(),
             "mxdev" => Injector(),
             "injects" => Injects(),
+            "form" => Form(),
             _ => editing ? Editor() : Mine(),
         };
         // Своё пространство Hub: четыре раздела слева, шапка с одной главной кнопкой, сетка чертежа.
         // Открытый проект: в шапке — его имя и вкладки «Код · Обзор»; в «Проектах» — «Проекты · Опубликованные»; в ModScript — его вкладки.
         var sub = editing ? PaneTabs() : _tab is "home" or "mine" ? MineTabs() : _tab == "modscript" ? MsTabs() : null;
         Content = HubNav.Frame(HubTabOf(_tab), HubNav.RailOf(_tab, creator: true), editing ? _open!.Name : HubTitle(), body, sold: () => _ = LoadMarket(force: true), local: Rail, sub: sub,
-            action: _tab == "team" ? TeamAction() : null, lead: _tab == "modscript" && _ms != "studio" ? I18n.T("v13.ms.lead", ("n", ModScriptCommands.All.Length), ("new", ModScriptCommands.NewCount)) : null);
+            action: _tab == "team" ? TeamAction() : _tab == "form" ? new Border() : null, lead: _tab == "form" ? I18n.T("v16.form.lead") : _tab == "modscript" ? I18n.T("v13.ms.lead", ("n", ModScriptCommands.All.Length), ("new", ModScriptCommands.NewCount)) : null);
     }
 
     /// <summary>Название раздела в шапке Hub — так же, как пункт боковой панели.</summary>
@@ -230,6 +232,7 @@ public sealed partial class CreatorPage : Page
     {
         "home" or "mine" => I18n.T("v13.hub.projects"),
         "modscript" => "ModScript",
+        "form" => I18n.T("v16.form.title"),
         _ => TabTitle(_tab),
     };
 
@@ -248,8 +251,8 @@ public sealed partial class CreatorPage : Page
     }
 
     /// <summary>
-    /// «Создать» (шапка, «путь автора»): 12.0 — мастер нового проекта (имя, игра, с чего начать),
-    /// а после него — та же анимация, что и у «Скачать», и сразу редактор.
+    /// «Создать» (шапка, «путь автора», палитра команд). 16.0: анкета нового проекта (<see cref="OpenForm"/>),
+    /// после неё — новая среда ModScript X. Старый мастер (main.mls, импорт) — ссылка внизу анкеты.
     /// </summary>
-    public static void CreateNew() => NewProjectDialog();
+    public static void CreateNew() => OpenForm();
 }

@@ -20,7 +20,15 @@ public static class Engines
         return null;
     }
 
+    /// <summary>16.0: движок по мосту (Bridge.Scan, двадцать движков по отпечаткам); старые правила — если мост не нашёл кода.</summary>
     public static Target? Detect(string gameDir)
+    {
+        try { if (Bridge.TargetOf(Bridge.Scan(gameDir)) is { } bridged) return bridged; }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+        return DetectOld(gameDir);
+    }
+
+    static Target? DetectOld(string gameDir)
     {
         bool Dir(params string[] p) => Directory.Exists(Path.Combine([gameDir, .. p]));
         bool File_(params string[] p) => File.Exists(Path.Combine([gameDir, .. p]));

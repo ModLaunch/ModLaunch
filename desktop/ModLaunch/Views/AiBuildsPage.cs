@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.VisualTree;
 using ModLaunch.Core;
 using ModLaunch.Features;
 using ModLaunch.Sources;
@@ -27,6 +28,12 @@ public sealed class AiBuildsPage : Page
     static readonly HashSet<string> _off = [];
     static (string Game, ModInfo Mod)? _weekly;
     static int _weeklyFor = -1;
+    /// <summary>16.0: мод сборки, открытый справа в «Просмотре» (нажатие на строку мода).</summary>
+    static string? _peek;
+    static int _peekImage;
+    static readonly Dictionary<string, ModDetails> _details = [];
+    static readonly Dictionary<string, List<ModInfo>> _alts = [];
+    static string _refine = "";
 
     bool _busy;
     string? _error;
@@ -36,8 +43,13 @@ public sealed class AiBuildsPage : Page
 
     public override string Title => I18n.T("v98.nav.ai");
 
-    /// <summary>Для снимков: показать готовую сборку.</summary>
-    public static void DemoResult(AiBuild b) { _result = b; _game = b.Game; _prompt = b.Prompt; _style = b.Style; _tab = "create"; }
+    /// <summary>Для снимков: показать готовую сборку (и открыть в просмотре мод номер peek).</summary>
+    public static void DemoResult(AiBuild b, int peek = -1)
+    {
+        _result = b; _game = b.Game; _prompt = b.Prompt; _style = b.Style; _tab = "create";
+        _peek = peek >= 0 && peek < b.Picks.Count ? b.Picks[peek].Mod.Id : null;
+        _peekImage = 0;
+    }
 
     static List<GameState> Games() => AppState.Games
         .Where(g => g.Status == Detect.Found && !g.Def.IsMinecraft && g.Def.HasExternalCatalog)
@@ -121,8 +133,10 @@ public sealed class AiBuildsPage : Page
         if (_error is not null) left.Children.Add(Ui.Card(Ui.Row(10, Ui.Icon(Icons.Alert, 18, Ui.Res("Bad")), Ui.Text(_error, "muted", wrap: true)), 18));
         if (_result is not null && !_busy) left.Children.Add(Result(_result));
 
-        var right = Ui.Col(18, Ideas(), Weekly());
-        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,320"), ColumnSpacing = 18 };
+        // 16.0: нажали на мод сборки — справа его просмотр вместо идей и «Мода недели».
+        var peek = _result is { } r && !_busy ? r.Picks.FirstOrDefault(p => p.Mod.Id == _peek) : null;
+        Control right = peek is not null ? Peek(_result!, peek) : Ui.Col(18, Ideas(), Weekly());
+        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions(peek is not null ? "*,460" : "*,320"), ColumnSpacing = 18 };
         grid.Children.Add(left);
         Grid.SetColumn(right, 1);
         grid.Children.Add(right);
@@ -192,7 +206,7 @@ public sealed class AiBuildsPage : Page
     {
         var g = AppState.Games.FirstOrDefault(x => x.Def.Id == _game);
         if (g is null) return;
-        _busy = true; _error = null; _off.Clear();
+        _busy = true; _error = null; _off.Clear(); _peek = null;
         _cts = new CancellationTokenSource();
         Build();
         try
@@ -227,7 +241,9 @@ public sealed class AiBuildsPage : Page
         foreach (var p in b.Picks) list.Children.Add(PickRow(b, p));
         var body = Ui.Col(14, head);
         if (b.Note != "") body.Children.Add(Ui.Text(b.Note, "muted", wrap: true));
+        body.Children.Add(Ui.Text(I18n.T("v16.ai.peek.hint"), "small muted", wrap: true));
         body.Children.Add(list);
+        body.Children.Add(RefineBox(b));
         if (g?.Registry is null) body.Children.Add(Ui.Text(I18n.T("v98.noLoader"), "small muted", wrap: true));
         var card = Ui.Card(body, 24);
         Animate.From(card, "translateY(12px)", 260, 0, new Avalonia.Animation.Easings.QuinticEaseOut());
@@ -244,21 +260,37 @@ public sealed class AiBuildsPage : Page
             Ui.Row(8, Ui.Text(p.Mod.Name, "h3"), installed ? Gx.Tag(I18n.T("pack.have"), Ui.Res("Surface3"), Ui.Res("Good")) : new Panel()),
             Ui.Row(6, Ui.Icon(Icons.Sparkles, 13, Ui.Res("Brand2")), Ui.Text(p.Why, "small muted")));
         text.VerticalAlignment = VerticalAlignment.Center;
-        var row = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,Auto,*,Auto"), ColumnSpacing = 12 };
+        var row = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,Auto,*,Auto,Auto"), ColumnSpacing = 12 };
         row.Children.Add(check);
         var thumb = Ui.Thumb(p.Mod.Icon, p.Mod.Name, 44);
         Grid.SetColumn(thumb, 1);
         row.Children.Add(thumb);
         Grid.SetColumn(text, 2);
         row.Children.Add(text);
-        if (p.Mod.Author != "")
+        var tail = Ui.Row(10);
+        tail.VerticalAlignment = VerticalAlignment.Center;
+        if (p.Mod.Author != "" && _peek is null) tail.Children.Add(Ui.Text(p.Mod.Author, "small muted"));
+        if (p.Match > 0) tail.Children.Add(MatchPill(p.Match));
+        Grid.SetColumn(tail, 3);
+        row.Children.Add(tail);
+        var eye = Ui.Icon(Icons.ChevronRight, 14, Ui.Res("Faint"));
+        eye.VerticalAlignment = VerticalAlignment.Center;
+        Grid.SetColumn(eye, 4);
+        row.Children.Add(eye);
+        var on = _peek == id;
+        var host = new Border
         {
-            var by = Ui.Text(p.Mod.Author, "small muted");
-            by.VerticalAlignment = VerticalAlignment.Center;
-            Grid.SetColumn(by, 3);
-            row.Children.Add(by);
-        }
-        var host = new Border { Padding = new Thickness(10, 8), CornerRadius = new CornerRadius(12), Background = Ui.Res("Surface2"), Child = row, Opacity = _off.Contains(id) ? 0.5 : 1 };
+            Padding = new Thickness(10, 8), CornerRadius = new CornerRadius(12), Background = on ? Ui.Res("BrandSoft") : Ui.Res("Surface2"), Child = row,
+            BorderBrush = on ? Ui.Res("Brand") : Brushes.Transparent, BorderThickness = new Thickness(1),
+            Opacity = _off.Contains(id) ? 0.5 : 1, Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand),
+        };
+        ToolTip.SetTip(host, I18n.T("v16.ai.peek.tip"));
+        // 16.0: нажатие на мод (не на галочку) — просмотр справа; повторное — закрыть.
+        host.PointerReleased += (_, e) =>
+        {
+            if (e.Source is Avalonia.Visual v && (v is CheckBox || v.FindAncestorOfType<CheckBox>() is not null)) return;
+            OpenPeek(_peek == id ? null : id);
+        };
         return host;
     }
 
@@ -287,6 +319,256 @@ public sealed class AiBuildsPage : Page
         await File.WriteAllTextAsync(file, AiBuilds.Export(b));
         w.Toast(I18n.T("pack.exported", ("n", b.Picks.Count)));
     }
+
+    static Control MatchPill(int match)
+    {
+        var color = match >= 80 ? Ui.Res("Good") : match >= 58 ? Ui.Res("Brand2") : Ui.Res("Muted");
+        var pill = new Border
+        {
+            CornerRadius = new CornerRadius(999), Padding = new Thickness(8, 2), BorderBrush = color, BorderThickness = new Thickness(1),
+            Child = new TextBlock { Text = match + "%", FontSize = 11.5, FontWeight = FontWeight.SemiBold, Foreground = color },
+        };
+        ToolTip.SetTip(pill, I18n.T("v16.ai.match.tip"));
+        return pill;
+    }
+
+    // ---------------------------------------------------------------- 16.0: уточнить сборку
+
+    Control RefineBox(AiBuild b)
+    {
+        var box = new TextBox { Text = _refine, Watermark = I18n.T("v16.ai.refine.hint"), MaxLength = 300, MinHeight = 38, VerticalContentAlignment = VerticalAlignment.Center };
+        box.TextChanged += (_, _) => _refine = box.Text ?? "";
+        box.KeyDown += (_, e) => { if (e.Key == Avalonia.Input.Key.Enter && _refine.Trim() != "") { e.Handled = true; _ = Refine(b, _refine); } };
+        var go = Ui.Button(I18n.T("v16.ai.refine"), () => { if (_refine.Trim() != "") _ = Refine(b, _refine); }, "", Icons.Wand);
+        go.MinHeight = 38;
+        var line = new DockPanel();
+        DockPanel.SetDock(go, Dock.Right);
+        go.Margin = new Thickness(8, 0, 0, 0);
+        line.Children.Add(go);
+        line.Children.Add(box);
+        var chips = new WrapPanel();
+        for (var i = 1; i <= 5; i++)
+        {
+            var text = I18n.T($"v16.ai.refine.{i}");
+            var c = Ui.Button(text, () => _ = Refine(b, text), "chip");
+            c.Margin = new Thickness(0, 0, 8, 6);
+            chips.Children.Add(c);
+        }
+        return new Border
+        {
+            Padding = new Thickness(14, 12), CornerRadius = new CornerRadius(12), BorderBrush = Ui.Res("Line"), BorderThickness = new Thickness(1),
+            Child = Ui.Col(10, Ui.Row(8, Ui.Icon(Icons.Wand, 15, Ui.Res("Brand2")), Ui.Text(I18n.T("v16.ai.refine.title"), "strong")), line, chips),
+        };
+    }
+
+    async Task Refine(AiBuild b, string instruction)
+    {
+        var g = AppState.Games.FirstOrDefault(x => x.Def.Id == b.Game);
+        if (g is null || _busy) return;
+        _busy = true; _error = null; _peek = null;
+        _cts = new CancellationTokenSource();
+        Build();
+        try
+        {
+            _result = await AiBuilds.Refine(g, b, instruction, _size, _noCheats, _cts.Token);
+            AiBuilds.Save(_result);
+            _prompt = _result.Prompt;
+            _refine = "";
+            _off.Clear();
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception e) { _error = Jobs.Explain(e); }
+        _busy = false;
+        Build();
+    }
+
+    // ---------------------------------------------------------------- 16.0: просмотр мода
+
+    void OpenPeek(string? id)
+    {
+        _peek = id;
+        _peekImage = 0;
+        Build();
+    }
+
+    static string Key(AiBuild b, ModInfo m) => b.Game + "|" + m.Id;
+
+    async Task LoadPeek(AiBuild b, ModInfo mod)
+    {
+        var key = Key(b, mod);
+        var g = AppState.Games.FirstOrDefault(x => x.Def.Id == b.Game);
+        if (g is null) return;
+        try
+        {
+            var d = Program.Demo ? Demo.Details(g.Def, mod) : await Details.Load(g.Def, mod.Id, source: mod.Source);
+            _details[key] = d;
+        }
+        catch { _details[key] = new ModDetails(mod, [], mod.Icon is null ? [] : [mod.Icon], []); }
+        try { _alts[key] = await AiBuilds.Alternatives(g, b, mod); } catch { _alts[key] = []; }
+        if (_peek == mod.Id && MainWindow.Current?.CurrentPage == this) Build();
+    }
+
+    Control Peek(AiBuild b, AiPick p)
+    {
+        var mod = p.Mod;
+        var key = Key(b, mod);
+        _details.TryGetValue(key, out var d);
+        if (d is null) _ = LoadPeek(b, mod);
+        var at = b.Picks.IndexOf(p);
+
+        // Шапка: «Просмотр», листать моды сборки, закрыть.
+        var prev = Ui.Button("", () => OpenPeek(b.Picks[(at + b.Picks.Count - 1) % b.Picks.Count].Mod.Id), "icon ghost", Icons.ChevronLeft, I18n.T("v16.ai.peek.prev"));
+        var next = Ui.Button("", () => OpenPeek(b.Picks[(at + 1) % b.Picks.Count].Mod.Id), "icon ghost", Icons.ChevronRight, I18n.T("v16.ai.peek.next"));
+        var close = Ui.Button("", () => OpenPeek(null), "icon ghost", Icons.Close, I18n.T("v16.ai.peek.close"));
+        var tools = Ui.Row(2, prev, Ui.Text($"{at + 1}/{b.Picks.Count}", "small muted"), next, close);
+        foreach (var c in tools.Children) c.VerticalAlignment = VerticalAlignment.Center;
+        var head = new DockPanel();
+        DockPanel.SetDock(tools, Dock.Right);
+        head.Children.Add(tools);
+        head.Children.Add(Gx.Eyebrow(I18n.T("v16.ai.peek"), Ui.Res("Brand2")));
+
+        // Галерея: большая картинка и до шести миниатюр.
+        var pictures = (d?.Images ?? []).Where(u => !string.IsNullOrEmpty(u)).Distinct().Take(8).ToList();
+        if (pictures.Count == 0 && mod.Icon is not null) pictures.Add(mod.Icon);
+        _peekImage = Math.Clamp(_peekImage, 0, Math.Max(0, pictures.Count - 1));
+        Control big = pictures.Count == 0
+            ? new Border { Background = Ui.Res("Surface2"), Child = d is null ? new ProgressBar { IsIndeterminate = true, Width = 120, VerticalAlignment = VerticalAlignment.Center } : Ui.Icon(Icons.Image, 34, Ui.Res("Faint")) }
+            : Picture(pictures[_peekImage], 900);
+        var gallery = Ui.Col(8, new Border { Height = 230, CornerRadius = new CornerRadius(12), ClipToBounds = true, Child = big });
+        if (pictures.Count > 1)
+        {
+            var strip = new WrapPanel();
+            for (var i = 0; i < Math.Min(6, pictures.Count); i++)
+            {
+                var n = i;
+                var t = new Border
+                {
+                    Width = 64, Height = 40, CornerRadius = new CornerRadius(7), ClipToBounds = true, Margin = new Thickness(0, 0, 6, 0),
+                    BorderBrush = n == _peekImage ? Ui.Res("Brand") : Brushes.Transparent, BorderThickness = new Thickness(2),
+                    Child = Picture(pictures[n], 160), Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand),
+                };
+                StoreKit.OnClick(t, () => { _peekImage = n; Build(); });
+                strip.Children.Add(t);
+            }
+            gallery.Children.Add(strip);
+        }
+
+        var full = d?.Mod ?? mod;
+        var by = string.Join(" · ", new[] { full.Author, full.Version == "" ? null : "v" + full.Version }.Where(x => !string.IsNullOrEmpty(x)));
+        var stats = Ui.Row(18);
+        if (full.Downloads > 0) stats.Children.Add(Gx.Stat(Short(full.Downloads), I18n.T("v16.ai.peek.downloads"), null, 18));
+        if (full.Rating > 0) stats.Children.Add(Gx.Stat(Short(full.Rating), I18n.T("v16.ai.peek.likes"), null, 18));
+        if (full.UpdatedAt is { } u) stats.Children.Add(Gx.Stat(Ui.Ago(u), I18n.T("v16.ai.peek.updated"), null, 18));
+        var tags = new WrapPanel();
+        foreach (var c in full.Categories.Take(6))
+        {
+            var tag = Gx.Tag(c, Ui.Res("Surface3"), Ui.Res("Muted"));
+            tag.Margin = new Thickness(0, 0, 6, 6);
+            tags.Children.Add(tag);
+        }
+
+        // Почему ИИ взял мод и насколько он подходит.
+        var why = new Border
+        {
+            Padding = new Thickness(12, 10), CornerRadius = new CornerRadius(10), Background = Ui.Res("BrandSoft"),
+            Child = Ui.Col(8,
+                Ui.Row(8, Ui.Icon(Icons.Sparkles, 14, Ui.Res("Brand2")), Ui.Text(I18n.T("v16.ai.peek.why"), "small strong"), p.Match > 0 ? MatchPill(p.Match) : new Panel()),
+                Ui.Text(p.Why == "" ? I18n.T("v98.ai.why.rated") : p.Why, "small", wrap: true)),
+        };
+
+        // Описание: первые абзацы; целиком — на странице мода.
+        var about = new StackPanel { Spacing = 6 };
+        var blocks = d?.Blocks ?? [];
+        var shown = 0;
+        foreach (var block in blocks)
+        {
+            if (shown > 900) break;
+            var t = block.Kind switch
+            {
+                "h" => Ui.Text(block.Text, "strong", wrap: true),
+                "li" => Ui.Text("•  " + block.Text, "small", wrap: true),
+                _ => Ui.Text(block.Text, "small muted", wrap: true),
+            };
+            about.Children.Add(t);
+            shown += block.Text.Length;
+        }
+        if (about.Children.Count == 0 && full.Description != "") about.Children.Add(Ui.Text(full.Description, "small muted", wrap: true));
+        if (d is null && about.Children.Count == 0) about.Children.Add(Ui.Text(I18n.T("v16.ai.peek.loading"), "small muted"));
+
+        var col = Ui.Col(14, head, gallery,
+            Ui.Col(4, Gx.Title(full.Name, 22, null, 2), by == "" ? new Panel() : Ui.Text(by, "small muted")));
+        if (stats.Children.Count > 0) col.Children.Add(stats);
+        if (tags.Children.Count > 0) col.Children.Add(tags);
+        col.Children.Add(why);
+        col.Children.Add(about);
+
+        // Что ему нужно: зависимости, и есть ли они в сборке.
+        if (d?.Requirements is { Count: > 0 } reqs)
+        {
+            var list = Ui.Col(4, Ui.Text(I18n.T("v16.ai.peek.needs"), "small strong"));
+            foreach (var r in reqs.Take(6))
+            {
+                var inBuild = b.Picks.Any(x => Recommend.Bare(x.Mod.Id) == Recommend.Bare(r.Id));
+                list.Children.Add(Ui.Row(8, Ui.Icon(inBuild ? Icons.Check : Icons.Package, 13, inBuild ? Ui.Res("Good") : Ui.Res("Muted")),
+                    Ui.Text(r.Name + (inBuild ? "  · " + I18n.T("v16.ai.peek.inBuild") : ""), "small")));
+            }
+            col.Children.Add(list);
+        }
+
+        // Кнопки: страница мода, в сборке или нет, поставить только его.
+        var off = _off.Contains(mod.Id);
+        var g = AppState.Games.FirstOrDefault(x => x.Def.Id == b.Game);
+        var page = Ui.Button(I18n.T("v16.ai.peek.page"), () => { if (g is not null) MainWindow.Current?.Navigate(() => new ModPage(g.Def.Id, full)); }, "primary", Icons.External);
+        var toggle = Ui.Button(off ? I18n.T("v16.ai.peek.add") : I18n.T("v16.ai.peek.remove"), () => { if (!_off.Remove(mod.Id)) _off.Add(mod.Id); Build(); }, "", off ? Icons.Plus : Icons.Close);
+        var one = Ui.Button("", () => Install(b, [p]), "icon", Icons.Download, I18n.T("v16.ai.peek.installOne"));
+        one.IsEnabled = g?.Registry is not null;
+        var buttons = new WrapPanel();
+        foreach (var x in new Control[] { page, toggle, one }) { x.Margin = new Thickness(0, 0, 8, 6); buttons.Children.Add(x); }
+        col.Children.Add(buttons);
+
+        // Похожие: заменить мод одним нажатием.
+        if (_alts.TryGetValue(key, out var alts) && alts.Count > 0)
+        {
+            var list = Ui.Col(6, Ui.Row(8, Ui.Icon(Icons.Shuffle, 14, Ui.Res("Brand2")), Ui.Text(I18n.T("v16.ai.peek.alts"), "small strong")));
+            foreach (var alt in alts)
+            {
+                var a = alt;
+                var swap = Ui.Button(I18n.T("v16.ai.peek.swap"), () =>
+                {
+                    _result = AiBuilds.Replace(b, mod.Id, a);
+                    _peek = a.Id;
+                    _peekImage = 0;
+                    Build();
+                }, "chip");
+                swap.VerticalAlignment = VerticalAlignment.Center;
+                var line = new DockPanel();
+                DockPanel.SetDock(swap, Dock.Right);
+                line.Children.Add(swap);
+                var words = Ui.Col(1, Ui.Text(a.Name, "small strong"), Ui.Text(a.Downloads > 0 ? I18n.T("v98.ai.why.popular", ("n", Short(a.Downloads))) : a.Author, "tiny muted"));
+                words.VerticalAlignment = VerticalAlignment.Center;
+                line.Children.Add(Ui.Row(10, Ui.Thumb(a.Icon, a.Name, 34, 8, 80), words));
+                list.Children.Add(line);
+            }
+            col.Children.Add(list);
+        }
+
+        var card = Ui.Card(col, 18);
+        Animate.From(card, "translateX(14px)", 220, 0, new Avalonia.Animation.Easings.QuinticEaseOut());
+        return card;
+    }
+
+    static Control Picture(string url, int decode)
+    {
+        var image = new Image { Stretch = Stretch.UniformToFill };
+        var host = new Panel { Children = { new Border { Background = Ui.Res("Surface2") }, image } };
+        _ = Images.FromUrl(url, decode).ContinueWith(t =>
+        {
+            if (t.Result is { } bmp) Avalonia.Threading.Dispatcher.UIThread.Post(() => image.Source = bmp);
+        });
+        return host;
+    }
+
+    static string Short(long n) => n >= 1_000_000 ? $"{n / 1_000_000.0:0.#}M" : n >= 1000 ? $"{n / 1000.0:0.#}K" : n.ToString();
 
     // ---------------------------------------------------------------- справа
 
@@ -377,9 +659,17 @@ public sealed class AiBuildsPage : Page
         name.VerticalAlignment = VerticalAlignment.Bottom;
         top.Children.Add(name);
         var thumbs = Ui.Row(-8);
-        foreach (var p in b.Picks.Take(6)) thumbs.Children.Add(new Border { CornerRadius = new CornerRadius(9), BorderBrush = Ui.Res("Surface"), BorderThickness = new Thickness(2), ClipToBounds = true, Child = Ui.Thumb(p.Mod.Icon, p.Mod.Name, 30, 8, 80) });
+        foreach (var p in b.Picks.Take(6))
+        {
+            var pick = p;
+            var t = new Border { CornerRadius = new CornerRadius(9), BorderBrush = Ui.Res("Surface"), BorderThickness = new Thickness(2), ClipToBounds = true, Child = Ui.Thumb(p.Mod.Icon, p.Mod.Name, 30, 8, 80), Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand) };
+            ToolTip.SetTip(t, p.Mod.Name);
+            // 16.0: значок мода — сразу к сборке с этим модом в просмотре.
+            StoreKit.OnClick(t, () => { _result = b; _game = b.Game; _prompt = b.Prompt; _style = b.Style; _off.Clear(); _tab = "create"; _peek = pick.Mod.Id; _peekImage = 0; Build(); });
+            thumbs.Children.Add(t);
+        }
         var like = Ui.Button(b.Likes > 0 ? "♥" : "♡", () => { AiBuilds.Like(b); Build(); }, "icon ghost", null, I18n.T("v98.like"));
-        var open = Ui.Button(I18n.T("v98.open"), () => { _result = b; _game = b.Game; _prompt = b.Prompt; _style = b.Style; _off.Clear(); _tab = "create"; Build(); }, "primary");
+        var open = Ui.Button(I18n.T("v98.open"), () => { _result = b; _game = b.Game; _prompt = b.Prompt; _style = b.Style; _off.Clear(); _tab = "create"; _peek = null; Build(); }, "primary");
         var remove = Ui.Button("", () => { AiBuilds.Remove(b.Id); if (_result?.Id == b.Id) _result = null; Build(); }, "icon ghost", Icons.Trash, I18n.T("v98.remove"));
         var actions = Ui.Row(6, open, Ui.Button("", () => Install(b, b.Picks), "icon", Icons.Download, I18n.T("v98.install", ("n", b.Picks.Count))), like, remove);
         var body = Ui.Col(10,

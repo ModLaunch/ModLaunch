@@ -684,6 +684,7 @@ public sealed partial class GamePage : Page
         if (!_loading && _mods.Count == 0)
         {
             _listHost.Children.Add(Ui.Card(Ui.Text(_query == "" ? I18n.T("inst.empty") : I18n.T("catalog.nothingFound", ("query", _query)), "muted"), 22));
+            if (_hasMore) _listHost.Children.Add(MoreButton());
             return;
         }
 
@@ -704,15 +705,21 @@ public sealed partial class GamePage : Page
             else rows.Add(() => ModRow.Build(_g.Def, mod, IsInstalled(mod), IsInstalling(mod), picks.Contains(mod.Id), Install, Open, badge));
         }
 
-        Button? more = null;
-        if (_hasMore)
-        {
-            more = Ui.Button(_loading ? I18n.T("catalog.loading") : I18n.T("catalog.more"), () => _ = Load(reset: false), "", Icons.Refresh);
-            more.IsEnabled = !_loading;
-            more.HorizontalAlignment = HorizontalAlignment.Center;
-        }
+        // Следующая страница не загрузилась — список остаётся, а под ним причина и та же кнопка «Ещё моды».
+        Control? more = _hasMore ? MoreButton() : null;
+        if (more is not null && _error is not null && !_loading)
+            more = Ui.Col(8, Ui.Text(I18n.T("catalog.error") + ": " + _error, "muted small", wrap: true), more);
+        if (more is not null) more.HorizontalAlignment = HorizontalAlignment.Center;
         if (tiles is not null) { AddRows(tiles, rows); if (more is not null) _listHost.Children.Add(more); }
         else AddRows(_listHost, rows, more);
+    }
+
+    Button MoreButton()
+    {
+        var more = Ui.Button(_loading ? I18n.T("catalog.loading") : I18n.T("catalog.more"), () => _ = Load(reset: false), "", Icons.Refresh);
+        more.IsEnabled = !_loading;
+        more.HorizontalAlignment = HorizontalAlignment.Center;
+        return more;
     }
 
     internal static Control Skeleton() => new Border
@@ -744,18 +751,29 @@ public sealed partial class GamePage : Page
         RenderList();
         try
         {
-            var page = Program.Demo
-                ? Demo.Catalog(_g.Def, new Query(_query, _page, _sort, _section, _period, _adult))
-                : await Catalog.Browse(_g.Def, new Query(_query, _page, _sort, _section, _period, _adult), source: _source);
-            if (id != _requestId) return;
-            _mods.AddRange(page.Mods.Where(m => _mods.All(x => x.Id != m.Id)));
-            _total = page.Total;
-            _hasMore = page.HasMore;
+            // 16.0.1: страница могла прийти «пустой» — всё отсеяли фильтры (за период, скрытые, 18+) или
+            // это повторы с прошлой страницы. Тогда кнопка «Ещё моды» ничего не добавляла, а на первой
+            // странице её не было вовсе. Берём следующие страницы сами, пока не появятся новые моды.
+            for (var extra = 0; ; extra++)
+            {
+                var page = Program.Demo
+                    ? Demo.Catalog(_g.Def, new Query(_query, _page, _sort, _section, _period, _adult))
+                    : await Catalog.Browse(_g.Def, new Query(_query, _page, _sort, _section, _period, _adult), source: _source);
+                if (id != _requestId) return;
+                var before = _mods.Count;
+                _mods.AddRange(page.Mods.Where(m => _mods.All(x => x.Id != m.Id)));
+                _total = page.Total;
+                _hasMore = page.HasMore;
+                if (_mods.Count > before || !_hasMore || extra >= 4) break;
+                _page++;
+            }
         }
         catch (Exception e)
         {
             if (id != _requestId) return;
             _error = Jobs.Explain(e);
+            // Повтор — с той же страницы, а не через одну.
+            if (!reset) { _page = Math.Max(1, _page - 1); _hasMore = true; }
         }
         _loading = false;
         Build();
@@ -789,9 +807,16 @@ public sealed partial class GamePage : Page
         foreach (var id in _g.Def.Picks)
             if (byId.TryGetValue(id, out var mod))
                 rows.Add(() => ModRow.Build(_g.Def, mod, IsInstalled(mod), IsInstalling(mod), true, () => _ = Actions.Install(_g, mod), () => MainWindow.Current?.Navigate(() => new ModPage(_g.Def.Id, mod))));
-        AddRows(_listHost!, rows);
-        if (_listHost!.Children.Count == 0)
-            _listHost.Children.Add(Ui.Card(Ui.Text(_error ?? I18n.T("catalog.error"), "muted", wrap: true), 22));
+        if (rows.Count == 0) _listHost!.Children.Add(Ui.Card(Ui.Text(_error ?? I18n.T("catalog.error"), "muted", wrap: true), 22));
+        // 16.0.1: «Выбор ModLaunch» — короткая подборка, и кнопки «Ещё моды» под ней не было:
+        // казалось, что каталог кончился. Теперь она ведёт во весь каталог игры.
+        Button? all = null;
+        if (_g.Def.HasCatalog)
+        {
+            all = Ui.Button(I18n.T("catalog.more"), () => SelectSection("all"), "", Icons.ChevronDown);
+            all.HorizontalAlignment = HorizontalAlignment.Center;
+        }
+        AddRows(_listHost!, rows, all);
     }
 
     void RenderKits()

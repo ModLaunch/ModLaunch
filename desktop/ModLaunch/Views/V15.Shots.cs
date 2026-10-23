@@ -19,8 +19,8 @@ public static class V15Shots
 
     static void Studio(Shots s, string name, string panel)
     {
-        ModStudio.Demo(panel);
-        Shot(s, name, () => new CreatorPage("ide"), 1500);
+        var id = XStudio.DemoProject();
+        Shot(s, name, () => new XStudio(id, "files", panel), 1500);
     }
 
     [DemoShots] static void V15Studio(Shots s) => Studio(s, "v15-studio-1-problems", "problems");

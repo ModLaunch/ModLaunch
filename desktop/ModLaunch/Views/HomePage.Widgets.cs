@@ -298,6 +298,35 @@ public sealed partial class HomePage
                     : Stack(Cap(Icons.Trophy, I18n.T("v10.w.level"), tint), ring, words);
                 return Shell(body, () => Go(() => new ProfilePage()), wash);
             }
+            case "rewards":
+            {
+                // 16.0: путь наград за уровни — ступени с наградами, полоса до следующего уровня и «Забрать».
+                var (level, _, next) = RoadKit.Now();
+                var fresh = LevelRoad.Fresh(level);
+                var count = e.Size switch { "xl" => 8, "w" => 6, "l" => 5, _ => 4 };
+                var xpText = Small(I18n.T("v16.road.xp", ("level", level), ("left", next)), Ui.Res("Faint"), 1);
+                xpText.VerticalAlignment = VerticalAlignment.Center;
+                var head = new DockPanel();
+                DockPanel.SetDock(xpText, Dock.Right);
+                head.Children.Add(xpText);
+                head.Children.Add(Cap(Icons.Trophy, I18n.T("v16.road.title"), tint));
+                var bar = new ProgressBar { Minimum = 0, Maximum = 300, Value = 300 - next, Height = 4, MinHeight = 4, Margin = new Thickness(0, 8, 0, 0), Foreground = tint ?? Ui.Res("Brand") };
+                var top = Ui.Col(0, head, bar);
+                var strip = RoadKit.Strip(level, count, large ? 54 : Widgets.Density == "compact" ? 34 : 40, tint);
+                strip.VerticalAlignment = VerticalAlignment.Center;
+                strip.Margin = new Thickness(0, 6);
+                Control foot = fresh.Count > 0
+                    ? Ui.Button(I18n.T("v16.road.claim", ("n", fresh.Count)), RoadKit.Claim, "primary", Icons.Trophy)
+                    : Small(RoadKit.NextLine(level), Ui.Res("Muted"), 1);
+                foot.HorizontalAlignment = HorizontalAlignment.Left;
+                var dock = new DockPanel();
+                DockPanel.SetDock(top, Dock.Top);
+                DockPanel.SetDock(foot, Dock.Bottom);
+                dock.Children.Add(top);
+                dock.Children.Add(foot);
+                dock.Children.Add(strip);
+                return Shell(dock, () => Go(() => new ProfilePage("rewards")), wash, pad: 14);
+            }
             case "autopilot":
             {
                 var g = PickGame(e.Get("game"), mine.FirstOrDefault(x => !x.Def.IsMinecraft && x.Registry is not null)).Own;
@@ -519,12 +548,27 @@ public sealed partial class HomePage
             Child = new TextBlock { Text = name.Length > 0 ? name[..1].ToUpper(I18n.Culture) : "?", FontSize = 22, FontWeight = FontWeight.Bold, Foreground = new SolidColorBrush(Color.FromArgb(150, 255, 255, 255)), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
         };
         var image = new Image { Stretch = Stretch.UniformToFill };
-        _ = Images.FromUrl(url, decode).ContinueWith(async t =>
+        var fill = new Image { Stretch = Stretch.UniformToFill, IsVisible = false, Opacity = 0.9 };
+        var shade = new Border { Background = new SolidColorBrush(Color.FromArgb(70, 8, 10, 16)), IsVisible = false };
+        // 16.0: картинки Steam — через GameArt (кэш Steam на ПК и адреса с хэшем у новых игр); другая форма — постером.
+        var (appId, art) = GameArt.FromUrl(url);
+        _ = Task.Run(async () =>
         {
-            var bmp = t.Result ?? (fallback is null ? null : await Images.FromUrl(fallback, decode));
-            if (bmp is not null) Avalonia.Threading.Dispatcher.UIThread.Post(() => image.Source = bmp);
+            var bmp = await Images.FromUrl(url, decode)
+                ?? (appId > 0 ? await GameArt.Steam(appId, art, decode) : null)
+                ?? (fallback is null ? null : await Images.FromUrl(fallback, decode))
+                ?? (appId > 0 && art != Images.Art.Header ? await GameArt.Steam(appId, Images.Art.Header, decode) : null);
+            if (bmp is null) return;
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                var poster = !GameArt.Fits(bmp, art);
+                fill.Source = poster ? Images.Tiny(bmp) : null;
+                fill.IsVisible = shade.IsVisible = poster;
+                image.Stretch = poster ? Stretch.Uniform : Stretch.UniformToFill;
+                image.Source = bmp;
+            });
         });
-        return new Panel { Children = { back, image } };
+        return new Panel { Children = { back, fill, shade, image } };
     }
 
     /// <summary>Виджет «Игра» для игры ModLaunch: обложка или герой, имя и «Играть».</summary>

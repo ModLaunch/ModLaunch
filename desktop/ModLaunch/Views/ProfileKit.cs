@@ -37,6 +37,17 @@ public static class ProfileKit
             "flame" => Grad("#FFE066", "#FF8A1F", "#E8290B"),
             "holo" => Grad("#9BF6FF", "#BDB2FF", "#FFC6FF", "#CAFFBF"),
             "steel" => Grad("#F4F7FA", "#9FB0C2", "#3A4A5C"),
+            // 16.0: рамки пути уровней (каждый 5-й уровень).
+            "ruby" => Grad("#FF9AA8", "#E0115F", "#7A0A2E"),
+            "emerald" => Grad("#A8F5C8", "#1FB56A", "#0B5A33"),
+            "sapphire" => Grad("#A9C8FF", "#2F6BFF", "#122E7A"),
+            "amethyst" => Grad("#E2C4FF", "#9B5CFF", "#4A1F8C"),
+            "obsidian" => Grad("#6B6F80", "#1B1D26", "#000000"),
+            "prism" => Grad("#FF5A5F", "#F5C542", "#3FCB7E", "#3CC8E6", "#9B7BFF"),
+            "lava" => Grad("#FFD36B", "#FF5A1F", "#8A1000"),
+            "ice" => Grad("#FFFFFF", "#9BE7FF", "#3A8DC8"),
+            "royal" => Grad("#FFE9A8", "#C9A227", "#5A2A82"),
+            "cosmic" => Grad("#FF7AF5", "#7C5CFF", "#19D3F5", "#0A0F2C"),
             "game" => Grad(Lighter(GameAccent(game)), GameAccent(game), Look.Mix(Color.Parse(GameAccent(game)), Colors.Black, 0.35).ToString()),
             _ => Ui.Res("Brand"),
         };
@@ -46,7 +57,12 @@ public static class ProfileKit
     static BoxShadows FrameGlow(string id)
     {
         var (key, game) = Cosmetics.Split(id);
-        var hex = key switch { "holo" => "#BDB2FF", "gold" => "#FFC93C", "neon" => "#7C5CFF", "flame" => "#FF8A1F", "game" => GameAccent(game), _ => null };
+        var hex = key switch
+        {
+            "holo" => "#BDB2FF", "gold" => "#FFC93C", "neon" => "#7C5CFF", "flame" => "#FF8A1F", "game" => GameAccent(game),
+            "prism" => "#F5C542", "lava" => "#FF5A1F", "ice" => "#9BE7FF", "royal" => "#C9A227", "cosmic" => "#7C5CFF", "ruby" => "#E0115F", "emerald" => "#1FB56A",
+            "sapphire" => "#2F6BFF", "amethyst" => "#9B5CFF", _ => null,
+        };
         return hex is null ? default : BoxShadows.Parse($"0 0 22 2 {Gx.Alpha(Color.Parse(hex), 150)}");
     }
 
@@ -82,6 +98,17 @@ public static class ProfileKit
             "midnight" => Grad("#0A0F2C", "#1B2A6B", "#0B0D17"),
             "vault" => Grad("#1A1430", "#3B2A7A", "#0C0A14"),
             "forge" => Grad("#2B1A0E", "#B4541A", "#0E0B09"),
+            // 16.0: баннеры пути уровней.
+            "ocean" => Grad("#04263D", "#0E7FA6", "#06121F"),
+            "forest" => Grad("#0C2414", "#2E7D4F", "#081108"),
+            "ember" => Grad("#2A0B05", "#C2410C", "#120604"),
+            "nebula" => Grad("#1A0B33", "#7B2FBF", "#E83E8C"),
+            "glacier" => Grad("#0B2233", "#5FB4D9", "#E6F6FF"),
+            "synth" => Grad("#2B0B3F", "#FF2E97", "#19D3F5"),
+            "dawn" => Grad("#3B1D4A", "#FF8A5C", "#FFD27A"),
+            "void" => Grad("#000000", "#14121F", "#3B2A7A"),
+            "neon" => Grad("#04040C", "#00E5A8", "#7C5CFF"),
+            "cosmos" => Grad("#050818", "#283A8C", "#B04BE0", "#050818"),
             _ => new LinearGradientBrush
             {
                 StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
@@ -102,6 +129,11 @@ public static class ProfileKit
             "game" => (Grad(GameAccent(game), Lighter(GameAccent(game))), (IBrush)Brushes.White),
             "newbie" => ((IBrush)new SolidColorBrush(Color.FromArgb(46, 255, 255, 255)), (IBrush)Brushes.White),
             "opener" => (Grad("#2A2140", "#7B5CFF"), (IBrush)Brushes.White),
+            // 16.0: титулы пути уровней — чем выше, тем ярче.
+            "regular" or "explorer" or "tinkerer" => (Grad("#2B3A55", "#4C8DFF"), (IBrush)Brushes.White),
+            "veteran" or "architect" or "curator" => (Grad("#0E5A44", "#3FCB7E"), (IBrush)Brushes.White),
+            "pathfinder" or "virtuoso" or "grandmaster" => (Grad("#5A2A82", "#FF6FB1"), (IBrush)Brushes.White),
+            "legend" => (Grad("#FFE08A", "#FF8A1F", "#E0115F"), (IBrush)Brushes.White),
             _ => (Grad("#7C5CFF", "#FF3D81"), (IBrush)Brushes.White),
         };
         return new Border
@@ -122,8 +154,23 @@ public static class ProfileKit
             face = new Border
             {
                 CornerRadius = new CornerRadius(size / 2),
-                Background = key switch { "heart" => Grad("#FF7AA8", "#E83E8C"), "case" => Grad("#9B82FF", "#4A2FD0"), "build" => Grad("#5BE3A8", "#168A63"), _ => Grad("#5AA9FF", "#2D5BD8") },
-                Child = Ui.Icon(key switch { "heart" => Icons.Heart, "case" => Icons.Cube, "build" => Icons.Hourglass, _ => Icons.Clock }, size * 0.46, Brushes.White),
+                Background = key switch
+                {
+                    "heart" => Grad("#FF7AA8", "#E83E8C"), "case" => Grad("#9B82FF", "#4A2FD0"), "build" => Grad("#5BE3A8", "#168A63"),
+                    // 16.0: значки пути уровней.
+                    "star" or "comet" or "planet" => Grad("#FFD86B", "#F29A1F"), "bolt" or "rocket" => Grad("#FF8A5C", "#E8290B"),
+                    "gem" or "infinity" or "potion" or "music" => Grad("#C69BFF", "#7C3AED"), "shield" or "anvil" or "compass" or "sword" or "key" => Grad("#9FB0C2", "#3A4A5C"),
+                    "moon" => Grad("#3A4A7A", "#0A0F2C"),
+                    "crown" or "phoenix" => Grad("#FFE08A", "#E0A21B"), "dragon" => Grad("#5BE3A8", "#0E6B4A"), "controller" => Grad("#5AA9FF", "#7C5CFF"),
+                    _ => Grad("#5AA9FF", "#2D5BD8"),
+                },
+                Child = Ui.Icon(key switch
+                {
+                    "heart" => Icons.Heart, "case" => Icons.Cube, "build" => Icons.Hourglass,
+                    "star" or "comet" => Icons.Star, "bolt" => Icons.Zap, "gem" or "potion" => Icons.Sparkles, "rocket" => Icons.Flame, "shield" or "anvil" => Icons.Shield,
+                    "crown" => Icons.Trophy, "dragon" or "phoenix" => Icons.Flame, "infinity" => Icons.Shuffle, "compass" or "planet" => Icons.Globe,
+                    "controller" => Icons.Gamepad, "music" => Icons.Music, "key" => Icons.Key, "sword" => Icons.Tools, "moon" => Icons.Star, _ => Icons.Clock,
+                }, size * 0.46, Brushes.White),
             };
         var medal = new Border
         {

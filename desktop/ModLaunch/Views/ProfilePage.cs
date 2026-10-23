@@ -209,7 +209,9 @@ public sealed partial class ProfilePage : Page
         var title = new TextBlock { Text = Cosmetics.Name(r), FontWeight = FontWeight.SemiBold, FontSize = 13.5, TextTrimming = TextTrimming.CharacterEllipsis, HorizontalAlignment = HorizontalAlignment.Center };
         var sub = new TextBlock
         {
-            Text = have ? (from is null ? I18n.T("v99.rewards.starter") : from.Title) : I18n.T("v99.rewards.locked", ("ach", from?.Title ?? "")),
+            Text = LevelRoad.LevelOf(r) is int lv
+                ? I18n.T(have ? "v16.road.got" : "v16.road.locked", ("n", lv))
+                : have ? (from is null ? I18n.T("v99.rewards.starter") : from.Title) : I18n.T("v99.rewards.locked", ("ach", from?.Title ?? "")),
             FontSize = 11.5, Foreground = Ui.Res("Muted"), TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap, MaxLines = 2, TextTrimming = TextTrimming.CharacterEllipsis,
         };
         Control action = have
@@ -251,6 +253,13 @@ public sealed partial class ProfilePage : Page
     public static void AnnounceNew()
     {
         var fresh = Achievements.TakeNew();
+        // 16.0: новый уровень — одна строка о наградах пути (забрать — на главной или в профиле).
+        if (MainWindow.Current is { } win && LevelRoad.Fresh(Achievements.Level(Achievements.All()).Level) is { Count: > 0 } road && Settings.Data.Obj("profile").Long("roadToast") < road[^1].Level)
+        {
+            Settings.Data.Obj("profile")["roadToast"] = road[^1].Level;
+            Settings.Save();
+            win.Toast(I18n.T("v16.road.toast", ("level", road[^1].Level), ("n", road.Count)));
+        }
         if (fresh.Count == 0 || MainWindow.Current is not { } w) return;
         foreach (var a in fresh.Take(2))
             w.Toast(I18n.T("v99.unlocked", ("name", a.Title)) + (a.Reward is { } r ? " · " + Cosmetics.KindName(r.Kind) + " «" + Cosmetics.Name(r) + "»" : ""));

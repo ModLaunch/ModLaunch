@@ -39,6 +39,19 @@ public static class SelfCheck
             if (page.Mods.Count < 10) throw new Exception($"only {page.Mods.Count}");
             return $"{page.Total} mods, first {page.Mods[0].Name}";
         });
+        await Check("catalog paging", async () =>
+        {
+            // 16.0.1: «Ещё моды» — у первой страницы большого каталога есть продолжение, и вторая не повторяет первую.
+            var raw = await Http.GetJson("https://thunderstore.io/api/cyberstorm/listing/lethal-company/?page=1&ordering=most-downloaded");
+            var keys = raw is System.Text.Json.Nodes.JsonObject o ? string.Join(",", o.Select(p => p.Key)) : "?";
+            var first = await Thunderstore.Search("lethal-company", new Query(), []);
+            var second = await Thunderstore.Search("lethal-company", new Query(Page: 2), []);
+            if (!first.HasMore) throw new Exception($"thunderstore page 1 says no more (keys: {keys})");
+            if (second.Mods.Count == 0 || second.Mods.All(m => first.Mods.Any(x => x.Id == m.Id))) throw new Exception("thunderstore page 2 repeats page 1");
+            var nexus = await Nexus.Browse("subnautica", new Query(), [], []);
+            if (!nexus.HasMore) throw new Exception("nexus page 1 says no more");
+            return $"thunderstore keys {keys}; page 2 has {second.Mods.Count} new; nexus {nexus.Total} total";
+        });
         await Check("thunderstore sections", async () =>
         {
             var page = await Catalog.Browse(GameCatalog.ById("valheim")!, new Query(SectionId: "buildings"));

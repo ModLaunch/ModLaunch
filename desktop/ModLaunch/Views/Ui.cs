@@ -230,19 +230,19 @@ public static class Ui
     /// <summary>
     /// Обложка игры: цветной фон сразу, картинка — когда загрузится. Окно при
     /// этом не перерисовывается, меняется только эта картинка.
+    /// 16.0: картинка другой формы (широкая шапка в узкой обложке — так было у многих игр в меню слева,
+    /// в библиотеке и на полках) больше не режется посередине: она целиком по центру, а вокруг — она же,
+    /// размытая и притемнённая, как постер.
     /// </summary>
     public static Control GameImage(Games.GameDef def, int decode, Stretch stretch = Stretch.UniformToFill, Images.Art art = Images.Art.Header)
     {
-        var image = new Image { Classes = { "zoom" }, Stretch = stretch, Source = Images.GameAsset(def, art, decode) ?? (art == Images.Art.Header ? Images.Game(def, decode) : null) };
-        Border? backRef = null;
-        if (image.Source is null)
-            _ = Images.GameAsync(def, art, decode).ContinueWith(t =>
-            {
-                if (t.Result is Bitmap bmp) Avalonia.Threading.Dispatcher.UIThread.Post(() => { image.Source = bmp; if (backRef is not null) backRef.IsVisible = false; });
-            });
+        var image = new Image { Classes = { "zoom" }, Stretch = stretch };
+        var fill = new Image { Stretch = Stretch.UniformToFill, IsVisible = false, Opacity = 0.9 };
+        RenderOptions.SetBitmapInterpolationMode(fill, Avalonia.Media.Imaging.BitmapInterpolationMode.HighQuality);
+        var shade = new Border { Background = new SolidColorBrush(Color.FromArgb(70, 8, 10, 16)), IsVisible = false };
         var initials = new TextBlock
         {
-            Text = def.ShortName[..1], FontWeight = FontWeight.Bold, FontSize = 18, Foreground = Brushes.White,
+            Text = def.ShortName.Length > 0 ? def.ShortName[..1] : "?", FontWeight = FontWeight.Bold, FontSize = 18, Foreground = Brushes.White,
             HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
         };
         var back = new Border
@@ -253,10 +253,24 @@ public static class Ui
                 GradientStops = { new GradientStop(Color.Parse(def.Accent), 0), new GradientStop(Color.Parse("#1A1D26"), 1) },
             },
             Child = initials,
-            IsVisible = image.Source is null,
         };
-        backRef = back;
-        return new Panel { Children = { back, image } };
+        void Show(Bitmap bmp)
+        {
+            var poster = stretch == Stretch.UniformToFill && !GameArt.Fits(bmp, art);
+            fill.Source = poster ? Images.Tiny(bmp) : null;
+            fill.IsVisible = shade.IsVisible = poster;
+            image.Stretch = poster ? Stretch.Uniform : stretch;
+            image.Source = bmp;
+            back.IsVisible = false;
+        }
+        var ready = Images.GameAsset(def, art, decode) ?? (art == Images.Art.Header ? Images.Game(def, decode) : null);
+        if (ready is not null) Show(ready);
+        else
+            _ = Images.GameAsync(def, art, decode).ContinueWith(t =>
+            {
+                if (t.Result is Bitmap bmp) Avalonia.Threading.Dispatcher.UIThread.Post(() => Show(bmp));
+            });
+        return new Panel { Children = { back, fill, shade, image } };
     }
 
     /// <summary>Картинка по ссылке: пока грузится — буквы на цветном фоне.</summary>
