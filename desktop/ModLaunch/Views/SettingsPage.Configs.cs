@@ -39,7 +39,15 @@ public sealed partial class SettingsPage
         var copy = Ui.Button(I18n.T("v10.set.copy"), () => { _ = TopLevel.GetTopLevel(w)?.Clipboard?.SetTextAsync(Configs.Capture("ModLaunch")); w.Toast(I18n.T("v10.set.copied")); }, "ghost", Icons.Copy);
         var tools = new WrapPanel { Children = { load, save, export, folder, copy } };
         foreach (var b in tools.Children.OfType<Control>()) b.Margin = new Thickness(0, 0, 8, 8);
-        return Section(I18n.T("v10.set.configs"), I18n.T("v10.set.configs.hint"), tools, wrap);
+        // 17.0: личные сборки создателей — открываются на пути уровней, закрытые видны с замком и уровнем.
+        var (level, _, _) = RoadKit.Now();
+        var builds = new WrapPanel();
+        foreach (var b in CreatorBuilds.All)
+            builds.Children.Add(ConfigCard(CreatorBuilds.Config(b), CreatorBuilds.Open(b, level) ? null : b.Level));
+        var open = CreatorBuilds.All.Count(b => CreatorBuilds.Open(b, level));
+        var head = Ui.Row(10, Ui.Text(I18n.T("v99.kind.config.many"), "h3"), Gx.Tag($"{open} / {CreatorBuilds.All.Length}", Ui.Res("Surface3")));
+        var creators = Ui.Col(8, head, Ui.Text(I18n.T("v17.cb.hint"), "muted small", wrap: true), builds);
+        return Section(I18n.T("v10.set.configs"), I18n.T("v10.set.configs.hint"), tools, wrap, creators);
     }
 
     void SaveDialog()
@@ -64,11 +72,13 @@ public sealed partial class SettingsPage
     /// <summary>Золотой акцент (в 10.0.0 был наградой из кейса) — теперь у всех.</summary>
     const string GoldAccent = "#E8B84A";
 
-    /// <summary>Карточка конфига: мини-экран (боковая панель, сцена, виджеты), название, «Применить».</summary>
-    Control ConfigCard(UiConfig c)
+    /// <summary>
+    /// Мини-экран конфига 228×132: боковая панель, сцена главной и виджеты в его цветах.
+    /// 17.0: общий для карточек конфигов, наград «Сборки создателей» и пути уровней.
+    /// </summary>
+    internal static Border MiniScreen(UiConfig c)
     {
         var (p, accent, scan, radius) = Configs.Preview(c);
-        var on = Configs.CurrentId == c.Id;
         IBrush B(string key) => Ui.Hex(p.TryGetValue(key, out var v) ? v : "#000000");
         var r = radius == "sharp" ? 1 : radius == "round" ? 7 : 4;
         var screen = new Canvas { Width = 228, Height = 132, Background = B("Bg"), ClipToBounds = true };
@@ -111,8 +121,16 @@ public sealed partial class SettingsPage
             Box(33 + at[i].X * (cell + gap), top, cw * cell + (cw - 1) * gap, chh * ch + (chh - 1) * gap, B("Surface"));
         }
         if (scan) screen.Children.Add(new Border { Width = 228, Height = 132, Child = Gx.Scanlines(), Opacity = 0.9 });
+        return new Border { CornerRadius = new CornerRadius(12), ClipToBounds = true, Child = screen, BorderBrush = Ui.Res("Line"), BorderThickness = new Thickness(1) };
+    }
 
-        var shot = new Border { CornerRadius = new CornerRadius(12), ClipToBounds = true, Child = screen, BorderBrush = Ui.Res("Line"), BorderThickness = new Thickness(1) };
+    /// <summary>Карточка конфига: мини-экран (боковая панель, сцена, виджеты), название, «Применить».
+    /// 17.0: lockedAt — сборка создателя ещё не открыта (уровень, на котором откроется).</summary>
+    Control ConfigCard(UiConfig c, int? lockedAt = null)
+    {
+        var on = Configs.CurrentId == c.Id;
+        var shot = MiniScreen(c);
+        if (lockedAt is not null) shot.Opacity = 0.45;
         var title = Ui.Row(8, new TextBlock { Text = c.Name, FontWeight = FontWeight.SemiBold, FontSize = 14.5, TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = 160 });
         if (on) title.Children.Add(Gx.Tag(I18n.T("v10.set.on"), Ui.Res("BrandSoft"), Ui.Res("Brand2"), 11));
         var about = new TextBlock
@@ -121,7 +139,12 @@ public sealed partial class SettingsPage
             FontSize = 12, Foreground = Ui.Res("Muted"), TextWrapping = TextWrapping.Wrap, MaxLines = 2, TextTrimming = TextTrimming.CharacterEllipsis, Height = 32,
         };
         var actions = Ui.Row(6);
-        actions.Children.Add(Ui.Button(on ? I18n.T("v10.set.reapply") : I18n.T("v10.set.apply"), () => { Configs.Apply(c); MainWindow.Current?.Toast(I18n.T("v10.cfg.applied", ("name", c.Name))); Build(); }, on ? "" : "primary", on ? Icons.Refresh : Icons.Check));
+        if (lockedAt is int lv)
+            actions.Children.Add(Ui.Row(6, Ui.Icon(Icons.Lock, 13, Ui.Res("Faint")), Ui.Text(I18n.T("v16.road.locked", ("n", lv)), "small muted")));
+        else if (CreatorBuilds.Find(c.Id) is { } build)
+            actions.Children.Add(Ui.Button(on ? I18n.T("v10.set.reapply") : I18n.T("v10.set.apply"), () => { CreatorBuilds.Apply(build); MainWindow.Current?.Toast(I18n.T("v17.cb.applied", ("name", c.Name))); }, on ? "" : "primary", on ? Icons.Refresh : Icons.Check));
+        else
+            actions.Children.Add(Ui.Button(on ? I18n.T("v10.set.reapply") : I18n.T("v10.set.apply"), () => { Configs.Apply(c); MainWindow.Current?.Toast(I18n.T("v10.cfg.applied", ("name", c.Name))); }, on ? "" : "primary", on ? Icons.Refresh : Icons.Check));
         if (c.File is { } file)
         {
             actions.Children.Add(Ui.Button("", () => Ui.OpenUrl(file), "icon ghost", Icons.Edit, I18n.T("v10.set.edit")));

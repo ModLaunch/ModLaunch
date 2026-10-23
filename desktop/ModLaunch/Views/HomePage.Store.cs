@@ -167,8 +167,9 @@ public sealed partial class HomePage
             for (var i = 0; i < views.Count; i++)
             {
                 var on = i == index;
-                views[i].Transitions = animate && Animate.On ? [new Avalonia.Animation.DoubleTransition { Property = Visual.OpacityProperty, Duration = TimeSpan.FromMilliseconds(520) }] : null;
-                views[i].Opacity = on ? 1 : 0;
+                // 17.0: смена слайда — по кадрам (переходы на первом кадре показывали новый слайд целиком и гасили старый).
+                if (animate) Animate.FadeTo(views[i], on ? 1 : 0, 520);
+                else { views[i].Transitions = null; views[i].Opacity = on ? 1 : 0; }
                 views[i].IsHitTestVisible = on;
                 views[i].ZIndex = on ? 1 : 0;
                 pips[i].Width = on ? 22 : 6;

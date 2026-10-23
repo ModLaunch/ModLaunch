@@ -44,6 +44,13 @@ public sealed partial class HomePage
         var hero = Settings.Data.Str("homeHero") ?? "stage";
         if (hero != "off" && mine.Count > 0)
         {
+            // 15.1: только что появившаяся игра выходит на сцену сама — один раз за сеанс.
+            // 17.0: только при открытии главной — стрелки и клик по обложке больше не перебивает новая игра.
+            if (mine.FirstOrDefault(x => NewGames.IsNew(x) && !Presented.Contains(x.Def.Id)) is { } newest)
+            {
+                Presented.Add(newest.Def.Id);
+                _stage = newest.Def.Id;
+            }
             _stageHost = new Border { Child = Stage(mine, hero == "compact") };
             col.Children.Add(Intro(_stageHost, n++));
         }
@@ -100,12 +107,6 @@ public sealed partial class HomePage
 
     Control Stage(List<GameState> mine, bool compact, bool switching = false)
     {
-        // 15.1: только что появившаяся игра выходит на сцену сама — один раз за сеанс.
-        if (mine.FirstOrDefault(x => NewGames.IsNew(x) && !Presented.Contains(x.Def.Id)) is { } newest)
-        {
-            Presented.Add(newest.Def.Id);
-            _stage = newest.Def.Id;
-        }
         var g = mine.FirstOrDefault(x => x.Def.Id == _stage) ?? mine[0];
         _stage = g.Def.Id;
         var id = g.Def.Id;
@@ -113,26 +114,16 @@ public sealed partial class HomePage
         var running = Launcher.IsRunning(id);
 
         var art = new Border { Child = Ui.GameImage(g.Def, 1600, art: Images.Art.Hero), ClipToBounds = true };
-        if (Animate.On && !Program.Screenshot)
+        if (Animate.On && (!Program.Screenshot || Animate.Recording))
         {
             // Медленный наезд камеры — едва заметный, как на экране консоли. 15.1: при смене игры новый фон
             // проявляется поверх прежнего, приближаясь (всё внутри рамки сцены: она обрезает края).
             var slow = new Transitions { new TransformOperationsTransition { Property = RenderTransformProperty, Duration = TimeSpan.FromSeconds(16), Easing = new SineEaseOut() } };
             if (switching)
             {
-                art.Opacity = 0;
-                art.RenderTransform = Tf("scale(1.14)");
-                art.Transitions =
-                [
-                    new DoubleTransition { Property = OpacityProperty, Duration = TimeSpan.FromMilliseconds(520), Easing = new CubicEaseOut() },
-                    new TransformOperationsTransition { Property = RenderTransformProperty, Duration = TimeSpan.FromMilliseconds(1100), Easing = new QuinticEaseOut() },
-                ];
-                art.AttachedToVisualTree += (_, _) => Dispatcher.UIThread.Post(() =>
-                {
-                    art.Opacity = 1;
-                    art.RenderTransform = Tf("scale(1.0)");
-                    DispatcherTimer.RunOnce(() => { art.Transitions = slow; art.RenderTransform = Tf("scale(1.06)"); }, TimeSpan.FromMilliseconds(1150));
-                }, DispatcherPriority.Background);
+                // 17.0: по кадрам — переход Avalonia на первом кадре успевал показать новый фон целиком.
+                Animate.From(art, "scale(1.14)", 1100, 0, new QuinticEaseOut());
+                Animate.Later(() => { if (Avalonia.VisualTree.VisualExtensions.IsAttachedToVisualTree(art)) { art.Transitions = slow; art.RenderTransform = Tf("scale(1.06)"); } }, 1150);
             }
             else
             {
@@ -309,7 +300,7 @@ public sealed partial class HomePage
         if (!animate || _parts is not { } now) return;
         old!.Stage.Children.Remove(old.Art);
         now.Stage.Children.Insert(0, old.Art);
-        DispatcherTimer.RunOnce(() => now.Stage.Children.Remove(old.Art), TimeSpan.FromMilliseconds(700));
+        Animate.Later(() => now.Stage.Children.Remove(old.Art), 820);
         Animate.From(now.Tint, "none", 700, 0, new CubicEaseOut());
         for (var i = 0; i < now.Text.Length; i++)
             Animate.From(now.Text[i], "translateX(-36px)", 520, 70 + i * 70, new QuinticEaseOut());

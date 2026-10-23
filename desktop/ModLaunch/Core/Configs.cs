@@ -37,6 +37,21 @@ public static class Configs
 
     static readonly Dictionary<string, string> ColorCommand = Look.ColorKeys.ToDictionary(k => k, k => "color_" + k.ToLowerInvariant());
 
+    /// <summary>
+    /// 17.0: настройки поведения, которые тоже можно положить в конфиг (сборки создателей): команда → ключ настроек.
+    /// Только то, что безопасно менять одним файлом: вид списков, прокрутка, заставка, уведомления, эффекты.
+    /// </summary>
+    static readonly Dictionary<string, string> Prefs = new()
+    {
+        ["smooth_scroll"] = "smoothScroll", ["compact_lists"] = "compactLists", ["status_bar"] = "statusBar", ["splash"] = "splash",
+        ["toast_on_done"] = "toastOnDone", ["fx_install"] = "installFx", ["fx_mod_open"] = "modOpenFx", ["mature"] = "mature",
+    };
+
+    /// <summary>Все команды, которые понимает конфиг (для проверки сборок и подсказок).</summary>
+    public static readonly IReadOnlyCollection<string> Commands = new HashSet<string>(
+        ["name", "author", "about", "theme", "accent", "font", "radius", "backdrop", "scale", "fx_scanlines", "fx_vignette", "anim", "anim_open", "anim_launch",
+         "home_hero", "headings", "glow", "widget", "widget_grid", .. ColorCommand.Values, .. Prefs.Keys]);
+
     // ---------------------------------------------------------------- встроенные
 
     static UiConfig Make(string id, string author, string text)
@@ -236,6 +251,10 @@ public static class Configs
     }
 
 
+    /// <summary>Конфиг по id: встроенный, сборка создателя или файл из папки configs.</summary>
+    public static UiConfig? ById(string id) =>
+        id.StartsWith(CreatorBuilds.Prefix) ? CreatorBuilds.Find(id) is { } b ? CreatorBuilds.Config(b) : null : All().FirstOrDefault(x => x.Id == id);
+
     // ---------------------------------------------------------------- файл
 
     public static UiConfig? Read(string path)
@@ -291,6 +310,18 @@ public static class Configs
     {
         var d = Settings.Data;
         var palette = new JsonObject();
+        var prefs = false;
+        // 17.0: прежний конфиг (например, сборка создателя «Лёгкая») выключал прокрутку или анимации — новый,
+        // где об этом ни слова, возвращает их к обычным, а не оставляет чужой выбор навсегда.
+        if (CurrentId is { } was && was != c.Id && ById(was) is { } previous)
+            foreach (var (key, _) in previous.Lines)
+            {
+                if (c.Get(key) is not null) continue;
+                if (Prefs.TryGetValue(key, out var setting)) { d.Remove(setting); prefs = true; }
+                else if (key == "anim") d.Remove("animations");
+                else if (key == "scale") d.Remove("uiScale");
+                else if (key == "backdrop") d.Remove("backdrop");
+            }
         foreach (var (key, value) in c.Lines)
         {
             switch (key)
@@ -310,6 +341,7 @@ public static class Configs
                 case "home_hero" when value is "stage" or "compact" or "off": d["homeHero"] = value; break;
                 case "headings" when value is "ui" or "wide": d["headings"] = value; break;
                 case "glow" when double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var g) && g is >= 0 and <= 1: d["glow"] = g; break;
+                case var p when Prefs.TryGetValue(p, out var setting): d[setting] = On(value); prefs = true; break;
                 default:
                     if (ColorCommand.FirstOrDefault(x => x.Value == key).Key is { } color && Avalonia.Media.Color.TryParse(value, out _)) palette[color] = value;
                     break;
@@ -338,6 +370,8 @@ public static class Configs
         if (!apply) return;
         Look.Apply();
         Widgets.Notify();
+        // Строка состояния и списки перечитывают настройки при обновлении состояния.
+        if (prefs) AppState.Notify();
     }
 
     static bool On(string v) => v is "1" or "true" or "on" or "yes";
@@ -368,6 +402,9 @@ public static class Configs
         sb.AppendLine("home_hero " + (d.Str("homeHero") ?? "stage"));
         sb.AppendLine("headings " + (Look.WideHeadings ? "wide" : "ui"));
         sb.AppendLine("glow " + Look.Glow.ToString(CultureInfo.InvariantCulture));
+        // 17.0: настройки поведения — только заданные явно (иначе конфиг навязал бы их другу).
+        foreach (var (cmd, setting) in Prefs)
+            if (d[setting] is not null) sb.AppendLine($"{cmd} {(d.Bool(setting) ? 1 : 0)}");
         sb.AppendLine($"widget_grid {Widgets.Density} {Widgets.Gap}");
         foreach (var e in Widgets.Entries()) sb.AppendLine("widget " + Widgets.Format(e));
         return sb.ToString();

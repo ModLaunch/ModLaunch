@@ -12,6 +12,10 @@ public static class WhatsNew
 {
     static readonly (string Icon, string Key, Func<Page>? Open)[] Items =
     [
+        (Icons.Trophy, "new.v17.builds", () => new ProfilePage("rewards")),
+        (Icons.Palette, "new.v17.colors", () => new SettingsPage("look")),
+        (Icons.Play, "new.v17.motion", null),
+        (Icons.Activity, "new.v17.fast", null),
         (Icons.Code, "new.v16.studio", () => CreatorPage.NewForm()),
         (Icons.Layers, "new.v16.bridge", XStudio.Entry),
         (Icons.Sparkles, "new.v16.ai", () => new AiBuildsPage()),

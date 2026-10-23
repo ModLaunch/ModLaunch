@@ -25,9 +25,8 @@ public sealed partial class HomePage
         var mine = MyGames();
         if (mine.Count < 2) return false;
         var at = Math.Max(0, mine.FindIndex(g => g.Def.Id == _stage));
-        _stage = mine[((at + delta) % mine.Count + mine.Count) % mine.Count].Def.Id;
-        _stageHost.Child = Stage(mine, Settings.Data.Str("homeHero") == "compact");
-        if (Animate.On) Animate.From(_stageHost, delta > 0 ? "translateX(8px)" : "translateX(-8px)", 220, 0, null, 0.7);
+        // 17.0: стрелки меняют игру тем же переходом, что и клик по обложке (раньше сцена просто дёргалась вбок).
+        SwitchStage(mine[((at + delta) % mine.Count + mine.Count) % mine.Count].Def.Id);
         return true;
     }
 

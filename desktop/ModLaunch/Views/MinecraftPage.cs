@@ -330,29 +330,7 @@ public sealed partial class MinecraftPage : Page
             if (active is null || active.Bounds.Width <= 0) return;
             var p = active.TranslatePoint(new Point(0, 0), row) ?? new Point();
             var target = (X: p.X + 10, W: Math.Max(0, active.Bounds.Width - 20));
-            var inv = System.Globalization.CultureInfo.InvariantCulture;
-            if (animate && Animate.On && Mark.TryGetValue("mc", out var was) && Math.Abs(was.X - target.X) > 1)
-            {
-                ink.Transitions = null;
-                ink.Width = was.W;
-                ink.RenderTransform = Avalonia.Media.Transformation.TransformOperations.Parse($"translateX({was.X.ToString(inv)}px)");
-                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                {
-                    ink.Transitions =
-                    [
-                        new Avalonia.Animation.DoubleTransition { Property = Layoutable.WidthProperty, Duration = TimeSpan.FromMilliseconds(320), Easing = new Avalonia.Animation.Easings.CubicEaseOut() },
-                        new Avalonia.Animation.TransformOperationsTransition { Property = Visual.RenderTransformProperty, Duration = TimeSpan.FromMilliseconds(360), Easing = new Avalonia.Animation.Easings.BackEaseOut() },
-                    ];
-                    ink.Width = target.W;
-                    ink.RenderTransform = Avalonia.Media.Transformation.TransformOperations.Parse($"translateX({target.X.ToString(inv)}px)");
-                }, Avalonia.Threading.DispatcherPriority.Background);
-            }
-            else
-            {
-                ink.Transitions = null;
-                ink.Width = target.W;
-                ink.RenderTransform = Avalonia.Media.Transformation.TransformOperations.Parse($"translateX({target.X.ToString(inv)}px)");
-            }
+            Animate.Underline(ink, animate && Mark.TryGetValue("mc", out var was) ? was : null, target);
             Mark["mc"] = target;
         }
         row.LayoutUpdated += (_, _) => { if (placed || active is null || active.Bounds.Width <= 0) return; placed = true; Place(true); };

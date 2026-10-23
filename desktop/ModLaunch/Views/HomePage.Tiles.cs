@@ -201,7 +201,7 @@ public sealed partial class HomePage
         HorizontalAlignment = HorizontalAlignment.Stretch, VerticalAlignment = VerticalAlignment.Stretch,
         HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Stretch,
         Background = Brushes.Transparent,
-        Transitions = [new TransformOperationsTransition { Property = Visual.RenderTransformProperty, Duration = TimeSpan.FromMilliseconds(280), Easing = new BackEaseOut() }],
+        Transitions = [new TransformOperationsTransition { Property = Visual.RenderTransformProperty, Duration = TimeSpan.FromMilliseconds(280), Easing = new CubicEaseOut() }],
         Content = content,
     };
 
@@ -403,7 +403,7 @@ public sealed partial class HomePage
                 Cursor = new Cursor(StandardCursorType.Hand), Opacity = g.Status == Detect.Found ? 1 : 0.75,
                 RenderTransformOrigin = new RelativePoint(0.5, 1, RelativeUnit.Relative),
                 RenderTransform = TransformOperations.Parse(rest),
-                Transitions = [new TransformOperationsTransition { Property = Visual.RenderTransformProperty, Duration = TimeSpan.FromMilliseconds(240), Easing = new BackEaseOut() }],
+                Transitions = [new TransformOperationsTransition { Property = Visual.RenderTransformProperty, Duration = TimeSpan.FromMilliseconds(240), Easing = new CubicEaseOut() }],
             };
             Canvas.SetLeft(host, 10 + i * step);
             Canvas.SetTop(host, 16);

@@ -192,9 +192,17 @@ public static class ProfileKit
             "frame" => Avatar(name, 64, r.Id, 5),
             "banner" => new Border { Width = 150, Height = 64, CornerRadius = new CornerRadius(12), ClipToBounds = true, Child = Banner(r.Id) },
             "title" => new Border { Height = 64, Child = new Border { VerticalAlignment = VerticalAlignment.Center, Child = Title(r.Id, 13) } },
+            // 17.0: сборка создателя — мини-экран программы в её цветах.
+            "config" => ConfigShot(r.Id, 112),
             _ => Badge(r.Id, 56),
         };
     }
+
+    /// <summary>Мини-экран сборки создателя шириной width (высота — по пропорциям экрана 228×132).</summary>
+    public static Control ConfigShot(string id, double width) =>
+        CreatorBuilds.Find(id) is { } b
+            ? new Viewbox { Width = width, Height = width * 132 / 228, Stretch = Stretch.Uniform, Child = SettingsPage.MiniScreen(CreatorBuilds.Config(b)) }
+            : new Border { Width = width, Height = width * 132 / 228 };
 
     public static string PlayerName()
     {

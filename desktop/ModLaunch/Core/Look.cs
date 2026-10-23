@@ -10,7 +10,9 @@ namespace ModLaunch.Core;
 /// </summary>
 public static class Look
 {
-    public static readonly string[] Themes = ["slate", "store", "snow", "jet", "ink", "graphite", "paper", "dark", "black", "light", "midnight", "nord", "forest", "grape", "mocha", "sand", "contrast"];
+    public static readonly string[] Themes = ["slate", "store", "snow", "jet", "ink", "graphite", "paper", "dark", "black", "light", "midnight", "nord", "forest", "grape", "mocha", "sand", "contrast",
+        // 17.0: восемь новых — пять тёмных и три светлых.
+        "ocean", "crimson", "cyber", "olive", "rose", "mint", "sky", "blossom"];
     public static readonly string[] Designs = ["store", "vitrina", "studio", "aurora"];
 
     /// <summary>
@@ -192,7 +194,9 @@ public static class Look
         }
     }
 
-    public static readonly string[] Accents = ["#7B5CFF", "#D7262E", "#2BD46F", "#6E4BFF", "#F2483A", "#7C5CFF","#3B82F6", "#14B8A6", "#22C55E", "#EAB308", "#F97316", "#EF4444", "#EC4899", "#06B6D4", "#A3E635", "#F43F5E", "#8B5CF6", "#1BD96A", "#0078D4", "#FFFFFF"];
+    public static readonly string[] Accents = ["#7B5CFF", "#D7262E", "#2BD46F", "#6E4BFF", "#F2483A", "#7C5CFF","#3B82F6", "#14B8A6", "#22C55E", "#EAB308", "#F97316", "#EF4444", "#EC4899", "#06B6D4", "#A3E635", "#F43F5E", "#8B5CF6", "#1BD96A", "#0078D4", "#FFFFFF",
+        // 17.0: коралл, аква, небесный, лаванда, мандарин, сталь, мята и вишня.
+        "#FF7A59", "#00C2A8", "#38BDF8", "#B79CFF", "#FFA94D", "#94A3B8", "#5EEAD4", "#E11D74"];
     public static readonly string[] Fonts = ["Onest", "Inter", "Segoe UI", "Segoe UI Variable Display", "Arial", "Verdana", "Bahnschrift", "Consolas", "Cascadia Code"];
     public static readonly string[] Radii = ["sharp", "normal", "round"];
     public static readonly string[] Backdrops = ["aurora", "soft", "grid", "plain"];
@@ -224,7 +228,8 @@ public static class Look
     /// <summary>Сила цветного свечения фона, 0…1.</summary>
     public static double Glow => Settings.Data["glow"] is { } g && double.TryParse(g.ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v) ? Math.Clamp(v, 0, 1) : 1;
     /// <summary>Светлые темы (для подсветки кода и иконок).</summary>
-    public static bool IsLight => Theme == "custom" ? Luma(Color.Parse(Current["Bg"])) > 0.55 : Theme is "light" or "sand" or "paper" or "snow";
+    /// <summary>Светлая тема — по яркости фона (17.0: так и новые светлые темы, и свои палитры считаются верно).</summary>
+    public static bool IsLight => Luma(Color.Parse(Current["Bg"])) > 0.55;
 
     public static void SetFont(string font) { Settings.Data["font"] = font; Settings.Save(); Apply(); }
     public static void SetRadius(string radius) { Settings.Data["radius"] = radius; Settings.Save(); Apply(); }
@@ -414,6 +419,52 @@ public static class Look
         {
             ["Bg"] = "#000000", ["Rail"] = "#000000", ["Surface"] = "#0A0A0A", ["Surface2"] = "#141414", ["Surface3"] = "#222222",
             ["Line"] = "#FFFFFF", ["Text"] = "#FFFFFF", ["Muted"] = "#E0E0E0", ["Faint"] = "#BDBDBD",
+        },
+        // 17.0: «Океан» — глубокая сине-зелёная вода; спокойно смотрится с бирюзовым и голубым акцентом.
+        ["ocean"] = new()
+        {
+            ["Bg"] = "#0A1418", ["Rail"] = "#0A1418", ["Layer"] = "#0E1A1F", ["Surface"] = "#122128", ["Surface2"] = "#182A32", ["Surface3"] = "#20353E",
+            ["Line"] = "#1F333C", ["Text"] = "#E6F3F6", ["Muted"] = "#93B1BA", ["Faint"] = "#5F7F89",
+        },
+        // «Бордо» — тёмное вино: тёплый тёмный фон для красного, кораллового и золотого акцента.
+        ["crimson"] = new()
+        {
+            ["Bg"] = "#160C0E", ["Rail"] = "#160C0E", ["Layer"] = "#1C1013", ["Surface"] = "#241518", ["Surface2"] = "#2D1B1F", ["Surface3"] = "#382328",
+            ["Line"] = "#3A2328", ["Text"] = "#F7E9EB", ["Muted"] = "#C3A1A7", ["Faint"] = "#8C6A70",
+        },
+        // «Кибер» — ночной синий с холодным отливом: для неонового голубого и розового.
+        ["cyber"] = new()
+        {
+            ["Bg"] = "#070B14", ["Rail"] = "#070B14", ["Layer"] = "#0B111D", ["Surface"] = "#101828", ["Surface2"] = "#152034", ["Surface3"] = "#1C2A42",
+            ["Line"] = "#1B2740", ["Text"] = "#E3F1FF", ["Muted"] = "#8FA8C8", ["Faint"] = "#5A7090",
+        },
+        // «Хаки» — оливковый полевой: приглушённо, без синевы, под зелёный и жёлтый акцент.
+        ["olive"] = new()
+        {
+            ["Bg"] = "#12130E", ["Rail"] = "#12130E", ["Layer"] = "#171812", ["Surface"] = "#1E2018", ["Surface2"] = "#26281F", ["Surface3"] = "#303327",
+            ["Line"] = "#2F3226", ["Text"] = "#EEF0E4", ["Muted"] = "#ADB19A", ["Faint"] = "#777B66",
+        },
+        // «Роза» — тёмно-розовый бархат.
+        ["rose"] = new()
+        {
+            ["Bg"] = "#170D13", ["Rail"] = "#170D13", ["Layer"] = "#1D1118", ["Surface"] = "#251620", ["Surface2"] = "#2E1C28", ["Surface3"] = "#3A2433",
+            ["Line"] = "#3A2533", ["Text"] = "#FBEAF3", ["Muted"] = "#C9A2B8", ["Faint"] = "#8E6C80",
+        },
+        // Светлые: «Мята», «Небо» и «Сакура» — белые карточки на чуть цветном фоне.
+        ["mint"] = new()
+        {
+            ["Bg"] = "#E6F1EC", ["Rail"] = "#E6F1EC", ["Layer"] = "#F3F8F5", ["Surface"] = "#FFFFFF", ["Surface2"] = "#EEF5F1", ["Surface3"] = "#E0EBE5",
+            ["Line"] = "#D5E3DB", ["Text"] = "#12201A", ["Muted"] = "#4F6359", ["Faint"] = "#87998F",
+        },
+        ["sky"] = new()
+        {
+            ["Bg"] = "#E7EEF7", ["Rail"] = "#E7EEF7", ["Layer"] = "#F4F7FC", ["Surface"] = "#FFFFFF", ["Surface2"] = "#EEF3F9", ["Surface3"] = "#E1E9F3",
+            ["Line"] = "#D5DFEB", ["Text"] = "#111A26", ["Muted"] = "#4E5D70", ["Faint"] = "#8794A6",
+        },
+        ["blossom"] = new()
+        {
+            ["Bg"] = "#F6EBEF", ["Rail"] = "#F6EBEF", ["Layer"] = "#FBF5F7", ["Surface"] = "#FFFFFF", ["Surface2"] = "#F7EDF1", ["Surface3"] = "#EEDDE4",
+            ["Line"] = "#E8D5DD", ["Text"] = "#24121A", ["Muted"] = "#6E5360", ["Faint"] = "#9F8893",
         },
     };
 

@@ -295,29 +295,7 @@ public sealed partial class GamePage
             if (active is null || active.Bounds.Width <= 0) return;
             var p = active.TranslatePoint(new Point(0, 0), row) ?? new Point();
             var target = (X: p.X + 14, W: Math.Max(0, active.Bounds.Width - 28));
-            var inv = System.Globalization.CultureInfo.InvariantCulture;
-            if (animate && Animate.On && TabMark.TryGetValue(id, out var was) && Math.Abs(was.X - target.X) > 1)
-            {
-                indicator.Transitions = null;
-                indicator.Width = was.W;
-                indicator.RenderTransform = Avalonia.Media.Transformation.TransformOperations.Parse($"translateX({was.X.ToString(inv)}px)");
-                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                {
-                    indicator.Transitions =
-                    [
-                        new Avalonia.Animation.DoubleTransition { Property = Layoutable.WidthProperty, Duration = TimeSpan.FromMilliseconds(320), Easing = new Avalonia.Animation.Easings.CubicEaseOut() },
-                        new Avalonia.Animation.TransformOperationsTransition { Property = Visual.RenderTransformProperty, Duration = TimeSpan.FromMilliseconds(360), Easing = new Avalonia.Animation.Easings.BackEaseOut() },
-                    ];
-                    indicator.Width = target.W;
-                    indicator.RenderTransform = Avalonia.Media.Transformation.TransformOperations.Parse($"translateX({target.X.ToString(inv)}px)");
-                }, Avalonia.Threading.DispatcherPriority.Background);
-            }
-            else
-            {
-                indicator.Transitions = null;
-                indicator.Width = target.W;
-                indicator.RenderTransform = Avalonia.Media.Transformation.TransformOperations.Parse($"translateX({target.X.ToString(inv)}px)");
-            }
+            Animate.Underline(indicator, animate && TabMark.TryGetValue(id, out var was) ? was : null, target);
             TabMark[id] = target;
         }
         var placed = false;

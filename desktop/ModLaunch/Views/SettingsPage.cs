@@ -263,7 +263,19 @@ public sealed partial class SettingsPage : Page
     Control GamesTab()
     {
         var list = new StackPanel { Spacing = 10 };
-        foreach (var g in AppState.Games)
+        // 17.0: игр бывает сотня с лишним — строки порциями, первые сразу.
+        Ui.Fill(list, AppState.Games.Select(g => (Func<Control>)(() => GameRow(g))).ToList(), first: 10, step: 10);
+        var guide = Ui.Col(6, Ui.Text(I18n.T("guide.title"), "h3"),
+            Ui.Text(I18n.T("guide.steam"), "small muted", wrap: true), Ui.Text(I18n.T("guide.gog"), "small muted", wrap: true),
+            Ui.Text(I18n.T("guide.repack"), "small muted", wrap: true), Ui.Text(I18n.T("guide.check"), "small muted", wrap: true));
+        return Ui.Col(16, Section(I18n.T("settings.games"), I18n.T("settings.games.hint"), list,
+            Ui.Button(I18n.T("games.deep"), () => _ = AppState.DetectMany(AppState.Games.Where(x => x.Status != Detect.Found).ToList(), deep: true), "", Icons.Search),
+            Toggle(I18n.T("v151.set.autoAdd"), I18n.T("v151.set.autoAdd.hint"), Features.NewGames.AutoAdd, v => Features.NewGames.AutoAdd = v),
+            guide), GamesOrderSection(), HiddenSection());
+    }
+
+    static Control GameRow(GameState g)
+    {
         {
             var status = g.Status switch
             {
@@ -294,15 +306,8 @@ public sealed partial class SettingsPage : Page
             grid.Children.Add(info);
             Grid.SetColumn(buttons, 2);
             grid.Children.Add(buttons);
-            list.Children.Add(new Border { Background = Ui.Res("Surface2"), CornerRadius = new CornerRadius(12), Padding = new Thickness(12), Child = grid });
+            return new Border { Background = Ui.Res("Surface2"), CornerRadius = new CornerRadius(12), Padding = new Thickness(12), Child = grid };
         }
-        var guide = Ui.Col(6, Ui.Text(I18n.T("guide.title"), "h3"),
-            Ui.Text(I18n.T("guide.steam"), "small muted", wrap: true), Ui.Text(I18n.T("guide.gog"), "small muted", wrap: true),
-            Ui.Text(I18n.T("guide.repack"), "small muted", wrap: true), Ui.Text(I18n.T("guide.check"), "small muted", wrap: true));
-        return Ui.Col(16, Section(I18n.T("settings.games"), I18n.T("settings.games.hint"), list,
-            Ui.Button(I18n.T("games.deep"), () => _ = AppState.DetectMany(AppState.Games.Where(x => x.Status != Detect.Found).ToList(), deep: true), "", Icons.Search),
-            Toggle(I18n.T("v151.set.autoAdd"), I18n.T("v151.set.autoAdd.hint"), Features.NewGames.AutoAdd, v => Features.NewGames.AutoAdd = v),
-            guide), GamesOrderSection(), HiddenSection());
     }
 
     // ---------------------------------------------------------------- запуск и игровое время

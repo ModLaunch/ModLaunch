@@ -41,6 +41,8 @@ public static class RoadKit
                     Height = size * 0.62, MinWidth = size * 0.9, MaxWidth = size * 1.6, CornerRadius = new CornerRadius(999), Padding = new Thickness(7, 0), ClipToBounds = true,
                     Child = new Viewbox { Stretch = Stretch.Uniform, StretchDirection = StretchDirection.DownOnly, Child = ProfileKit.Title(r.Id, 11) },
                 };
+            case "config":
+                return ProfileKit.ConfigShot(r.Id, size * 1.3);
             default:
                 return ProfileKit.Badge(r.Id, size);
         }
@@ -89,8 +91,24 @@ public static class RoadKit
                 Text = I18n.T("v16.road.lv", ("n", lv)), FontSize = 11, FontWeight = big || next ? FontWeight.Bold : FontWeight.Normal, HorizontalAlignment = HorizontalAlignment.Center,
                 Foreground = have ? Ui.Res("Text") : next ? Ui.Res("Brand2") : Ui.Res("Faint"), Margin = new Thickness(0, 6, 0, 0),
             };
-            var cell = Ui.Col(0, disc, label);
-            ToolTip.SetTip(cell, I18n.T("v16.road.tip", ("n", lv), ("kind", Cosmetics.KindName(reward.Kind)), ("name", Cosmetics.Name(reward))) + (have ? "" : " · " + I18n.T("v16.road.closed")));
+            // 17.0: на уровне есть и сборка создателя — шестерёнка у края ступени.
+            Control top = disc;
+            var bonus = LevelRoad.BonusAt(lv);
+            if (bonus is not null)
+            {
+                var gear = new Border
+                {
+                    Width = 18, Height = 18, CornerRadius = new CornerRadius(9), Background = have ? accent : Ui.Res("Surface3"),
+                    BorderBrush = Ui.Res("Surface"), BorderThickness = new Thickness(2), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Top,
+                    Margin = new Thickness(size * 0.8, (node - size) / 2 - 2, 0, 0),
+                    Child = Ui.Icon(Icons.Settings, 10, have ? Ui.Res("OnBrand") : Ui.Res("Muted")),
+                };
+                top = new Panel { Children = { disc, gear } };
+            }
+            var cell = Ui.Col(0, top, label);
+            var tip = I18n.T("v16.road.tip", ("n", lv), ("kind", Cosmetics.KindName(reward.Kind)), ("name", Cosmetics.Name(reward)));
+            if (bonus is not null) tip += " + " + Cosmetics.KindName("config").ToLowerInvariant() + " «" + Cosmetics.Name(bonus) + "»";
+            ToolTip.SetTip(cell, tip + (have ? "" : " · " + I18n.T("v16.road.closed")));
             Grid.SetColumn(cell, i);
             grid.Children.Add(cell);
         }
@@ -102,6 +120,26 @@ public static class RoadKit
     {
         var next = LevelRoad.Road.FirstOrDefault(x => x.Level > level);
         return next.Reward is null ? I18n.T("v16.road.done") : I18n.T("v16.road.next", ("kind", Cosmetics.KindName(next.Reward.Kind)), ("name", Cosmetics.Name(next.Reward)), ("n", next.Level));
+    }
+
+    static Control ClaimCard(Reward r, int lv, Control preview)
+    {
+        var col = Ui.Col(8, new Border { Height = 66, Child = preview },
+            new TextBlock { Text = Cosmetics.Name(r), FontWeight = FontWeight.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis },
+            new TextBlock { Text = Cosmetics.KindName(r.Kind) + " · " + I18n.T("v16.road.lv", ("n", lv)), FontSize = 11.5, Foreground = Ui.Res("Muted"), HorizontalAlignment = HorizontalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis });
+        // 17.0: сборку создателя можно применить прямо из окна наград.
+        if (r.Kind == "config")
+        {
+            var apply = Ui.Button(I18n.T("v10.set.apply"), () =>
+            {
+                Cosmetics.Toggle(r);
+                MainWindow.Current?.CloseDialog();
+                MainWindow.Current?.Toast(I18n.T("v17.cb.applied", ("name", Cosmetics.Name(r))));
+            }, "primary", Icons.Check);
+            apply.HorizontalAlignment = HorizontalAlignment.Center;
+            col.Children.Add(apply);
+        }
+        return col;
     }
 
     /// <summary>Забрать новые награды: окно с тем, что получено, и кнопкой «В профиль».</summary>
@@ -120,9 +158,7 @@ public static class RoadKit
             wrap.Children.Add(new Border
             {
                 Classes = { "card" }, Width = 170, Padding = new Thickness(12, 14), Margin = new Thickness(0, 0, 10, 10),
-                Child = Ui.Col(8, new Border { Height = 66, Child = preview },
-                    new TextBlock { Text = Cosmetics.Name(r), FontWeight = FontWeight.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis },
-                    new TextBlock { Text = Cosmetics.KindName(r.Kind) + " · " + I18n.T("v16.road.lv", ("n", lv)), FontSize = 11.5, Foreground = Ui.Res("Muted"), HorizontalAlignment = HorizontalAlignment.Center }),
+                Child = ClaimCard(r, lv, preview),
             });
         }
         var body = Ui.Col(14, Ui.Text(I18n.T("v16.road.claimed.text", ("n", got.Count), ("level", level)), "muted", wrap: true), wrap);

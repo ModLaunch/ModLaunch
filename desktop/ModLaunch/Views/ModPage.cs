@@ -256,14 +256,13 @@ public sealed partial class ModPage : Page
     {
         var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2 };
         for (var i = 1; i <= 5; i++)
-            row.Children.Add(Ui.Icon(Icons.Star, size, null, fill: false) is Viewbox v ? Colorize(v, i <= Math.Round(value)) : new Panel());
+            row.Children.Add(Ui.Icon(Icons.Star, size, null, fill: false) is IconView v ? Colorize(v, i <= Math.Round(value)) : new Panel());
         return row;
 
-        static Control Colorize(Viewbox v, bool on)
+        static Control Colorize(IconView v, bool on)
         {
-            var path = (Avalonia.Controls.Shapes.Path)((Canvas)v.Child!).Children[0];
-            path.Stroke = on ? Ui.Hex("#F2B84B") : Ui.Res("Faint");
-            path.Fill = on ? Ui.Hex("#F2B84B") : Brushes.Transparent;
+            v.Stroke = on ? Ui.Hex("#F2B84B") : Ui.Res("Faint");
+            v.Fill = on ? Ui.Hex("#F2B84B") : null;
             return v;
         }
     }

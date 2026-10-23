@@ -131,7 +131,7 @@ public static class MarketTiles
             var now = MarketLocal.ToggleWish(l.Id);
             b.Content = Ui.Icon(Icons.Heart, 15, now ? Ui.Res("Bad") : onArt ? Brushes.White : Ui.Res("Muted"), fill: now);
             ToolTip.SetTip(b, I18n.T(now ? "v93.mk.wish.remove" : "v93.mk.wish.add"));
-            if (now) Animate.From(b, "scale(1.5)", 420, 0, new Avalonia.Animation.Easings.BackEaseOut(), 1);
+            if (now) Animate.From(b, "scale(1.3)", 360, 0, new Avalonia.Animation.Easings.QuinticEaseOut(), 1);
             MainWindow.Current?.Toast(I18n.T(now ? "v93.mk.wish.added" : "v93.mk.wish.removed", ("title", l.Title)));
         };
         return b;
