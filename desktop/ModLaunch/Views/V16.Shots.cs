@@ -42,6 +42,31 @@ public static class V16Shots
         Shot(s, "v16-road-3-profile", () => new ProfilePage("rewards"));
     }
 
+    /// <summary>16.0.1: под «Выбором ModLaunch» и под списком каталога — «Ещё моды».</summary>
+    [DemoShots]
+    static void V16More(Shots s)
+    {
+        var g = AppState.Games.FirstOrDefault(x => x.Status == Detect.Found && x.Def.Picks.Length > 0 && x.Def.HasExternalCatalog);
+        if (g is null) return;
+        var page = new GamePage(g.Def.Id, "catalog");
+        s.Window.Navigate(() => page);
+        // Снимаем низ списка — там и стоит кнопка.
+        void Bottom()
+        {
+            if (page.Content is Avalonia.Controls.Panel p && p.Children.Count > 0 && p.Children[0] is Avalonia.Controls.ScrollViewer sv)
+                sv.Offset = new Avalonia.Vector(0, 100_000);
+            s.Pump(500);
+        }
+        page.ShowSection("picks");
+        s.Pump(1400);
+        Bottom();
+        s.Save("v16-more-1-picks");
+        page.ShowSection("all");
+        s.Pump(1400);
+        Bottom();
+        s.Save("v16-more-2-catalog");
+    }
+
     [DemoShots] static void V16Form(Shots s) => Shot(s, "v16-hub-1-form", () => CreatorPage.NewForm());
 
     [DemoShots]

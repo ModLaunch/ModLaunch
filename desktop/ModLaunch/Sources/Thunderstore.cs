@@ -66,11 +66,50 @@ public static class Thunderstore
             args.AddRange(ids.Select(id => "included_categories=" + id));
         }
         var data = await Http.GetJson($"{Base}/api/cyberstorm/listing/{Uri.EscapeDataString(community)}/?{string.Join('&', args)}", ct, 20);
-        var mods = data.Arr("results")
+        var results = data.Arr("results");
+        if (q.Page == 1 && results.Count > 0) PageSizes[community] = results.Count;
+        var mods = results
             .Where(i => i is not null && (q.Adult || !i.Bool("is_nsfw")))
             .Select(i => ToMod(i!, community))
             .ToList();
-        return new Page(mods, data.Long("count"), data?["next"] is JsonValue, q.Page);
+        return new Page(mods, data.Long("count"), HasMore(data, q.Page, results.Count, PageSizes.GetValueOrDefault(community)), q.Page);
+    }
+
+    static readonly ConcurrentDictionary<string, int> PageSizes = new();
+
+    /// <summary>
+    /// 16.0.1: есть ли следующая страница. Cyberstorm отвечает то ссылкой «next», то флагом «hasMore» —
+    /// раньше смотрели только на «next», и у части игр кнопка «Ещё моды» не появлялась. Если нет ни того,
+    /// ни другого, считаем по «count»: сколько уже показано против того, сколько всего.
+    /// </summary>
+    internal static bool HasMore(JsonNode? data, int page, int got, int pageSize)
+    {
+        if (data?["next"] is JsonValue next && next.ToString() != "") return true;
+        if (data?["hasMore"] is JsonValue more && more.TryGetValue<bool>(out var flag)) return flag;
+        if (got == 0) return false;
+        var size = Math.Max(got, pageSize);
+        return (long)(page - 1) * size + got < data.Long("count");
+    }
+
+    [SelfTest]
+    static string PagingUnderstandsEveryShape()
+    {
+        JsonNode? J(string json) => JsonNode.Parse(json);
+        var cases = new (string Json, int Page, int Got, int Size, bool Want)[]
+        {
+            ("""{"count":95,"next":"https://thunderstore.io/api/cyberstorm/listing/repo/?page=2","results":[]}""", 1, 20, 0, true),
+            ("""{"count":95,"next":null,"previous":"x","results":[]}""", 5, 15, 20, false),
+            ("""{"count":95,"hasMore":true,"results":[]}""", 1, 20, 0, true),
+            ("""{"count":95,"hasMore":false,"results":[]}""", 5, 15, 20, false),
+            ("""{"count":95,"results":[]}""", 1, 20, 0, true),
+            ("""{"count":95,"results":[]}""", 4, 20, 20, true),
+            ("""{"count":95,"results":[]}""", 5, 15, 20, false),
+            ("""{"count":12,"results":[]}""", 1, 12, 0, false),
+            ("""{"count":0,"results":[]}""", 1, 0, 0, false),
+        };
+        foreach (var c in cases)
+            if (HasMore(J(c.Json), c.Page, c.Got, c.Size) != c.Want) throw new Exception($"{c.Json} page {c.Page}: expected {c.Want}");
+        return "next link, hasMore flag and count-only answers all page right";
     }
 
     static async Task<List<string>> CategoryIds(string community, string[] slugs, CancellationToken ct)
