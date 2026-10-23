@@ -38,7 +38,8 @@
     "new.v17.motion": "Плавнее",
     "new.v17.motion.text": "Страницы больше не мигают при переходе, вкладки, слайды, экран запуска и смена игры на главной идут по кадрам, без рывков и «перелётов».",
     "new.v17.fast": "Быстрее",
-    "new.v17.fast.text": "Иконки рисуются одним элементом, внешний вид не перестраивает страницу дважды, длинные списки показываются сразу, а остальное догружается."
+    "new.v17.fast.text": "Иконки рисуются одним элементом, внешний вид не перестраивает страницу дважды, длинные списки показываются сразу, а остальное догружается.",
+    "new.v17.subtitle": "Финальная полировка: сборки настроек от создателей в наградах, 8 новых тем, плавные анимации без мигания и быстрее открываются страницы."
   },
   "en": {
     "look.theme.ocean": "Ocean",
@@ -79,6 +80,7 @@
     "new.v17.motion": "Smoother",
     "new.v17.motion.text": "Pages no longer blink on navigation; tabs, slides, the launch screen and the home stage animate frame by frame, with no jumps or overshoot.",
     "new.v17.fast": "Faster",
-    "new.v17.fast.text": "Icons draw as a single element, Look changes rebuild a page once, and long lists show right away while the rest loads in."
+    "new.v17.fast.text": "Icons draw as a single element, Look changes rebuild a page once, and long lists show right away while the rest loads in.",
+    "new.v17.subtitle": "Final polish: creator settings builds as rewards, 8 new themes, smooth animations without blinking and faster pages."
   }
 }
