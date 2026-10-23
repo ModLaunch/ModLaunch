@@ -18,7 +18,8 @@ public sealed partial class SettingsPage
     {
         var w = MainWindow.Current!;
         var wrap = new WrapPanel();
-        foreach (var c in Configs.All()) wrap.Children.Add(ConfigCard(c));
+        // 17.0: первые карточки сразу, остальные — следующими порциями (страница открывается быстрее).
+        Ui.Fill(wrap, Configs.All().Select(c => (Func<Control>)(() => ConfigCard(c))).ToList(), first: 4, step: 4);
         var load = Ui.Button(I18n.T("v10.set.load"), async () =>
         {
             var file = await w.PickAny(I18n.T("v10.set.load"), ["*" + Configs.Ext], I18n.T("v10.set.filetype"));
@@ -42,8 +43,7 @@ public sealed partial class SettingsPage
         // 17.0: личные сборки создателей — открываются на пути уровней, закрытые видны с замком и уровнем.
         var (level, _, _) = RoadKit.Now();
         var builds = new WrapPanel();
-        foreach (var b in CreatorBuilds.All)
-            builds.Children.Add(ConfigCard(CreatorBuilds.Config(b), CreatorBuilds.Open(b, level) ? null : b.Level));
+        Ui.Fill(builds, CreatorBuilds.All.Select(b => (Func<Control>)(() => ConfigCard(CreatorBuilds.Config(b), CreatorBuilds.Open(b, level) ? null : b.Level))).ToList(), first: 0, step: 4);
         var open = CreatorBuilds.All.Count(b => CreatorBuilds.Open(b, level));
         var head = Ui.Row(10, Ui.Text(I18n.T("v99.kind.config.many"), "h3"), Gx.Tag($"{open} / {CreatorBuilds.All.Length}", Ui.Res("Surface3")));
         var creators = Ui.Col(8, head, Ui.Text(I18n.T("v17.cb.hint"), "muted small", wrap: true), builds);
@@ -81,14 +81,9 @@ public sealed partial class SettingsPage
         var (p, accent, scan, radius) = Configs.Preview(c);
         IBrush B(string key) => Ui.Hex(p.TryGetValue(key, out var v) ? v : "#000000");
         var r = radius == "sharp" ? 1 : radius == "round" ? 7 : 4;
-        var screen = new Canvas { Width = 228, Height = 132, Background = B("Bg"), ClipToBounds = true };
-        void Box(double x, double y, double wd, double ht, IBrush fill, double rad = -1)
-        {
-            var b = new Border { Width = wd, Height = ht, Background = fill, CornerRadius = new CornerRadius(rad < 0 ? r : rad) };
-            Canvas.SetLeft(b, x);
-            Canvas.SetTop(b, y);
-            screen.Children.Add(b);
-        }
+        // 17.0: мини-экран рисуется одним элементом, а не двумя десятками рамок — в «Внешнем виде» таких карточек 20+.
+        var screen = new Sketch { Width = 228, Height = 132, Back = B("Bg"), ClipToBounds = true };
+        void Box(double x, double y, double wd, double ht, IBrush fill, double rad = -1) => screen.Boxes.Add((new Rect(x, y, wd, ht), fill, rad < 0 ? r : rad));
         Box(0, 0, 26, 132, B("Rail"), 0);
         for (var i = 0; i < 4; i++) Box(8, 12 + i * 16, 10, 10, i == 0 ? Ui.Hex(accent) : B("Surface3"), 3);
         Box(26, 0, 202, 132, B("Layer"), 0);
@@ -97,14 +92,11 @@ public sealed partial class SettingsPage
         if (hero != "off")
         {
             var hh = hero == "compact" ? 30 : 52;
-            var art = new Border { Width = 188, Height = hh, CornerRadius = new CornerRadius(r), ClipToBounds = true, Background = new LinearGradientBrush
+            Box(33, y, 188, hh, new LinearGradientBrush
             {
                 StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
                 GradientStops = { new GradientStop(Color.Parse(p["Surface2"]), 0), new GradientStop(Look.Mix(Color.Parse(p["Surface2"]), Color.Parse(accent), 0.35), 1) },
-            } };
-            Canvas.SetLeft(art, 33);
-            Canvas.SetTop(art, y);
-            screen.Children.Add(art);
+            });
             Box(39, y + hh - 14, 26, 8, Ui.Hex(accent), 3);
             y += hh + 6;
         }
@@ -120,8 +112,22 @@ public sealed partial class SettingsPage
             if (top > 128) break;
             Box(33 + at[i].X * (cell + gap), top, cw * cell + (cw - 1) * gap, chh * ch + (chh - 1) * gap, B("Surface"));
         }
-        if (scan) screen.Children.Add(new Border { Width = 228, Height = 132, Child = Gx.Scanlines(), Opacity = 0.9 });
-        return new Border { CornerRadius = new CornerRadius(12), ClipToBounds = true, Child = screen, BorderBrush = Ui.Res("Line"), BorderThickness = new Thickness(1) };
+        Control child = screen;
+        if (scan) child = new Panel { Children = { screen, new Border { Width = 228, Height = 132, Child = Gx.Scanlines(), Opacity = 0.9 } } };
+        return new Border { CornerRadius = new CornerRadius(12), ClipToBounds = true, Child = child, BorderBrush = Ui.Res("Line"), BorderThickness = new Thickness(1) };
+    }
+
+    /// <summary>Прямоугольники мини-экрана, нарисованные за один проход.</summary>
+    sealed class Sketch : Control
+    {
+        public readonly List<(Rect R, IBrush Fill, double Radius)> Boxes = [];
+        public IBrush? Back;
+
+        public override void Render(DrawingContext dc)
+        {
+            if (Back is not null) dc.FillRectangle(Back, new Rect(Bounds.Size));
+            foreach (var (rect, fill, radius) in Boxes) dc.DrawRectangle(fill, null, new RoundedRect(rect, radius));
+        }
     }
 
     /// <summary>Карточка конфига: мини-экран (боковая панель, сцена, виджеты), название, «Применить».

@@ -246,4 +246,29 @@ public static class CreatorBuilds
         }
         return $"{All.Length} creator builds on levels {string.Join(", ", levels)}; every command known";
     }
+
+    /// <summary>Сборка «Лёгкая» выключает прокрутку и анимации — следующий конфиг, где о них ни слова, их возвращает.</summary>
+    [SelfTest]
+    static string BuildsLeaveNoTrace()
+    {
+        var d = Settings.Data;
+        var keep = d.DeepClone().AsObject();
+        try
+        {
+            foreach (var k in new[] { "smoothScroll", "compactLists", "splash", "animations", "config" }) d.Remove(k);
+            Configs.Apply(Config(Find("light")!), apply: false);
+            if (d.Bool("smoothScroll", true) || !d.Bool("compactLists") || d.Bool("animations", true))
+                throw new Exception("«light» did not switch scrolling, compact lists and animations");
+            Configs.Apply(Configs.BuiltIn().First(c => c.Id == "modlaunch"), apply: false);
+            if (d.ContainsKey("smoothScroll") || d.ContainsKey("compactLists") || d.ContainsKey("splash") || d.ContainsKey("animations"))
+                throw new Exception("the next config kept the creator build's settings");
+            return "a creator build's settings go back to normal with the next config";
+        }
+        finally
+        {
+            foreach (var k in d.Select(x => x.Key).ToList()) d.Remove(k);
+            foreach (var (k, v) in keep) d[k] = v?.DeepClone();
+            Settings.Save();
+        }
+    }
 }

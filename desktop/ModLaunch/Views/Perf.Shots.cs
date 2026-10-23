@@ -82,6 +82,9 @@ public static class PerfShots
             ("stats", () => new StatsPage()),
         };
         // Прогрев: шрифты, стили, картинки.
+        // MODLAUNCH_PERF_ONLY=settings-look,profile-rewards — замерить только эти страницы.
+        if (Environment.GetEnvironmentVariable("MODLAUNCH_PERF_ONLY")?.Split(',') is { Length: > 0 } only && only[0] != "")
+            pages = pages.Where(x => only.Contains(x.Name)).ToList();
         foreach (var (_, make) in pages.Take(4)) { w.Navigate(make); s.Pump(150); }
 
         double Measure(Action a)
