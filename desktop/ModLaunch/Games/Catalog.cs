@@ -188,7 +188,7 @@ public static class GameCatalog
                 "Advize-PlantEverything", "RandyKnapp-EquipmentAndQuickSlots", "shudnal-ExtraSlots", "Advize-PlantEasily",
                 "OdinPlus-TeleportEverything", "MSchmoecker-MultiUserChest", "ishid4-BetterArchery",
                 "Goldenrevolver-Quick_Stack_Store_Sort_Trash_Restock", "Tekla-AutoRepair", "BentoG-MissingPieces",
-                "RustyMods-Seasonality", "Therzie-Warfare", "RandyKnapp-EpicLoot", "Vapok-AdventureBackpacks", "OdinPlus-OdinArchitect",
+                "RustyMods-Seasonality", "RandyKnapp-EpicLoot", "Vapok-AdventureBackpacks", "OdinPlus-OdinArchitect",
                 "Therzie-Monstrum", "Therzie-Armory", "Smoothbrain-Sailing", "Smoothbrain-Jewelcrafting", "MathiasDecrock-PlanBuild",
                 "OdinPlus-OdinHorse", "Smoothbrain-PassivePowers", "JereKuusela-Server_devcommands",
             ],
