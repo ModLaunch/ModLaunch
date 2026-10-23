@@ -777,9 +777,9 @@ public static partial class ModxInsight
         var (pretty, safe) = Format(messy);
         if (!safe || !pretty.Contains("\n    let a = 1\n    if a > 0 {\n        say \"{a}\"\n    }\n}") || !pretty.Contains("    def f():\n        return 1")) throw new Exception("format:\n" + pretty);
         if (Format(pretty).Text != pretty) throw new Exception("format is not stable");
-        var arena = CreatorPageArena();
-        var (arenaPretty, arenaSafe) = Format(arena);
-        if (!arenaSafe) throw new Exception("arena example cannot be formatted safely");
+        // Пример студии (строка в коде, без ресурсов Avalonia: самопроверка в CI идёт без окна).
+        var (arenaPretty, arenaSafe) = Format(Views.XStudio.DemoCode);
+        if (!arenaSafe) throw new Exception("studio example cannot be formatted safely");
         // Большой файл (≈2000 строк) разбирается и проверяется быстро — это происходит на каждой паузе в наборе.
         var big = new StringBuilder("mod \"Big\"\nlet base = 1\n");
         for (var i = 0; i < 250; i++) big.Append($"fn f{i}(a, b) {{\n    let x = a * base + b\n    if x > {i} {{\n        x += f{Math.Max(0, i - 1)}(x, 1)\n    }}\n    return x\n}}\n\n");
@@ -791,5 +791,4 @@ public static partial class ModxInsight
         return $"{m.Symbols.Count} symbols, {m.Refs.Count} refs, {issues.Count} issues, rename/format verified ({arenaPretty.Length} chars); 2000 lines in {ms} ms ({bigIssues.Count} issues)";
     }
 
-    static string CreatorPageArena() => Views.CreatorPage.ArenaExample();
 }
