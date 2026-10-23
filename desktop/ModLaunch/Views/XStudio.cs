@@ -37,6 +37,8 @@ public sealed class XStudio : Page
         public List<Diag> Diags = [];
         public bool Modx => Path is null || Path.EndsWith(MX.ModxDoc.Extension, StringComparison.OrdinalIgnoreCase);
         public bool Dirty => Editor.Text != Saved;
+        /// <summary>18.0: за сколько миллисекунд прошла последняя проверка на лету — в строке состояния.</summary>
+        public double CheckMs;
     }
 
     /// <summary>Что открыто в проекте: живёт дольше страницы.</summary>
@@ -103,8 +105,8 @@ public sealed class XStudio : Page
 
     public override IEnumerable<(string Text, Action? Open)> Crumbs =>
     [
-        ("Creator Hub", () => MainWindow.Current?.Navigate(() => new MarketPage())),
-        (I18n.T("v13.hub.projects"), () => MainWindow.Current?.Navigate(() => new CreatorPage())),
+        ("Creator Hub", () => MainWindow.Current?.Navigate(() => new CreatorPage())),
+        (I18n.T("v18.hub.projects"), () => MainWindow.Current?.Navigate(() => new CreatorPage())),
         (_p?.Name ?? "ModScript X", null),
     ];
 
@@ -161,9 +163,10 @@ public sealed class XStudio : Page
         _side.BorderThickness = new Thickness(0, 0, 1, 0);
         _side.Width = 290;
 
+        // 18.0: редактор обведён фирменной полосой — среда ModScript X сразу отличается от обычного редактора.
         var editor = new Border
         {
-            Background = HubLook.Panel, BorderBrush = HubLook.Edge, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(4), ClipToBounds = true,
+            Background = HubLook.Panel, BorderBrush = HubLook.Premium(140), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(4), ClipToBounds = true,
             Child = new DockPanel { Children = { Docked(_tabs, Dock.Top), _editorHost } },
         };
         var panel = new Border
@@ -186,7 +189,8 @@ public sealed class XStudio : Page
         Grid.SetColumn(work, 2);
         center.Children.Add(work);
 
-        var main = new DockPanel { Children = { Docked(_top, Dock.Top), Docked(_status, Dock.Bottom), center } };
+        var line = new Border { Height = 2, Background = HubLook.Premium(), IsHitTestVisible = false };
+        var main = new DockPanel { Children = { Docked(_top, Dock.Top), Docked(line, Dock.Top), Docked(_status, Dock.Bottom), center } };
         var root = new Panel { Classes = { "hub-space" }, Children = { new HubLook.Blueprint(), main } };
         HubLook.Scope(root);
         Content = root;
@@ -221,15 +225,12 @@ public sealed class XStudio : Page
     void RenderTop()
     {
         var p = _p!;
-        var back = Ui.Button("", () => MainWindow.Current?.Navigate(() => new CreatorPage()), "icon ghost", Icons.Back, I18n.T("v13.hub.projects"));
-        var tile = new Border
-        {
-            Width = 34, Height = 34, CornerRadius = new CornerRadius(6), Background = Color, VerticalAlignment = VerticalAlignment.Center,
-            Child = Ui.Icon(Icons.Code, 17, Brushes.White),
-        };
+        // 18.0: среда живёт внутри «Моих проектов» — слева путь назад туда, знак X и проект (цвет проекта — точкой).
+        var back = Ui.Button(I18n.T("v18.hub.projects"), () => MainWindow.Current?.Navigate(() => new CreatorPage()), "ghost", Icons.Back, I18n.T("v18.x.back"));
+        var tile = CreatorPage.XMark(34);
         var name = Ui.Col(1,
             new TextBlock { Text = p.Name, FontSize = 15, FontWeight = FontWeight.Bold, TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = 260 },
-            HubLook.MonoText($"v{p.Version}  ·  ModScript X", 10.5));
+            Ui.Row(6, Ui.Dot(Color, 6), HubLook.MonoText($"v{p.Version}  ·  MODSCRIPT X", 10.5, HubLook.Violet)));
         var t = TargetFor(ActiveDoc());
         var b = Bridge;
         Control art = Game?.Def is { } def
@@ -252,18 +253,14 @@ public sealed class XStudio : Page
         var run = Ui.Button(I18n.T("v15.ms.run"), Run, "", Icons.Play, I18n.T("v15.ms.run.tip") + "  (F5)");
         var inject = Ui.Button(_busy ? I18n.T("v15.ms.injecting") : I18n.T("v16.x.inject"), () => _ = InjectNow(), "primary", Icons.Zap, I18n.T("v15.ms.inject.tip") + "  (F6)");
         inject.IsEnabled = !_busy;
-        var eject = Ui.Button("", () => _ = EjectNow(), "icon", Icons.Undo, I18n.T("v15.ms.eject.tip") + "  (Shift+F6)");
-        var watch = new ToggleButton
-        {
-            Classes = { "chip" }, IsChecked = _s.Watch, VerticalAlignment = VerticalAlignment.Center,
-            Content = Ui.Row(6, Ui.Icon(Icons.Eye, 13), new TextBlock { Text = I18n.T("v15.ms.watch"), VerticalAlignment = VerticalAlignment.Center }),
-        };
-        ToolTip.SetTip(watch, I18n.T("v15.ms.watch.tip"));
-        watch.IsCheckedChanged += (_, _) => { _s.Watch = watch.IsChecked == true; RenderStatus(); };
-        var play = Ui.Button("", () => _ = PlayWithInject(), "icon", Icons.Gamepad, I18n.T("v15.ms.play") + " — " + I18n.T("v15.ms.play.tip"));
-        var save = Ui.Button("", () => { if (_s.Active is { } d) Save(d); }, "icon", Icons.Save, I18n.T("cr.save") + "  (Ctrl+S)");
+        // 18.0: на виду — две главные кнопки (F5, F6); снять мод, «Следить», «Играть» и «Сохранить» — в «⋯» и на клавишах.
         var more = Ui.Button("", () => { }, "icon ghost", Icons.More, I18n.T("top.more"));
         more.Flyout = Ctx.Menu(
+            Ctx.Item(I18n.T("v15.ms.play"), Icons.Gamepad, () => _ = PlayWithInject()),
+            Ctx.Item(I18n.T("v15.ms.eject.tip"), Icons.Undo, () => _ = EjectNow(), gesture: "Shift+F6"),
+            Ctx.Item((_s.Watch ? "✓  " : "") + I18n.T("v15.ms.watch"), Icons.Eye, () => { _s.Watch = !_s.Watch; RenderStatus(); RenderTop(); }),
+            Ctx.Item(I18n.T("cr.save"), Icons.Save, () => { if (_s.Active is { } d) Save(d); }, gesture: "Ctrl+S"),
+            "-",
             Ctx.Item(I18n.T("v15.ms.new"), Icons.FilePlus, NewFile, gesture: "Ctrl+N"),
             Ctx.Item(I18n.T("v15.ms.open"), Icons.Folder, () => _ = OpenFile(), gesture: "Ctrl+O"),
             Ctx.Item(I18n.T("v15.ms.find"), Icons.Search, () => _s.Active?.Editor.Find(), gesture: "Ctrl+F"),
@@ -274,9 +271,9 @@ public sealed class XStudio : Page
             Ctx.Item(I18n.T("v11.lx.sell"), Icons.Bag, Sell),
             "-",
             Ctx.Item(I18n.T("v16.x.side.settings"), Icons.Settings, () => Side("settings")),
-            Ctx.Item(I18n.T("v15.ms.library"), Icons.Zap, () => MainWindow.Current?.Navigate(() => new CreatorPage("injects"))),
+            Ctx.Item(I18n.T("v18.hub.scripts"), Icons.Shield, () => MainWindow.Current?.Navigate(() => new CreatorPage("scripts"))),
             Ctx.Folder(I18n.T("v15.ms.reveal"), p.Dir));
-        var right = Ui.Row(8, run, inject, eject, watch, play, save, more);
+        var right = Ui.Row(8, run, inject, more);
         foreach (var c in right.Children) c.VerticalAlignment = VerticalAlignment.Center;
         var bar = new DockPanel();
         DockPanel.SetDock(right, Dock.Right);
@@ -898,7 +895,9 @@ public sealed class XStudio : Page
     static void Analyze(Doc d)
     {
         if (!d.Modx) { d.Diags = []; return; }
+        var clock = System.Diagnostics.Stopwatch.StartNew();
         var doc = MX.ModxDoc.Parse(d.Editor.Text ?? "");
+        d.CheckMs = clock.Elapsed.TotalMilliseconds;
         d.Diags = [.. doc.Diags.OrderBy(x => x.Warning).ThenBy(x => x.Line)];
         d.Editor.MarkErrors(d.Diags.Where(x => !x.Warning && x.Line > 0).Select(x => x.Line));
     }
@@ -1227,6 +1226,7 @@ public sealed class XStudio : Page
                 parts.Add($"{t.Title} → {Lang(t.Language)}");
                 var errors = d.Diags.Count(x => !x.Warning);
                 parts.Add(errors == 0 ? I18n.T("v15.ms.noProblems") : I18n.T("v15.ms.errors", ("n", errors)));
+                if (d.CheckMs > 0) parts.Add(I18n.T("v18.x.checked", ("ms", d.CheckMs.ToString(d.CheckMs < 10 ? "0.0" : "0"))));
             }
             parts.Add(d.Dirty ? I18n.T("v15.ms.modified") : I18n.T("v15.ms.saved"));
         }

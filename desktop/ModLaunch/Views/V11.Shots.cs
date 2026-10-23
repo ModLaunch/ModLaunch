@@ -18,19 +18,6 @@ public static class V11Shots
     }
 
     [DemoShots]
-    static void Eleven1Lang(Shots s)
-    {
-        CreatorPage.DemoLang();
-        s.Window.Navigate(() => new CreatorPage("inject"));
-        s.Pump(1000);
-        s.Save("v11-1-lang-sandbox");
-        CreatorPage.DemoLang("code");
-        s.Window.Navigate(() => new CreatorPage("inject"));
-        s.Pump(800);
-        s.Save("v11-2-lang-code");
-    }
-
-    [DemoShots]
     static void Eleven2Injects(Shots s)
     {
         Inject.Demo();

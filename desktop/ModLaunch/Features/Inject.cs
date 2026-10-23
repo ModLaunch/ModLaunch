@@ -10,13 +10,16 @@ using MX = ModScriptX;
 
 namespace ModLaunch.Features;
 
-/// <summary>Инжект в библиотеке: купленный в Creator Hub или свой .modx.</summary>
+/// <summary>Инжект в библиотеке: купленный в Creator Hub, импортированный в «Скрипты» или свой .modx.</summary>
 public sealed record InjectItem(
     string Id, string Title, string Game, string Kind, string Source, string? Listing, string Seller,
-    string FileName, string Sha256, bool Enabled, string? LocalPath, string Changes, DateTime? Added)
+    string FileName, string Sha256, bool Enabled, string? LocalPath, string Changes, DateTime? Added, ScriptGuard.Report? Guard = null)
 {
-    /// <summary>Купленный: исходник не показываем, файл на диске зашифрован.</summary>
-    public bool Sealed => Source == "market";
+    /// <summary>
+    /// Чужой (купленный или, с 18.0, импортированный): исходник не показываем, в библиотеке — только
+    /// сжатая и скомпилированная копия (<see cref="ScriptGuard"/>), зашифрованная под этот компьютер.
+    /// </summary>
+    public bool Sealed => Source is "market" or "import";
 }
 
 /// <summary>Что сделал инжектор перед запуском — для уведомления «Запущено · инжект 12 мс».</summary>
@@ -65,7 +68,7 @@ public static class Inject
     static InjectItem? Read(string id, JsonObject? o) => o is null ? null : new InjectItem(
         id, o.Str("title") ?? id, o.Str("game") ?? "", o.Str("kind") ?? "modx", o.Str("source") ?? "local", o.Str("listing"), o.Str("seller") ?? "",
         o.Str("fileName") ?? "", o.Str("sha256") ?? "", o.Bool("enabled", true), o.Str("localPath"), o.Str("changes") ?? "",
-        DateTime.TryParse(o.Str("added"), out var d) ? d.ToUniversalTime() : null);
+        DateTime.TryParse(o.Str("added"), out var d) ? d.ToUniversalTime() : null, ScriptGuard.Report.From(o["guard"]));
 
     static string KindOf(string fileName) => Path.GetExtension(fileName).ToLowerInvariant() switch
     {
@@ -77,8 +80,8 @@ public static class Inject
     static string BlobPath(string id) => Path.Combine(Dir, id + ".bin");
 
     /// <summary>
-    /// Купленный товар → инжект: автомодерация, шифрование, в библиотеку. Файл после этого удаляется —
-    /// у покупателя остаётся только зашифрованная копия.
+    /// Купленный товар → инжект: автомодерация, защита (сжатие и компиляция, 18.0), шифрование, в библиотеку.
+    /// Файл после этого удаляется — у покупателя остаётся только защищённая зашифрованная копия.
     /// </summary>
     public static (InjectItem? Item, Verdict Verdict) AddPurchase(Listing l, string file)
     {
@@ -92,18 +95,78 @@ public static class Inject
             var id = "mk_" + l.Id;
             Moderation.Note(id, l.Title, v, "buy");
             if (!v.Ok) return (null, v);
-            File.WriteAllBytes(BlobPath(id), Vault.Seal(bytes));
+            var (packed, guard) = ScriptGuard.Protect(name, bytes);
+            File.WriteAllBytes(BlobPath(id), Vault.Seal(packed));
             Items[id] = new JsonObject
             {
                 ["title"] = l.Title, ["game"] = GameCatalog.ById(l.Game) is not null ? l.Game : "", ["kind"] = KindOf(name), ["source"] = "market",
-                ["listing"] = l.Id, ["seller"] = l.Author, ["fileName"] = name, ["sha256"] = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant(),
-                ["enabled"] = true, ["changes"] = v.Changes, ["added"] = DateTime.UtcNow.ToString("o"),
+                ["listing"] = l.Id, ["seller"] = l.Author, ["fileName"] = name, ["sha256"] = Hash(packed),
+                ["enabled"] = true, ["changes"] = v.Changes, ["added"] = DateTime.UtcNow.ToString("o"), ["guard"] = guard.Json(),
             };
             Lib.Save();
             Notify();
             return (Get(id), v);
         }
         finally { try { File.Delete(file); } catch { } }
+    }
+
+    static string Hash(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
+
+    /// <summary>
+    /// 18.0: чужой скрипт из файла (раздел «Скрипты» → «Импорт»): автомодерация, защита и шифрование — как у покупки.
+    /// В библиотеку ложится только защищённая копия; сам файл остаётся там, где был (он ваш).
+    /// Тот же файл второй раз не дублируется — обновляется запись.
+    /// </summary>
+    public static (InjectItem? Item, Verdict Verdict) AddImport(string path, string gameId)
+    {
+        var bytes = File.ReadAllBytes(path);
+        var name = Path.GetFileName(path);
+        var v = Moderation.Check(name, bytes);
+        var id = "im_" + Hash(bytes)[..12];
+        var title = Path.GetFileNameWithoutExtension(path);
+        var author = "";
+        if (KindOf(name) == "modx")
+        {
+            var doc = MX.ModxDoc.Parse(Encoding.UTF8.GetString(bytes));
+            if (doc.Name != "") title = doc.Name;
+            author = doc.Author;
+            if (gameId == "" && GameCatalog.ById(doc.Game) is not null) gameId = doc.Game;
+        }
+        Moderation.Note(id, title, v, "import");
+        if (!v.Ok) return (null, v);
+        var (packed, guard) = ScriptGuard.Protect(name, bytes);
+        File.WriteAllBytes(BlobPath(id), Vault.Seal(packed));
+        Items[id] = new JsonObject
+        {
+            ["title"] = title, ["game"] = gameId, ["kind"] = KindOf(name), ["source"] = "import", ["seller"] = author, ["fileName"] = name,
+            ["sha256"] = Hash(packed), ["enabled"] = true, ["changes"] = v.Changes, ["added"] = DateTime.UtcNow.ToString("o"), ["guard"] = guard.Json(),
+        };
+        Lib.Save();
+        Notify();
+        return (Get(id), v);
+    }
+
+    /// <summary>
+    /// 18.0: покупки прошлых версий лежали зашифрованным исходником — защищаем их тем же путём (один раз).
+    /// Возвращает, сколько записей обновлено. Битый или чужой файл пропускаем — он и так не запустится.
+    /// </summary>
+    public static int Harden()
+    {
+        var n = 0;
+        foreach (var item in All().Where(i => i.Sealed && i.Guard is null))
+            try
+            {
+                var plain = Load(item);
+                var (packed, guard) = ScriptGuard.Protect(item.FileName, plain);
+                File.WriteAllBytes(BlobPath(item.Id), Vault.Seal(packed));
+                if (Items[item.Id] is not JsonObject o) continue;
+                o["sha256"] = Hash(packed);
+                o["guard"] = guard.Json();
+                n++;
+            }
+            catch (Exception) { }
+        if (n > 0) { Lib.Save(); Notify(); }
+        return n;
     }
 
     /// <summary>Свой .modx из Creator Hub: ставится при каждом запуске игры (файл читается заново — правки видны сразу).</summary>
@@ -160,13 +223,26 @@ public static class Inject
         File.WriteAllText(bought, Views.CreatorPage.ArenaExample());
         AddPurchase(new Listing("demo-arena", "seller", "Mira", "Arena waves", "", "", "script", game, 9900, "personal", "1.0.0", "", [], [],
             0, "", 1, "arena.modx", "active", 12, DateTime.UtcNow.AddDays(-4), DateTime.UtcNow), bought);
+        // 18.0: чужой скрипт, импортированный файлом, — защищается так же, как купленный.
+        var foreign = Path.Combine(dir, "night-market.modx");
+        File.WriteAllText(foreign, "# Night Market by Nox — prices drop after dark\nmod \"Night Market\"\nversion 2.1.0\nauthor \"Nox\"\n\n# discount in percent\nlet night_discount = 35\nlet night_start = 20\n\nfn price_after_dark(price, hour) {\n    if hour >= night_start {\n        return price * (100 - night_discount) / 100\n    }\n    return price\n}\n\nhook start {\n    say \"Night market is open\"\n    log price_after_dark(200, 22)\n}\n");
+        AddImport(foreign, game);
         var own = Path.Combine(dir, "gold.modx");
         File.WriteAllText(own, "mod \"Gold boost\"\nversion 1.0.0\n\nhook start {\n  gold += 500\n  say \"+500 gold\"\n}\n");
         AddLocal(own, game);
     }
 
-    /// <summary>Содержимое инжекта: купленный — расшифровать, свой — прочитать с диска.</summary>
-    static byte[] Load(InjectItem i) => i.Sealed ? Vault.Open(File.ReadAllBytes(BlobPath(i.Id))) : File.ReadAllBytes(i.LocalPath!);
+    /// <summary>
+    /// Содержимое инжекта: чужой — расшифровать, сверить подпись (SHA-256 защищённой копии: подменённый файл не
+    /// запустится) и распаковать; свой — прочитать с диска.
+    /// </summary>
+    static byte[] Load(InjectItem i)
+    {
+        if (!i.Sealed) return File.ReadAllBytes(i.LocalPath!);
+        var opened = Vault.Open(File.ReadAllBytes(BlobPath(i.Id)));
+        if (Hash(opened) != i.Sha256) throw new InvalidDataException("hash");
+        return ScriptGuard.Unpack(opened);
+    }
 
     // ---------------------------------------------------------------- сеанс игры
 
@@ -194,7 +270,6 @@ public static class Inject
             try
             {
                 var bytes = Load(item);
-                if (item.Sealed && Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant() != item.Sha256) throw new InvalidDataException("hash");
                 var v = Moderation.Check(item.FileName, bytes);
                 if (!v.Ok)
                 {

@@ -310,17 +310,13 @@ public sealed partial class CreatorPage
         go.HorizontalContentAlignment = HorizontalAlignment.Center;
         go.MinHeight = 46;
         go.IsEnabled = !f.Busy && (target is not null || filesOnly);
-        var cancel = Ui.Button(I18n.T("common.cancel"), () => Go("home"), "ghost");
-        cancel.HorizontalAlignment = HorizontalAlignment.Stretch;
-        cancel.HorizontalContentAlignment = HorizontalAlignment.Center;
-        var import = Ui.Button(I18n.T("v16.form.import"), NewProjectDialog, "ghost", Icons.Folder);
-        import.HorizontalAlignment = HorizontalAlignment.Center;
+        // 18.0: «Отмена» и «Импорт» убраны — уйти можно пунктом слева, импорт — в «Других способах» под анкетой.
         var steps = Ui.Col(6);
         foreach (var (n, key) in new[] { (1, "v16.form.flow.1"), (2, "v16.form.flow.2"), (3, "v16.form.flow.3") })
             steps.Children.Add(Ui.Row(8, HubLook.MonoText($"0{n}", 10.5, HubLook.Cyan), Ui.Text(I18n.T(key), "small muted")));
 
         var card = new Border { Background = HubLook.Panel, BorderBrush = HubLook.Edge, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(4), ClipToBounds = true, Child = Ui.Col(0, stripe, top, body) };
-        var col = Ui.Col(12, card, go, cancel, steps, import);
+        var col = Ui.Col(12, card, go, steps);
         col.VerticalAlignment = VerticalAlignment.Top;
         return col;
     }

@@ -49,6 +49,20 @@ public static class HubLook
         GradientStops = { new GradientStop(Color.FromArgb(alpha, 0x70, 0x48, 0xE8), 0), new GradientStop(Color.FromArgb(alpha, 0x0B, 0x8F, 0xB3), 1) },
     };
 
+    /// <summary>
+    /// 18.0: знак ModScript X — монограмма, рамка «Создать», линия под шапкой среды. Обычно — фирменная полоса;
+    /// во «взрослом» виде — та же сталь, но с переливом (без неона), чтобы среда выделялась и там.
+    /// </summary>
+    public static IBrush Premium(byte alpha = 255) => !Look.Mature ? Signature(alpha) : new LinearGradientBrush
+    {
+        StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
+        GradientStops =
+        {
+            new GradientStop(Color.FromArgb(alpha, 0x6C, 0x83, 0xB0), 0), new GradientStop(Color.FromArgb(alpha, 0x3A, 0x4A, 0x6E), 0.55),
+            new GradientStop(Color.FromArgb(alpha, 0x5E, 0x8A, 0x9C), 1),
+        },
+    };
+
     /// <summary>Подпись «// РАЗДЕЛ» моноширинным шрифтом.</summary>
     public static TextBlock Eyebrow(string text, IBrush? color = null) => new()
     {
