@@ -232,6 +232,8 @@ public static class CreatorBuilds
             throw new Exception("levels must be unique, ascending, inside the road");
         // Каждая команда сборки — известная: иначе она молча не применится.
         var known = new HashSet<string>(Configs.Commands);
+        // В --selfcheck окна нет и строки из ресурсов не загружены — тогда строки не проверяем (это делает --selftest).
+        var strings = I18n.Raw("ru", "common.cancel") is not null;
         foreach (var b in All)
         {
             var c = Config(b);
@@ -240,11 +242,12 @@ public static class CreatorBuilds
             if (c.Get("font") is { } f && !Look.Fonts.Contains(f)) throw new Exception($"{b.Id}: font {f}");
             if (c.WidgetLines().Select(Widgets.Parse).Any(e => e is null)) throw new Exception($"{b.Id}: widget line");
             if (c.Widgets().Count < 4) throw new Exception($"{b.Id}: too few widgets");
-            foreach (var lang in new[] { "ru", "en" })
-                foreach (var key in new[] { $"v99.config.{b.Id}", $"v17.cb.{b.Id}.d" })
-                    if (I18n.Raw(lang, key) is null) throw new Exception($"{b.Id}: no {lang} string {key}");
+            if (strings)
+                foreach (var lang in new[] { "ru", "en" })
+                    foreach (var key in new[] { $"v99.config.{b.Id}", $"v17.cb.{b.Id}.d" })
+                        if (I18n.Raw(lang, key) is null) throw new Exception($"{b.Id}: no {lang} string {key}");
         }
-        return $"{All.Length} creator builds on levels {string.Join(", ", levels)}; every command known";
+        return $"{All.Length} creator builds on levels {string.Join(", ", levels)}; every command known" + (strings ? "" : " (strings not loaded, skipped)");
     }
 
     /// <summary>Сборка «Лёгкая» выключает прокрутку и анимации — следующий конфиг, где о них ни слова, их возвращает.</summary>
