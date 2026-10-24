@@ -454,9 +454,11 @@ public sealed partial class MainWindow
         // Разделы.
         _sideNav.Margin = collapsed ? new Thickness(0, 2, 0, 0) : new Thickness(12, 2, 12, 0);
         _sideNav.Children.Clear();
-        foreach (var b in new[] { _homeButton, _modsButton, _feedButton, _libraryButton }) _sideNav.Children.Add(b);
+        // Каталог модов открывается со страницы игры и с главной, а на его месте — Creator Hub.
+        if (_creatorButton.Parent is Panel cp) cp.Children.Remove(_creatorButton);
+        foreach (var b in new[] { _homeButton, _creatorButton, _feedButton, _libraryButton }) _sideNav.Children.Add(b);
         SideItem(_homeButton, _current is HomePage or SearchPage, collapsed);
-        SideItem(_modsButton, _current is GamePage { OpenTab: "catalog" } or ModPage, collapsed);
+        SideItem(_creatorButton, _current is MarketPage or CreatorPage or XStudio or ListingPage or AuthorPage, collapsed);
         SideItem(_feedButton, _current is AiBuildsPage, collapsed);
         SideItem(_libraryButton, _current is LibraryPage or AddGamePage or SteamLibraryPage, collapsed);
 
@@ -510,12 +512,10 @@ public sealed partial class MainWindow
             row.Background = on ? Ui.Res("BrandSoft") : Brushes.Transparent;
         }
 
-        // Низ панели: Creator Hub, Сообщество (сколько друзей в сети), статистика владельца, Настройки.
+        // Низ панели: Сообщество (сколько друзей в сети), статистика владельца, Настройки.
         _sideBottom.Margin = collapsed ? new Thickness(0, 6, 0, 12) : new Thickness(12, 6, 12, 14);
         _sideBottom.Children.Clear();
         _sideBottom.Children.Add(new Border { Height = 1, Background = Ui.Res("Line"), Margin = collapsed ? new Thickness(16, 0, 16, 8) : new Thickness(4, 0, 4, 8) });
-        _sideBottom.Children.Add(_creatorButton);
-        SideItem(_creatorButton, _current is MarketPage or CreatorPage or XStudio or ListingPage or AuthorPage, collapsed);
         var view = Social.Friends.View();
         var online = view.Friends.Count(f => f.State != "offline");
         _friendsBadge.IsVisible = view.Incoming.Count > 0 || online > 0;
