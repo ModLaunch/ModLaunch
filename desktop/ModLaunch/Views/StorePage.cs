@@ -180,7 +180,7 @@ public sealed class StorePage : Page
         {
             Width = 76, Height = 76, CornerRadius = new CornerRadius(16), ClipToBounds = true,
             BorderBrush = new SolidColorBrush(Color.FromArgb(70, 255, 255, 255)), BorderThickness = new Thickness(1),
-            BoxShadow = BoxShadows.Parse("0 14 34 0 #A0000000"), Child = Ui.Thumb(m.Icon, m.Name, 76, 0, 200),
+            BoxShadow = BoxShadows.Parse("0 14 34 0 #A0000000"), Child = ModIcon(g, m, 76, 200),
         };
         var eyebrow = Ui.Row(8,
             new Border { Background = Ui.Res("Brand"), CornerRadius = new CornerRadius(5), Padding = new Thickness(8, 3), Child = new TextBlock { Text = I18n.T("v20.store.pick").ToUpper(I18n.Culture), FontSize = 10.5, FontWeight = FontWeight.Bold, LetterSpacing = 0.8, Foreground = Brushes.White } },
@@ -227,7 +227,7 @@ public sealed class StorePage : Page
             var thumb = new Border
             {
                 Classes = { "hero-thumb" }, Width = 210, Height = 64, Background = new SolidColorBrush(Color.FromArgb(150, 12, 13, 18)),
-                Child = Ui.Row(10, new Border { Width = 46, Height = 46, CornerRadius = new CornerRadius(8), ClipToBounds = true, Child = Ui.Thumb(tm.Icon, tm.Name, 46, 0, 120) },
+                Child = Ui.Row(10, new Border { Width = 46, Height = 46, CornerRadius = new CornerRadius(8), ClipToBounds = true, Child = ModIcon(tg, tm, 46, 120) },
                     Ui.Col(1,
                         new TextBlock { Text = tm.Name, FontSize = 12.5, FontWeight = FontWeight.SemiBold, Foreground = Brushes.White, TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = 136 },
                         new TextBlock { Text = tg.Def.ShortName, FontSize = 11, Foreground = Ui.Hex("#A9ADBA"), TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = 136 })),
@@ -260,6 +260,10 @@ public sealed class StorePage : Page
         _heroHost.Children.Add(layers);
         if (animate) Animate.From(words, "translateX(-18px)", 420);
     }
+
+    /// <summary>Значок мода; у модов без значка (так бывает в ModLinks и Thunderstore) — обложка игры, а не пустой кубик.</summary>
+    static Control ModIcon(GameState g, ModInfo m, double size, int decode) =>
+        string.IsNullOrEmpty(m.Icon) ? Ui.GameImage(g.Def, decode, art: Images.Art.Cover) : Ui.Thumb(m.Icon, m.Name, size, 0, decode);
 
     static Button Arrow(string icon, Action go)
     {
