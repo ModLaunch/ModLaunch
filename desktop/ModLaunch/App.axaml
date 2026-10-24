@@ -833,5 +833,73 @@
     </Style>
     <Style Selector="Window.juicy Button.quick:pointerover"><Setter Property="RenderTransform" Value="translateY(-2px)"/></Style>
     <Style Selector="Window.juicy Button.quick:pressed"><Setter Property="RenderTransform" Value="scale(0.95)"/></Style>
+
+    <!-- ============================== 20.0 ============================== -->
+    <!-- Пункты боковой панели: значок и подпись в строку; выбранный — мягкая подложка акцента (задаётся в коде) -->
+    <Style Selector="Button.nav20">
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="FontWeight" Value="Normal"/>
+      <Setter Property="Foreground" Value="{StaticResource Muted}"/>
+    </Style>
+    <Style Selector="Button.nav20:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{StaticResource Hover}"/></Style>
+    <Style Selector="Button.nav20.active:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{StaticResource BrandSoft}"/></Style>
+    <Style Selector="Window.juicy Button.nav20:pressed"><Setter Property="RenderTransform" Value="scale(0.97)"/></Style>
+    <!-- Профиль в шапке -->
+    <Style Selector="Button.acct20">
+      <Setter Property="Background" Value="{StaticResource Surface}"/>
+      <Setter Property="BorderBrush" Value="{StaticResource Line}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+    </Style>
+    <Style Selector="Button.acct20:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{StaticResource Surface2}"/><Setter Property="BorderBrush" Value="{StaticResource Line}"/></Style>
+    <Style Selector="Button.acct20.active /template/ ContentPresenter"><Setter Property="Background" Value="{StaticResource Surface2}"/></Style>
+    <!-- Точка состояния в шапке -->
+    <Style Selector="Button.status20">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="{StaticResource Line}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="FontWeight" Value="Medium"/>
+    </Style>
+    <Style Selector="Button.status20:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{StaticResource Hover}"/><Setter Property="BorderBrush" Value="{StaticResource Line}"/></Style>
+    <!-- Мягкая акцентная кнопка («Установить», «Забрать награду»): подложка акцента, при наведении — заливка -->
+    <Style Selector="Button.soft">
+      <Setter Property="Background" Value="{StaticResource BrandSoft}"/>
+      <Setter Property="Foreground" Value="{StaticResource Brand2}"/>
+      <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+    <Style Selector="Button.soft:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{StaticResource Brand}"/><Setter Property="Foreground" Value="{StaticResource OnBrand}"/></Style>
+    <Style Selector="Button.soft:disabled /template/ ContentPresenter"><Setter Property="Background" Value="{StaticResource Surface2}"/><Setter Property="Foreground" Value="{StaticResource Muted}"/></Style>
+    <!-- Ссылка цветом акцента -->
+    <Style Selector="Button.link20">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Foreground" Value="{StaticResource Brand2}"/>
+      <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+    <Style Selector="Button.link20:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{StaticResource Hover}"/><Setter Property="Foreground" Value="{StaticResource Text}"/></Style>
+    <!-- «Пилюли» стилей поверх арта и на карточках -->
+    <Style Selector="Button.chip20">
+      <Setter Property="Background" Value="#26FFFFFF"/>
+      <Setter Property="Foreground" Value="White"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="FontWeight" Value="Medium"/>
+    </Style>
+    <Style Selector="Button.chip20:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="#40FFFFFF"/><Setter Property="Foreground" Value="White"/></Style>
+    <Style Selector="Button.chip20.on-card">
+      <Setter Property="Background" Value="{StaticResource Surface2}"/>
+      <Setter Property="Foreground" Value="{StaticResource Text}"/>
+    </Style>
+    <Style Selector="Button.chip20.on-card:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{StaticResource Surface3}"/><Setter Property="Foreground" Value="{StaticResource Text}"/></Style>
+    <!-- Карточки 20.0: при наведении — линия акцента -->
+    <Style Selector="Border.tile20"><Setter Property="Cursor" Value="Hand"/><Setter Property="BorderBrush" Value="{StaticResource Line}"/><Setter Property="BorderThickness" Value="1"/></Style>
+    <Style Selector="Border.tile20:pointerover"><Setter Property="BorderBrush" Value="{StaticResource Brand}"/></Style>
+    <!-- Строка списка 20.0 (моды на обзоре игры): при наведении — лёгкая подложка -->
+    <Style Selector="Border.row20"><Setter Property="Background" Value="Transparent"/></Style>
+    <Style Selector="Border.row20:pointerover"><Setter Property="Background" Value="{StaticResource Hover}"/></Style>
+    <!-- Кнопка-плитка «Инструментов»: значок над подписью -->
+    <Style Selector="Button.tool20">
+      <Setter Property="Background" Value="{StaticResource Surface2}"/>
+      <Setter Property="Foreground" Value="{StaticResource Text}"/>
+      <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+    <Style Selector="Button.tool20:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{StaticResource Surface3}"/><Setter Property="Foreground" Value="{StaticResource Text}"/></Style>
   </Application.Styles>
 </Application>

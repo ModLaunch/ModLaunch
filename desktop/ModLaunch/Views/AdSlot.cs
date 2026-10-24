@@ -112,6 +112,37 @@ public static class AdSlot
     /// </summary>
     public static Control Banner() => new Border { IsVisible = false };
 
+    /// <summary>
+    /// 20.0: реклама — обычная плитка в «Подборках» на главной (штриховая рамка, пометка «Реклама» или
+    /// «ModLaunch» у своих объявлений), а не колонка справа на всех экранах.
+    /// </summary>
+    public static Control Tile()
+    {
+        var label = new TextBlock { FontSize = 12, FontWeight = FontWeight.SemiBold, Foreground = Ui.Res("Muted") };
+        var labelBox = new Border { Background = Ui.Res("Surface2"), CornerRadius = new CornerRadius(6), Padding = new Thickness(8, 2), HorizontalAlignment = HorizontalAlignment.Left, Child = label };
+        var title = new TextBlock { FontSize = 16, FontWeight = FontWeight.Bold, TextWrapping = TextWrapping.Wrap, MaxLines = 2, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 4, 0, 0) };
+        var text = new TextBlock { FontSize = 13.5, LineHeight = 19, Foreground = Ui.Res("Muted"), TextWrapping = TextWrapping.Wrap, MaxLines = 2, TextTrimming = TextTrimming.CharacterEllipsis };
+        var go = new TextBlock { Text = I18n.T("v20.home.more") + " →", FontSize = 14, FontWeight = FontWeight.SemiBold, Foreground = Ui.Res("Brand2") };
+        var dock = new DockPanel { LastChildFill = false };
+        DockPanel.SetDock(go, Dock.Bottom);
+        dock.Children.Add(go);
+        var top = Ui.Col(8, labelBox, title, text);
+        DockPanel.SetDock(top, Dock.Top);
+        dock.Children.Add(top);
+        var host = new Border { Background = Brushes.Transparent, Cursor = new Cursor(StandardCursorType.Hand), Child = Kit20.Dashed(dock, 20) };
+        Ad? current = null;
+        host.PointerReleased += (_, e) => { if (current is not null && e.InitialPressMouseButton == MouseButton.Left) Open(current); };
+        Rotate(host, (ad, _, _) =>
+        {
+            current = ad;
+            label.Text = ad.House ? "ModLaunch" : I18n.T("ad.label");
+            title.Text = ad.Title;
+            text.Text = ad.Text;
+            ToolTip.SetTip(host, ad.Title + (ad.Text != "" ? " — " + ad.Text : ""));
+        });
+        return host;
+    }
+
     /// <summary>Скрыто до перезапуска кнопкой «×» на самой колонке.</summary>
     public static bool SideClosed { get; set; }
 

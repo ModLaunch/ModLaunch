@@ -337,7 +337,7 @@ public sealed partial class GamePage
         Child = Ui.Row(10, Ui.Icon(icon, 16, color), new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap, FontSize = 13, MaxWidth = 900 }),
     };
 
-    Control InstalledRow(ModRegistry registry, JsonObject mod, ModUpdate? update)
+    Control InstalledRow(ModRegistry registry, JsonObject mod, ModUpdate? update, bool flat = false)
     {
         var id = mod.Str("id")!;
         var name = ModTitle(mod);
@@ -396,14 +396,15 @@ public sealed partial class GamePage
             b.IsEnabled = !busy;
             right.Children.Add(b);
         }
-        if (mod.Str("url") is string url) right.Children.Add(Ui.Button("", () => Ui.OpenUrl(url), "icon ghost", Icons.External, I18n.T("mod.page")));
         right.Children.Add(toggle);
-        right.Children.Add(Ui.Button("", () => ModDialog(registry, mod), "icon ghost", Icons.Edit, I18n.T("v4.note")));
-        right.Children.Add(Ui.Button("", () => ConfirmRemove(registry, mod), "icon ghost", Icons.Trash, I18n.T("mod.remove")));
+        // 20.0: страница мода, заметка, папка и «Удалить» — в меню «⋯» (то же, что по правой кнопке).
+        var dots = Ui.Button("", () => { }, "icon ghost", Icons.More, I18n.T("top.more"));
+        dots.Click += (_, _) => { var m = Menu(); m.Placement = Avalonia.Controls.PlacementMode.BottomEdgeAlignedRight; m.ShowAt(dots); };
+        right.Children.Add(dots);
         right.VerticalAlignment = VerticalAlignment.Center;
 
         var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"), ColumnSpacing = 14 };
-        grid.Children.Add(Ui.Thumb(mod.Str("icon"), name, 48, 12, 96));
+        grid.Children.Add(Ui.Thumb(mod.Str("icon"), name, flat ? 44 : 48, flat ? 11 : 12, 96));
         Grid.SetColumn(middle, 1);
         grid.Children.Add(middle);
         Grid.SetColumn(right, 2);
@@ -415,10 +416,15 @@ public sealed partial class GamePage
             DockPanel.SetDock(box, Dock.Left);
             body = new DockPanel { Children = { box, grid } };
         }
-        var card = new Border { Classes = { "card" }, Padding = new Thickness(12), Child = body };
+        var card = flat
+            ? new Border { Classes = { "row20" }, BorderBrush = Ui.Res("Line"), BorderThickness = new Thickness(0, 1, 0, 0), Padding = new Thickness(20, 11, 12, 11), Child = body }
+            : new Border { Classes = { "card" }, Padding = new Thickness(12), Child = body };
         if (_select && _picked.Contains(id)) { card.BorderBrush = Ui.Res("Brand"); card.BorderThickness = new Thickness(1); }
-        if (!enabled || missing) card.Opacity = 0.7;
-        Ctx.Attach(card, () => Ctx.Menu(
+        if (!enabled || missing) middle.Opacity = 0.6;
+        Ctx.Attach(card, Menu);
+        return card;
+
+        MenuFlyout Menu() => Ctx.Menu(
             Ctx.Item(enabled ? I18n.T("ctx.disable") : I18n.T("ctx.enable"), enabled ? Icons.EyeOff : Icons.Eye, () => ToggleMod(registry, mod, !enabled), !missing),
             update is not null ? Ctx.Item(I18n.T("upd.to", ("version", update.Latest)), Icons.ArrowUp, () => RunUpdate(update)) : null,
             Ctx.Item(I18n.T("v4.note"), Icons.Edit, () => ModDialog(registry, mod)),
@@ -429,8 +435,8 @@ public sealed partial class GamePage
             Ctx.Copy(I18n.T("ctx.copyId"), id),
             "-",
             Ctx.Item(_select && _picked.Contains(id) ? I18n.T("ctx.unselect") : I18n.T("ctx.select"), Icons.Check, () => { _select = true; if (!_picked.Remove(id)) _picked.Add(id); Build(); }),
-            Ctx.Item(I18n.T("mod.remove"), Icons.Trash, () => ConfirmRemove(registry, mod))));
-        return card;
+            "-",
+            Ctx.Item(I18n.T("v20.mod.remove"), Icons.Trash, () => ConfirmRemove(registry, mod)));
     }
 
     void ConfirmRemove(ModRegistry registry, JsonObject mod)

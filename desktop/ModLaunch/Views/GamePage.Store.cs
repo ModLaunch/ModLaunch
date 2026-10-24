@@ -24,7 +24,7 @@ public sealed partial class GamePage
     void BuildStore()
     {
         var page = new StackPanel();
-        page.Children.Add(StoreHeader());
+        page.Children.Add(StoreHeader20());
         var content = StoreKit.Column(spacing: 22, top: 0);
         if (_g.Status == Detect.Found)
         {
@@ -41,7 +41,7 @@ public sealed partial class GamePage
                 "health" => HealthView(),
                 "config" => ConfigView(),
                 "shots" => ShotsView(),
-                _ => OverviewView(),
+                _ => OverviewView20(),
             };
             content.Children.Add(body);
             if (!Shown) Stagger(body, TabSwitch ? 0 : 160);
@@ -253,13 +253,16 @@ public sealed partial class GamePage
             b.Click += (_, _) => Go(id);
             return b;
         }
+        // 20.0: пять вкладок — Обзор · Моды · Каталог · Профили · Настройки. Редкие (сохранения, журнал,
+        // проверка, инструменты, скриншоты) открываются из «Инструментов» на обзоре; вкладка «Ещё» видна,
+        // только когда открыта одна из них.
         row.Children.Add(Tab("overview", I18n.T("v92.tab.overview"), null));
         var mods = Tab("installed", I18n.T("tab.mods"), _g.ModCount > 0 ? _g.ModCount.ToString() : null);
         if (updates > 0 && mods.Content is StackPanel modsRow) modsRow.Children.Add(new Border { Classes = { "tab-badge", "good" }, Child = Ui.Text("↑" + updates, "tiny") });
         row.Children.Add(mods);
-        if (_g.Def.HasCatalog) row.Children.Add(Tab("catalog", I18n.T("games.market"), _total > 0 ? I18n.Compact(_total) : null));
-        row.Children.Add(Tab("config", I18n.T("tab.config"), configs > 0 ? configs.ToString() : null));
+        if (_g.Def.HasCatalog) row.Children.Add(Tab("catalog", I18n.T("v20.tab.catalog"), _total > 0 ? I18n.Compact(_total) : null));
         row.Children.Add(Tab("profiles", I18n.T("games.profiles"), profiles > 0 ? profiles.ToString() : null));
+        row.Children.Add(Tab("config", I18n.T("v20.tab.config"), configs > 0 ? configs.ToString() : null));
 
         var extra = new List<(string Id, string Text, string Icon, string? Badge)>
         {
@@ -280,7 +283,7 @@ public sealed partial class GamePage
             menu.Placement = PlacementMode.BottomEdgeAlignedLeft;
             menu.ShowAt(more);
         };
-        row.Children.Add(more);
+        if (current.Id is not null) row.Children.Add(more);
 
         // Полоска под выбранной вкладкой — переезжает от прежней.
         var indicator = new Border

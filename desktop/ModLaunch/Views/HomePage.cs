@@ -28,7 +28,17 @@ public sealed partial class HomePage : Page
     {
         // 9.9: в дизайне Store — только «Главная» (HomePage.Main.cs); лента убрана совсем.
         // 10.0: главная со сценой и виджетами; прежняя сводка 9.9 — по желанию (Настройки → Интерфейс).
-        if (Look.Store) { if (Settings.Data.Str("homeStyle") == "classic") BuildMain(); else BuildTen(); return; }
+        // 20.0: главная по эскизам (баннер, «Ваш прогресс», рекомендации, подборки); сцена 10.0–19.0 — homeStyle "stage".
+        if (Look.Store)
+        {
+            switch (Settings.Data.Str("homeStyle"))
+            {
+                case "classic": BuildMain(); break;
+                case "stage": BuildTen(); break;
+                default: BuildTwenty(); break;
+            }
+            return;
+        }
         var content = new StackPanel { Spacing = 30, Margin = new Thickness(32, 26, 32, 32), MaxWidth = 1680 };
 
         // Новичку: три шага «найти игру, поставить мод, играть».

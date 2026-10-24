@@ -70,7 +70,7 @@ public static class StylePicker
         var name = Ui.Row(8, Ui.Dot(new SolidColorBrush(accent), 10), Ui.Text(I18n.T("v92.style." + style.Id), "h3"));
         var words = Ui.Col(4, name, Ui.Text(I18n.T("v92.style." + style.Id + ".text"), "small muted", wrap: true));
         words.Margin = new Thickness(14, 12, 14, 14);
-        var footer = new Panel { Children = { words } };
+        var footer = new Panel { Children = { words }, MinHeight = 84 };
         if (on)
             footer.Children.Add(new Border
             {

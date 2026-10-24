@@ -75,6 +75,7 @@ public sealed partial class ModPage : Page
     {
         // 9.2: пока играет анимация открытия, не меняем страницу под ней — перестроим сразу после.
         if (ReferenceEquals(ModOpenFx.Running, this)) { _deferred = true; return; }
+        if (Look.Store) { Build20(); return; }
         var col = StoreKit.Fit(new StackPanel { Spacing = 24, Margin = new Thickness(40, 26, 40, 40), MaxWidth = 1500 }, 2000);
         col.Children.Add(Header());
         col.Children.Add(Tabs());

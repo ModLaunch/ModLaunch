@@ -41,6 +41,52 @@ public sealed class AiBuildsPage : Page
 
     public AiBuildsPage(string tab = "create") { _tab = tab; _ = LoadWeekly(); }
 
+    /// <summary>20.0: открыть «Собрать» сразу с игрой и стилем (из подсказки на главной).</summary>
+    public static AiBuildsPage Start(string? game, string? style = null)
+    {
+        _game = game ?? _game;
+        if (style is not null && AiBuilds.Styles.Any(s => s.Id == style)) _style = style;
+        _result = null;
+        _peek = null;
+        _off.Clear();
+        return new AiBuildsPage("create");
+    }
+
+    /// <summary>20.0: подходит ли игра для ИИ-сборки (свой внешний каталог, не Minecraft).</summary>
+    public static bool Supports(GameState g) => g.Status == Detect.Found && !g.Def.IsMinecraft && g.Def.HasExternalCatalog;
+
+    /// <summary>20.0: «Мод недели» для плитки на главной — тот же, что в «ИИ-сборках».</summary>
+    public static (GameState Game, ModInfo Mod, int DaysLeft)? WeeklyPick
+    {
+        get
+        {
+            if (_weekly is not { } wk || _weeklyFor != Week) return null;
+            var g = AppState.Games.FirstOrDefault(x => x.Def.Id == wk.Game);
+            if (g is null) return null;
+            var days = ((int)DayOfWeek.Monday - (int)DateTime.UtcNow.DayOfWeek + 7) % 7;
+            return (g, wk.Mod, days == 0 ? 7 : days);
+        }
+    }
+
+    /// <summary>20.0: подгрузить «Мод недели» без открытия страницы (главная перерисуется, когда придёт).</summary>
+    public static async Task EnsureWeekly(Action done)
+    {
+        if (_weeklyFor == Week) return;
+        var games = Games();
+        if (games.Count == 0) return;
+        var g = games[Week % games.Count];
+        try
+        {
+            var mods = Program.Demo ? Demo.Catalog(g.Def, new Query()).Mods : (await Catalog.Browse(g.Def, new Query(Sort: SortBy.Rating))).Mods;
+            mods = mods.Where(m => !m.Adult && !m.Deprecated).Take(30).ToList();
+            if (mods.Count == 0) return;
+            _weekly = (g.Def.Id, mods[Week % mods.Count]);
+            _weeklyFor = Week;
+            done();
+        }
+        catch { }
+    }
+
     public override string Title => I18n.T("v98.nav.ai");
 
     /// <summary>Для снимков: показать готовую сборку (и открыть в просмотре мод номер peek).</summary>

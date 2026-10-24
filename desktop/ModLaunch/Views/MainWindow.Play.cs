@@ -21,8 +21,8 @@ public sealed partial class MainWindow
     };
     readonly Border _accountPanel = new()
     {
-        Classes = { "card" }, Width = 300, Padding = new Thickness(18), Margin = new Thickness(88, 0, 0, 16),
-        HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Bottom, IsVisible = false,
+        Classes = { "card" }, Width = 300, Padding = new Thickness(18), Margin = new Thickness(0, 58, 142, 0),
+        HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top, IsVisible = false,
         BoxShadow = BoxShadows.Parse("0 18 50 0 #80000000"),
     };
 
@@ -60,31 +60,38 @@ public sealed partial class MainWindow
 
     void RenderAccount()
     {
+        // 20.0: профиль в шапке — аватар в рамке, имя и уровень; у гостя — значок и «Войти».
         var p = Social.Account.Get();
+        var (level, _, _) = Features.Achievements.Level(Features.Achievements.All());
+        Control avatar;
+        string title;
         if (p.SignedIn)
         {
-            var name = p.Name ?? p.Email ?? "?";
+            title = p.Name ?? p.Email ?? "?";
             var online = new Border
             {
-                Width = 12, Height = 12, CornerRadius = new CornerRadius(6), Background = Ui.Res("Good"),
-                BorderBrush = Ui.Res("Rail"), BorderThickness = new Thickness(2),
+                Width = 10, Height = 10, CornerRadius = new CornerRadius(5), Background = Ui.Res("Good"),
+                BorderBrush = Ui.Res("Surface"), BorderThickness = new Thickness(2),
                 HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom,
             };
-            // 9.9: аватар в надетой рамке (награда за достижения).
-            var ring = ProfileKit.Avatar(name, 40, ring: 3);
-            _accountButton.Content = new Panel { Width = 40, Height = 40, Children = { ring, online } };
-            ToolTip.SetTip(_accountButton, name);
+            avatar = new Panel { Width = 32, Height = 32, Children = { ProfileKit.Avatar(title, 32, ring: 2), online } };
         }
         else
         {
-            _accountButton.Content = new Border
+            title = I18n.T("v20.acc.guest");
+            avatar = new Border
             {
-                Width = 38, Height = 38, CornerRadius = new CornerRadius(19), Background = Ui.Res("Surface2"), BorderBrush = Ui.Res("Line"), BorderThickness = new Thickness(1),
-                Child = Ui.Icon(Icons.User, 18, Ui.Res("Muted")),
+                Width = 32, Height = 32, CornerRadius = new CornerRadius(16), Background = Ui.Res("Surface3"),
+                BorderBrush = Ui.Res("Brand"), BorderThickness = new Thickness(2),
+                Child = Ui.Icon(Icons.User, 15, Ui.Res("Muted")),
             };
-            ToolTip.SetTip(_accountButton, I18n.T("acc.menu.signin"));
         }
-        _accountButton.Foreground = Ui.Res("Muted");
+        var words = Ui.Col(0,
+            new TextBlock { Text = title, FontSize = 13, FontWeight = FontWeight.SemiBold, Foreground = Ui.Res("Text"), MaxWidth = 130, TextTrimming = TextTrimming.CharacterEllipsis },
+            new TextBlock { Text = I18n.T("v20.acc.level", ("n", level)), FontSize = 12, Foreground = Ui.Res("Faint") });
+        words.VerticalAlignment = VerticalAlignment.Center;
+        _accountButton.Content = Ui.Row(10, avatar, words);
+        ToolTip.SetTip(_accountButton, p.SignedIn ? title : I18n.T("acc.menu.signin"));
         _accountButton.Classes.Set("active", _accountPanel.IsVisible);
     }
 

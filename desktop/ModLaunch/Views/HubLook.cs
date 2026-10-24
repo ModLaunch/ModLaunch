@@ -20,30 +20,36 @@ public static class HubLook
 {
     static bool Light => Look.IsLight;
 
+    /// <summary>
+    /// 20.0: Creator Hub в общем облике программы — цвета темы, скругления и акцент, без сетки чертежа
+    /// и фирменной полосы. Старый облик мастерской остаётся у прежних оформлений (Look.Store выключен).
+    /// </summary>
+    public static bool Twenty => Look.Store;
+
     /// <summary>Моноширинный шрифт — тот же, что у редактора кода.</summary>
     public static readonly FontFamily Mono = new("Cascadia Mono, Consolas, JetBrains Mono, DejaVu Sans Mono, monospace");
 
     static SolidColorBrush B(string hex) => new(Color.Parse(hex));
 
     /// <summary>Фон Hub: чернила или бумага.</summary>
-    public static IBrush Ink => B(Light ? "#F3F1EA" : "#0A0C12");
+    public static IBrush Ink => Twenty ? Ui.Res("Bg") : B(Light ? "#F3F1EA" : "#0A0C12");
     /// <summary>Листы и рамки.</summary>
-    public static IBrush Panel => B(Light ? "#FBFAF6" : "#10131B");
+    public static IBrush Panel => Twenty ? Ui.Res("Surface") : B(Light ? "#FBFAF6" : "#10131B");
     /// <summary>Поднятое: наведение, выбранное, полоса редактора.</summary>
-    public static IBrush Raised => B(Light ? "#ECE9DF" : "#171B27");
+    public static IBrush Raised => Twenty ? Ui.Res("Surface2") : B(Light ? "#ECE9DF" : "#171B27");
     /// <summary>Волосяная линия.</summary>
-    public static IBrush Edge => B(Light ? "#D9D4C6" : "#232839");
+    public static IBrush Edge => Twenty ? Ui.Res("Line") : B(Light ? "#D9D4C6" : "#232839");
     /// <summary>Линия под курсором.</summary>
-    public static IBrush EdgeHi => B(Light ? "#9AA6C8" : "#454E72");
+    public static IBrush EdgeHi => Twenty ? Ui.Res("Surface3") : B(Light ? "#9AA6C8" : "#454E72");
     /// <summary>Акцент для текста и значков: фиолетовый и бирюзовый, читаемые на своём фоне.</summary>
     /// 14.0: во «взрослом» виде — сталь и холодный серо-голубой, без неона.
-    public static IBrush Violet => Look.Mature ? B(Light ? "#3B4A6B" : "#A9B6D3") : B(Light ? "#5B3FD0" : "#A48BFF");
+    public static IBrush Violet => Twenty ? Ui.Res("Brand2") : Look.Mature ? B(Light ? "#3B4A6B" : "#A9B6D3") : B(Light ? "#5B3FD0" : "#A48BFF");
     public static IBrush Cyan => Look.Mature ? B(Light ? "#3E5F73" : "#8FB3C4") : B(Light ? "#0E7490" : "#45D3EE");
     /// <summary>Уголки рамок.</summary>
-    static IBrush Tick => B(Light ? "#7A86B8" : "#6D62B8");
+    static IBrush Tick => Twenty ? Brushes.Transparent : B(Light ? "#7A86B8" : "#6D62B8");
 
     /// <summary>Фирменная полоса: фиолетовый → бирюзовый (белый текст на ней читается).</summary>
-    public static IBrush Signature(byte alpha = 255) => Look.Mature ? new SolidColorBrush(Color.FromArgb(alpha, 0x3A, 0x4A, 0x66)) : new LinearGradientBrush
+    public static IBrush Signature(byte alpha = 255) => Twenty ? Ui.Res("Brand") : Look.Mature ? new SolidColorBrush(Color.FromArgb(alpha, 0x3A, 0x4A, 0x66)) : new LinearGradientBrush
     {
         StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
         GradientStops = { new GradientStop(Color.FromArgb(alpha, 0x70, 0x48, 0xE8), 0), new GradientStop(Color.FromArgb(alpha, 0x0B, 0x8F, 0xB3), 1) },
@@ -53,7 +59,7 @@ public static class HubLook
     /// 18.0: знак ModScript X — монограмма, рамка «Создать», линия под шапкой среды. Обычно — фирменная полоса;
     /// во «взрослом» виде — та же сталь, но с переливом (без неона), чтобы среда выделялась и там.
     /// </summary>
-    public static IBrush Premium(byte alpha = 255) => !Look.Mature ? Signature(alpha) : new LinearGradientBrush
+    public static IBrush Premium(byte alpha = 255) => Twenty || !Look.Mature ? Signature(alpha) : new LinearGradientBrush
     {
         StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
         GradientStops =
@@ -64,7 +70,11 @@ public static class HubLook
     };
 
     /// <summary>Подпись «// РАЗДЕЛ» моноширинным шрифтом.</summary>
-    public static TextBlock Eyebrow(string text, IBrush? color = null) => new()
+    public static TextBlock Eyebrow(string text, IBrush? color = null) => Twenty ? new()
+    {
+        Text = text.ToUpper(I18n.Culture), FontSize = 11.5, FontWeight = FontWeight.Bold, LetterSpacing = 0.9,
+        Foreground = color ?? Ui.Res("Faint"), VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis,
+    } : new()
     {
         Text = "// " + text.ToUpper(I18n.Culture), FontFamily = Mono, FontSize = 10.5, FontWeight = FontWeight.SemiBold, LetterSpacing = 1.1,
         Foreground = color ?? Ui.Res("Muted"), VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis,
@@ -86,8 +96,8 @@ public static class HubLook
     /// <summary>Рамка мастерской: лист с волосяной линией и уголками-засечками, как на чертеже.</summary>
     public static Control Frame(Control child, Thickness padding, bool ticks = true)
     {
-        var box = new Border { Background = Panel, BorderBrush = Edge, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(3), Padding = padding, Child = child };
-        if (!ticks) return box;
+        var box = new Border { Background = Panel, BorderBrush = Edge, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(Twenty ? 16 : 3), Padding = padding, Child = child };
+        if (!ticks || Twenty) return box;
         var panel = new Avalonia.Controls.Panel { Children = { box } };
         foreach (var (h, v, t) in new[]
         {
@@ -121,6 +131,7 @@ public static class HubLook
     /// </summary>
     public static void Scope(Control root)
     {
+        if (Twenty) { ScopeTwenty(root); return; }
         void Add(Func<Selector?, Selector> sel, params (AvaloniaProperty P, object V)[] setters)
         {
             var style = new Style(sel);
@@ -179,6 +190,43 @@ public static class HubLook
             (ContentPresenter.BorderBrushProperty, Signature()));
     }
 
+    /// <summary>20.0: в общем облике остаются только строки боковой панели, списков и вкладки раздела — цветами темы.</summary>
+    static void ScopeTwenty(Control root)
+    {
+        void Add(Func<Selector?, Selector> sel, params (AvaloniaProperty P, object V)[] setters)
+        {
+            var style = new Style(sel);
+            foreach (var (p, v) in setters) style.Setters.Add(new Setter(p, v));
+            root.Styles.Add(style);
+        }
+        Add(x => x.OfType<Button>().Class("hub-rail"),
+            (TemplatedControl.BackgroundProperty, Brushes.Transparent), (TemplatedControl.ForegroundProperty, Ui.Res("Muted")),
+            (TemplatedControl.PaddingProperty, new Thickness(0, 0, 10, 0)), (Layoutable.HeightProperty, 38.0),
+            (Layoutable.HorizontalAlignmentProperty, HorizontalAlignment.Stretch), (ContentControl.HorizontalContentAlignmentProperty, HorizontalAlignment.Stretch),
+            (ContentControl.VerticalContentAlignmentProperty, VerticalAlignment.Center), (TemplatedControl.FontWeightProperty, FontWeight.Medium),
+            (TemplatedControl.CornerRadiusProperty, new CornerRadius(10)));
+        Add(x => x.OfType<Button>().Class("hub-rail").Class(":pointerover").Template().OfType<ContentPresenter>(),
+            (ContentPresenter.BackgroundProperty, Ui.Res("Hover")), (ContentPresenter.ForegroundProperty, Ui.Res("Text")));
+        Add(x => x.OfType<Button>().Class("hub-rail").Class("active"),
+            (TemplatedControl.BackgroundProperty, Ui.Res("Surface2")), (TemplatedControl.ForegroundProperty, Ui.Res("Text")), (TemplatedControl.FontWeightProperty, FontWeight.SemiBold));
+        Add(x => x.OfType<Button>().Class("hub-row"),
+            (TemplatedControl.BackgroundProperty, Brushes.Transparent), (TemplatedControl.PaddingProperty, new Thickness(10, 8)),
+            (Layoutable.HorizontalAlignmentProperty, HorizontalAlignment.Stretch), (ContentControl.HorizontalContentAlignmentProperty, HorizontalAlignment.Stretch),
+            (TemplatedControl.FontWeightProperty, FontWeight.Normal), (TemplatedControl.CornerRadiusProperty, new CornerRadius(10)));
+        Add(x => x.OfType<Button>().Class("hub-row").Class(":pointerover").Template().OfType<ContentPresenter>(), (ContentPresenter.BackgroundProperty, Ui.Res("Hover")));
+        Add(x => x.OfType<Button>().Class("hub-tab"),
+            (TemplatedControl.BackgroundProperty, Brushes.Transparent), (TemplatedControl.ForegroundProperty, Ui.Res("Muted")),
+            (TemplatedControl.PaddingProperty, new Thickness(2, 8)), (TemplatedControl.CornerRadiusProperty, new CornerRadius(0)),
+            (TemplatedControl.BorderThicknessProperty, new Thickness(0, 0, 0, 3)), (TemplatedControl.BorderBrushProperty, Brushes.Transparent),
+            (TemplatedControl.FontWeightProperty, FontWeight.SemiBold));
+        Add(x => x.OfType<Button>().Class("hub-tab").Class(":pointerover").Template().OfType<ContentPresenter>(),
+            (ContentPresenter.BackgroundProperty, Brushes.Transparent), (ContentPresenter.ForegroundProperty, Ui.Res("Text")), (ContentPresenter.BorderBrushProperty, Ui.Res("Line")));
+        Add(x => x.OfType<Button>().Class("hub-tab").Class("active"),
+            (TemplatedControl.ForegroundProperty, Ui.Res("Text")), (TemplatedControl.BorderBrushProperty, Ui.Res("Brand")), (TemplatedControl.FontWeightProperty, FontWeight.Bold));
+        Add(x => x.OfType<Button>().Class("hub-tab").Class("active").Class(":pointerover").Template().OfType<ContentPresenter>(),
+            (ContentPresenter.BorderBrushProperty, Ui.Res("Brand")));
+    }
+
     /// <summary>Фон Hub: чернила, сетка чертежа (крупная клетка через пять мелких) и слабый свет фирменного цвета сверху.</summary>
     public sealed class Blueprint : Control
     {
@@ -192,6 +240,7 @@ public static class HubLook
             var w = Bounds.Width;
             var h = Bounds.Height;
             ctx.FillRectangle(Ink, new Rect(0, 0, w, h));
+            if (Twenty) return; // 20.0: ровный фон темы, без сетки
             var glow = new RadialGradientBrush
             {
                 Center = new RelativePoint(0.18, 0, RelativeUnit.Relative), GradientOrigin = new RelativePoint(0.18, 0, RelativeUnit.Relative),

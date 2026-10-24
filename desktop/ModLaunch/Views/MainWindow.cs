@@ -32,6 +32,8 @@ public abstract class Page : UserControl
     public virtual string? Accent => GameId is string id ? AppState.Game(id).Def.Accent : null;
     /// <summary>15.0: рабочее место (Creator Hub, среда разработки) — колонку рекламы справа не показываем.</summary>
     public virtual bool Workspace => false;
+    /// <summary>20.0: рабочий раздел со своей боковой колонкой (Creator Hub, редактор) — главная панель сворачивается до значков.</summary>
+    public virtual bool CompactRail => false;
 }
 
 /// <summary>
@@ -131,17 +133,17 @@ public sealed partial class MainWindow : Window
         _forward = Ui.Button("", GoForward, "icon ghost", Icons.Forward, I18n.T("nav.forward"));
         // 9.2 Store: разделы — подписанными пунктами на боковой панели, как в Microsoft Store.
         // 9.3: первый пункт — логотип ModLaunch и «Главная». 9.8: за ним вместо «Ленты» — «ИИ-сборки».
-        _homeButton = NavButton(LogoIcon, "v93.nav.home", () => Navigate(() => new HomePage()));
-        _feedButton = NavButton(Icons.Sparkles, "v98.nav.ai", () => Navigate(() => new AiBuildsPage()));
-        _libraryButton = NavButton(Icons.Gamepad, "v92.nav.games", () => Navigate(() => new LibraryPage()));
-        _modsButton = NavButton(Icons.Package, "v92.nav.mods", () => Navigate(() => new ModsCenterPage()));
-        _settingsButton = NavButton(Icons.Settings, "v92.nav.settings", () => Navigate(() => new SettingsPage()));
-        _friendsButton = NavButton(Icons.Users, "v11.cm.nav", () => Navigate(() => new CommunityPage()));
-        _statsButton = NavButton(Icons.Chart, "v92.nav.stats", () => Navigate(() => new StatsPage()));
+        // 20.0: боковая панель как на эскизах — значок и подпись в строку: Главная, Каталог модов, ИИ-сборки,
+        // Библиотека; ниже — «Мои игры»; внизу — Creator Hub, Сообщество и Настройки.
+        _homeButton = NavButton(Icons.Home, "v20.nav.home", () => Navigate(() => new HomePage()));
+        _feedButton = NavButton(Icons.Sparkles, "v20.nav.ai", () => Navigate(() => new AiBuildsPage()));
+        _libraryButton = NavButton(Icons.Grid, "v20.nav.library", () => Navigate(() => new LibraryPage()));
+        _modsButton = NavButton(Icons.Compass, "v20.nav.catalog", OpenCatalog);
+        _settingsButton = NavButton(Icons.Sliders, "v20.nav.settings", () => Navigate(() => new SettingsPage()));
+        _friendsButton = NavButton(Icons.Users, "v20.nav.community", () => Navigate(() => new CommunityPage()));
+        _statsButton = NavButton(Icons.Chart, "v20.nav.stats", () => Navigate(() => new StatsPage()));
         _donateButton = NavButton(Icons.Coffee, "v92.nav.donate", () => Navigate(() => new DonatePage()));
-        // 9.3: Creator Hub снова на боковой панели — это рынок креаторов (MarketPage).
-        // 18.0: «Мои проекты» — главный пункт Creator Hub, кнопка ведёт в «Доступные» (магазин — пунктом слева).
-        _creatorButton = NavButton(Icons.Creator, "Creator Hub", () => Navigate(() => new CreatorPage()));
+        _creatorButton = NavButton(Icons.Code, "v20.nav.creator", () => Navigate(() => new CreatorPage()));
         _friendsBadge.Width = 9; _friendsBadge.Height = 9; _friendsBadge.CornerRadius = new CornerRadius(5);
         _friendsBadge.Background = Ui.Res("Good"); _friendsBadge.HorizontalAlignment = HorizontalAlignment.Right; _friendsBadge.VerticalAlignment = VerticalAlignment.Top;
         _updatePill.Click += (_, _) => ShowUpdate();
@@ -544,13 +546,6 @@ public sealed partial class MainWindow : Window
         _appliedScale = k;
         _scale.LayoutTransform = Math.Abs(k - 1) < 0.001 ? null : new ScaleTransform(k, k);
         if (_railHost is not null) _railHost.IsVisible = !Settings.Data.Bool("railHidden");
-        // Без боковой панели «лист» с содержимым — без скруглённого угла.
-        if (_sheet is not null)
-        {
-            var rail = _railHost?.IsVisible == true;
-            _sheet.CornerRadius = rail ? new CornerRadius(8, 0, 0, 0) : new CornerRadius(0);
-            _sheet.BorderThickness = rail ? new Thickness(1, 1, 0, 0) : new Thickness(0, 1, 0, 0);
-        }
     }
 
     /// <summary>С чего начинать: главная, последняя игра, Creator Hub или библиотека.</summary>

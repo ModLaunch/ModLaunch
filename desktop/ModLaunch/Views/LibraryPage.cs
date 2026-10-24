@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
+using Avalonia.Media;
 using ModLaunch.Core;
 using ModLaunch.Features;
 
@@ -128,18 +129,31 @@ public sealed partial class LibraryPage : Page
     /// </summary>
     Control? SupportedLink()
     {
-        var query = _query;
-        var row = new WrapPanel();
+        // 20.0: карточка «Ещё N игр поддерживаются» с полем поиска — найти игру и сразу добавить её.
         var more = Games.CustomGames.MoreSupported;
-        if (more > 0)
-        {
-            var title = query != ""
-                ? I18n.T("v12g.lib.find", ("query", query))
-                : I18n.T("v12g.lib.more." + I18n.Plural(more, "one", "few", "many"), ("n", more.ToString("N0", I18n.Culture)));
-            row.Children.Add(Link(query != "" ? Icons.Search : Icons.Plus, title, I18n.T("v12g.lib.more.hint"), () => MainWindow.Current?.Navigate(() => new AddGamePage(query))));
-        }
-        // 15.1: отдельной страницы Steam нет — все игры Steam в каталоге ниже и в «Добавить игру».
-        return row.Children.Count == 0 ? null : row;
+        if (more <= 0) return null;
+        var icon = new Border { Width = 44, Height = 44, CornerRadius = new CornerRadius(12), Background = Ui.Res("BrandSoft"), Child = Ui.Icon(Icons.Globe, 22, Ui.Res("Brand2")) };
+        var words = Ui.Col(3,
+            new TextBlock { Text = I18n.T("v12g.lib.more." + I18n.Plural(more, "one", "few", "many"), ("n", more.ToString("N0", I18n.Culture))), FontSize = 15, FontWeight = FontWeight.Bold, TextTrimming = TextTrimming.CharacterEllipsis },
+            new TextBlock { Text = I18n.T("v12g.lib.more.hint"), FontSize = 13.5, Foreground = Ui.Res("Muted"), TextTrimming = TextTrimming.CharacterEllipsis });
+        words.VerticalAlignment = VerticalAlignment.Center;
+        var box = new TextBox { Watermark = I18n.T("v20.lib.find"), Height = 42, MinHeight = 42, Width = 340, Text = _query, VerticalContentAlignment = VerticalAlignment.Center };
+        box.InnerLeftContent = new Border { Padding = new Thickness(12, 0, 0, 0), Child = Ui.Icon(Icons.Search, 15, Ui.Res("Faint")) };
+        void Go() { var q = (box.Text ?? "").Trim(); MainWindow.Current?.Navigate(() => new AddGamePage(q)); }
+        box.KeyDown += (_, e) => { if (e.Key == Avalonia.Input.Key.Enter) Go(); };
+        var find = Ui.Button(I18n.T("v20.lib.find.go"), Go, "", null);
+        find.Height = 42;
+        find.VerticalContentAlignment = VerticalAlignment.Center;
+        var right = Ui.Row(8, box, find);
+        right.VerticalAlignment = VerticalAlignment.Center;
+        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"), ColumnSpacing = 18 };
+        grid.Children.Add(icon);
+        Grid.SetColumn(words, 1);
+        grid.Children.Add(words);
+        Grid.SetColumn(right, 2);
+        grid.Children.Add(right);
+        grid.SizeChanged += (_, e) => right.IsVisible = e.NewSize.Width >= 760;
+        return Kit20.Card(grid, new Thickness(22, 18));
     }
 
     static Button Link(string glyph, string title, string hint, Action open)

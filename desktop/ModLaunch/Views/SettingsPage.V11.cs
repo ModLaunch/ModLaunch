@@ -144,7 +144,33 @@ public sealed partial class SettingsPage
     Control LookTab()
     {
         // Карточкам конфигов нужна вся ширина — без «кирпичиков».
-        return new Border { Child = Ui.Col(16, ConfigsSection(), ThemeSection(), SizeSection(), MotionSection(), HomeSection(), FineTuneSection()) };
+        return new Border { Child = Ui.Col(16, StylesSection20(), ConfigsSection(), ThemeSection(), SizeSection(), MotionSection(), HomeSection(), FineTuneSection()) };
+    }
+
+    /// <summary>
+    /// 20.0: три готовых оформления из эскизов — «Сирень», «Терминал», «Снег» — карточками-образцами,
+    /// и «Вернуть оформление 19.0», если до обновления было своё.
+    /// </summary>
+    Control StylesSection20()
+    {
+        var rows = new List<Control> { StylePicker.Row(width: 236) };
+        if (Look.HasLook19)
+        {
+            var restore = Ui.Button(I18n.T("v20.look.restore"), () =>
+            {
+                Look.RestoreLook19();
+                MainWindow.Current?.Toast(I18n.T("v20.look.restored"));
+                Build();
+            }, "", Icons.Undo);
+            var text = Ui.Text(I18n.T("v20.look.restore.text"), "small muted", wrap: true);
+            text.VerticalAlignment = VerticalAlignment.Center;
+            var line = new DockPanel();
+            DockPanel.SetDock(restore, Dock.Right);
+            line.Children.Add(restore);
+            line.Children.Add(text);
+            rows.Add(new Border { Background = Ui.Res("Surface2"), CornerRadius = new CornerRadius(12), Padding = new Thickness(16, 10, 10, 10), Child = line });
+        }
+        return Section(I18n.T("v20.look.styles"), I18n.T("v20.look.styles.hint"), rows.ToArray());
     }
 
     /// <summary>Тема (карточки-образцы) и цвет акцента.</summary>

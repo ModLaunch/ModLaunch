@@ -58,8 +58,8 @@ public sealed partial class MainWindow
     /// </summary>
     void UpdateAdVisibility()
     {
-        _adRail.IsVisible = Ads.Enabled && !AdSlot.SideClosed && !_asideHost.IsVisible
-            && Bounds.Width / Math.Max(0.5, _appliedScale) >= 1360 && _current is { Workspace: false };
+        // 20.0: колонки рекламы нет — реклама живёт плиткой в «Подборках» на главной.
+        _adRail.IsVisible = false;
     }
 
     /// <summary>Кольцо на кнопке загрузок: общий прогресс всего, что сейчас качается.</summary>

@@ -23,7 +23,7 @@ public sealed partial class GamePage : Page
     SortBy _sort = SortBy.Popular;
     int _period;
     bool _hideInstalled = Settings.Data.Bool("hideInstalled");
-    string _view = Settings.Data.Str("catalogView") == "grid" ? "grid" : "list";
+    string _view = Settings.Data.Str("catalogView") is { } v ? (v == "grid" ? "grid" : "list") : Look.Store ? "grid" : "list"; // 20.0: по умолчанию — сетка карточек
     bool _adult = Settings.Data.Bool("showAdult", false);
 
     // Каталог грузится отдельно от перерисовки: перерисовка не должна его сбрасывать.
@@ -36,6 +36,9 @@ public sealed partial class GamePage : Page
     List<ModInfo>? _picks;
 
     StackPanel? _listHost;
+
+    /// <summary>20.0: открытая вкладка (для подсветки «Каталога модов» на боковой панели).</summary>
+    public string OpenTab => _tab;
 
     public GamePage(string gameId, string tab = "", string query = "")
     {
@@ -671,7 +674,7 @@ public sealed partial class GamePage : Page
         var picks = _g.Def.Picks.ToHashSet();
         var shown = _hideInstalled ? _mods.Where(m => !IsInstalled(m)).ToList() : _mods;
         if (OnlyWorking && Features.Compat.CanFilter(_g.Def)) shown = shown.Where(m => Features.Compat.Works(_g.Def, m)).ToList();
-        var tiles = _view == "grid" ? new WrapPanel() : null;
+        Panel? tiles = _view == "grid" ? Look.Store ? new TileGrid { MinTile = 240, MaxColumns = 4 } : new WrapPanel() : null;
         if (tiles is not null) _listHost.Children.Add(tiles);
         var rows = new List<Func<Control>>();
         for (var i = 0; i < shown.Count; i++)
@@ -680,7 +683,8 @@ public sealed partial class GamePage : Page
             var badge = BadgeFor(mod, i);
             void Install() => _ = Actions.Install(_g, mod);
             void Open() => MainWindow.Current?.Navigate(() => new ModPage(_g.Def.Id, mod));
-            if (tiles is not null) rows.Add(() => ModRow.Tile(_g.Def, mod, IsInstalled(mod), IsInstalling(mod), Install, Open, badge));
+            if (tiles is TileGrid) rows.Add(() => Kit20.ModTile(_g, mod, badge: picks.Contains(mod.Id), coverHeight: 124));
+            else if (tiles is not null) rows.Add(() => ModRow.Tile(_g.Def, mod, IsInstalled(mod), IsInstalling(mod), Install, Open, badge));
             else rows.Add(() => ModRow.Build(_g.Def, mod, IsInstalled(mod), IsInstalling(mod), picks.Contains(mod.Id), Install, Open, badge));
         }
 
@@ -783,9 +787,13 @@ public sealed partial class GamePage : Page
         }
         var byId = _picks.ToDictionary(m => m.Id, StringComparer.OrdinalIgnoreCase);
         var rows = new List<Func<Control>>();
+        // 20.0: здесь все моды — «Выбор ModLaunch», так что метку на каждом не повторяем.
+        var grid = _view == "grid" && Look.Store;
         foreach (var id in _g.Def.Picks)
             if (byId.TryGetValue(id, out var mod))
-                rows.Add(() => ModRow.Build(_g.Def, mod, IsInstalled(mod), IsInstalling(mod), true, () => _ = Actions.Install(_g, mod), () => MainWindow.Current?.Navigate(() => new ModPage(_g.Def.Id, mod))));
+                rows.Add(grid
+                    ? () => Kit20.ModTile(_g, mod, coverHeight: 124)
+                    : () => ModRow.Build(_g.Def, mod, IsInstalled(mod), IsInstalling(mod), !Look.Store, () => _ = Actions.Install(_g, mod), () => MainWindow.Current?.Navigate(() => new ModPage(_g.Def.Id, mod))));
         if (rows.Count == 0) _listHost!.Children.Add(Ui.Card(Ui.Text(_error ?? I18n.T("catalog.error"), "muted", wrap: true), 22));
         // 16.0.1: «Выбор ModLaunch» — короткая подборка, и кнопки «Ещё моды» под ней не было:
         // казалось, что каталог кончился. Теперь она ведёт во весь каталог игры.
@@ -795,7 +803,14 @@ public sealed partial class GamePage : Page
             all = Ui.Button(I18n.T("catalog.more"), () => SelectSection("all"), "", Icons.ChevronDown);
             all.HorizontalAlignment = HorizontalAlignment.Center;
         }
-        AddRows(_listHost!, rows, all);
+        if (grid && rows.Count > 0)
+        {
+            var tiles = new TileGrid { MinTile = 240, MaxColumns = 4 };
+            _listHost!.Children.Add(tiles);
+            AddRows(tiles, rows);
+            if (all is not null) _listHost.Children.Add(all);
+        }
+        else AddRows(_listHost!, rows, all);
     }
 
     void RenderKits()

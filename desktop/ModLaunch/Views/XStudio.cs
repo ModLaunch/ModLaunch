@@ -109,6 +109,8 @@ public sealed partial class XStudio : Page
 
     public override string Title => _p?.Name ?? "ModScript X";
     public override bool Workspace => true;
+    // 20.0: в редакторе боковая панель программы свёрнута до значков — больше места коду.
+    public override bool CompactRail => true;
     public override bool SameScreenAs(Page? previous) => HubNav.IsHub(previous);
     public override string? Accent => _p is null ? null : XProjects.Hex(_p.Color);
     public override string SearchHint => I18n.T("v16.x.search");
@@ -173,19 +175,29 @@ public sealed partial class XStudio : Page
         _side.BorderBrush = HubLook.Edge;
         _side.BorderThickness = new Thickness(0, 0, 1, 0);
         _side.Width = 290;
+        var twenty = HubLook.Twenty;
+        if (twenty)
+        {
+            // 20.0: среда — одна ровная плоскость цвета фона, области разделены тонкими линиями.
+            _top.Background = HubLook.Ink;
+            _top.Padding = new Thickness(14, 10, 14, 10);
+            _activity.Background = HubLook.Ink;
+            _side.Background = HubLook.Ink;
+            _side.Width = 252;
+        }
 
         // 18.0: редактор обведён фирменной полосой — среда ModScript X сразу отличается от обычного редактора.
         var editor = new Border
         {
-            Background = HubLook.Panel, BorderBrush = HubLook.Premium(140), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(4), ClipToBounds = true,
+            Background = twenty ? HubLook.Ink : HubLook.Panel, BorderBrush = twenty ? Brushes.Transparent : HubLook.Premium(140), BorderThickness = new Thickness(twenty ? 0 : 1), CornerRadius = new CornerRadius(twenty ? 0 : 4), ClipToBounds = true,
             Child = new DockPanel { Children = { Docked(_tabs, Dock.Top), _editorHost } },
         };
         var panel = new Border
         {
-            Background = HubLook.Panel, BorderBrush = HubLook.Edge, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(4), ClipToBounds = true,
+            Background = twenty ? HubLook.Ink : HubLook.Panel, BorderBrush = HubLook.Edge, BorderThickness = twenty ? new Thickness(0, 1, 0, 0) : new Thickness(1), CornerRadius = new CornerRadius(twenty ? 0 : 4), ClipToBounds = true,
             Child = new DockPanel { Children = { Docked(_panelTabs, Dock.Top), _panelBody } },
         };
-        var work = new Grid { RowDefinitions = new RowDefinitions("*,6,230"), Margin = new Thickness(10, 10, 10, 8) };
+        var work = new Grid { RowDefinitions = new RowDefinitions(twenty ? "*,4,232" : "*,6,230"), Margin = twenty ? new Thickness(0) : new Thickness(10, 10, 10, 8) };
         work.Children.Add(editor);
         var split = new GridSplitter { Background = Brushes.Transparent, ResizeDirection = GridResizeDirection.Rows };
         Grid.SetRow(split, 1);
@@ -200,7 +212,7 @@ public sealed partial class XStudio : Page
         Grid.SetColumn(work, 2);
         center.Children.Add(work);
 
-        var line = new Border { Height = 2, Background = HubLook.Premium(), IsHitTestVisible = false };
+        var line = new Border { Height = twenty ? 0 : 2, Background = HubLook.Premium(), IsHitTestVisible = false };
         var main = new DockPanel { Children = { Docked(_top, Dock.Top), Docked(line, Dock.Top), Docked(_status, Dock.Bottom), center } };
         var root = new Panel { Classes = { "hub-space" }, Children = { new HubLook.Blueprint(), main, _overlay } };
         HubLook.Scope(root);
@@ -264,6 +276,24 @@ public sealed partial class XStudio : Page
         var run = Ui.Button(I18n.T("v15.ms.run"), Run, "", Icons.Play, I18n.T("v15.ms.run.tip") + "  (F5)");
         var inject = Ui.Button(_busy ? I18n.T("v15.ms.injecting") : I18n.T("v16.x.inject"), () => _ = InjectNow(), "primary", Icons.Zap, I18n.T("v15.ms.inject.tip") + "  (F6)");
         inject.IsEnabled = !_busy;
+        if (HubLook.Twenty)
+        {
+            // 20.0: клавиша — прямо на кнопке, как на эскизе.
+            static void Hint(Button b, string key, bool onBrand)
+            {
+                if (b.Content is not StackPanel content) return;
+                content.Children.Add(new Border
+                {
+                    Background = onBrand ? new SolidColorBrush(Avalonia.Media.Color.FromArgb(40, 0, 0, 0)) : Ui.Res("Surface3"), CornerRadius = new CornerRadius(5), Padding = new Thickness(5, 1), Margin = new Thickness(4, 0, 0, 0),
+                    VerticalAlignment = VerticalAlignment.Center, Child = new TextBlock { Text = key, FontSize = 11, FontWeight = FontWeight.Bold, Opacity = 0.85 },
+                });
+            }
+            Hint(run, "F5", false);
+            Hint(inject, "F6", true);
+            run.Height = inject.Height = 40;
+            run.Padding = inject.Padding = new Thickness(16, 0);
+            run.VerticalContentAlignment = inject.VerticalContentAlignment = VerticalAlignment.Center;
+        }
         // 18.0: на виду — две главные кнопки (F5, F6); снять мод, «Следить», «Играть» и «Сохранить» — в «⋯» и на клавишах.
         var more = Ui.Button("", () => { }, "icon ghost", Icons.More, I18n.T("top.more"));
         more.Flyout = Ctx.Menu(
@@ -339,7 +369,7 @@ public sealed partial class XStudio : Page
     void RenderSide()
     {
         _side.IsVisible = _s.Side != "";
-        if (!_side.IsVisible) return;
+        if (!_side.IsVisible) { _activity.IsVisible = true; return; }
         var body = _s.Side switch
         {
             "bridge" => BridgeSide(),
@@ -351,10 +381,36 @@ public sealed partial class XStudio : Page
         };
         var title = Sides.FirstOrDefault(x => x.Id == _s.Side).Key is { } key ? I18n.T(key) : "";
         var head = new Border { Padding = new Thickness(16, 14, 12, 10), Child = HubLook.Eyebrow(title, Color) };
+        _activity.IsVisible = !HubLook.Twenty;
+        if (HubLook.Twenty) head = new Border { Padding = new Thickness(12, 12, 12, 4), Child = Ui.Col(14, SideIcons20(), new Border { Padding = new Thickness(8, 0), Child = HubLook.Eyebrow(title) }) };
         _side.Child = new DockPanel { Children = { Docked(head, Dock.Top), new ScrollViewer { Content = body, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled } } };
     }
 
-    static Control Caption(string text) => new Border { Padding = new Thickness(8, 14, 8, 6), Child = HubLook.MonoText(text.ToUpper(I18n.Culture), 10, Ui.Res("Faint")) };
+    static Control Caption(string text) => new Border { Padding = new Thickness(8, 14, 8, 6), Child = HubLook.Twenty ? HubLook.Eyebrow(text) : HubLook.MonoText(text.ToUpper(I18n.Culture), 10, Ui.Res("Faint")) };
+
+    /// <summary>20.0: значки разделов боковой панели — одной строкой над ней, а не отдельной колонкой.</summary>
+    Control SideIcons20()
+    {
+        var grid = new Grid { ColumnSpacing = 2 };
+        for (var i = 0; i < Sides.Length; i++)
+        {
+            var (id, icon, key) = Sides[i];
+            var side = id;
+            var on = _s.Side == id;
+            grid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
+            var b = new Button
+            {
+                Classes = { "ghost" }, Height = 32, Padding = new Thickness(0), HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center, CornerRadius = new CornerRadius(8),
+                Background = on ? Ui.Res("Surface3") : Brushes.Transparent, Content = Ui.Icon(icon, 16, on ? Ui.Res("Text") : Ui.Res("Muted")),
+            };
+            ToolTip.SetTip(b, I18n.T(key));
+            b.Click += (_, _) => Side(side);
+            Grid.SetColumn(b, i);
+            grid.Children.Add(b);
+        }
+        return new Border { Background = Ui.Res("Surface"), CornerRadius = new CornerRadius(10), Padding = new Thickness(3), Child = grid };
+    }
 
     static Button Row(string icon, string text, bool active, Action open, IBrush? mark = null, string? right = null, IBrush? iconColor = null)
     {
@@ -373,12 +429,13 @@ public sealed partial class XStudio : Page
             line.Children.Add(dot);
         }
         line.Children.Add(Ui.Row(8, Ui.Icon(icon, 14, iconColor ?? Ui.Res("Muted")),
-            new TextBlock { Text = text, FontSize = 12.5, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center }));
+            new TextBlock { Text = text, FontSize = HubLook.Twenty ? 13.5 : 12.5, FontWeight = active && HubLook.Twenty ? FontWeight.SemiBold : FontWeight.Normal, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center }));
         var b = new Button
         {
-            Classes = { "ghost" }, Padding = new Thickness(8, 5), HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch,
+            Classes = { "ghost" }, Padding = HubLook.Twenty ? new Thickness(10, 8) : new Thickness(8, 5), HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch,
             Background = active ? HubLook.Raised : Brushes.Transparent, Content = line,
         };
+        if (HubLook.Twenty) b.CornerRadius = new CornerRadius(8);
         b.Click += (_, _) => open();
         return b;
     }
@@ -387,8 +444,8 @@ public sealed partial class XStudio : Page
     {
         var p = _p!;
         var col = new StackPanel { Spacing = 1, Margin = new Thickness(8, 0, 8, 12) };
-        var add = Ui.Button(I18n.T("v15.ms.new"), NewFile, "ghost", Icons.FilePlus);
-        add.HorizontalAlignment = HorizontalAlignment.Left;
+        Control add = HubLook.Twenty ? Row(Icons.Plus, I18n.T("v15.ms.new"), false, NewFile) : Ui.Button(I18n.T("v15.ms.new"), NewFile, "ghost", Icons.FilePlus);
+        if (add is Button ab && !HubLook.Twenty) ab.HorizontalAlignment = HorizontalAlignment.Left;
         List<string> files = [];
         try
         {
@@ -397,7 +454,7 @@ public sealed partial class XStudio : Page
                 .OrderBy(f => System.IO.Path.GetFileName(f) == System.IO.Path.GetFileName(p.Main) ? 0 : f.EndsWith(".md", StringComparison.OrdinalIgnoreCase) ? 2 : 1).ThenBy(f => f).ToList();
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
-        col.Children.Add(Caption(I18n.T("v16.x.files.project")));
+        if (!HubLook.Twenty) col.Children.Add(Caption(I18n.T("v16.x.files.project"))); // 20.0: над списком и так «Файлы»
         foreach (var f in files)
         {
             var path = f;
@@ -956,8 +1013,11 @@ public sealed partial class XStudio : Page
     {
         var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2, Margin = new Thickness(8, 4) };
         var problems = (_s.Active?.Diags.Count ?? 0) + (_s.Active?.Lints.Count ?? 0);
+        // 20.0: на виду четыре вкладки (проблемы, вывод, отладка, ссылки), остальные — в «Ещё».
+        var main = new[] { "problems", "output", "debug", "refs" };
         foreach (var (id, key, icon) in PanelTabs)
         {
+            if (HubLook.Twenty && !main.Contains(id) && _s.Panel != id) continue;
             var tab = id;
             var content = Ui.Row(6, Ui.Icon(icon, 13, _s.Panel == id ? Color : Ui.Res("Muted")), new TextBlock { Text = I18n.T(key), VerticalAlignment = VerticalAlignment.Center });
             if (id == "problems" && problems > 0) content.Children.Add(new Border { Classes = { "tab-badge" }, Child = Ui.Text(problems.ToString(), "tiny") });
@@ -966,6 +1026,17 @@ public sealed partial class XStudio : Page
             if (_s.Panel == id) b.Classes.Add("active");
             b.Click += (_, _) => { _s.Panel = tab; RenderPanel(); };
             row.Children.Add(b);
+        }
+        if (HubLook.Twenty)
+        {
+            var more = new Button { Classes = { "tab" }, Content = Ui.Row(6, new TextBlock { Text = I18n.T("tab.more"), VerticalAlignment = VerticalAlignment.Center }, Ui.Icon(Icons.ChevronDown, 13)) };
+            more.Click += (_, _) =>
+            {
+                var menu = Ctx.Menu(PanelTabs.Where(t => !main.Contains(t.Id)).Select(t => (object?)Ctx.Item(I18n.T(t.Key), t.Icon, () => { _s.Panel = t.Id; RenderPanel(); })).ToArray());
+                menu.Placement = PlacementMode.TopEdgeAlignedLeft;
+                menu.ShowAt(more);
+            };
+            row.Children.Add(more);
         }
         _panelTabs.Child = row;
         _panelTabs.BorderBrush = HubLook.Edge;
@@ -1256,6 +1327,29 @@ public sealed partial class XStudio : Page
         }
         if (_s.Watch) parts.Add(I18n.T("v15.ms.watching"));
         if (_s is { Debugging: true, Trace: { Frames.Count: > 0 } trace }) parts.Add(I18n.T("v19.status.debug", ("i", _s.Frame + 1), ("n", trace.Frames.Count)));
+        if (HubLook.Twenty)
+        {
+            // 20.0: одна тихая строка состояния цветами темы (строки состояния программы в 20.0 нет).
+            var left = Ui.Row(18);
+            for (var i = 0; i < parts.Count; i++)
+            {
+                var text = new TextBlock { Text = parts[i], FontSize = 12, Foreground = i == 0 ? Ui.Res("Text") : Ui.Res("Muted"), FontWeight = i == 0 ? FontWeight.Bold : FontWeight.Normal, VerticalAlignment = VerticalAlignment.Center };
+                left.Children.Add(text);
+            }
+            if (_s.Active is { Modx: true } ad && ad.Diags.Count(x => !x.Warning) + ad.Lints.Count(x => !x.Warning) == 0 && left.Children.Count > 2)
+                left.Children[2] = Ui.Row(6, Ui.Dot(Ui.Res("Good"), 7), left.Children[2] is TextBlock ok ? new TextBlock { Text = ok.Text, FontSize = 12, Foreground = Ui.Res("Muted"), VerticalAlignment = VerticalAlignment.Center } : new Control());
+            var right = new TextBlock { Text = I18n.T("v15.ms.caret", ("line", _s.Caret.Line), ("col", _s.Caret.Col)) + "     F5 · F9 · F12 · Ctrl+P", FontSize = 12, Foreground = Ui.Res("Faint"), VerticalAlignment = VerticalAlignment.Center };
+            var dock = new DockPanel();
+            DockPanel.SetDock(right, Dock.Right);
+            dock.Children.Add(right);
+            dock.Children.Add(left);
+            _status.Child = dock;
+            _status.Background = Ui.Res("Bg");
+            _status.BorderBrush = Ui.Res("Line");
+            _status.BorderThickness = new Thickness(0, 1, 0, 0);
+            _status.Padding = new Thickness(16, 6);
+            return;
+        }
         var line = new TextBlock { Text = string.Join("   ·   ", parts), FontSize = 11.5, Foreground = Brushes.White, FontFamily = Mono, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center };
         var caret = new TextBlock { Text = I18n.T("v15.ms.caret", ("line", _s.Caret.Line), ("col", _s.Caret.Col)) + "   ·   F5 · F9 · F12 · Ctrl+P", FontSize = 11.5, Foreground = Brushes.White, FontFamily = Mono, VerticalAlignment = VerticalAlignment.Center };
         var bar = new DockPanel();

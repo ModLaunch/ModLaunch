@@ -10,7 +10,10 @@ namespace ModLaunch.Core;
 /// </summary>
 public static class Look
 {
-    public static readonly string[] Themes = ["slate", "store", "snow", "jet", "ink", "graphite", "paper", "dark", "black", "light", "midnight", "nord", "forest", "grape", "mocha", "sand", "contrast",
+    public static readonly string[] Themes = [
+        // 20.0: «Сирень» (по умолчанию), «Терминал» (чёрно-зелёная) и «Снег» (красно-белая, светлая).
+        "lilac", "terminal", "snowred",
+        "slate", "store", "snow", "jet", "ink", "graphite", "paper", "dark", "black", "light", "midnight", "nord", "forest", "grape", "mocha", "sand", "contrast",
         // 17.0: восемь новых — пять тёмных и три светлых.
         "ocean", "crimson", "cyber", "olive", "rose", "mint", "sky", "blossom"];
     public static readonly string[] Designs = ["store", "vitrina", "studio", "aurora"];
@@ -22,9 +25,10 @@ public static class Look
     public sealed record LookStyle(string Id, string Theme, string Accent);
     public static readonly LookStyle[] Styles =
     [
-        new("dark", "store", "#7B5CFF"),
-        new("redwhite", "snow", "#D7262E"),
-        new("blackgreen", "jet", "#2BD46F"),
+        // 20.0: три темы эскизов — «Сирень», «Терминал» и «Снег».
+        new("lilac", "lilac", "#E2A8FF"),
+        new("terminal", "terminal", "#5CF08A"),
+        new("redwhite", "snowred", "#D42A35"),
     ];
 
     /// <summary>Какое из трёх оформлений сейчас включено (null — своя тема или акцент).</summary>
@@ -32,6 +36,8 @@ public static class Look
 
     public static void SetStyle(string id)
     {
+        // Прежние названия оформлений 9.2 ведут на темы 20.0.
+        id = id switch { "dark" => "lilac", "blackgreen" => "terminal", _ => id };
         if (Styles.FirstOrDefault(s => s.Id == id) is not { } style) return;
         Settings.Data["design"] = "store";
         Settings.Data["theme"] = style.Theme;
@@ -72,8 +78,58 @@ public static class Look
         Apply();
     }
 
-    /// <summary>Первый запуск 8.3: включить «Студию» и её тему, если оформление не меняли.</summary>
+    /// <summary>Переходы оформления между версиями: сначала прежние (8.3–11.0), затем 20.0.</summary>
     static void Migrate()
+    {
+        MigrateLegacy();
+        Migrate20();
+    }
+
+    /// <summary>Ключи оформления, которые 20.0 меняет один раз и умеет вернуть («Вернуть оформление 19.0»).</summary>
+    static readonly string[] Look20Keys = ["design", "theme", "accent", "font", "headings", "statusBar", "customPalette", "customBase", "config"];
+
+    /// <summary>
+    /// 20.0: всем — новый вид из эскизов: тема «Сирень» (почти чёрный фон и сиреневый акцент), шрифты Onest и
+    /// Unbounded, без строки состояния внизу (её сведения — в точке «Всё работает» в шапке). Прежнее оформление
+    /// сохраняется в look19 — его можно вернуть в «Настройки → Внешний вид».
+    /// </summary>
+    static void Migrate20()
+    {
+        if (Settings.Data.Bool("look20")) return;
+        var backup = new System.Text.Json.Nodes.JsonObject();
+        foreach (var key in Look20Keys)
+            if (Settings.Data[key] is { } v) backup[key] = v.DeepClone();
+        Settings.Data["look19"] = backup;
+        Settings.Data["look20"] = true;
+        Settings.Data["design"] = "store";
+        Settings.Data["theme"] = "lilac";
+        Settings.Data["accent"] = "#E2A8FF";
+        Settings.Data["font"] = "Onest";
+        Settings.Data["headings"] = "wide";
+        Settings.Data["statusBar"] = false;
+        Settings.Data.Remove("customPalette");
+        Settings.Save();
+    }
+
+    /// <summary>Есть ли сохранённое оформление 19.0 (до перехода на 20.0).</summary>
+    public static bool HasLook19 => Settings.Data["look19"] is System.Text.Json.Nodes.JsonObject o && o.Count > 0;
+
+    /// <summary>Вернуть оформление, которое было до 20.0 (тема, акцент, шрифт, строка состояния…).</summary>
+    public static void RestoreLook19()
+    {
+        if (Settings.Data["look19"] is not System.Text.Json.Nodes.JsonObject o) return;
+        foreach (var key in Look20Keys)
+        {
+            if (o[key] is { } v) Settings.Data[key] = v.DeepClone();
+            else Settings.Data.Remove(key);
+        }
+        Settings.Data.Remove("look19");
+        Settings.Save();
+        ApplyCore();
+    }
+
+    /// <summary>Первый запуск 8.3: включить «Студию» и её тему, если оформление не меняли.</summary>
+    static void MigrateLegacy()
     {
         // 11.0: «взрослый» вид по умолчанию — конфиг «Строгий», если оформление не меняли (стандартный конфиг 10.0 или ничего).
         if (!Settings.Data.Bool("look11"))
@@ -157,7 +213,7 @@ public static class Look
         {
             Settings.Data.Clear();
             setup(Settings.Data);
-            Migrate();
+            MigrateLegacy();
             return ok(Settings.Data) ? null : Settings.Data.ToJsonString();
         }
         try
@@ -216,7 +272,7 @@ public static class Look
     public static readonly FontFamily Onest = new("avares://ModLaunch/Assets/fonts#Onest");
     public static readonly FontFamily Unbounded = new("avares://ModLaunch/Assets/fonts#Unbounded");
     /// <summary>Шрифт крупных заголовков: в «Витрине» — Unbounded, иначе — шрифт интерфейса.</summary>
-    public static FontFamily Display => Store ? UiFont : Vitrina ? Unbounded : UiFont;
+    public static FontFamily Display => Store ? HeadingFont : Vitrina ? Unbounded : UiFont;
     public static FontFamily UiFont => Font switch
     {
         "Onest" => Onest,
@@ -331,6 +387,25 @@ public static class Look
 
     static readonly Dictionary<string, Dictionary<string, string>> Palettes = new()
     {
+        // 20.0 «Сирень»: почти чёрный фон без фиолетовой заливки — на нём не тонет сиреневый акцент,
+        // а карточки отделяются от фона. Боковая панель чуть светлее окна.
+        ["lilac"] = new()
+        {
+            ["Bg"] = "#0D0C11", ["Rail"] = "#121118", ["Layer"] = "#0D0C11", ["Surface"] = "#16151C", ["Surface2"] = "#211F2A", ["Surface3"] = "#2A2735",
+            ["Line"] = "#26242F", ["Text"] = "#F3F1F8", ["Muted"] = "#B3AEC2", ["Faint"] = "#8C879C",
+        },
+        // 20.0 «Терминал»: чёрный с зеленцой — под неоново-зелёный акцент.
+        ["terminal"] = new()
+        {
+            ["Bg"] = "#070908", ["Rail"] = "#0B100D", ["Layer"] = "#070908", ["Surface"] = "#101612", ["Surface2"] = "#16211A", ["Surface3"] = "#1E2B22",
+            ["Line"] = "#1C2A21", ["Text"] = "#E8F5EC", ["Muted"] = "#9FB8A8", ["Faint"] = "#6F8A79",
+        },
+        // 20.0 «Снег»: светлый тёплый фон, белые карточки и красный акцент.
+        ["snowred"] = new()
+        {
+            ["Bg"] = "#F4F2F0", ["Rail"] = "#FFFFFF", ["Layer"] = "#F4F2F0", ["Surface"] = "#FFFFFF", ["Surface2"] = "#F1ECE8", ["Surface3"] = "#E6E0DB",
+            ["Line"] = "#E4DFDB", ["Text"] = "#1A1416", ["Muted"] = "#5E5558", ["Faint"] = "#766C70",
+        },
         // 11.0 «Строгий»: холодный графит без фиолетового оттенка — спокойный фон, на котором работают арты игр и один акцент.
         ["slate"] = new()
         {
@@ -650,12 +725,15 @@ public static class Look
         CornerRadius Cr(double r) => new(Math.Round(r * round));
         var font = UiFont;
 
+        // 20.0: при широких заголовках (по умолчанию) h1 и h2 — Unbounded, как на эскизах; иначе — шрифт интерфейса.
+        var heading = HeadingFont;
+        var wide = WideHeadings;
         Add(x => x.OfType<Avalonia.Controls.TextBlock>().Class("h1"),
-            (Avalonia.Controls.TextBlock.FontFamilyProperty, font), (Avalonia.Controls.TextBlock.FontSizeProperty, 30.0),
-            (Avalonia.Controls.TextBlock.FontWeightProperty, FontWeight.Bold), (Avalonia.Controls.TextBlock.LetterSpacingProperty, -0.6));
+            (Avalonia.Controls.TextBlock.FontFamilyProperty, heading), (Avalonia.Controls.TextBlock.FontSizeProperty, wide ? 28.0 : 30.0),
+            (Avalonia.Controls.TextBlock.FontWeightProperty, FontWeight.Bold), (Avalonia.Controls.TextBlock.LetterSpacingProperty, wide ? -0.8 : -0.6));
         Add(x => x.OfType<Avalonia.Controls.TextBlock>().Class("h2"),
-            (Avalonia.Controls.TextBlock.FontFamilyProperty, font), (Avalonia.Controls.TextBlock.FontSizeProperty, 20.0),
-            (Avalonia.Controls.TextBlock.FontWeightProperty, FontWeight.SemiBold), (Avalonia.Controls.TextBlock.LetterSpacingProperty, -0.3));
+            (Avalonia.Controls.TextBlock.FontFamilyProperty, heading), (Avalonia.Controls.TextBlock.FontSizeProperty, wide ? 19.0 : 20.0),
+            (Avalonia.Controls.TextBlock.FontWeightProperty, wide ? FontWeight.Bold : FontWeight.SemiBold), (Avalonia.Controls.TextBlock.LetterSpacingProperty, wide ? -0.4 : -0.3));
         Add(x => x.OfType<Avalonia.Controls.TextBlock>().Class("h3"),
             (Avalonia.Controls.TextBlock.FontSizeProperty, 14.5), (Avalonia.Controls.TextBlock.FontWeightProperty, FontWeight.SemiBold), (Avalonia.Controls.TextBlock.LetterSpacingProperty, -0.1));
 
@@ -719,13 +797,15 @@ public static class Look
         // «Лист» с содержимым есть только у тем Store; у остальных — цвет окна.
         if (!palette.ContainsKey("Layer")) Set(app, "Layer", Color.Parse(palette["Bg"]));
         var accent = Color.Parse(Accent);
-        // Текст на акценте: на светлом (зелёный, белый) — тёмный, иначе белый.
-        Set(app, "OnBrand", Luma(accent) > 0.55 ? Color.Parse("#08110B") : Colors.White);
+        // Текст на акценте: на светлом (сирень, зелёный, белый) — почти чёрный с оттенком акцента, иначе белый.
+        Set(app, "OnBrand", Luma(accent) > 0.55 ? Mix(accent, Color.Parse("#05040A"), 0.9) : Colors.White);
         var bg = Color.Parse(palette["Bg"]);
         var light = IsLight;
         Set(app, "Brand", accent);
         Set(app, "Brand2", light ? Mix(accent, Colors.Black, 0.12) : Mix(accent, Colors.White, 0.22));
-        Set(app, "BrandSoft", Mix(bg, accent, light ? 0.16 : 0.24));
+        // 20.0: у тем «Сирень», «Терминал» и «Снег» подложка выбранного мягче — акцент не заливает панель.
+        var calmSoft = Theme is "lilac" or "terminal" or "snowred";
+        Set(app, "BrandSoft", Mix(bg, accent, light ? (calmSoft ? 0.11 : 0.16) : (calmSoft ? 0.17 : 0.24)));
         if (Studio && !Vitrina)
         {
             // Акцент только у главного действия: подсветки и значки — нейтральные.

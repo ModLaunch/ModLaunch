@@ -108,6 +108,8 @@ public static class Icons
     public const string Bug = "M8 2l1.9 1.9 M16 2l-1.9 1.9 M9 7.1V6a3 3 0 1 1 6 0v1.1 M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6z M12 20v-9 M6.5 13H3 M21 13h-3.5 M6 17l-3 2 M18 17l3 2 M6 9L3 7 M18 9l3-2";
     public const string Undo = "M3 7v6h6 M21 17a9 9 0 0 0-15-6.7L3 13";
     public const string Cube = "M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z M3.3 7L12 12l8.7-5 M12 22V12";
+    /// <summary>20.0: компас — «Каталог модов».</summary>
+    public const string Compass = "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z M16.24 7.76l-2.12 6.36-6.36 2.12 2.12-6.36z";
     public const string Copy = "M9 9h13v13H9z M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1";
 }
 

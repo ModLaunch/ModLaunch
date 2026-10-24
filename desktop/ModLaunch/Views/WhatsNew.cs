@@ -12,6 +12,11 @@ public static class WhatsNew
 {
     static readonly (string Icon, string Key, Func<Page>? Open)[] Items =
     [
+        (Icons.Palette, "new.v20.look", () => new SettingsPage("look")),
+        (Icons.Home, "new.v20.home", () => new HomePage()),
+        (Icons.Gamepad, "new.v20.game", () => new LibraryPage()),
+        (Icons.Compass, "new.v20.catalog", null),
+        (Icons.Code, "new.v20.creator", XStudio.Entry),
         (Icons.Code, "new.v19.ide", XStudio.Entry),
         (Icons.Bug, "new.v19.debug", XStudio.Entry),
         (Icons.Alert, "new.v19.lint", XStudio.Entry),
