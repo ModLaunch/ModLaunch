@@ -108,6 +108,8 @@ public static class Look
         Settings.Data["headings"] = "wide";
         Settings.Data["statusBar"] = false;
         Settings.Data.Remove("customPalette");
+        // Конфиг стиля 19.0 больше не действует (цвета другие) — не показываем его выбранным; он сохранён в look19.
+        Settings.Data.Remove("config");
         Settings.Save();
     }
 

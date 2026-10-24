@@ -9,8 +9,19 @@ namespace ModLaunch.Views;
 /// </summary>
 public static class V20Shots
 {
+    /// <summary>Окно 1440×900 и вид 20.0 по умолчанию: при полном прогоне снимки до этого меняют тему, конфиг и строку состояния.</summary>
     static void Size(Shots s, double w = 1440, double h = 900)
     {
+        var d = Settings.Data;
+        d["design"] = "store";
+        d["theme"] = "lilac";
+        d["accent"] = "#E2A8FF";
+        d["font"] = "Onest";
+        d["headings"] = "wide";
+        d["statusBar"] = false;
+        d["sideCollapsed"] = false;
+        foreach (var key in new[] { "config", "customPalette", "customBase", "ownerStats", "uiScale", "radius", "fxScanlines", "fxVignette" }) d.Remove(key);
+        Look.Apply();
         s.Window.Width = w;
         s.Window.Height = h;
         s.Pump(300);
