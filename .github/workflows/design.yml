@@ -79,6 +79,13 @@ jobs:
           cp out/ModLaunch.exe "pack/ModLaunch-Setup-$v.exe"
           pwsh -NoProfile -Command "Compress-Archive -Path 'pack/ModLaunch-Setup-$v.exe' -DestinationPath 'pack/ModLaunch-Setup-$v.zip' -Force"
           cd pack
+          # 20.0: с 12.0 exe не сжат (~150 МБ) — больше лимита git в 100 МБ. Большие файлы — частями по 90 МБ
+          # (собрать: cat ModLaunch-Setup-<v>.exe.part-* > ModLaunch-Setup-<v>.exe), sha256 — рядом.
+          for f in *; do
+            sha256sum "$f" >> SHA256SUMS.txt
+            if [ $(stat -c %s "$f") -gt 95000000 ]; then split -b 90m -d "$f" "$f.part-" && rm "$f"; fi
+          done
+          ls -la
           git init -q -b design-build
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
