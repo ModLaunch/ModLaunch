@@ -114,15 +114,16 @@ public static class PlatformNav
     [SelfTest]
     static string PlatformSectionsCoverPages()
     {
-        // Каждая вкладка открывает страницу своего раздела и сама же на ней горит.
+        // У каждого раздела есть вкладки, у каждой вкладки — название. Тексты читаются из ресурсов Avalonia:
+        // в --selfcheck (без интерфейса) их нет — там проверяем только сами вкладки.
+        var texts = Avalonia.Application.Current is not null;
         foreach (var s in Main)
         {
             var tabs = Tabs(s);
             if (tabs.Count == 0) throw new Exception($"{s}: no tabs");
+            if (tabs.Select(t => t.Id).Distinct().Count() != tabs.Count) throw new Exception($"{s}: duplicate tab ids");
             foreach (var t in tabs)
-            {
-                if (I18n.T(t.Key) == t.Key) throw new Exception($"{s}/{t.Id}: no text for {t.Key}");
-            }
+                if (texts && I18n.T(t.Key) == t.Key) throw new Exception($"{s}/{t.Id}: no text for {t.Key}");
         }
         if (Of(null) != Section.None) throw new Exception("no page — no section");
         foreach (var (tab, want) in new[] { ("store", Section.Store), ("workshop", Section.Store), ("wishlist", Section.Store), ("studio", Section.Creator), ("commission", Section.Creator) })
