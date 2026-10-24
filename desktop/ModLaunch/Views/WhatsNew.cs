@@ -12,7 +12,7 @@ public static class WhatsNew
 {
     static readonly (string Icon, string Key, Func<Page>? Open)[] Items =
     [
-        (Icons.Creator, "new.v20.platform", () => new CreatorPage()),
+        (Icons.Make, "new.v20.platform", () => new CreatorPage()),
         (Icons.Sidebar, "new.v20.rail", null),
         (Icons.Package, "new.v20.click", null),
         (Icons.Palette, "new.v20.look", () => new SettingsPage("look")),

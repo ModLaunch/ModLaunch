@@ -59,6 +59,8 @@ public static class Icons
     public const string User = "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2 M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z";
     public const string Plus = "M12 5v14 M5 12h14";
     public const string Code = "M16 18l6-6-6-6 M8 6l-6 6 6 6";
+    /// <summary>20.0.1: Creator Hub — молоток и отвёртка крест-накрест («мастерская»).</summary>
+    public const string Make = "M15 12 L6.63 20.37 A1 1 0 1 1 3.63 17.37 L12 9 M18 15 L22 11 M21.5 11.5 L19.59 9.59 A2 2 0 0 1 19 8.17 L19 7 L16.74 4.74 A6 6 0 0 0 12.54 2.98 L9 2.96 L9.92 3.78 A6.18 6.18 0 0 1 12 8.4 L12 10 L14 12 L15.17 12 A2 2 0 0 1 16.59 12.59 L18.5 14.5 M4.5 4.5 L10 10 M15.91 13.09 L21.41 18.59 A2 2 0 0 1 18.59 21.41 L13.09 15.91 A2 2 0 0 1 15.91 13.09 Z";
     public const string Wand = "M15 4V2 M15 16v-2 M8 9h2 M20 9h2 M17.8 11.8L19 13 M15 9h.01 M17.8 6.2L19 5 M3 21l9-9 M12.2 6.2L11 5";
     public const string Book = "M4 19.5A2.5 2.5 0 0 1 6.5 17H20 M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z";
     public const string Palette = "M12 22a10 10 0 1 1 10-10c0 2.5-2 3-3.5 3H16a2 2 0 0 0-1.5 3.3A1.9 1.9 0 0 1 12 22z M7.5 10.5h.01 M12 7.5h.01 M16.5 10.5h.01";

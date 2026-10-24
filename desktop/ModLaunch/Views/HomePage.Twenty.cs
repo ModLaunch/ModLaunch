@@ -328,7 +328,7 @@ public sealed partial class HomePage
         }
         Put(WeeklyTile(hero), 0, 0, 2, 2);
         Put(AiTile(), 2, 0, 2);
-        Put(SmallTile(Icons.Code, I18n.T("v20.home.creator.title"), I18n.T("v20.home.creator.text"), I18n.T("v20.home.creator.go"), () => MainWindow.Current?.Navigate(() => new CreatorPage())), 2, 1);
+        Put(SmallTile(Icons.Make, I18n.T("v20.home.creator.title"), I18n.T("v20.home.creator.text"), I18n.T("v20.home.creator.go"), () => MainWindow.Current?.Navigate(() => new CreatorPage())), 2, 1);
         Put(Ads.Enabled ? AdSlot.Tile() : SmallTile(Icons.Users, I18n.T("v20.home.friends.title"), I18n.T("v20.home.friends.text"), I18n.T("v20.home.friends.go"), () => MainWindow.Current?.Navigate(() => new CommunityPage())), 3, 1);
         return Ui.Col(16, Kit20.SectionHead(I18n.T("v20.home.picks")), grid);
     }
