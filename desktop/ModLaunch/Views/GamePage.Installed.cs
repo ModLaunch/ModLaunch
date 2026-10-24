@@ -422,6 +422,12 @@ public sealed partial class GamePage
         if (_select && _picked.Contains(id)) { card.BorderBrush = Ui.Res("Brand"); card.BorderThickness = new Thickness(1); }
         if (!enabled || missing) middle.Opacity = 0.6;
         Ctx.Attach(card, Menu);
+        // 20.0.1: нажатие по строке — описание мода (в режиме выбора — отметить строку).
+        ModView.Clickable(card, () =>
+        {
+            if (_select) { if (!_picked.Remove(id)) _picked.Add(id); Build(); }
+            else ModView.Open(_g, mod);
+        });
         return card;
 
         MenuFlyout Menu() => Ctx.Menu(

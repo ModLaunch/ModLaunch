@@ -826,7 +826,7 @@ public sealed partial class GamePage : Page
         {
             var mods = kit.Mods.Select(id => byId.GetValueOrDefault(id)).OfType<ModInfo>().ToList();
             var missing = mods.Where(m => !IsInstalled(m)).ToList();
-            var icons = Ui.Row(-10, mods.Take(7).Select(m => (Control)new Border { BorderBrush = Ui.Res("Surface"), BorderThickness = new Thickness(2), CornerRadius = new CornerRadius(12), Child = Ui.Thumb(m.Icon, m.Name, 40, 10, 80) }).ToArray());
+            var icons = Ui.Row(-10, mods.Take(7).Select(m => (Control)ModView.Clickable(new Border { BorderBrush = Ui.Res("Surface"), BorderThickness = new Thickness(2), CornerRadius = new CornerRadius(12), Child = Ui.Thumb(m.Icon, m.Name, 40, 10, 80) }, () => ModView.Open(_g.Def.Id, m), m.Name)).ToArray());
             var n = kit.Mods.Length;
             var info = Ui.Col(6,
                 Ui.Text(I18n.T($"kit.{kit.Id}.title"), "h3"),

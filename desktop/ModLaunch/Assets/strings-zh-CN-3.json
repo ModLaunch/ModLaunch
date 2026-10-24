@@ -324,7 +324,7 @@
     "setup.window.close": "关闭",
     "setup.welcome.title": "安装 ModLaunch",
     "setup.welcome.titleUpdate": "更新 ModLaunch",
-    "setup.welcome.lead": "Subnautica、Stardew Valley、Valheim、Lethal Company、R.E.P.O. 等游戏的模组，一键搞定。",
+    "setup.welcome.lead": "一键为 Subnautica、Stardew Valley、Valheim、Lethal Company、R.E.P.O. 等游戏安装模组——还有制作和发布自己模组所需的一切。",
     "setup.welcome.update": "已安装版本 {from}，将更新到 {version}；你的设置和模组保持不变。",
     "setup.welcome.updateLegacy": "ModLaunch 已经安装，将更新到 {version}；你的设置和模组保持不变。",
     "setup.welcome.folder": "安装文件夹",

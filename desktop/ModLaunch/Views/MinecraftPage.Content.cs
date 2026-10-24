@@ -128,6 +128,8 @@ public sealed partial class MinecraftPage
             Ctx.Copy(I18n.T("mine.copyFile"), item.Key),
             "-",
             Ctx.Item(I18n.T("mod.remove"), Icons.Trash, () => ConfirmDelete(a, item))));
+        // 20.0.1: нажатие по строке — описание мода.
+        ModView.Clickable(card, () => ModView.Open(item, a.Folder(item.Kind)));
         return card;
     }
 

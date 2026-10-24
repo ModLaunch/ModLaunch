@@ -857,7 +857,7 @@ public sealed partial class SettingsPage : Page
             MainWindow.Current?.Toast(I18n.T(on ? "stats.enabled" : "stats.disabled"));
             AppState.Notify();
         };
-        var name = Ui.Col(4, Ui.Text("ModLaunch", "h2"), version,
+        var name = Ui.Col(4, Ui.Text("ModLaunch", "h2"), Ui.Text(I18n.T("v20.brand.long"), "muted"), version,
             Ui.Button(I18n.T("nav.donate"), () => MainWindow.Current?.Navigate(() => new DonatePage()), "ghost", Icons.Coffee));
         name.VerticalAlignment = VerticalAlignment.Center;
 

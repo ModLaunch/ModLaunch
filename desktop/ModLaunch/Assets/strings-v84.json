@@ -154,7 +154,7 @@
     "keys.aside": "Панель сведений справа",
     "svc.session": "Вход устарел — войдите заново",
     "svc.fix.session": "Сохранённый вход больше не действует (сменился пароль или вход из старой версии). Войдите в аккаунт ещё раз — друзья и отзывы снова заработают.",
-    "setup.kicker": "Лаунчер модов для Windows"
+    "setup.kicker": "Платформа для модов и мододелов"
   },
   "en": {
     "top.more": "More",
@@ -311,7 +311,7 @@
     "keys.aside": "Details panel on the right",
     "svc.session": "Sign-in expired — sign in again",
     "svc.fix.session": "The saved sign-in no longer works (password changed or it came from an old version). Sign in again and friends and reviews will work.",
-    "setup.kicker": "Mod launcher for Windows"
+    "setup.kicker": "The platform for mods and modders"
   },
   "uk": {
     "top.more": "Ще",
@@ -468,6 +468,6 @@
     "keys.aside": "Панель відомостей праворуч",
     "svc.session": "Вхід застарів — увійдіть знову",
     "svc.fix.session": "Збережений вхід більше не діє (змінився пароль або вхід зі старої версії). Увійдіть в акаунт ще раз — друзі й відгуки знову працюватимуть.",
-    "setup.kicker": "Лаунчер модів для Windows"
+    "setup.kicker": "Платформа для модів і модмейкерів"
   }
 }

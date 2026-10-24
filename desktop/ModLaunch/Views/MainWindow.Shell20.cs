@@ -21,7 +21,7 @@ namespace ModLaunch.Views;
 public sealed partial class MainWindow
 {
     const double TitleHeight = 60;
-    const double SideWide = 248, SideNarrow = 72;
+    const double SideWide = 256, SideNarrow = 76;
 
     readonly StackPanel _sideNav = new() { Spacing = 2 };
     readonly StackPanel _sideBottom = new() { Spacing = 2 };
@@ -36,14 +36,28 @@ public sealed partial class MainWindow
     readonly List<(string Id, Button Row)> _sideGameRows = [];
     readonly Button _sideAdd = new() { Classes = { "icon", "ghost" } };
 
-    /// <summary>Свёрнута ли боковая панель: выбрано вручную, рабочий раздел или узкое окно.</summary>
+    /// <summary>
+    /// 20.0.1: по умолчанию панель — узкая полоса значков (логотип ведёт на главную, разделы и игры — значками
+    /// с подсказками), подписи — по кнопке «развернуть». Рабочие разделы и узкое окно всегда держат её узкой.
+    /// </summary>
     bool SideCollapsed
     {
         get
         {
-            if (Settings.Data.Bool("sideCollapsed") || _current is { CompactRail: true }) return true;
+            if (!Settings.Data.Bool("sideLabels") || _current is { CompactRail: true }) return true;
             var w = Bounds.Width / Math.Max(0.5, _appliedScale);
             return w > 0 && w < 1100;
+        }
+    }
+
+    /// <summary>Можно ли сейчас развернуть панель кнопкой (не рабочий раздел и окно не узкое).</summary>
+    bool SideCanExpand
+    {
+        get
+        {
+            if (_current is { CompactRail: true }) return false;
+            var w = Bounds.Width / Math.Max(0.5, _appliedScale);
+            return w <= 0 || w >= 1100;
         }
     }
 
@@ -72,7 +86,7 @@ public sealed partial class MainWindow
         _sideToggle = new Button { Classes = { "icon", "ghost" }, Width = 30, Height = 30, CornerRadius = new CornerRadius(8), VerticalAlignment = VerticalAlignment.Center };
         _sideToggle.Click += (_, _) =>
         {
-            Settings.Data["sideCollapsed"] = !Settings.Data.Bool("sideCollapsed");
+            Settings.Data["sideLabels"] = !Settings.Data.Bool("sideLabels");
             Settings.Save();
             RenderRail();
         };
@@ -280,14 +294,14 @@ public sealed partial class MainWindow
     /// <summary>Содержимое пункта: значок (с точкой-меткой) и подпись; справа — необязательная приписка.</summary>
     static Control SideContent(string icon, string label, bool active, bool collapsed, Control? badge = null, string? trailing = null)
     {
-        Control glyph = Ui.Icon(icon, 19, active ? Ui.Res("Brand2") : Ui.Res("Muted"));
+        Control glyph = Ui.Icon(icon, collapsed ? 21 : 19, active ? Ui.Res("Brand2") : Ui.Res("Muted"));
         if (badge is not null)
         {
             if (badge.Parent is Panel old) old.Children.Remove(badge);
             badge.Margin = new Thickness(0, -3, -3, 0);
-            glyph = new Panel { Width = 20, Height = 20, Children = { glyph, badge } };
+            glyph = new Panel { Width = 22, Height = 22, Children = { glyph, badge } };
         }
-        if (collapsed) return glyph;
+        if (collapsed) return RailTile(glyph, active, 48, 44);
         var text = new TextBlock
         {
             Text = label, FontSize = 14, FontWeight = active ? FontWeight.SemiBold : FontWeight.Medium,
@@ -296,36 +310,65 @@ public sealed partial class MainWindow
         var dock = new DockPanel { LastChildFill = true };
         if (trailing is not null)
         {
-            var t = new TextBlock { Text = trailing, FontSize = 12, Foreground = Ui.Res("Faint"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0) };
+            var t = new Border
+            {
+                Background = Ui.Res("Surface2"), CornerRadius = new CornerRadius(999), Padding = new Thickness(7, 1), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0),
+                Child = new TextBlock { Text = trailing, FontSize = 12, FontWeight = FontWeight.SemiBold, Foreground = Ui.Res("Muted") },
+            };
             DockPanel.SetDock(t, Dock.Right);
             dock.Children.Add(t);
         }
         var row = Ui.Row(12, glyph, text);
         row.VerticalAlignment = VerticalAlignment.Center;
         dock.Children.Add(row);
-        return dock;
+        return new Panel { Children = { SideBar(active, 18), dock } };
     }
+
+    /// <summary>Полоска акцента у левого края панели — у выбранного пункта и игры.</summary>
+    static Border SideBar(bool active, double height, double left = -12) => new()
+    {
+        Width = 4, Height = height, CornerRadius = new CornerRadius(0, 3, 3, 0), Background = Ui.Res("Brand"),
+        HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(left, 0, 0, 0),
+        IsVisible = active, IsHitTestVisible = false,
+    };
+
+    /// <summary>Пункт узкой панели: на всю ширину (полоска у края), внутри — плитка со значком.</summary>
+    static Control RailTile(Control glyph, bool active, double w, double h) => new Panel
+    {
+        Children =
+        {
+            SideBar(active, 24, 0),
+            new Border
+            {
+                Classes = { "railtile" }, Width = w, Height = h, CornerRadius = new CornerRadius(12), HorizontalAlignment = HorizontalAlignment.Center,
+                Background = active ? Ui.Res("BrandSoft") : null, Child = new Panel { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Children = { glyph } },
+            },
+        },
+    };
 
     void SideItem(Button b, bool active, bool collapsed, Control? badge = null, string? trailing = null)
     {
         if (!_nav.TryGetValue(b, out var n)) return;
         var label = Label(n.Label);
         b.Classes.Set("active", active);
-        b.Background = active ? Ui.Res("BrandSoft") : Brushes.Transparent;
+        b.Classes.Set("nav20", !collapsed);
+        b.Classes.Set("rail20", collapsed);
         b.CornerRadius = new CornerRadius(10);
         if (collapsed)
         {
-            b.Width = 48;
-            b.Height = 44;
+            b.Width = double.NaN;
+            b.Height = 48;
             b.Padding = new Thickness(0);
-            b.HorizontalAlignment = HorizontalAlignment.Center;
-            b.HorizontalContentAlignment = HorizontalAlignment.Center;
+            b.Background = Brushes.Transparent;
+            b.HorizontalAlignment = HorizontalAlignment.Stretch;
+            b.HorizontalContentAlignment = HorizontalAlignment.Stretch;
         }
         else
         {
             b.Width = double.NaN;
             b.Height = 42;
             b.Padding = new Thickness(12, 0);
+            b.Background = active ? Ui.Res("BrandSoft") : Brushes.Transparent;
             b.HorizontalAlignment = HorizontalAlignment.Stretch;
             b.HorizontalContentAlignment = HorizontalAlignment.Stretch;
         }
@@ -362,51 +405,86 @@ public sealed partial class MainWindow
         var running = Features.Launcher.IsRunning(id);
         var ready = g.LoaderInstalled || g.Def.Loader is Games.LoaderKind.None or Games.LoaderKind.Minecraft;
         var fresh = Features.NewGames.IsNew(g);
-        var (w, h) = collapsed ? (34.0, 46.0) : (30.0, 40.0);
-        var art = new Border { Width = w, Height = h, CornerRadius = new CornerRadius(collapsed ? 7 : 6), ClipToBounds = true, Child = Ui.GameImage(g.Def, 120, art: Images.Art.Cover) };
+        var (line, color) = GameLine(g);
+        var (w, h) = collapsed ? (40.0, 54.0) : (30.0, 40.0);
+        var art = new Border { Width = w, Height = h, CornerRadius = new CornerRadius(collapsed ? 9 : 6), ClipToBounds = true, Child = Ui.GameImage(g.Def, 120, art: Images.Art.Cover) };
+        // Точка состояния на обложке: запущена (зелёная), нужен загрузчик (жёлтая), новая (акцент).
         var dot = new Border
         {
-            Width = 10, Height = 10, CornerRadius = new CornerRadius(5), Background = running ? Ui.Res("Good") : !ready ? Ui.Res("Warn") : Ui.Res("Brand"),
-            BorderBrush = Ui.Res("Rail"), BorderThickness = new Thickness(2), Margin = new Thickness(0, 0, -3, -3),
-            HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom, IsVisible = collapsed && (running || !ready || fresh),
+            Width = 11, Height = 11, CornerRadius = new CornerRadius(6), Background = running ? Ui.Res("Good") : !ready ? Ui.Res("Warn") : Ui.Res("Brand"),
+            BorderBrush = Ui.Res("Rail"), BorderThickness = new Thickness(2), Margin = new Thickness(0, 0, -4, -4),
+            HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom, IsVisible = running || !ready || fresh,
         };
         if (running) dot.Classes.Add("pulse");
-        var cover = new Panel { Width = w, Height = h, Children = { art, dot } };
-        var b = new Button { Classes = { "nav20", "side-game" }, CornerRadius = new CornerRadius(10), VerticalContentAlignment = VerticalAlignment.Center };
+        var ring = new Border { Width = w + 6, Height = h + 6, CornerRadius = new CornerRadius(collapsed ? 12 : 9), BorderThickness = new Thickness(2), BorderBrush = Ui.Res("Brand"), IsVisible = false, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, IsHitTestVisible = false, Classes = { "game-ring" } };
+        var cover = new Panel { Width = w + 6, Height = h + 6, Children = { ring, new Panel { Width = w, Height = h, Children = { art, dot } } } };
+        var b = new Button { Classes = { collapsed ? "rail20" : "nav20", "side-game" }, CornerRadius = new CornerRadius(10), VerticalContentAlignment = VerticalAlignment.Center, Background = Brushes.Transparent };
+        var bar = SideBar(false, collapsed ? 30 : 22, collapsed ? 0 : -8);
+        bar.Classes.Add("game-bar");
         if (collapsed)
         {
-            b.Width = 48;
-            b.Height = 54;
+            b.Height = 64;
             b.Padding = new Thickness(0);
-            b.HorizontalAlignment = HorizontalAlignment.Center;
-            b.HorizontalContentAlignment = HorizontalAlignment.Center;
-            b.Content = cover;
-            ToolTip.SetTip(b, g.Def.Name);
+            b.HorizontalAlignment = HorizontalAlignment.Stretch;
+            b.HorizontalContentAlignment = HorizontalAlignment.Stretch;
+            cover.HorizontalAlignment = HorizontalAlignment.Center;
+            b.Content = new Panel { Children = { bar, cover } };
+            ToolTip.SetTip(b, $"{g.Def.Name} · {line}");
             ToolTip.SetPlacement(b, PlacementMode.Right);
         }
         else
         {
-            var (line, color) = GameLine(g);
-            b.Height = 52;
-            b.Padding = new Thickness(8, 0, 10, 0);
+            // Одна строка: обложка и название; справа — число модов (если есть), состояние — точкой и подсказкой.
+            b.Height = 48;
+            b.Padding = new Thickness(5, 0, 10, 0);
             b.HorizontalAlignment = HorizontalAlignment.Stretch;
             b.HorizontalContentAlignment = HorizontalAlignment.Stretch;
-            var name = new TextBlock { Text = g.Def.Name, FontSize = 13.5, FontWeight = FontWeight.SemiBold, Foreground = Ui.Res("Text"), TextTrimming = TextTrimming.CharacterEllipsis };
-            var sub = new TextBlock { Text = line, FontSize = 12, Foreground = color, TextTrimming = TextTrimming.CharacterEllipsis };
-            var words = Ui.Col(2, name, sub);
-            words.VerticalAlignment = VerticalAlignment.Center;
-            var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*"), ColumnSpacing = 12 };
+            var name = new TextBlock { Text = g.Def.Name, FontSize = 13.5, FontWeight = FontWeight.SemiBold, Foreground = Ui.Res("Text"), TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center };
+            var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"), ColumnSpacing = 10 };
             grid.Children.Add(cover);
-            Grid.SetColumn(words, 1);
-            grid.Children.Add(words);
-            b.Content = grid;
-            if (running || fresh) ToolTip.SetTip(b, $"{g.Def.Name} · {line}");
+            Grid.SetColumn(name, 1);
+            grid.Children.Add(name);
+            var count = g.Def.IsMinecraft ? 0 : g.ModCount;
+            if (count > 0)
+            {
+                var pill = new Border
+                {
+                    Background = Ui.Res("Surface2"), CornerRadius = new CornerRadius(999), Padding = new Thickness(7, 1), VerticalAlignment = VerticalAlignment.Center,
+                    Child = new TextBlock { Text = count.ToString(), FontSize = 12, FontWeight = FontWeight.SemiBold, Foreground = Ui.Res("Muted") },
+                };
+                Grid.SetColumn(pill, 2);
+                grid.Children.Add(pill);
+            }
+            b.Content = new Panel { Children = { bar, grid } };
+            ToolTip.SetTip(b, $"{g.Def.Name} · {line}");
+            ToolTip.SetPlacement(b, PlacementMode.Right);
         }
         b.Click += (_, _) => Navigate(() => new GamePage(id));
         // Двойной щелчок — сразу играть, как в библиотеке Steam.
         b.DoubleTapped += (_, _) => Guard.Later(() => Actions.Play(g));
         b.ContextFlyout = GameCard.Menu(g);
         return b;
+    }
+
+    /// <summary>Выбранная игра на панели: полоска у края и рамка акцента вокруг обложки.</summary>
+    static void MarkGame(Button row, bool on)
+    {
+        row.Classes.Set("active", on);
+        foreach (var r in Rings(row)) r.IsVisible = on;
+    }
+
+    static IEnumerable<Border> Rings(Control root)
+    {
+        if (root is Border b && (b.Classes.Contains("game-ring") || b.Classes.Contains("game-bar"))) yield return b;
+        var kids = root switch
+        {
+            Panel p => p.Children.Cast<Control>(),
+            Decorator d when d.Child is not null => [d.Child],
+            ContentControl cc when cc.Content is Control c => [c],
+            _ => [],
+        };
+        foreach (var k in kids)
+            foreach (var r in Rings(k)) yield return r;
     }
 
     void RenderRail()
@@ -417,47 +495,61 @@ public sealed partial class MainWindow
         _sideIsCollapsed = collapsed;
         _side.Width = collapsed ? SideNarrow : SideWide;
 
-        // Логотип и название; у развёрнутой панели — кнопка «свернуть».
+        // Логотип — это «Главная»: узкая панель — значок по центру, широкая — значок, название и «платформа модов».
+        var home = _current is HomePage or SearchPage;
         if (_sideHead is not null)
         {
             _sideHead.Children.Clear();
-            var logo = new Border { Width = 32, Height = 32, CornerRadius = new CornerRadius(9), ClipToBounds = true, Child = new Image { Source = Images.Asset("icon.png", 96), Width = 32, Height = 32 } };
-            var brand = new Border { Background = Brushes.Transparent, Cursor = new Cursor(StandardCursorType.Hand), VerticalAlignment = VerticalAlignment.Center };
-            brand.PointerPressed += (_, e) => { if (e.GetCurrentPoint(brand).Properties.IsLeftButtonPressed) { e.Handled = true; Navigate(() => new HomePage()); } };
+            var logo = new Border { Width = collapsed ? 40 : 36, Height = collapsed ? 40 : 36, CornerRadius = new CornerRadius(collapsed ? 11 : 10), ClipToBounds = true, Child = new Image { Source = Images.Asset("icon.png", 128), Stretch = Stretch.UniformToFill } };
+            var brand = new Button
+            {
+                Classes = { "brand20" }, Padding = new Thickness(collapsed ? 3 : 6), CornerRadius = new CornerRadius(collapsed ? 14 : 13), VerticalAlignment = VerticalAlignment.Center,
+                BorderThickness = new Thickness(2), BorderBrush = home ? Ui.Res("Brand") : Brushes.Transparent, Background = home && !collapsed ? Ui.Res("BrandSoft") : Brushes.Transparent,
+            };
+            brand.Classes.Set("active", home);
+            brand.Click += (_, _) => Navigate(() => new HomePage());
             ToolTip.SetTip(brand, I18n.T("v20.nav.home"));
+            ToolTip.SetPlacement(brand, PlacementMode.Right);
             if (collapsed)
             {
-                brand.Child = logo;
+                brand.Content = logo;
                 brand.HorizontalAlignment = HorizontalAlignment.Center;
                 Grid.SetColumnSpan(brand, 2);
                 _sideHead.Children.Add(brand);
             }
             else
             {
-                var name = new TextBlock { Text = "ModLaunch", FontFamily = Look.Display, FontSize = Look.WideHeadings ? 15.5 : 16.5, FontWeight = FontWeight.SemiBold, LetterSpacing = Look.WideHeadings ? -0.2 : -0.3, VerticalAlignment = VerticalAlignment.Center };
-                brand.Child = Ui.Row(10, logo, name);
-                brand.Margin = new Thickness(18, 0, 0, 0);
-                brand.HorizontalAlignment = HorizontalAlignment.Left;
+                brand.BorderThickness = new Thickness(0);
+                var name = new TextBlock { Text = "ModLaunch", FontFamily = Look.Display, FontSize = Look.WideHeadings ? 15.5 : 16.5, FontWeight = FontWeight.SemiBold, LetterSpacing = Look.WideHeadings ? -0.2 : -0.3 };
+                var tag = new TextBlock { Text = I18n.T("v20.brand.tag"), FontSize = 11.5, Foreground = Ui.Res("Faint"), TextTrimming = TextTrimming.CharacterEllipsis };
+                var words = Ui.Col(1, name, tag);
+                words.VerticalAlignment = VerticalAlignment.Center;
+                brand.Content = Ui.Row(10, logo, words);
+                brand.HorizontalAlignment = HorizontalAlignment.Stretch;
+                brand.HorizontalContentAlignment = HorizontalAlignment.Left;
+                brand.Margin = new Thickness(10, 0, 4, 0);
                 _sideHead.Children.Add(brand);
                 if (_sideToggle is not null)
                 {
                     if (_sideToggle.Parent is Panel p) p.Children.Remove(_sideToggle);
                     _sideToggle.Content = Ui.Icon(Icons.ChevronLeft, 16, Ui.Res("Faint"));
                     _sideToggle.Margin = new Thickness(0, 0, 10, 0);
+                    _sideToggle.HorizontalAlignment = HorizontalAlignment.Right;
                     ToolTip.SetTip(_sideToggle, I18n.T("v20.side.collapse"));
                     Grid.SetColumn(_sideToggle, 1);
                     _sideHead.Children.Add(_sideToggle);
                 }
             }
         }
+        _sideHead!.Height = collapsed ? 68 : TitleHeight + 8;
 
-        // Разделы.
-        _sideNav.Margin = collapsed ? new Thickness(0, 2, 0, 0) : new Thickness(12, 2, 12, 0);
+        // Разделы: Creator Hub, ИИ-сборки, Библиотека («Главная» — логотип, каталог — у игры и на главной).
+        _sideNav.Margin = collapsed ? new Thickness(0, 4, 0, 0) : new Thickness(12, 6, 12, 0);
+        _sideNav.Spacing = collapsed ? 4 : 2;
         _sideNav.Children.Clear();
-        // Каталог модов открывается со страницы игры и с главной, а на его месте — Creator Hub.
-        if (_creatorButton.Parent is Panel cp) cp.Children.Remove(_creatorButton);
-        foreach (var b in new[] { _homeButton, _creatorButton, _feedButton, _libraryButton }) _sideNav.Children.Add(b);
-        SideItem(_homeButton, _current is HomePage or SearchPage, collapsed);
+        foreach (var b in new[] { _homeButton, _modsButton, _creatorButton, _feedButton, _libraryButton })
+            if (b.Parent is Panel bp) bp.Children.Remove(b);
+        foreach (var b in new[] { _creatorButton, _feedButton, _libraryButton }) _sideNav.Children.Add(b);
         SideItem(_creatorButton, _current is MarketPage or CreatorPage or XStudio or ListingPage or AuthorPage, collapsed);
         SideItem(_feedButton, _current is AiBuildsPage, collapsed);
         SideItem(_libraryButton, _current is LibraryPage or AddGamePage or SteamLibraryPage, collapsed);
@@ -467,7 +559,7 @@ public sealed partial class MainWindow
         if (_sideGamesHead is Border gh)
         {
             if (_sideAdd.Parent is Panel ap) ap.Children.Remove(_sideAdd);
-            var rule = new Border { Height = 1, Background = Ui.Res("Line"), Margin = collapsed ? new Thickness(16, 12, 16, 8) : new Thickness(16, 14, 16, 10) };
+            var rule = new Border { Height = 1, Background = Ui.Res("Line"), Margin = collapsed ? new Thickness(22, 10, 22, 8) : new Thickness(16, 14, 16, 10) };
             if (collapsed) gh.Child = rule;
             else
             {
@@ -488,6 +580,7 @@ public sealed partial class MainWindow
             _sideGameRows.Clear();
             _sideGames.Children.Clear();
             _sideGames.Margin = collapsed ? new Thickness(0, 0, 0, 8) : new Thickness(12, 0, 12, 8);
+            _sideGames.Spacing = collapsed ? 0 : 2;
             foreach (var g in games)
             {
                 var row = SideGameRow(g, collapsed);
@@ -498,24 +591,25 @@ public sealed partial class MainWindow
                 _sideGames.Children.Add(new TextBlock { Text = I18n.T("v20.side.none"), FontSize = 12.5, Foreground = Ui.Res("Faint"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(12, 4, 12, 0) });
             if (collapsed)
             {
-                var plus = new Button { Classes = { "nav20" }, Width = 48, Height = 40, CornerRadius = new CornerRadius(10), Padding = new Thickness(0), HorizontalAlignment = HorizontalAlignment.Center, HorizontalContentAlignment = HorizontalAlignment.Center, VerticalContentAlignment = VerticalAlignment.Center, Content = Ui.Icon(Icons.Plus, 17, Ui.Res("Muted")) };
+                // «Добавить игру» — пунктирная плитка размером с обложку.
+                var plus = new Button
+                {
+                    Classes = { "rail20" }, Height = 60, Padding = new Thickness(0), Background = Brushes.Transparent, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Center, VerticalContentAlignment = VerticalAlignment.Center,
+                    Content = new Border { Classes = { "railtile" }, Width = 40, Height = 40, CornerRadius = new CornerRadius(11), Child = Kit20.Dashed(Ui.Icon(Icons.Plus, 17, Ui.Res("Muted")), 11, new Thickness(0)) },
+                };
                 plus.Click += (_, _) => Navigate(() => new AddGamePage());
                 ToolTip.SetTip(plus, I18n.T("add.title"));
                 ToolTip.SetPlacement(plus, PlacementMode.Right);
                 _sideGames.Children.Add(plus);
             }
         }
-        foreach (var (id, row) in _sideGameRows)
-        {
-            var on = _current?.GameId == id;
-            row.Classes.Set("active", on);
-            row.Background = on ? Ui.Res("BrandSoft") : Brushes.Transparent;
-        }
+        foreach (var (id, row) in _sideGameRows) MarkGame(row, _current?.GameId == id && _current is not HomePage);
 
         // Низ панели: Сообщество (сколько друзей в сети), статистика владельца, Настройки.
-        _sideBottom.Margin = collapsed ? new Thickness(0, 6, 0, 12) : new Thickness(12, 6, 12, 14);
+        _sideBottom.Margin = collapsed ? new Thickness(0, 6, 0, 10) : new Thickness(12, 6, 12, 14);
+        _sideBottom.Spacing = collapsed ? 2 : 2;
         _sideBottom.Children.Clear();
-        _sideBottom.Children.Add(new Border { Height = 1, Background = Ui.Res("Line"), Margin = collapsed ? new Thickness(16, 0, 16, 8) : new Thickness(4, 0, 4, 8) });
+        _sideBottom.Children.Add(new Border { Height = 1, Background = Ui.Res("Line"), Margin = collapsed ? new Thickness(22, 0, 22, 8) : new Thickness(4, 0, 4, 8) });
         var view = Social.Friends.View();
         var online = view.Friends.Count(f => f.State != "offline");
         _friendsBadge.IsVisible = view.Incoming.Count > 0 || online > 0;
@@ -524,7 +618,7 @@ public sealed partial class MainWindow
         if (_friendsButton.IsVisible)
         {
             _sideBottom.Children.Add(_friendsButton);
-            SideItem(_friendsButton, _current is FriendsPage or CommunityPage, collapsed, collapsed ? _friendsBadge : null, I18n.T("v20.side.online", ("n", online)));
+            SideItem(_friendsButton, _current is FriendsPage or CommunityPage, collapsed, collapsed ? _friendsBadge : null, online > 0 ? online.ToString() : null);
         }
         if (Settings.Data.Bool("ownerStats"))
         {
@@ -533,12 +627,13 @@ public sealed partial class MainWindow
         }
         _sideBottom.Children.Add(_settingsButton);
         SideItem(_settingsButton, _current is SettingsPage, collapsed);
-        // У свёрнутой панели — кнопка «развернуть» внизу (если свернули сами, а не узкое окно или рабочий раздел).
-        if (collapsed && _sideToggle is not null && Settings.Data.Bool("sideCollapsed"))
+        // У узкой панели — кнопка «показать подписи» внизу (если окно не узкое и это не рабочий раздел).
+        if (collapsed && _sideToggle is not null && SideCanExpand)
         {
             if (_sideToggle.Parent is Panel p) p.Children.Remove(_sideToggle);
             _sideToggle.Content = Ui.Icon(Icons.ChevronRight, 16, Ui.Res("Faint"));
             _sideToggle.Margin = new Thickness(0, 4, 0, 0);
+            Grid.SetColumn(_sideToggle, 0);
             _sideToggle.HorizontalAlignment = HorizontalAlignment.Center;
             ToolTip.SetTip(_sideToggle, I18n.T("v20.side.expand"));
             _sideBottom.Children.Add(_sideToggle);

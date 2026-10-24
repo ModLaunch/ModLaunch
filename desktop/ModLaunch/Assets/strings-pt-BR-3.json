@@ -324,7 +324,7 @@
     "setup.window.close": "Fechar",
     "setup.welcome.title": "Instalar o ModLaunch",
     "setup.welcome.titleUpdate": "Atualizar o ModLaunch",
-    "setup.welcome.lead": "Mods para Subnautica, Stardew Valley, Valheim, Lethal Company, R.E.P.O. e mais, com um clique.",
+    "setup.welcome.lead": "Mods com um clique para Subnautica, Stardew Valley, Valheim, Lethal Company, R.E.P.O. e mais — e tudo para criar e publicar os seus.",
     "setup.welcome.update": "A versão {from} está instalada. Ela será atualizada para a {version}; suas configurações e mods ficam no lugar.",
     "setup.welcome.updateLegacy": "O ModLaunch já está aqui. Ele será atualizado para a {version}; suas configurações e mods ficam no lugar.",
     "setup.welcome.folder": "Pasta de instalação",

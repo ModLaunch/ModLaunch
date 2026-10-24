@@ -117,6 +117,9 @@ public sealed partial class GamePage
             DockPanel.SetDock(tag, Dock.Right);
             row.Children.Add(tag);
             row.Children.Add(Ui.Row(10, Ui.Thumb(m.Icon, m.Name, 28, 7, 64), Ui.Text(m.Name + (m.Version != "" ? $" · {m.Version}" : ""))));
+            // 20.0.1: нажатие — описание мода (окно коллекции закроется).
+            var mm = m;
+            ModView.Clickable(row, () => ModView.Open(_g.Def.Id, new ModInfo { Source = "nexus", Id = mm.Id, Name = mm.Name, Icon = mm.Icon, Version = mm.Version }));
             list.Children.Add(row);
         }
 

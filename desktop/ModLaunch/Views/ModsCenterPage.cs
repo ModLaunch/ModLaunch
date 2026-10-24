@@ -78,7 +78,7 @@ public sealed class ModsCenterPage : Page
         var def = Games.GameCatalog.ById(game);
         var open = Ui.Button(I18n.T("common.open"), () => MainWindow.Current?.Navigate(() => new ModPage(game, mod)), "ghost");
         var row = Row(mod.Icon, mod.Name, (def?.ShortName ?? game) + (subtitle == "" ? "" : " · " + subtitle), [.. extra, open]);
-        return row;
+        return ModView.Clickable(row, () => ModView.Open(game, mod));
     }
 
     static Control List(IEnumerable<Control> rows, string empty)
@@ -105,8 +105,10 @@ public sealed class ModsCenterPage : Page
                 var update = Ui.Button(busy ? I18n.T("upd.updating") : I18n.T("upd.one"), () => { _ = Actions.UpdateMods(g, [u]); Build(); },
                     u.Manual ? "" : "primary", u.Manual ? Icons.External : Icons.ArrowUp, u.Manual ? I18n.T("upd.viaBrowser.tip") : null);
                 update.IsEnabled = !busy;
-                rows.Add(Row(u.Icon, u.Name, $"{g.Def.ShortName} · {u.Current} → {u.Latest}",
-                    Ui.Button("", () => MainWindow.Current?.Navigate(() => new GamePage(gameId, "installed")), "icon ghost", Icons.Forward, I18n.T("mc.toGame")), update));
+                var uu = u;
+                rows.Add(ModView.Clickable(Row(u.Icon, u.Name, $"{g.Def.ShortName} · {u.Current} → {u.Latest}",
+                    Ui.Button("", () => MainWindow.Current?.Navigate(() => new GamePage(gameId, "installed")), "icon ghost", Icons.Forward, I18n.T("mc.toGame")), update),
+                    () => ModView.Open(gameId, new ModInfo { Source = g.Def.SourceOf(uu.RecordId, uu.Source == "" ? null : uu.Source), Id = uu.CatalogId, Name = uu.Name, Icon = uu.Icon, Version = uu.Current })));
             }
         }
         foreach (var u in Tracking.Updates.Where(u => Match(u.Item.Name)))

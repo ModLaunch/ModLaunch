@@ -113,6 +113,11 @@ public static class UpdateReview
         var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,Auto,*,Auto"), ColumnSpacing = 12 };
         grid.Children.Add(check);
         var thumb = Ui.Thumb(u.Icon, u.Name, 36, 9);
+        // 20.0.1: название и значок — описание мода.
+        var g = item.Game;
+        void OpenMod() => ModView.Open(g.Def.Id, new Sources.ModInfo { Source = g.Def.SourceOf(u.RecordId, u.Source == "" ? null : u.Source), Id = u.CatalogId, Name = u.Name, Icon = u.Icon, Version = u.Current });
+        ModView.Clickable(thumb, OpenMod);
+        ModView.Clickable(middle, OpenMod);
         Grid.SetColumn(thumb, 1);
         grid.Children.Add(thumb);
         Grid.SetColumn(middle, 2);

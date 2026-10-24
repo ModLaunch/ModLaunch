@@ -844,6 +844,15 @@
     <Style Selector="Button.nav20:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{StaticResource Hover}"/></Style>
     <Style Selector="Button.nav20.active:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{StaticResource BrandSoft}"/></Style>
     <Style Selector="Window.juicy Button.nav20:pressed"><Setter Property="RenderTransform" Value="scale(0.97)"/></Style>
+    <!-- 20.0.1: узкая панель — кнопка на всю ширину без подложки, подсвечивается плитка со значком внутри -->
+    <Style Selector="Button.rail20"><Setter Property="BorderThickness" Value="0"/><Setter Property="Foreground" Value="{StaticResource Muted}"/></Style>
+    <Style Selector="Button.rail20:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="Transparent"/></Style>
+    <Style Selector="Button.rail20:pressed /template/ ContentPresenter"><Setter Property="Background" Value="Transparent"/></Style>
+    <Style Selector="Button.rail20:pointerover Border.railtile"><Setter Property="Background" Value="{StaticResource Hover}"/></Style>
+    <Style Selector="Window.juicy Button.rail20:pressed Border.railtile"><Setter Property="RenderTransform" Value="scale(0.94)"/></Style>
+    <!-- Логотип-«Главная» -->
+    <Style Selector="Button.brand20:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{StaticResource Hover}"/></Style>
+    <Style Selector="Button.brand20.active:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{StaticResource BrandSoft}"/></Style>
     <!-- Профиль в шапке -->
     <Style Selector="Button.acct20">
       <Setter Property="Background" Value="{StaticResource Surface}"/>

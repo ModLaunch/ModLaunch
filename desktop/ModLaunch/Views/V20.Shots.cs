@@ -19,7 +19,7 @@ public static class V20Shots
         d["font"] = "Onest";
         d["headings"] = "wide";
         d["statusBar"] = false;
-        d["sideCollapsed"] = false;
+        d.Remove("sideLabels");
         foreach (var key in new[] { "config", "customPalette", "customBase", "ownerStats", "uiScale", "radius", "fxScanlines", "fxVignette" }) d.Remove(key);
         Look.Apply();
         s.Window.Width = w;
@@ -66,14 +66,14 @@ public static class V20Shots
     static void V20Collapsed(Shots s)
     {
         Size(s);
-        Settings.Data["sideCollapsed"] = true;
+        Settings.Data["sideLabels"] = true;
         try
         {
             s.Window.Navigate(() => new HomePage());
             s.Pump(1500);
-            s.Save("v20-side-collapsed");
+            s.Save("v20-side-labels");
         }
-        finally { Settings.Data["sideCollapsed"] = false; }
+        finally { Settings.Data.Remove("sideLabels"); }
     }
 
     [DemoShots]
@@ -173,5 +173,38 @@ public static class V20Shots
         s.Window.Navigate(() => new SettingsPage("look"));
         s.Pump(1800);
         s.Save("v20-settings-look");
+    }
+
+    /// <summary>Боковая панель на разных размерах окна: 1280×720, 1536×816 и 1920×1040.</summary>
+    [DemoShots]
+    static void V20Sizes(Shots s)
+    {
+        foreach (var (w, h) in new[] { (1280.0, 720.0), (1536.0, 816.0), (1920.0, 1040.0) })
+        {
+            Size(s, w, h);
+            s.Window.Navigate(() => new HomePage());
+            s.Pump(1800);
+            s.Save($"v20-size-{w}x{h}");
+        }
+    }
+
+    /// <summary>Нажатие по моду: установленный из каталога — его страница, из файла — окно «О моде».</summary>
+    [DemoShots]
+    static void V20Click(Shots s)
+    {
+        Size(s);
+        var g = AppState.Game("subnautica");
+        s.Window.Navigate(() => new GamePage("subnautica", "installed"));
+        s.Pump(1200);
+        if (g.Registry?.List().FirstOrDefault() is { } first)
+        {
+            ModView.Open(g, first);
+            s.Pump(1800);
+            s.Save("v20-click-1-installed");
+        }
+        ModView.Open(g, new System.Text.Json.Nodes.JsonObject { ["id"] = "local-shot", ["name"] = "Better Lights (local)", ["source"] = "file", ["version"] = "2.1", ["author"] = "Me" });
+        s.Pump(900);
+        s.Save("v20-click-2-local");
+        s.Window.CloseDialog();
     }
 }
