@@ -833,5 +833,178 @@
     </Style>
     <Style Selector="Window.juicy Button.quick:pointerover"><Setter Property="RenderTransform" Value="translateY(-2px)"/></Style>
     <Style Selector="Window.juicy Button.quick:pressed"><Setter Property="RenderTransform" Value="scale(0.95)"/></Style>
+
+    <!-- ============================== 20.0 «Платформа» ============================== -->
+    <!-- Разделы в шапке: крупные надписи, у открытого — подчёркивание акцентом (как в Steam) -->
+    <Style Selector="Button.ptab">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="CornerRadius" Value="0"/>
+      <Setter Property="Padding" Value="14,0"/>
+      <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+    </Style>
+    <Style Selector="Button.ptab:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{StaticResource Hover}"/></Style>
+    <Style Selector="TextBlock.ptab-label"><Setter Property="Foreground" Value="{StaticResource Muted}"/></Style>
+    <Style Selector="Button.ptab:pointerover TextBlock.ptab-label"><Setter Property="Foreground" Value="{StaticResource Text}"/></Style>
+    <Style Selector="Button.ptab.active TextBlock.ptab-label"><Setter Property="Foreground" Value="{StaticResource Text}"/></Style>
+    <Style Selector="Window.juicy Button.ptab:pressed"><Setter Property="RenderTransform" Value="scale(0.97)"/></Style>
+
+    <!-- Вкладки раздела под шапкой -->
+    <Style Selector="Button.subtab">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="CornerRadius" Value="8"/>
+      <Setter Property="Padding" Value="12,7"/>
+      <Setter Property="FontSize" Value="13"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="Foreground" Value="{StaticResource Muted}"/>
+    </Style>
+    <Style Selector="Button.subtab:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource Hover}"/>
+      <Setter Property="Foreground" Value="{StaticResource Text}"/>
+    </Style>
+    <Style Selector="Button.subtab.active">
+      <Setter Property="Background" Value="{StaticResource Surface2}"/>
+      <Setter Property="Foreground" Value="{StaticResource Text}"/>
+    </Style>
+    <Style Selector="Button.subtab.active:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource Surface3}"/>
+      <Setter Property="Foreground" Value="{StaticResource Text}"/>
+    </Style>
+
+    <!-- Аккаунт в шапке -->
+    <Style Selector="Button.account-chip">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="CornerRadius" Value="999"/>
+    </Style>
+    <Style Selector="Button.account-chip:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource Hover}"/>
+      <Setter Property="BorderBrush" Value="{StaticResource Line}"/>
+    </Style>
+    <Style Selector="Button.account-chip.active">
+      <Setter Property="Background" Value="{StaticResource Surface2}"/>
+      <Setter Property="BorderBrush" Value="{StaticResource Line}"/>
+    </Style>
+
+    <!-- Список игр слева в библиотеке -->
+    <Style Selector="TextBox.side-search">
+      <Setter Property="Background" Value="{StaticResource Surface}"/>
+      <Setter Property="BorderBrush" Value="{StaticResource Line}"/>
+      <Setter Property="CornerRadius" Value="8"/>
+      <Setter Property="FontSize" Value="12.5"/>
+      <Setter Property="Padding" Value="8,6"/>
+    </Style>
+    <Style Selector="Button.side-filter">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="CornerRadius" Value="999"/>
+      <Setter Property="Padding" Value="10,4"/>
+      <Setter Property="FontSize" Value="11.5"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="Foreground" Value="{StaticResource Faint}"/>
+    </Style>
+    <Style Selector="Button.side-filter:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{StaticResource Hover}"/><Setter Property="Foreground" Value="{StaticResource Text}"/></Style>
+    <Style Selector="Button.side-filter.active"><Setter Property="Background" Value="{StaticResource Surface3}"/><Setter Property="Foreground" Value="{StaticResource Text}"/></Style>
+    <Style Selector="Button.side-filter.active:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{StaticResource Surface3}"/></Style>
+    <Style Selector="Button.side-group">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="HorizontalAlignment" Value="Stretch"/>
+      <Setter Property="HorizontalContentAlignment" Value="Left"/>
+      <Setter Property="Padding" Value="8,10,8,5"/>
+      <Setter Property="CornerRadius" Value="6"/>
+    </Style>
+    <Style Selector="Button.side-group:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="Transparent"/></Style>
+    <Style Selector="Button.librow">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="CornerRadius" Value="8"/>
+      <Setter Property="Padding" Value="6,4,6,4"/>
+      <Setter Property="HorizontalAlignment" Value="Stretch"/>
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+    </Style>
+    <Style Selector="Button.librow:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{StaticResource Hover}"/></Style>
+    <Style Selector="Button.librow.active"><Setter Property="Background" Value="{StaticResource BrandSoft}"/></Style>
+    <Style Selector="Button.librow.active:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{StaticResource BrandSoft}"/></Style>
+    <Style Selector="Window.juicy Button.librow:pressed"><Setter Property="RenderTransform" Value="scale(0.98)"/></Style>
+    <Style Selector="Button.side-play">
+      <Setter Property="Opacity" Value="0"/>
+      <Setter Property="Transitions">
+        <Transitions><DoubleTransition Property="Opacity" Duration="0:0:0.14"/></Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Button.librow:pointerover Button.side-play"><Setter Property="Opacity" Value="1"/></Style>
+    <Style Selector="Button.side-play.on"><Setter Property="Opacity" Value="1"/></Style>
+
+    <!-- Нижняя полоса платформы -->
+    <Style Selector="Button.foot">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="CornerRadius" Value="8"/>
+      <Setter Property="Padding" Value="10,5"/>
+      <Setter Property="Height" Value="32"/>
+      <Setter Property="FontSize" Value="12.5"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="Foreground" Value="{StaticResource Muted}"/>
+      <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+    <Style Selector="Button.foot:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{StaticResource Hover}"/><Setter Property="Foreground" Value="{StaticResource Text}"/></Style>
+    <Style Selector="Button.foot-dl"><Setter Property="Padding" Value="8,3,14,3"/><Setter Property="MinWidth" Value="200"/></Style>
+    <Style Selector="Button.friends-pill.foot-friends">
+      <Setter Property="Height" Value="32"/>
+      <Setter Property="Padding" Value="8,3,14,3"/>
+      <Setter Property="FontSize" Value="12.5"/>
+      <Setter Property="Background" Value="{StaticResource Surface2}"/>
+    </Style>
+    <Style Selector="Button.friends-pill.foot-friends.active"><Setter Property="Background" Value="{StaticResource BrandSoft}"/></Style>
+    <Style Selector="Window.juicy Button.friends-pill.foot-friends:pointerover"><Setter Property="RenderTransform" Value="none"/></Style>
+
+    <!-- Витрина магазина -->
+    <Style Selector="Border.store-card">
+      <Setter Property="Background" Value="{StaticResource Surface}"/>
+      <Setter Property="BorderBrush" Value="{StaticResource Line}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="CornerRadius" Value="12"/>
+      <Setter Property="ClipToBounds" Value="True"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Transitions">
+        <Transitions>
+          <BrushTransition Property="BorderBrush" Duration="0:0:0.15"/>
+          <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.2" Easing="CubicEaseOut"/>
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Border.store-card:pointerover"><Setter Property="BorderBrush" Value="{StaticResource Brand}"/></Style>
+    <Style Selector="Window.juicy Border.store-card:pointerover"><Setter Property="RenderTransform" Value="translateY(-3px)"/></Style>
+    <Style Selector="Border.store-cat">
+      <Setter Property="CornerRadius" Value="12"/>
+      <Setter Property="ClipToBounds" Value="True"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Opacity" Value="0.92"/>
+      <Setter Property="Transitions">
+        <Transitions>
+          <DoubleTransition Property="Opacity" Duration="0:0:0.15"/>
+          <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.2" Easing="CubicEaseOut"/>
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Border.store-cat:pointerover"><Setter Property="Opacity" Value="1"/></Style>
+    <Style Selector="Window.juicy Border.store-cat:pointerover"><Setter Property="RenderTransform" Value="translateY(-3px)"/></Style>
+    <Style Selector="Border.hero-thumb">
+      <Setter Property="CornerRadius" Value="8"/>
+      <Setter Property="ClipToBounds" Value="True"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="BorderThickness" Value="2"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="Opacity" Value="0.6"/>
+      <Setter Property="Transitions">
+        <Transitions><DoubleTransition Property="Opacity" Duration="0:0:0.15"/></Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Border.hero-thumb:pointerover"><Setter Property="Opacity" Value="1"/></Style>
+    <Style Selector="Border.hero-thumb.active"><Setter Property="Opacity" Value="1"/><Setter Property="BorderBrush" Value="{StaticResource Brand}"/></Style>
   </Application.Styles>
 </Application>

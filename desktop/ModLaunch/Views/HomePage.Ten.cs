@@ -68,25 +68,21 @@ public sealed partial class HomePage
         Content = new ScrollViewer { Content = col, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
     }
 
-    /// <summary>Приветствие одной строкой и две кнопки: «Изменить виджеты» и «Стиль».</summary>
+    /// <summary>Приветствие одной строкой, уровень и две кнопки: «Изменить виджеты» и «Стиль».</summary>
     Control Greet()
     {
         var name = ProfileKit.PlayerName();
         var hello = new TextBlock { Text = Greeting() + ", " + name, FontFamily = Look.Display, FontSize = 22, FontWeight = FontWeight.Bold, LetterSpacing = -0.5, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
         var edit = Ui.Button(_editWidgets ? I18n.T("v10.w.done") : I18n.T("v10.w.edit"), () => { _editWidgets = !_editWidgets; Build(); }, _editWidgets ? "primary" : "ghost", _editWidgets ? Icons.Check : Icons.Grid);
         var style = Ui.Button(I18n.T("v10.cfg.short"), () => MainWindow.Current?.Navigate(() => new SettingsPage("configs")), "ghost", Icons.Palette);
-        // 12.0: быстрые переходы одной кнопкой (у каждой — свой Ctrl-ярлык в подсказке).
-        Button Quick(string text, string icon, string keys, Func<Page> make) => Ui.Button(text, () => MainWindow.Current?.Navigate(make), "ghost", icon, keys);
-        var dock = Ui.Row(6,
-            Quick(I18n.T("lib.title"), Icons.Grid, "Ctrl+L", () => new LibraryPage()),
-            Quick(I18n.T("mc.title"), Icons.Package, "Ctrl+U", () => new ModsCenterPage()));
+        // 20.0: «Библиотека» и «Центр модов» — вкладками раздела под шапкой окна, здесь они только повторялись.
         // 16.0: уровень рядом с приветствием; есть новые награды пути — кнопка «Забрать».
         var (level, _, next) = RoadKit.Now();
         var fresh = LevelRoad.Fresh(level).Count;
         var lv = fresh > 0
             ? Ui.Button(I18n.T("v16.road.chip.new", ("level", level), ("n", fresh)), RoadKit.Claim, "primary", Icons.Trophy)
             : Ui.Button(I18n.T("v16.road.lv", ("n", level)), () => MainWindow.Current?.Navigate(() => new ProfilePage("rewards")), "ghost", Icons.Trophy, I18n.T("v98.level.next", ("n", next)) + " · " + RoadKit.NextLine(level));
-        var right = Ui.Row(6, lv, dock, new Border { Width = 1, Height = 22, Background = Ui.Res("Line"), Margin = new Thickness(4, 0), VerticalAlignment = VerticalAlignment.Center }, style, edit);
+        var right = Ui.Row(6, lv, new Border { Width = 1, Height = 22, Background = Ui.Res("Line"), Margin = new Thickness(4, 0), VerticalAlignment = VerticalAlignment.Center }, style, edit);
         right.VerticalAlignment = VerticalAlignment.Center;
         var row = new DockPanel { Margin = new Thickness(2, 6, 0, 0) };
         DockPanel.SetDock(right, Dock.Right);

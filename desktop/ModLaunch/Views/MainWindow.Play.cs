@@ -10,7 +10,7 @@ namespace ModLaunch.Views;
 
 /// <summary>
 /// Главное окно, часть «игра и аккаунт»: экран запуска поверх всего окна, кнопка
-/// аккаунта внизу боковой панели с меню и помощник, когда игра вылетела.
+/// аккаунта в шапке справа с меню и помощник, когда игра вылетела.
 /// </summary>
 public sealed partial class MainWindow
 {
@@ -21,8 +21,8 @@ public sealed partial class MainWindow
     };
     readonly Border _accountPanel = new()
     {
-        Classes = { "card" }, Width = 300, Padding = new Thickness(18), Margin = new Thickness(88, 0, 0, 16),
-        HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Bottom, IsVisible = false,
+        Classes = { "card" }, Width = 300, Padding = new Thickness(18),
+        HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top, IsVisible = false,
         BoxShadow = BoxShadows.Parse("0 18 50 0 #80000000"),
     };
 
@@ -58,33 +58,62 @@ public sealed partial class MainWindow
     /// <summary>Кнопка аккаунта на боковой панели: аватар с зелёной точкой или значок «войти».</summary>
     public void RefreshAccount() => RenderAccount();
 
+    /// <summary>Уровень игрока для кнопки аккаунта: считается не чаще раза в 20 секунд (достижения читают диск).</summary>
+    (int Level, DateTime At) _levelCache = (0, DateTime.MinValue);
+
+    int CachedLevel()
+    {
+        if (_levelCache.Level > 0 && DateTime.UtcNow - _levelCache.At < TimeSpan.FromSeconds(20)) return _levelCache.Level;
+        var level = 1;
+        try { level = Features.Achievements.Level(Features.Achievements.All()).Level; } catch { }
+        _levelCache = (level, DateTime.UtcNow);
+        return level;
+    }
+
+    /// <summary>
+    /// 20.0: аккаунт — справа в шапке, как в Steam: аватар в рамке с точкой «в сети», имя, уровень и баланс кошелька.
+    /// В узком окне — только аватар.
+    /// </summary>
     void RenderAccount()
     {
         var p = Social.Account.Get();
+        var name = p.SignedIn ? p.Name ?? p.Email ?? "?" : I18n.T("acc.menu.guest");
+        Control face;
         if (p.SignedIn)
         {
-            var name = p.Name ?? p.Email ?? "?";
             var online = new Border
             {
-                Width = 12, Height = 12, CornerRadius = new CornerRadius(6), Background = Ui.Res("Good"),
+                Width = 11, Height = 11, CornerRadius = new CornerRadius(6), Background = Ui.Res("Good"),
                 BorderBrush = Ui.Res("Rail"), BorderThickness = new Thickness(2),
                 HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom,
             };
             // 9.9: аватар в надетой рамке (награда за достижения).
-            var ring = ProfileKit.Avatar(name, 40, ring: 3);
-            _accountButton.Content = new Panel { Width = 40, Height = 40, Children = { ring, online } };
-            ToolTip.SetTip(_accountButton, name);
+            face = new Panel { Width = 30, Height = 30, Children = { ProfileKit.Avatar(name, 30, ring: 2), online } };
+        }
+        else
+            face = new Border
+            {
+                Width = 30, Height = 30, CornerRadius = new CornerRadius(15), Background = Ui.Res("Surface2"), BorderBrush = Ui.Res("Line"), BorderThickness = new Thickness(1),
+                Child = Ui.Icon(Icons.User, 15, Ui.Res("Muted")),
+            };
+        var level = CachedLevel();
+        var line = I18n.T("v20.acc.level", ("n", level));
+        if (p.SignedIn && MarketData.Wallet is { } w) line += " · " + Creator.Market.Money(w.Balance);
+        if (_accountCompact)
+        {
+            _accountButton.Padding = new Thickness(3);
+            _accountButton.Content = face;
         }
         else
         {
-            _accountButton.Content = new Border
-            {
-                Width = 38, Height = 38, CornerRadius = new CornerRadius(19), Background = Ui.Res("Surface2"), BorderBrush = Ui.Res("Line"), BorderThickness = new Thickness(1),
-                Child = Ui.Icon(Icons.User, 18, Ui.Res("Muted")),
-            };
-            ToolTip.SetTip(_accountButton, I18n.T("acc.menu.signin"));
+            var words = Ui.Col(0,
+                new TextBlock { Text = p.SignedIn ? name : I18n.T("acc.menu.signin"), FontSize = 12.5, FontWeight = FontWeight.SemiBold, MaxWidth = 130, TextTrimming = TextTrimming.CharacterEllipsis },
+                new TextBlock { Text = line, FontSize = 10.5, Foreground = Ui.Res("Muted"), MaxWidth = 130, TextTrimming = TextTrimming.CharacterEllipsis });
+            words.VerticalAlignment = VerticalAlignment.Center;
+            _accountButton.Padding = new Thickness(4, 3, 10, 3);
+            _accountButton.Content = Ui.Row(9, face, words, Ui.Icon(Icons.ChevronDown, 13, Ui.Res("Faint")));
         }
-        _accountButton.Foreground = Ui.Res("Muted");
+        ToolTip.SetTip(_accountButton, p.SignedIn ? name : I18n.T("acc.menu.signin"));
         _accountButton.Classes.Set("active", _accountPanel.IsVisible);
     }
 

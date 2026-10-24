@@ -61,8 +61,8 @@ public sealed class FriendsDock : Panel
             },
         };
         Children.Add(_panel);
-        var pillHost = new Panel { HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom, Children = { _pill } };
-        Children.Add(pillHost);
+        _pillHost = new Panel { HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom, Children = { _pill } };
+        Children.Add(_pillHost);
 
         I18n.Changed += () => Dispatcher.UIThread.Post(Render);
         Friends.Changed += () => Dispatcher.UIThread.Post(Render);
@@ -75,10 +75,27 @@ public sealed class FriendsDock : Panel
 
     public bool IsOpen => _open;
 
+    readonly Panel _pillHost;
+    bool _docked;
+
+    /// <summary>
+    /// 20.0: кнопка «Друзья и чат» — в нижней полосе окна, как в Steam; здесь остаётся только панель над ней.
+    /// </summary>
+    public Button TakePill()
+    {
+        _pillHost.Children.Remove(_pill);
+        _docked = true;
+        _pill.Classes.Add("foot-friends");
+        _panel.Margin = new Thickness(0);
+        Render();
+        return _pill;
+    }
+
     public void Toggle(bool? open = null)
     {
         _open = open ?? !_open;
         _panel.IsVisible = _open;
+        if (_docked) { IsVisible = _open; _pill.Classes.Set("active", _open); }
         if (!_open) Render();
         if (_open)
         {
@@ -94,9 +111,9 @@ public sealed class FriendsDock : Panel
         var online = view.Friends.Where(f => f.State != "offline").ToList();
         // 9.4: кнопка в углу — только когда есть что показать (кто-то в сети, заявка) или панель открыта.
         // Иначе она лежала поверх страниц и закрывала кнопки; «Друзья» есть на боковой панели.
-        var railHasFriends = !Settings.Data.Bool("railHidden") && Settings.Data.Bool("railFriends", true);
         var worth = view.SignedIn && (online.Count > 0 || view.Incoming.Count > 0);
-        IsVisible = Settings.Data.Bool("friendsDock", true) && (_open || worth || !railHasFriends);
+        // 20.0: кнопка живёт в нижней полосе — сама панель видна, только пока открыта.
+        IsVisible = _docked ? _open : Settings.Data.Bool("friendsDock", true) && (_open || worth);
         var faces = new Panel { Width = Math.Max(1, Math.Min(3, online.Count)) * 16 + 10, Height = 26 };
         for (var i = 0; i < Math.Min(3, online.Count); i++)
         {
@@ -106,8 +123,8 @@ public sealed class FriendsDock : Panel
             faces.Children.Add(new Border { Child = t, CornerRadius = new CornerRadius(14), BorderThickness = new Thickness(2), BorderBrush = Ui.Res("Surface"), Margin = t.Margin, HorizontalAlignment = HorizontalAlignment.Left });
             t.Margin = new Thickness(0);
         }
-        var label = !view.SignedIn ? I18n.T("friends.title")
-            : online.Count > 0 ? I18n.T("dock.online", ("n", online.Count)) : I18n.T("friends.title");
+        var label = !view.SignedIn ? I18n.T(_docked ? "v20.foot.friends" : "friends.title")
+            : online.Count > 0 ? I18n.T("dock.online", ("n", online.Count)) : I18n.T(_docked ? "v20.foot.friends" : "friends.title");
         var content = Ui.Row(10);
         content.Children.Add(online.Count > 0 ? faces : Ui.Icon(Icons.Users, 16));
         content.Children.Add(new TextBlock { Text = label, VerticalAlignment = VerticalAlignment.Center, FontWeight = FontWeight.SemiBold });

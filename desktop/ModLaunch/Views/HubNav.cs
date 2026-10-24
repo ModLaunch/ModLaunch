@@ -123,11 +123,9 @@ public static class HubNav
         column.Children.Add(Head(current, rail, title, lead, inPage, sold, sub, action));
         column.Children.Add(body);
         var scroll = new ScrollViewer { Content = column, HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled };
-        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*") };
-        grid.Children.Add(RailPanel(rail, inPage, local));
-        Grid.SetColumn(scroll, 1);
-        grid.Children.Add(scroll);
-        var root = new Panel { Classes = { "hub-space" }, Children = { new HubLook.Blueprint(), grid } };
+        // 20.0: разделы Creator Hub — вкладками раздела «Создателям» под шапкой окна (одна навигация на всю программу),
+        // поэтому своей боковой панели у мастерской больше нет: странице достаётся вся ширина.
+        var root = new Panel { Classes = { "hub-space" }, Children = { new HubLook.Blueprint(), scroll } };
         HubLook.Scope(root);
         return root;
     }

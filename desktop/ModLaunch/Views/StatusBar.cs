@@ -12,6 +12,8 @@ namespace ModLaunch.Views;
 /// 11.0: строка состояния внизу окна, как у взрослых лаунчеров: сеть (и сам включившийся офлайн),
 /// инжектор (готов, инжекты в игре или выключен), последний бэкап с кнопкой «в один клик» и версия.
 /// Каждая часть — ссылка на свой раздел.
+/// 20.0: это нижняя полоса платформы, как в Steam: слева «Добавить игру» и состояние, посередине — загрузки,
+/// справа — версия и «Друзья и чат». Настройка «Строка состояния» прячет только пункты состояния.
 /// </summary>
 public sealed class StatusBar : Border
 {
@@ -19,20 +21,37 @@ public sealed class StatusBar : Border
     readonly StackPanel _right = Ui.Row(4);
     readonly DispatcherTimer _tick = new() { Interval = TimeSpan.FromSeconds(30) };
 
-    public StatusBar()
+    public StatusBar(Control? lead = null, Control? center = null, Control? trail = null)
     {
-        Height = 28;
+        Height = 42;
         Background = Ui.Res("Rail");
         BorderBrush = Ui.Res("Line");
         BorderThickness = new Thickness(0, 1, 0, 0);
-        Padding = new Thickness(8, 0);
+        Padding = new Thickness(8, 0, 10, 0);
         _left.VerticalAlignment = _right.VerticalAlignment = VerticalAlignment.Center;
-        var dock = new DockPanel();
-        DockPanel.SetDock(_right, Dock.Right);
-        dock.Children.Add(_right);
-        dock.Children.Add(_left);
-        Child = dock;
+        var leftSide = Ui.Row(4);
+        leftSide.VerticalAlignment = VerticalAlignment.Center;
+        if (lead is not null) { leftSide.Children.Add(lead); leftSide.Children.Add(Dot()); }
+        leftSide.Children.Add(_left);
+        var rightSide = Ui.Row(8, _right);
+        rightSide.VerticalAlignment = VerticalAlignment.Center;
+        if (trail is not null) { trail.VerticalAlignment = VerticalAlignment.Center; rightSide.Children.Add(trail); }
+        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto,*") };
+        // Узкое окно: пункты состояния не налезают на загрузки посередине — обрезаются, а второстепенные прячутся (Render).
+        grid.Children.Add(new Border { Child = leftSide, ClipToBounds = true });
+        if (center is not null)
+        {
+            center.HorizontalAlignment = HorizontalAlignment.Center;
+            center.VerticalAlignment = VerticalAlignment.Center;
+            Grid.SetColumn(center, 1);
+            grid.Children.Add(center);
+        }
+        rightSide.HorizontalAlignment = HorizontalAlignment.Right;
+        Grid.SetColumn(rightSide, 2);
+        grid.Children.Add(rightSide);
+        Child = grid;
         _tick.Tick += (_, _) => Render();
+        SizeChanged += (_, e) => { if ((e.NewSize.Width < 1500) != (e.PreviousSize.Width < 1500) || (e.NewSize.Width < 1250) != (e.PreviousSize.Width < 1250)) Render(); };
         AttachedToVisualTree += (_, _) =>
         {
             Offline.Changed += Later;
@@ -52,7 +71,6 @@ public sealed class StatusBar : Border
             I18n.Changed -= Later;
             _tick.Stop();
         };
-        IsVisible = Settings.Data.Bool("statusBar", true);
     }
 
     void Later() => Dispatcher.UIThread.Post(Render);
@@ -77,8 +95,9 @@ public sealed class StatusBar : Border
 
     void Render()
     {
-        IsVisible = Settings.Data.Bool("statusBar", true);
-        if (!IsVisible) return;
+        var on = Settings.Data.Bool("statusBar", true);
+        _left.IsVisible = _right.IsVisible = on;
+        if (!on) return;
         var w = MainWindow.Current;
         _left.Children.Clear();
         _right.Children.Clear();
@@ -93,13 +112,14 @@ public sealed class StatusBar : Border
         else _left.Children.Add(Item(Icons.Wifi, I18n.T("v11.sb.online"), Ui.Res("Good"), () => w?.Navigate(() => new SettingsPage("general"))));
         _left.Children.Add(Dot());
 
-        // Инжектор.
+        // Инжектор (в узком окне — только когда он что-то делает).
+        var narrow = Bounds.Width > 0 && Bounds.Width < 1250;
         var live = AppState.Games.Count(g => Inject.Live(g.Def.Id));
         var count = Inject.All().Count(i => i.Enabled);
         var (injText, injTint) = !Inject.On ? (I18n.T("v11.sb.inj.off"), Ui.Res("Faint"))
             : live > 0 ? (I18n.T("v11.sb.inj.live"), Ui.Res("Brand2"))
             : (count > 0 ? I18n.T("v11.sb.inj.ready.n", ("n", count)) : I18n.T("v11.sb.inj.ready"), Ui.Res("Good"));
-        _left.Children.Add(Item(Icons.Zap, injText, injTint, () => w?.Navigate(() => new CreatorPage("injects")), I18n.T("v11.sb.inj.tip")));
+        if (!narrow || live > 0) _left.Children.Add(Item(Icons.Zap, injText, injTint, () => w?.Navigate(() => new CreatorPage("injects")), I18n.T("v11.sb.inj.tip")));
 
         // Бэкап в один клик.
         _left.Children.Add(Dot());
@@ -109,7 +129,7 @@ public sealed class StatusBar : Border
             : last.Ok ? (I18n.T("v11.sb.backup.ago", ("ago", Ui.Ago(last.At))), Ui.Res("Good"))
             : (I18n.T("v11.sb.backup.fail"), Ui.Res("Warn"));
         _left.Children.Add(Item(Icons.Shield, bkText, bkTint, () => w?.Navigate(() => new SettingsPage("backups"))));
-        if (!OneClickBackup.Running)
+        if (!OneClickBackup.Running && !(Bounds.Width > 0 && Bounds.Width < 1500))
         {
             var b = new Button { Classes = { "ghost" }, Padding = new Thickness(8, 2), Height = 24, MinHeight = 0, VerticalAlignment = VerticalAlignment.Center,
                 Content = new TextBlock { Text = I18n.T("v11.sb.backup.now"), FontSize = 11.5, FontWeight = FontWeight.SemiBold, Foreground = Ui.Res("Brand2") } };

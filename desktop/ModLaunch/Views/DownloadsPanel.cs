@@ -31,6 +31,7 @@ public sealed partial class MainWindow
     {
         _dlBadge.IsVisible = Jobs.ActiveCount > 0;
         UpdateDlRing();
+        RenderFooterDownloads();
         if (_dlPending) return;
         _dlPending = true;
         DispatcherTimer.RunOnce(() => { _dlPending = false; DrawDownloads(); }, TimeSpan.FromMilliseconds(150));
@@ -47,6 +48,7 @@ public sealed partial class MainWindow
     void DrawDownloads()
     {
         _dlBadge.IsVisible = Jobs.ActiveCount > 0;
+        RenderFooterDownloads();
         DrawDownloadsHeader();
         var jobs = Jobs.All.Take(40).ToList();
         if (jobs.Count == 0)

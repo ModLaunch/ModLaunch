@@ -35,8 +35,9 @@ public abstract class Page : UserControl
 }
 
 /// <summary>
-/// Окно со своей рамкой: слева — главная, игры и настройки, сверху — навигация,
-/// поиск, загрузки и кнопки окна. Страница меняется в середине.
+/// Окно со своей рамкой. 20.0: сверху — разделы платформы (Магазин, Библиотека, Сообщество, Создателям),
+/// уведомления и аккаунт; под ними — вкладки раздела и поиск; в библиотеке слева — список игр;
+/// внизу — полоса с «Добавить игру», загрузками и друзьями. Страница меняется в середине.
 /// </summary>
 public sealed partial class MainWindow : Window
 {
@@ -61,7 +62,7 @@ public sealed partial class MainWindow : Window
     };
     Border? _adWrap;
     readonly Border _adRail = new() { IsVisible = false };
-    readonly Button _back, _forward, _downloads, _settingsButton, _friendsButton, _statsButton, _donateButton, _creatorButton, _libraryButton, _modsButton, _homeButton, _feedButton;
+    readonly Button _back, _forward, _downloads;
     readonly LayoutTransformControl _scale = new();
     Control? _railHost;
     Panel? _layers;
@@ -129,29 +130,13 @@ public sealed partial class MainWindow : Window
 
         _back = Ui.Button("", GoBack, "icon ghost", Icons.Back, I18n.T("nav.back"));
         _forward = Ui.Button("", GoForward, "icon ghost", Icons.Forward, I18n.T("nav.forward"));
-        // 9.2 Store: разделы — подписанными пунктами на боковой панели, как в Microsoft Store.
-        // 9.3: первый пункт — логотип ModLaunch и «Главная». 9.8: за ним вместо «Ленты» — «ИИ-сборки».
-        _homeButton = NavButton(LogoIcon, "v93.nav.home", () => Navigate(() => new HomePage()));
-        _feedButton = NavButton(Icons.Sparkles, "v98.nav.ai", () => Navigate(() => new AiBuildsPage()));
-        _libraryButton = NavButton(Icons.Gamepad, "v92.nav.games", () => Navigate(() => new LibraryPage()));
-        _modsButton = NavButton(Icons.Package, "v92.nav.mods", () => Navigate(() => new ModsCenterPage()));
-        _settingsButton = NavButton(Icons.Settings, "v92.nav.settings", () => Navigate(() => new SettingsPage()));
-        _friendsButton = NavButton(Icons.Users, "v11.cm.nav", () => Navigate(() => new CommunityPage()));
-        _statsButton = NavButton(Icons.Chart, "v92.nav.stats", () => Navigate(() => new StatsPage()));
-        _donateButton = NavButton(Icons.Coffee, "v92.nav.donate", () => Navigate(() => new DonatePage()));
-        // 9.3: Creator Hub снова на боковой панели — это рынок креаторов (MarketPage).
-        // 18.0: «Мои проекты» — главный пункт Creator Hub, кнопка ведёт в «Доступные» (магазин — пунктом слева).
-        _creatorButton = NavButton(Icons.Creator, "Creator Hub", () => Navigate(() => new CreatorPage()));
         _friendsBadge.Width = 9; _friendsBadge.Height = 9; _friendsBadge.CornerRadius = new CornerRadius(5);
         _friendsBadge.Background = Ui.Res("Good"); _friendsBadge.HorizontalAlignment = HorizontalAlignment.Right; _friendsBadge.VerticalAlignment = VerticalAlignment.Top;
         _updatePill.Click += (_, _) => ShowUpdate();
 
-        _downloads = new Button
-        {
-            Classes = { "icon", "ghost" },
-            // Кольцо вокруг значка — общий прогресс всех загрузок (как в браузере).
-            Content = new Panel { Children = { _dlRing, Ui.Icon(Icons.Download, 18), _dlBadge } },
-        };
+        // 20.0: загрузки — в середине нижней полосы, как в Steam (содержимое кнопки — DownloadsStrip).
+        // Кольцо вокруг значка — общий прогресс всех загрузок (как в браузере).
+        _downloads = new Button { Classes = { "icon", "ghost" } };
         _dlRing.Stroke = Ui.Res("Brand");
         _dlBadge.Classes.Add("pulse");
         _dlBadge.RenderTransform = new ScaleTransform();
@@ -265,41 +250,6 @@ public sealed partial class MainWindow : Window
             if (Settings.Data.Bool("closeToTray")) Opened += (_, _) => Dispatcher.UIThread.Post(Hide);
             else WindowState = WindowState.Minimized;
         }
-    }
-
-    static Button RailIcon(string icon, Action onClick, string tip)
-    {
-        var b = Ui.Button("", onClick, "rail", icon, tip);
-        b.HorizontalContentAlignment = HorizontalAlignment.Center;
-        b.VerticalContentAlignment = VerticalAlignment.Center;
-        b.Foreground = Ui.Res("Muted");
-        return b;
-    }
-
-    /// <summary>Черта на боковой панели: тонкая, к краям растворяется в фон.</summary>
-    static Control RailRule(Thickness margin) => new Border
-    {
-        Height = 1, Margin = margin, Width = 44, HorizontalAlignment = HorizontalAlignment.Center,
-        // Цвет — из темы (меняется вместе с ней), края гасит маска.
-        Background = Ui.Res("Line"),
-        OpacityMask = new LinearGradientBrush
-        {
-            StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 0, RelativeUnit.Relative),
-            GradientStops = { new GradientStop(Colors.Transparent, 0), new GradientStop(Colors.Black, 0.25), new GradientStop(Colors.Black, 0.75), new GradientStop(Colors.Transparent, 1) },
-        },
-    };
-
-    readonly List<(Panel Slot, Button Button)> _railSlots = [];
-
-    /// <summary>Пункт боковой панели с «пилюлей» слева: растёт при наведении и у выбранного.</summary>
-    Control Slot(Button b)
-    {
-        var slot = new Panel { Classes = { "rail-item" }, Width = 76, Children = { new Border { Classes = { "rail-pip" } }, b } };
-        b.HorizontalAlignment = HorizontalAlignment.Center;
-        b.PropertyChanged += (_, e) => { if (e.Property == IsVisibleProperty) slot.IsVisible = b.IsVisible; };
-        slot.IsVisible = b.IsVisible;
-        _railSlots.Add((slot, b));
-        return slot;
     }
 
     static Button WinButton(string icon, Action onClick, string tip, string extra = "")
@@ -436,9 +386,8 @@ public sealed partial class MainWindow : Window
             }
             _crumbs.Children.Add(t);
         }
-        // Store: как в Microsoft Store — в шапке только название программы, путь показывают сами страницы.
-        _crumbs.IsVisible = !Look.Store;
-        if (_crumbSep is not null) _crumbSep.IsVisible = _crumbs.IsVisible && _crumbs.Children.Count > 0;
+        // 20.0: путь виден там, где у раздела нет своих вкладок (настройки и т. п.) — на месте вкладок под шапкой.
+        _crumbs.IsVisible = PlatformNav.Tabs(_section).Count == 0;
     }
 
     /// <summary>Перестроить правую панель (страница вызывает, когда догрузила данные).</summary>
@@ -543,14 +492,8 @@ public sealed partial class MainWindow : Window
         var k = EffectiveScale();
         _appliedScale = k;
         _scale.LayoutTransform = Math.Abs(k - 1) < 0.001 ? null : new ScaleTransform(k, k);
-        if (_railHost is not null) _railHost.IsVisible = !Settings.Data.Bool("railHidden");
-        // Без боковой панели «лист» с содержимым — без скруглённого угла.
-        if (_sheet is not null)
-        {
-            var rail = _railHost?.IsVisible == true;
-            _sheet.CornerRadius = rail ? new CornerRadius(8, 0, 0, 0) : new CornerRadius(0);
-            _sheet.BorderThickness = rail ? new Thickness(1, 1, 0, 0) : new Thickness(0, 1, 0, 0);
-        }
+        // 20.0: список игр слева (в библиотеке) и скругление «листа» рядом с ним.
+        UpdateSidebar();
     }
 
     /// <summary>С чего начинать: главная, последняя игра, Creator Hub или библиотека.</summary>
@@ -566,7 +509,7 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    /// <summary>Скрыть или показать боковую панель (Ctrl+B) — «дзен-режим».</summary>
+    /// <summary>Скрыть или показать список игр слева в библиотеке (Ctrl+B) — «дзен-режим».</summary>
     public void ToggleRail()
     {
         Settings.Data["railHidden"] = !Settings.Data.Bool("railHidden");
@@ -634,6 +577,10 @@ public sealed partial class MainWindow : Window
         var list = new StackPanel { Spacing = 2 };
         var commands = new List<(string Title, string Icon, Action Run)>
         {
+            (I18n.T("v20.nav.store"), Icons.Bag, () => OpenSection(Section.Store)),
+            (I18n.T("v20.nav.library"), Icons.Gamepad, () => OpenSection(Section.Library)),
+            (I18n.T("v20.nav.community"), Icons.Users, () => OpenSection(Section.Community)),
+            (I18n.T("v20.nav.creator"), Icons.Creator, () => OpenSection(Section.Creator)),
             (I18n.T("nav.menu"), Icons.Home, () => Navigate(() => new HomePage())),
             ("Creator Hub", Icons.Creator, () => Navigate(() => new CreatorPage())),
             (I18n.T("add.title"), Icons.Plus, () => Navigate(() => new AddGamePage())),
@@ -764,6 +711,7 @@ public sealed partial class MainWindow : Window
         var tile = gameFx ? TileUnderPress() : null;
         var origin = ClickInPage();
         _current = page;
+        TrackSection(page);
         UiWatch.Doing = "page " + page.GetType().Name;
         if (page.GameId is string gid) { Settings.Data["lastGame"] = gid; Settings.Save(); }
         page.Build();
@@ -817,7 +765,8 @@ public sealed partial class MainWindow : Window
         var updates = Features.Tracking.Updates;
         var hub = Creator.Hub.Updates.Where(h => !updates.Any(u => u.Item.Source == "hub" && u.Item.Id == h.Id)).ToList();
         _bellBadge.IsVisible = updates.Count + hub.Count > 0;
-        _bell.IsVisible = _bellBadge.IsVisible || _bellPanel.IsVisible;
+        // 20.0: колокольчик в шапке всегда на месте, как у платформ; точка — когда есть новое.
+        _bell.IsVisible = true;
         _bellList.Children.Clear();
         if (updates.Count + hub.Count == 0)
         {

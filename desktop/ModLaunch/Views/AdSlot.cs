@@ -168,6 +168,51 @@ public static class AdSlot
         return host;
     }
 
+    /// <summary>
+    /// 20.0: реклама одной тихой строкой внизу списка игр в библиотеке: знак, подпись «Реклама», заголовок и «×».
+    /// Колонки справа на каждой странице больше нет — страница важнее.
+    /// </summary>
+    public static Control Compact(Action close)
+    {
+        var host = new Border
+        {
+            Classes = { "ad-compact" }, CornerRadius = new CornerRadius(10), Padding = new Thickness(10, 8, 6, 8),
+            Background = Ui.Res("Surface"), BorderBrush = Ui.Res("Line"), BorderThickness = new Thickness(1),
+            Cursor = new Cursor(StandardCursorType.Hand), Opacity = 0.85,
+        };
+        host.PointerEntered += (_, _) => host.Opacity = 1;
+        host.PointerExited += (_, _) => host.Opacity = 0.85;
+        Ad? current = null;
+        host.PointerPressed += (_, e) =>
+        {
+            if (current is not null && e.GetCurrentPoint(host).Properties.IsLeftButtonPressed && e.Source is Visual v && v.FindAncestorOfType<Button>(true) is null) Open(current);
+        };
+        Rotate(host, (ad, _, _) =>
+        {
+            current = ad;
+            var x = Ui.Button("", close, "icon ghost", Icons.Close, I18n.T("v14.ad.hide"));
+            x.Width = x.Height = 22;
+            x.Padding = new Thickness(0);
+            x.VerticalAlignment = VerticalAlignment.Top;
+            var words = Ui.Col(1,
+                new TextBlock { Text = (ad.House ? I18n.T("v14.ad.house") : I18n.T("ad.label")).ToUpper(I18n.Culture), FontSize = 9, LetterSpacing = 0.9, FontWeight = FontWeight.SemiBold, Foreground = Ui.Res("Faint") },
+                new TextBlock { Text = ad.Title, FontSize = 12, FontWeight = FontWeight.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis },
+                new TextBlock { Text = ad.Text, FontSize = 11, Foreground = Ui.Res("Muted"), TextTrimming = TextTrimming.CharacterEllipsis });
+            words.VerticalAlignment = VerticalAlignment.Center;
+            var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"), ColumnSpacing = 10 };
+            var mark = Mark(ad, 34, 9);
+            mark.VerticalAlignment = VerticalAlignment.Center;
+            grid.Children.Add(mark);
+            Grid.SetColumn(words, 1);
+            grid.Children.Add(words);
+            Grid.SetColumn(x, 2);
+            grid.Children.Add(x);
+            host.Child = grid;
+            ToolTip.SetTip(host, ad.Title + (ad.Text != "" ? " — " + ad.Text : ""));
+        });
+        return host;
+    }
+
     /// <summary>Широкий баннер 8.4 (оставлен для витрины «Разместить рекламу»).</summary>
     public static Control WideBanner()
     {

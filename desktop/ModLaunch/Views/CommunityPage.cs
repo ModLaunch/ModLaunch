@@ -22,6 +22,8 @@ public sealed partial class CommunityPage : Page
     static readonly FontFamily Mono = new("Cascadia Mono, Consolas, JetBrains Mono, DejaVu Sans Mono, monospace");
 
     string _tab;
+    /// <summary>20.0: вкладка страницы — она горит в ряду вкладок раздела «Сообщество».</summary>
+    public string Tab => _tab;
     string _shownTab = "";
     string? _code, _friendsError, _boardError;
     bool _loading;
@@ -38,6 +40,8 @@ public sealed partial class CommunityPage : Page
         {
             Friends.Changed += OnFriends;
             Servers.Changed += OnServers;
+            MarketData.Changed += OnWorkshop;
+            _ = MarketData.Load();
             McHost.Changed += OnHost;
             _refresh.Start();
             if (SignedIn && !Program.Demo) _ = Load();
@@ -46,6 +50,7 @@ public sealed partial class CommunityPage : Page
         {
             Friends.Changed -= OnFriends;
             Servers.Changed -= OnServers;
+            MarketData.Changed -= OnWorkshop;
             McHost.Changed -= OnHost;
             _refresh.Stop();
             DetachConsole();
@@ -53,11 +58,24 @@ public sealed partial class CommunityPage : Page
     }
 
     public override string Title => I18n.T("v11.cm.title");
+    /// <summary>Другая вкладка сообщества — тот же экран: без въезда всей страницы.</summary>
+    public override bool SameScreenAs(Page? previous) => previous is CommunityPage;
 
     /// <summary>Вошёл ли человек (в снимках — по примеру друзей).</summary>
     static bool SignedIn => Friends.View().SignedIn;
 
     void OnFriends() => Dispatcher.UIThread.Post(() => { if (_tab == "friends") Build(); });
+    void OnWorkshop() => Dispatcher.UIThread.Post(() => { if (_tab == "friends") Build(); });
+
+    /// <summary>Полка «Мастерская сообщества»: самые любимые моды ModLaunch Hub.</summary>
+    static Control? Workshop()
+    {
+        var mods = MarketData.Mods.OrderByDescending(h => h.Likes).ThenByDescending(h => h.Downloads).Take(10).ToList();
+        if (mods.Count == 0) return null;
+        return Ui.Col(14,
+            StoreKit.Header(I18n.T("v20.cm.hub"), () => MainWindow.Current?.Navigate(() => new MarketPage("workshop"))),
+            StoreKit.Shelf(mods.Select(h => MarketTiles.WorkshopCard(h, 252))));
+    }
     // Друзья: с доски на вкладке только их серверы и число серверов в сети — остальное (отметки «в сети» и т. п.) её не трогает.
     void OnServers() => Dispatcher.UIThread.Post(() => { if (_tab == "servers" || (_tab == "friends" && FriendsBoardKey() != _friendsKey)) Build(); });
 
@@ -92,12 +110,11 @@ public sealed partial class CommunityPage : Page
     {
         var col = StoreKit.Fit(new StackPanel { Spacing = 18, Margin = new Thickness(30, 22, 30, 34) }, 1400);
         col.Children.Add(Head());
-        col.Children.Add(Ui.TabBar(
-            Tab("friends", I18n.T("v11.cm.tab.friends"), Icons.Users),
-            Tab("servers", I18n.T("v11.cm.tab.servers"), Icons.Server),
-            Tab("host", I18n.T("v11.cm.tab.host"), Icons.Cube)));
+        // 20.0: вкладки «Друзья · Серверы · Свой сервер» — в ряду вкладок раздела «Сообщество» под шапкой окна.
         if (_tab != "host") DetachConsole();
         col.Children.Add(_tab switch { "servers" => Board(), "host" => Host(), _ => FriendsTab() });
+        // 20.0: под друзьями — мастерская сообщества (моды ModLaunch Hub), её видно и без входа.
+        if (_tab == "friends" && Workshop() is { } workshop) col.Children.Add(workshop);
 
         // Тот же экран перестроился (пришли новые данные) — прокрутка остаётся на месте.
         var offset = _shownTab == _tab && Content is ScrollViewer old ? old.Offset : default;
@@ -105,13 +122,6 @@ public sealed partial class CommunityPage : Page
         Content = scroll;
         if (offset != default) Dispatcher.UIThread.Post(() => scroll.Offset = offset, DispatcherPriority.Loaded);
         _shownTab = _tab;
-    }
-
-    Button Tab(string id, string text, string icon)
-    {
-        var b = Ui.Button(text, () => { _tab = id; Build(); }, "tab", icon);
-        if (_tab == id) b.Classes.Add("active");
-        return b;
     }
 
     Control Head()

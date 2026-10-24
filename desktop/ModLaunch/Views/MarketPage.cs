@@ -23,6 +23,8 @@ public sealed partial class MarketPage : Page
     public static readonly string[] Tabs = ["store", "browse", "workshop", "queue", "authors", "wishlist", "library", "wallet", "studio", "commission"];
 
     string _tab;
+    /// <summary>20.0: открытая вкладка — по ней шапка понимает раздел (покупателю — «Магазин», продавцу — «Создателям»).</summary>
+    public string Tab => _tab;
     string _query = "";
     // Обзор: фильтры как в поиске Steam.
     string _price = "all";
