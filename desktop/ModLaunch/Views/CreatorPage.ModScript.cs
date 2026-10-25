@@ -20,8 +20,8 @@ namespace ModLaunch.Views;
 /// </summary>
 public sealed partial class CreatorPage
 {
-    /// <summary>Вкладка раздела ModScript X (20.0): overview, console, commands, functions.</summary>
-    string _ms = "overview";
+    /// <summary>Вкладка консоли и справки ModScript (20.0): console, commands, functions.</summary>
+    string _ms = "console";
     string _msGroup = "";
     bool _msNewOnly;
     static string? _msText;
@@ -47,7 +47,7 @@ public sealed partial class CreatorPage
     List<Control> MsTabs()
     {
         var tabs = new List<Control>();
-        foreach (var (id, key) in new[] { ("overview", "v20.x.tab.overview"), ("console", "v13.ms.tab.console"), ("commands", "v13.ms.tab.commands"), ("functions", "v13.ms.tab.functions") })
+        foreach (var (id, key) in new[] { ("console", "v13.ms.tab.console"), ("commands", "v13.ms.tab.commands"), ("functions", "v13.ms.tab.functions") })
         {
             var tab = id;
             var b = Ui.Button(I18n.T(key), () => { if (_ms == tab) return; _ms = tab; Build(); }, "hub-tab");

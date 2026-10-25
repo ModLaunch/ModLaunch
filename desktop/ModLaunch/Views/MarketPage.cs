@@ -20,7 +20,8 @@ namespace ModLaunch.Views;
 /// </summary>
 public sealed partial class MarketPage : Page
 {
-    public static readonly string[] Tabs = ["store", "browse", "workshop", "queue", "authors", "wishlist", "library", "wallet", "studio", "commission"];
+    /// <summary>20.0: рынок — только покупать и смотреть; кошелёк, студия продавца (доход) и комиссия — в «Аккаунте».</summary>
+    public static readonly string[] Tabs = ["store", "browse", "workshop", "queue", "authors", "wishlist", "library"];
 
     string _tab;
     string _query = "";
@@ -58,7 +59,7 @@ public sealed partial class MarketPage : Page
     public override string? Accent => null;
 
     public override IEnumerable<(string Text, Action? Open)> Crumbs =>
-        _tab == "store" ? [("Creator Hub", null)] : [("Creator Hub", () => MainWindow.Current?.Navigate(() => new MarketPage())), (I18n.T(_tab == "commission" ? "v14.mk.tab.commission" : "v93.mk.tab." + _tab), null)];
+        _tab == "store" ? [("Creator Hub", null)] : [("Creator Hub", () => MainWindow.Current?.Navigate(() => new MarketPage())), (I18n.T("v93.mk.tab." + _tab), null)];
 
     public override void Search(string text) { _query = text.Trim(); _tab = "browse"; Build(); MainWindow.Current?.RenderCrumbs(); }
 
@@ -80,12 +81,9 @@ public sealed partial class MarketPage : Page
             "authors" => loading ? Skeleton() : Authors(),
             "wishlist" => loading ? Skeleton() : Wishlist(),
             "library" => Library(),
-            "wallet" => new WalletPanel(),
-            "studio" => Studio(),
-            "commission" => new CommissionPanel(),
             _ => loading ? Skeleton() : Front(),
         };
-        Content = HubNav.Frame(_tab, HubNav.RailOf(_tab, creator: false), I18n.T(_tab == "commission" ? "v14.mk.tab.commission" : "v93.mk.tab." + _tab), body, Go, () => { MarketData.Reload(); if (_tab == "studio") ReloadStudio(); });
+        Content = HubNav.Frame(_tab, HubNav.RailOf(_tab, creator: false), I18n.T("v93.mk.tab." + _tab), body, Go, MarketData.Reload);
     }
 
     static Control Skeleton()

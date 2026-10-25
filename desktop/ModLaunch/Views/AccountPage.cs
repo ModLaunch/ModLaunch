@@ -24,17 +24,15 @@ public sealed partial class AccountPage : Page
     bool _busy;
 
     // Загружается по требованию, сбрасывается кнопкой «Обновить».
-    Wallet? _wallet;
     List<Purchase>? _purchases;
     List<Payout>? _payouts;
     List<TopUp>? _topups;
-    List<Listing>? _listings;
     (List<TopUp> TopUps, List<Payout> Payouts, Wallet Platform)? _admin;
     string? _error;
 
     public AccountPage(string tab = "profile") { _tab = tab == "selling" ? "earnings" : tab; }
 
-    void Reset() { _wallet = null; _purchases = null; _payouts = null; _topups = null; _listings = null; _admin = null; _error = null; _tried.Clear(); }
+    void Reset() { _earn = null; _purchases = null; _payouts = null; _topups = null; _admin = null; _error = null; _tried.Clear(); }
 
     /// <summary>Что уже пробовали загрузить: после ошибки не повторяем сами (иначе бесконечный цикл запросов), только по кнопке «Обновить».</summary>
     readonly HashSet<string> _tried = [];
@@ -79,6 +77,8 @@ public sealed partial class AccountPage : Page
             ("earnings", "v20.acc.earnings", Icons.Chart),
             ("data", "acc.s.data", Icons.Folder),
         };
+        // 14.0 → 20.0: комиссия площадки — доход владельца, место ей здесь, а не на рынке.
+        if (Account.Owner && p.SignedIn) sections.Add(("commission", "v14.mk.tab.commission", Icons.Percent));
         if (p.Admin) sections.Add(("admin", "acc.s.admin", Icons.Shield));
         // Снимки экрана: «Заработок» на примере, без входа.
         var demo = Program.Screenshot && _tab == "earnings";
@@ -109,6 +109,7 @@ public sealed partial class AccountPage : Page
             "wallet" => new WalletPanel(),
             "purchases" => PurchasesTab(),
             "earnings" => Earnings(),
+            "commission" when Account.Owner => new CommissionPanel(),
             "data" => DataTab(p),
             "admin" when p.Admin => Admin(),
             _ => Profile(p),
@@ -209,18 +210,7 @@ public sealed partial class AccountPage : Page
         whoGrid.Children.Add(toProfile);
         col.Children.Add(new Border { Classes = { "card" }, Padding = new Thickness(0), ClipToBounds = true, Height = 230, Child = new Panel { Children = { ProfileKit.Banner(), whoGrid } } });
 
-        if (_wallet is null && !_busy) Load("profile", async () => { _wallet = await Market.MyWallet(); _purchases = await Market.Purchases(); });
-        var stats = new UniformGrid { Columns = 4 };
-        stats.Children.Add(Stat(I18n.T("st.balance"), _wallet is null ? "…" : Market.Money(_wallet.Balance), Ui.Res("Brand2")));
-        var earned = Stat(I18n.T("st.earned"), _wallet is null ? "…" : Market.Money(_wallet.Earned));
-        earned.Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand);
-        ToolTip.SetTip(earned, I18n.T("v20.acc.earnings.open"));
-        earned.PointerPressed += (_, _) => { _tab = "earnings"; Build(); };
-        stats.Children.Add(earned);
-        stats.Children.Add(Stat(I18n.T("acc.spent"), _wallet is null ? "…" : Market.Money(_wallet.Spent)));
-        stats.Children.Add(Stat(I18n.T("acc.s.purchases"), _purchases?.Count.ToString(I18n.Culture) ?? "…"));
-        col.Children.Add(stats);
-
+        // 20.0: цифры кошелька и дохода здесь больше не повторяются — они в «Кошельке» и «Заработке».
         var rename = new TextBox { Text = p.Name, MaxLength = 32, Width = 280 };
         col.Children.Add(Card(I18n.T("acc.rename"), I18n.T("acc.rename.hint"),
             Ui.Row(8, rename, Ui.Button(I18n.T("common.save"), () => Call(() => Account.Rename(rename.Text ?? ""), I18n.T("acc.renamed"), reload: false), "primary"))));
@@ -229,7 +219,7 @@ public sealed partial class AccountPage : Page
             Ui.Button(I18n.T("acc.menu.friends"), () => MainWindow.Current?.Navigate(() => new CommunityPage()), "", Icons.Users),
             Ui.Button("Creator Hub", () => MainWindow.Current?.Navigate(() => new CreatorPage()), "", Icons.Creator),
             Ui.Button(I18n.T("mk.tab"), () => MainWindow.Current?.Navigate(() => new MarketPage()), "", Icons.Bag),
-            Ui.Button(I18n.T("st.tab"), () => MainWindow.Current?.Navigate(() => new MarketPage("studio")), "", Icons.Chart))));
+            Ui.Button(I18n.T("v20.acc.earnings"), () => { _tab = "earnings"; Build(); }, "", Icons.Chart))));
         return col;
     }
 

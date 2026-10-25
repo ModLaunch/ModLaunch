@@ -19,19 +19,11 @@ namespace ModLaunch.Views;
 /// </summary>
 public sealed partial class CreatorPage
 {
-    /// <summary>20.0: «Создать» — только анкета и другие способы начать; знак среды переехал в раздел ModScript X.</summary>
-    Control CreateView() => Ui.Col(20, Form(), OtherWays());
-
-    /// <summary>Главная кнопка ModScript X: открыть среду с последним проектом (нет проектов — анкета).</summary>
-    Control XAction()
-    {
-        var last = XProjects.List().OrderByDescending(p => p.Updated).FirstOrDefault();
-        return Ui.Button(I18n.T(last is null ? "v20.x.start" : "v20.x.open"), () =>
-        {
-            if (last is null) Go("form");
-            else MainWindow.Current?.Navigate(() => new XStudio(last.Id));
-        }, "primary", last is null ? Icons.Plus : Icons.Play);
-    }
+    /// <summary>
+    /// 20.0: «ModScript X → Создать»: знак среды, анкета нового проекта и другие способы начать — шаблон, импорт,
+    /// а также консоль и справка ModScript (своего пункта слева у них больше нет).
+    /// </summary>
+    Control CreateView() => Ui.Col(20, XBanner(), Form(), OtherWays());
 
     /// <summary>Значок слева, название и пояснение справа (пояснение переносится по ширине плитки).</summary>
     static Control WayContent(string icon, string key)
@@ -42,61 +34,6 @@ public sealed partial class CreatorPage
         dock.Children.Add(mark);
         dock.Children.Add(Ui.Col(2, Ui.Text(I18n.T(key), "strong"), Ui.Text(I18n.T(key + ".text"), "small muted", wrap: true)));
         return dock;
-    }
-
-    /// <summary>
-    /// 20.0: обзор ModScript X — знак среды с живыми цифрами и сравнением, «Продолжить» (последние проекты строками:
-    /// клик — среда) и короткие пути в консоль и справку.
-    /// </summary>
-    Control XHome()
-    {
-        var col = Ui.Col(20, XBanner());
-        var recent = XProjects.List().OrderByDescending(p => p.Updated).Take(5).ToList();
-        if (recent.Count > 0)
-        {
-            var rows = Ui.Col(6);
-            foreach (var p in recent)
-            {
-                var item = p;
-                var game = p.Game == "" ? null : Games.GameCatalog.ById(p.Game);
-                var target = p.Target is { } t ? MX.Target.Find(t) : null;
-                var line = new DockPanel();
-                var when = HubLook.MonoText(Ui.Ago(p.Updated), 10.5);
-                when.VerticalAlignment = VerticalAlignment.Center;
-                DockPanel.SetDock(when, Dock.Right);
-                line.Children.Add(when);
-                line.Children.Add(Ui.Row(12,
-                    new Border { Width = 4, Height = 30, CornerRadius = new CornerRadius(2), Background = Ui.Hex(XProjects.Hex(p.Color)) },
-                    Ui.Col(1, Ui.Text(p.Name, "strong"), HubLook.MonoText((game?.Name ?? I18n.T("v16.sum.noGame")) + (target is null ? "" : $" · {target.Title} → {XStudio.Lang(target.Language)}"), 10.5))));
-                var b = new Button
-                {
-                    Classes = { "tile" }, Padding = new Thickness(14, 10), HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch, Content = line,
-                };
-                b.Click += (_, _) => MainWindow.Current?.Navigate(() => new XStudio(item.Id));
-                rows.Children.Add(b);
-            }
-            col.Children.Add(Ui.Col(10, Section(I18n.T("v20.x.recent")), rows));
-        }
-        var ways = new UniformGrid { Columns = 3 };
-        foreach (var (icon, key, tab) in new[] { (Icons.Plus, "v20.x.way.new", "form"), (Icons.Activity, "v20.x.way.console", "console"), (Icons.Book, "v20.x.way.docs", "commands") })
-        {
-            var to = tab;
-            var b = new Button
-            {
-                Classes = { "tile" }, Margin = new Thickness(0, 0, 14, 0), Padding = new Thickness(16, 12),
-                HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch,
-                Content = WayContent(icon, key),
-            };
-            b.Click += (_, _) =>
-            {
-                if (to == "form") { Go("form"); return; }
-                _ms = to;
-                Build();
-            };
-            ways.Children.Add(b);
-        }
-        col.Children.Add(ways);
-        return col;
     }
 
     /// <summary>За сколько среда разбирает и проверяет типичный мод (Arena) на этом компьютере — среднее пяти прогонов.</summary>
@@ -220,19 +157,20 @@ public sealed partial class CreatorPage
     /// <summary>Другие способы начать: шаблон или импорт папки/архива (классический мастер ModScript).</summary>
     Control OtherWays()
     {
-        var grid = new UniformGrid { Columns = 2 };
+        var grid = new UniformGrid { Columns = 4 };
         foreach (var (icon, key, run) in new (string, string, Action)[]
         {
             (Icons.Wand, "v18.other.template", () => Go("examples")),
             (Icons.Folder, "v18.other.import", NewProjectDialog),
+            (Icons.Activity, "v20.x.way.console", () => { _ms = "console"; Go("x"); }),
+            (Icons.Book, "v20.x.way.docs", () => { _ms = "commands"; Go("x"); }),
         })
         {
             var b = new Button
             {
                 Classes = { "tile" }, Margin = new Thickness(0, 0, 14, 0), Padding = new Thickness(16, 12),
-                HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch,
-                Content = Ui.Row(12, new Border { Width = 34, Height = 34, CornerRadius = new CornerRadius(4), BorderBrush = HubLook.Edge, BorderThickness = new Thickness(1), Child = Ui.Icon(icon, 16, HubLook.Violet) },
-                    Ui.Col(2, Ui.Text(I18n.T(key), "strong"), Ui.Text(I18n.T(key + ".text"), "small muted", wrap: true))),
+                HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalAlignment = VerticalAlignment.Stretch,
+                Content = WayContent(icon, key),
             };
             b.Click += (_, _) => run();
             grid.Children.Add(b);

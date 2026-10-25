@@ -25,13 +25,12 @@ public sealed partial class CreatorPage
     /// <summary>Покупки прошлых версий защищаются один раз за сеанс — при первом открытии библиотеки.</summary>
     static bool _hardened;
 
-    /// <summary>20.0: раздел ModScript X — обзор среды, консоль и справка; библиотека скриптов — в «Моих проектах».</summary>
+    /// <summary>20.0: консоль и справка ModScript (открываются из «ModScript X → Создать»); библиотека скриптов — в «Моих проектах».</summary>
     Control XHub() => _ms switch
     {
-        "console" => Console(),
         "commands" => Commands(),
         "functions" => LibraryDocs(),
-        _ => XHome(),
+        _ => Console(),
     };
 
     /// <summary>Главная кнопка «Скриптов»: импорт файла (.modx, .mls или архив).</summary>
