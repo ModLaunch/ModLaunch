@@ -15,7 +15,7 @@ namespace ModLaunch.Views;
 /// Аккаунт ModLaunch — отдельная страница: профиль, безопасность, кошелёк
 /// (пополнение и вывод), покупки, продажи, свои данные и панель админа.
 /// </summary>
-public sealed class AccountPage : Page
+public sealed partial class AccountPage : Page
 {
     public override string Title => I18n.T("acc.page");
 
@@ -32,7 +32,7 @@ public sealed class AccountPage : Page
     (List<TopUp> TopUps, List<Payout> Payouts, Wallet Platform)? _admin;
     string? _error;
 
-    public AccountPage(string tab = "profile") { _tab = tab; }
+    public AccountPage(string tab = "profile") { _tab = tab == "selling" ? "earnings" : tab; }
 
     void Reset() { _wallet = null; _purchases = null; _payouts = null; _topups = null; _listings = null; _admin = null; _error = null; _tried.Clear(); }
 
@@ -76,11 +76,13 @@ public sealed class AccountPage : Page
             ("security", "acc.s.security", Icons.Lock),
             ("wallet", "acc.s.wallet", Icons.Bag),
             ("purchases", "acc.s.purchases", Icons.Download),
-            ("selling", "acc.s.selling", Icons.Chart),
+            ("earnings", "v20.acc.earnings", Icons.Chart),
             ("data", "acc.s.data", Icons.Folder),
         };
         if (p.Admin) sections.Add(("admin", "acc.s.admin", Icons.Shield));
-        if (!p.SignedIn) _tab = "profile";
+        // Снимки экрана: «Заработок» на примере, без входа.
+        var demo = Program.Screenshot && _tab == "earnings";
+        if (!p.SignedIn && !demo) _tab = "profile";
 
         var tabs = new StackPanel { Spacing = 4, Width = 230 };
         var head = Ui.Row(12, ProfileKit.Avatar(p.SignedIn ? p.Name ?? p.Email ?? "?" : "?", 46),
@@ -92,20 +94,21 @@ public sealed class AccountPage : Page
             var b = Ui.Button(I18n.T(key), () => { _tab = id; _error = null; Build(); }, "tab", icon);
             b.HorizontalAlignment = HorizontalAlignment.Stretch;
             b.HorizontalContentAlignment = HorizontalAlignment.Left;
-            b.IsEnabled = p.SignedIn || id == "profile";
+            b.IsEnabled = p.SignedIn || id == "profile" || demo;
             if (_tab == id) b.Classes.Add("active");
             tabs.Children.Add(b);
         }
 
         Control body;
-        if (!p.Configured) body = Card(I18n.T("acc.title"), I18n.T("acc.off"));
+        if (demo) body = Earnings();
+        else if (!p.Configured) body = Card(I18n.T("acc.title"), I18n.T("acc.off"));
         else if (!p.SignedIn) body = SignForm();
         else body = _tab switch
         {
             "security" => Security(p),
             "wallet" => new WalletPanel(),
             "purchases" => PurchasesTab(),
-            "selling" => Selling(),
+            "earnings" => Earnings(),
             "data" => DataTab(p),
             "admin" when p.Admin => Admin(),
             _ => Profile(p),
@@ -209,7 +212,11 @@ public sealed class AccountPage : Page
         if (_wallet is null && !_busy) Load("profile", async () => { _wallet = await Market.MyWallet(); _purchases = await Market.Purchases(); });
         var stats = new UniformGrid { Columns = 4 };
         stats.Children.Add(Stat(I18n.T("st.balance"), _wallet is null ? "…" : Market.Money(_wallet.Balance), Ui.Res("Brand2")));
-        stats.Children.Add(Stat(I18n.T("st.earned"), _wallet is null ? "…" : Market.Money(_wallet.Earned)));
+        var earned = Stat(I18n.T("st.earned"), _wallet is null ? "…" : Market.Money(_wallet.Earned));
+        earned.Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand);
+        ToolTip.SetTip(earned, I18n.T("v20.acc.earnings.open"));
+        earned.PointerPressed += (_, _) => { _tab = "earnings"; Build(); };
+        stats.Children.Add(earned);
         stats.Children.Add(Stat(I18n.T("acc.spent"), _wallet is null ? "…" : Market.Money(_wallet.Spent)));
         stats.Children.Add(Stat(I18n.T("acc.s.purchases"), _purchases?.Count.ToString(I18n.Culture) ?? "…"));
         col.Children.Add(stats);
@@ -295,26 +302,6 @@ public sealed class AccountPage : Page
             col.Children.Add(Ui.Card(line, 12));
         }
         return Card(I18n.T("acc.s.purchases"), I18n.T("acc.purchases.text"), col);
-    }
-
-    // ---------------------------------------------------------------- продажи
-
-    Control Selling()
-    {
-        if (_listings is null && !_busy) Load("selling", async () => { _listings = await Market.Mine(); _wallet = await Market.MyWallet(); });
-        var col = Ui.Col(16);
-        if (_listings is null || _wallet is null) { col.Children.Add(Loading()); return col; }
-        var stats = new UniformGrid { Columns = 3 };
-        stats.Children.Add(Stat(I18n.T("st.listings"), _listings.Count(l => l.Active).ToString(I18n.Culture)));
-        stats.Children.Add(Stat(I18n.T("st.sales"), _listings.Sum(l => l.Sales).ToString(I18n.Culture)));
-        stats.Children.Add(Stat(I18n.T("st.earned"), Market.Money(_wallet.Earned), Ui.Res("Good")));
-        col.Children.Add(stats);
-        col.Children.Add(Card(I18n.T("acc.selling.title"), I18n.T("acc.selling.text", ("fee", Market.FeePercent)),
-            Ui.Row(10,
-                Ui.Button(I18n.T("st.tab"), () => MainWindow.Current?.Navigate(() => new MarketPage("studio")), "primary", Icons.Chart),
-                Ui.Button(I18n.T("mk.new"), () => MarketViews.Editor(null, () => { Reset(); Build(); }), "", Icons.Plus),
-                Ui.Button(I18n.T("acc.payout"), () => { _tab = "wallet"; Build(); }, "", Icons.Upload))));
-        return col;
     }
 
     // ---------------------------------------------------------------- данные

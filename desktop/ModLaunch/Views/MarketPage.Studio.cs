@@ -128,7 +128,7 @@ public sealed partial class MarketPage
     }
 
     /// <summary>Столбики дохода по дням за 30 дней; наведите — сумма и число продаж.</summary>
-    static Control Chart(List<Sale> sales)
+    internal static Control Chart(List<Sale> sales)
     {
         var today = DateTime.UtcNow.Date;
         var days = Enumerable.Range(0, 30).Select(i => today.AddDays(i - 29)).ToList();

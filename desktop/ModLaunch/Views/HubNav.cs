@@ -13,23 +13,26 @@ namespace ModLaunch.Views;
 /// решения; при наведении на плитку — «Запуск» и «Настройка»). Среда ModScript X открывается только отсюда.
 /// Ниже — «Скрипты» (купленные и импортированные скрипты под защитой, консоль и справка ModScript),
 /// «Команда» и «Магазин». В шапке — название раздела и не больше одной главной кнопки.
+/// 20.0: кнопок меньше — слева только три главных пункта: «ModScript X» (среда, консоль и справка), «Создать» и
+/// «Мои проекты» (с защищёнными скриптами вкладкой). «Команда» и «Магазин» — тихими строками внизу, там же
+/// заработок автора (ведёт в «Аккаунт → Заработок»).
 /// </summary>
 public static class HubNav
 {
     /// <summary>Пункт боковой панели: id, ключ названия, значок.</summary>
     sealed record Rail(string Id, string Key, string Icon);
 
-    /// <summary>Подразделы «Моих проектов».</summary>
-    static readonly Rail[] ProjectRails =
+    /// <summary>20.0: три главных пункта — всё, что нужно автору каждый день.</summary>
+    static readonly Rail[] Main =
     [
+        new("x", "v20.hub.x", Icons.Code),
         new("create", "v18.hub.create", Icons.Plus),
-        new("available", "v18.hub.available", Icons.Grid),
+        new("available", "v20.hub.projects", Icons.Grid),
     ];
 
-    /// <summary>Остальные разделы.</summary>
+    /// <summary>Редкие разделы — тихими строками внизу панели.</summary>
     static readonly Rail[] Sections =
     [
-        new("scripts", "v18.hub.scripts", Icons.Shield),
         new("team", "v13.hub.team", Icons.Users),
         new("shop", "v13.hub.shop", Icons.Bag),
     ];
@@ -55,7 +58,7 @@ public static class HubNav
 
     /// <summary>Все разделы и вкладки (для палитры команд): id, ключ названия, значок.</summary>
     public static IEnumerable<(string Id, string Key, string Icon)> Tabs =>
-        ProjectRails.Concat(Sections).Select(s => (s.Id, s.Key, s.Icon)).Concat(ShopTabs.Select(t => (t.Id, t.Key, Icons.Bag))).Concat(ShopMore);
+        Main.Concat(Sections).Select(s => (s.Id, s.Key, s.Icon)).Concat(ShopTabs.Select(t => (t.Id, t.Key, Icons.Bag))).Concat(ShopMore);
 
     /// <summary>Страница Creator Hub (рынок, мастерская или среда ModScript X): между ними — без въезда всей страницы.</summary>
     public static bool IsHub(Page? page) => page is MarketPage or CreatorPage or XStudio;
@@ -71,10 +74,11 @@ public static class HubNav
         if (IsMarketTab(id)) _lastShop = id;
     }
 
-    /// <summary>Вкладка мастерской для раздела или старого id: «Доступные» — home, «Создать» — анкета (form).</summary>
+    /// <summary>Вкладка мастерской для раздела или старого id: «Мои проекты» — home, «Создать» — анкета (form), ModScript X — x.</summary>
     internal static string CreatorTab(string id) => id switch
     {
         "projects" or "available" or "lang" => "home",
+        "modscript" or "console" or "commands" or "functions" or "docs" => "x",
         "create" => "form",
         "templates" => "examples",
         _ => id,
@@ -94,20 +98,18 @@ public static class HubNav
     }
 
     /// <summary>
-    /// Какой пункт горит: по вкладке мастерской (старые id тоже) или «Магазин» для рынка. Старая среда (x, inject, mxdev)
-    /// ведёт в «Доступные»: ModScript X теперь только внутри «Моих проектов».
+    /// Какой пункт горит: по вкладке мастерской (старые id тоже) или «Магазин» для рынка. 20.0: консоль и справка —
+    /// в «ModScript X», защищённые скрипты — вкладка «Моих проектов»; старая среда (inject, mxdev) — тоже в проектах.
     /// </summary>
     public static string RailOf(string tab, bool creator) => !creator ? "shop" : tab switch
     {
         "form" or "create" or "examples" => "create",
-        "scripts" or "modscript" or "console" or "commands" or "functions" or "docs" or "injects" or "library" => "scripts",
+        "x" or "modscript" or "console" or "commands" or "functions" or "docs" => "x",
         "team" => "team",
         "codes" or "models" or "hub" => "shop",
         _ => "available",
     };
 
-    /// <summary>Горящий пункт — подраздел «Моих проектов»?</summary>
-    static bool InProjects(string rail) => ProjectRails.Any(p => p.Id == rail);
 
     /// <summary>
     /// Весь экран Creator Hub — своё пространство: слева «Мои проекты» и разделы (не прокручиваются), справа шапка и тело на сетке чертежа.
@@ -144,7 +146,8 @@ public static class HubNav
     static Button RailButton(Rail r, bool on, double indent, Action click, string? count = null)
     {
         var bar = new Border { Width = 3, Height = 20, CornerRadius = new CornerRadius(2), Background = on ? HubLook.Signature() : Brushes.Transparent, Margin = new Thickness(0, 0, 10 + indent, 0) };
-        var text = new TextBlock { Text = I18n.T(r.Key), FontSize = 14, FontWeight = on ? FontWeight.SemiBold : FontWeight.Normal, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
+        var text = new TextBlock { Text = I18n.T(r.Key), FontSize = indent > 0 ? 13 : 14.5, FontWeight = on ? FontWeight.SemiBold : FontWeight.Normal, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
+        if (indent > 0 && !on) text.Foreground = Ui.Res("Muted");
         var row = new DockPanel { Children = { bar } };
         DockPanel.SetDock(bar, Dock.Left);
         if (count is not null)
@@ -153,42 +156,16 @@ public static class HubNav
             DockPanel.SetDock(n, Dock.Right);
             row.Children.Add(n);
         }
-        row.Children.Add(Ui.Row(12, Ui.Icon(r.Icon, indent > 0 ? 16 : 18, on ? HubLook.Violet : null), text));
-        var b = new Button { Classes = { "hub-rail" }, Content = row, MinHeight = indent > 0 ? 36 : 42 };
+        // Знак ModScript X — монограмма на фирменной полосе, у остальных — значок.
+        Control icon = r.Id == "x" ? CreatorPage.XMark(20) : Ui.Icon(r.Icon, indent > 0 ? 15 : 18, on ? HubLook.Violet : null);
+        row.Children.Add(Ui.Row(12, icon, text));
+        var b = new Button { Classes = { "hub-rail" }, Content = row, MinHeight = indent > 0 ? 34 : 46 };
         if (on) b.Classes.Add("active");
         b.Click += (_, _) => click();
         return b;
     }
 
-    /// <summary>
-    /// «Мои проекты» — главный блок панели: знак ModScript X, название и два подраздела под ним.
-    /// Сам заголовок ведёт в «Доступные».
-    /// </summary>
-    static Control ProjectsGroup(string current, Action<string>? inPage, Func<string, bool>? local)
-    {
-        var lit = InProjects(current);
-        var mark = CreatorPage.XMark(28);
-        var words = Ui.Col(0,
-            new TextBlock { Text = I18n.T("v18.hub.projects"), FontSize = 15, FontWeight = FontWeight.Bold, LetterSpacing = -0.2 },
-            HubLook.MonoText("MODSCRIPT X", 9.5, HubLook.Cyan));
-        var head = new Button { Classes = { "hub-rail" }, Content = Ui.Row(10, mark, words), MinHeight = 48, Padding = new Thickness(8, 0, 10, 0) };
-        head.Click += (_, _) => Go("available", inPage, local);
-        ToolTip.SetTip(head, I18n.T("v18.hub.projects.tip"));
-        var items = new StackPanel { Spacing = 2, Margin = new Thickness(0, 4, 0, 2) };
-        foreach (var r in ProjectRails)
-        {
-            var id = r.Id;
-            items.Children.Add(RailButton(r, id == current, 14, () => Go(id, inPage, local)));
-        }
-        return new Border
-        {
-            Background = lit ? HubLook.Raised : Brushes.Transparent, BorderBrush = lit ? HubLook.EdgeHi : HubLook.Edge, BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(5), Padding = new Thickness(4), Margin = new Thickness(0, 0, 0, 14),
-            Child = Ui.Col(0, head, new Border { Height = 1, Background = HubLook.Edge, Margin = new Thickness(8, 2, 8, 0) }, items),
-        };
-    }
-
-    /// <summary>Боковая панель: знак и название, «Мои проекты» с подразделами, остальные разделы; внизу — команда и баланс, если они есть.</summary>
+    /// <summary>Боковая панель: знак и название, три главных пункта; внизу — «Команда», «Магазин» и заработок.</summary>
     static Control RailPanel(string current, Action<string>? inPage, Func<string, bool>? local)
     {
         var brand = Ui.Row(10, CreatorLogo.Tile(30), Ui.Col(1,
@@ -197,17 +174,22 @@ public static class HubNav
         ToolTip.SetTip(brand, I18n.T("v93.mk.sub", ("n", 100 - Market.FeePercent)));
         brand.Margin = new Thickness(6, 2, 0, 22);
 
-        var items = new StackPanel { Spacing = 4 };
-        items.Children.Add(ProjectsGroup(current, inPage, local));
-        foreach (var r in Sections)
+        var items = new StackPanel { Spacing = 6 };
+        foreach (var r in Main)
         {
             var id = r.Id;
-            // Число защищённых скриптов — из библиотеки (один небольшой JSON), без чтения самих файлов.
-            var count = id == "scripts" && Features.Inject.All().Count(i => i.Sealed) is > 0 and var n ? n.ToString() : null;
+            // Число проектов — из списков на диске (имена папок), без чтения кода.
+            var count = id == "available" && XProjects.List().Count + Projects.List().Count is > 0 and var n ? n.ToString() : null;
             items.Children.Add(RailButton(r, id == current, 0, () => Go(id, inPage, local), count));
         }
 
-        var foot = Ui.Col(8);
+        var foot = Ui.Col(2);
+        foreach (var r in Sections)
+        {
+            var id = r.Id;
+            foot.Children.Add(RailButton(r, id == current, 4, () => Go(id, inPage, local)));
+        }
+        foot.Children.Add(new Border { Height = 1, Background = HubLook.Edge, Margin = new Thickness(8, 8, 8, 8) });
         // Своя команда — тихой строкой внизу: тег и название (клик — в раздел «Команда»).
         if (Social.Teams.Mine.FirstOrDefault() is { } team)
         {
@@ -216,14 +198,18 @@ public static class HubNav
             t.Click += (_, _) => Go("team", inPage, local);
             foot.Children.Add(t);
         }
+        // 20.0: заработок автора — одной строкой; клик — «Аккаунт → Заработок» (продажи, скачивания, график).
         if (Social.Account.SignedIn && MarketData.Wallet is { } w)
         {
             var wallet = new Button
             {
-                Classes = { "hub-rail" }, Content = Ui.Row(10, Ui.Icon(Icons.Bag, 15), new TextBlock { Text = Market.Money(w.Balance), FontFamily = HubLook.Mono, FontWeight = FontWeight.SemiBold, VerticalAlignment = VerticalAlignment.Center }),
+                Classes = { "hub-rail" },
+                Content = Ui.Row(10, Ui.Icon(Icons.Chart, 15, HubLook.Cyan), Ui.Col(0,
+                    HubLook.MonoText(I18n.T("v20.hub.earned").ToUpper(I18n.Culture), 9.5),
+                    new TextBlock { Text = Market.Money(w.Earned), FontFamily = HubLook.Mono, FontWeight = FontWeight.SemiBold })),
             };
-            ToolTip.SetTip(wallet, I18n.T("v93.mk.wallet"));
-            wallet.Click += (_, _) => Open("wallet", inPage);
+            ToolTip.SetTip(wallet, I18n.T("v20.hub.earned.tip", ("sum", Market.Money(w.Balance))));
+            wallet.Click += (_, _) => MainWindow.Current?.Navigate(() => new AccountPage("earnings"));
             foot.Children.Add(wallet);
         }
         var dock = new DockPanel { Margin = new Thickness(12, 18, 12, 14) };
@@ -241,7 +227,7 @@ public static class HubNav
     /// <summary>Шапка раздела: «// CREATOR HUB · РАЗДЕЛ», название (и строка пояснения), справа — одна главная кнопка; под ней — вкладки.</summary>
     static Control Head(string current, string rail, string title, string? lead, Action<string>? inPage, Action? sold, IReadOnlyList<Control>? sub, Control? action)
     {
-        var eyebrow = InProjects(rail) ? I18n.T("v18.hub.projects") : I18n.T(Sections.First(s => s.Id == rail).Key);
+        var eyebrow = Main.Concat(Sections).FirstOrDefault(s => s.Id == rail) is { } r ? I18n.T(r.Key) : "";
         var words = Ui.Col(4,
             HubLook.Eyebrow("Creator Hub · " + eyebrow, HubLook.Violet),
             new TextBlock { Text = title, FontFamily = Look.Display, FontSize = 26, FontWeight = FontWeight.Bold, LetterSpacing = -0.6, TextTrimming = TextTrimming.CharacterEllipsis });
@@ -334,19 +320,20 @@ public static class HubNav
             if (ShopTarget != "wishlist") throw new Exception("shop tab not remembered");
             // Старые и новые вкладки мастерской горят в своём пункте; старая среда ModScript X — в «Доступных»; рынок — всегда «Магазин».
             foreach (var (tab, creator, rail) in new[] { ("home", true, "available"), ("mine", true, "available"), ("form", true, "create"), ("examples", true, "create"),
-                ("x", true, "available"), ("inject", true, "available"), ("mxdev", true, "available"), ("modscript", true, "scripts"), ("docs", true, "scripts"),
-                ("console", true, "scripts"), ("injects", true, "scripts"), ("team", true, "team"), ("codes", true, "shop"), ("hub", true, "shop"),
+                ("x", true, "x"), ("inject", true, "available"), ("mxdev", true, "available"), ("modscript", true, "x"), ("docs", true, "x"),
+                ("console", true, "x"), ("injects", true, "available"), ("scripts", true, "available"), ("team", true, "team"), ("codes", true, "shop"), ("hub", true, "shop"),
                 ("studio", false, "shop"), ("wallet", false, "shop") })
                 if (RailOf(tab, creator) != rail) throw new Exception($"rail {tab} → {RailOf(tab, creator)}");
-            foreach (var (id, tab) in new[] { ("available", "home"), ("projects", "home"), ("create", "form"), ("templates", "examples"), ("scripts", "scripts"), ("lang", "home") })
+            foreach (var (id, tab) in new[] { ("available", "home"), ("projects", "home"), ("create", "form"), ("templates", "examples"), ("scripts", "scripts"), ("lang", "home"), ("x", "x"), ("console", "x") })
                 if (CreatorTab(id) != tab) throw new Exception($"open {id} → {CreatorTab(id)}");
             // Поиск: со своим списком — фильтр на месте, с разделов без списка — к проектам.
             foreach (var (tab, editing, q, to) in new[] { ("home", false, "x", "home"), ("home", false, "", "home"), ("mine", true, "x", "home"), ("scripts", false, "x", "scripts"),
-                ("team", false, "x", "home"), ("codes", false, "x", "codes"), ("examples", false, "x", "examples"), ("hub", false, "x", "hub") })
+                ("team", false, "x", "home"), ("x", false, "x", "x"), ("codes", false, "x", "codes"), ("examples", false, "x", "examples"), ("hub", false, "x", "hub") })
                 if (CreatorPage.SearchTab(tab, editing, q) != to) throw new Exception($"search on {tab} → {CreatorPage.SearchTab(tab, editing, q)}");
-            if (ProjectRails.Length != 2 || Sections.Length != 3) throw new Exception("Creator Hub: «Мои проекты» (create, available) + scripts, team, shop");
+            // 20.0: на виду три пункта — ModScript X, «Создать», «Мои проекты»; остальное внизу.
+            if (string.Join(",", Main.Select(m => m.Id)) != "x,create,available" || Sections.Length != 2) throw new Exception("Creator Hub: x, create, available + team, shop below");
             if (ShopMore.Any(m => m.Id is "injects" or "codes" or "models")) throw new Exception("old duplicate shop pages are back");
-            return "«Мои проекты» first (create, available), then scripts, team, shop; old tab ids land in their place";
+            return "ModScript X, «Создать», «Мои проекты» on top; team and shop below; old tab ids land in their place";
         }
         finally { _lastShop = saved; }
     }
