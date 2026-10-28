@@ -25,12 +25,12 @@ public sealed partial class CreatorPage
     /// <summary>Покупки прошлых версий защищаются один раз за сеанс — при первом открытии библиотеки.</summary>
     static bool _hardened;
 
-    Control ScriptsHub() => _ms switch
+    /// <summary>20.0: консоль и справка ModScript (открываются из «ModScript X → Создать»); библиотека скриптов — в «Моих проектах».</summary>
+    Control XHub() => _ms switch
     {
-        "console" => Console(),
         "commands" => Commands(),
         "functions" => LibraryDocs(),
-        _ => Library(),
+        _ => Console(),
     };
 
     /// <summary>Главная кнопка «Скриптов»: импорт файла (.modx, .mls или архив).</summary>
@@ -219,7 +219,8 @@ public sealed partial class CreatorPage
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException) { MainWindow.Current?.Toast(e.Message, bad: true); }
         }
-        _ms = "library";
+        _tab = "scripts";
+        _open = null;
         Build();
         if (added.Count == 1) MainWindow.Current?.Toast(I18n.T("v18.lib.import.done", ("name", added[0].Title), ("guard", GuardLine(added[0]))));
         else if (added.Count > 1) MainWindow.Current?.Toast(I18n.T("v18.lib.import.many", ("n", added.Count)));

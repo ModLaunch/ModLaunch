@@ -19,7 +19,22 @@ namespace ModLaunch.Views;
 /// </summary>
 public sealed partial class CreatorPage
 {
+    /// <summary>
+    /// 20.0: «ModScript X → Создать»: знак среды, анкета нового проекта и другие способы начать — шаблон, импорт,
+    /// а также консоль и справка ModScript (своего пункта слева у них больше нет).
+    /// </summary>
     Control CreateView() => Ui.Col(20, XBanner(), Form(), OtherWays());
+
+    /// <summary>Значок слева, название и пояснение справа (пояснение переносится по ширине плитки).</summary>
+    static Control WayContent(string icon, string key)
+    {
+        var mark = new Border { Width = 34, Height = 34, CornerRadius = new CornerRadius(4), BorderBrush = HubLook.Edge, BorderThickness = new Thickness(1), Margin = new Thickness(0, 0, 12, 0), VerticalAlignment = VerticalAlignment.Top, Child = Ui.Icon(icon, 16, HubLook.Violet) };
+        var dock = new DockPanel();
+        DockPanel.SetDock(mark, Dock.Left);
+        dock.Children.Add(mark);
+        dock.Children.Add(Ui.Col(2, Ui.Text(I18n.T(key), "strong"), Ui.Text(I18n.T(key + ".text"), "small muted", wrap: true)));
+        return dock;
+    }
 
     /// <summary>За сколько среда разбирает и проверяет типичный мод (Arena) на этом компьютере — среднее пяти прогонов.</summary>
     static double? _checkMs;
@@ -142,19 +157,20 @@ public sealed partial class CreatorPage
     /// <summary>Другие способы начать: шаблон или импорт папки/архива (классический мастер ModScript).</summary>
     Control OtherWays()
     {
-        var grid = new UniformGrid { Columns = 2 };
+        var grid = new UniformGrid { Columns = 4 };
         foreach (var (icon, key, run) in new (string, string, Action)[]
         {
             (Icons.Wand, "v18.other.template", () => Go("examples")),
             (Icons.Folder, "v18.other.import", NewProjectDialog),
+            (Icons.Activity, "v20.x.way.console", () => { _ms = "console"; Go("x"); }),
+            (Icons.Book, "v20.x.way.docs", () => { _ms = "commands"; Go("x"); }),
         })
         {
             var b = new Button
             {
                 Classes = { "tile" }, Margin = new Thickness(0, 0, 14, 0), Padding = new Thickness(16, 12),
-                HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch,
-                Content = Ui.Row(12, new Border { Width = 34, Height = 34, CornerRadius = new CornerRadius(4), BorderBrush = HubLook.Edge, BorderThickness = new Thickness(1), Child = Ui.Icon(icon, 16, HubLook.Violet) },
-                    Ui.Col(2, Ui.Text(I18n.T(key), "strong"), Ui.Text(I18n.T(key + ".text"), "small muted", wrap: true))),
+                HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalAlignment = VerticalAlignment.Stretch,
+                Content = WayContent(icon, key),
             };
             b.Click += (_, _) => run();
             grid.Children.Add(b);

@@ -240,7 +240,7 @@ public sealed class ListingPage : Page
             if (e is Social.ServiceError { Code: "NO_MONEY" })
                 w.Dialog(I18n.T("mk.noMoney.title"), Ui.Text(I18n.T("mk.noMoney.text", ("price", Market.Money(_l.Price))), "muted", wrap: true),
                     Ui.Button(I18n.T("common.close"), w.CloseDialog),
-                    Ui.Button(I18n.T("acc.wallet.topup"), () => { w.CloseDialog(); w.Navigate(() => new MarketPage("wallet")); }, "primary", Icons.Plus));
+                    Ui.Button(I18n.T("acc.wallet.topup"), () => { w.CloseDialog(); w.Navigate(() => new AccountPage("wallet")); }, "primary", Icons.Plus));
             else w.Toast(Market.Explain(e), bad: true);
         }
         _busy = false;

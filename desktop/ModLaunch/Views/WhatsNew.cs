@@ -12,6 +12,8 @@ public static class WhatsNew
 {
     static readonly (string Icon, string Key, Func<Page>? Open)[] Items =
     [
+        (Icons.Grid, "new.v20.hub", () => new CreatorPage("home")),
+        (Icons.Chart, "new.v20.earnings", () => new AccountPage("earnings")),
         (Icons.Code, "new.v19.ide", XStudio.Entry),
         (Icons.Bug, "new.v19.debug", XStudio.Entry),
         (Icons.Alert, "new.v19.lint", XStudio.Entry),
@@ -33,7 +35,7 @@ public static class WhatsNew
         (Icons.Zap, "new.v15.inject", XStudio.Entry),
         (Icons.Gamepad, "new.v15.games", () => new AddGamePage()),
         (Icons.Activity, "new.v15.fast", null),
-        (Icons.Bag, "new.v14.market", () => new MarketPage("studio")),
+        (Icons.Bag, "new.v14.market", () => new AccountPage("earnings")),
         (Icons.Palette, "new.v14.look", () => new SettingsPage("look")),
         (Icons.Creator, "new.v13.hub", () => new CreatorPage("home")),
         (Icons.Code, "new.v13.modscript", () => new CreatorPage("console")),
@@ -69,7 +71,7 @@ public static class WhatsNew
         (Icons.Zap, "new.v97.modscriptx", () => new CreatorPage("inject")),
         (Icons.Home, "new.v95.home", () => new HomePage()),
         (Icons.Sparkles, "new.v95.forYou", () => new HomePage()),
-        (Icons.Bag, "new.v95.wallet", () => new MarketPage("wallet")),
+        (Icons.Bag, "new.v95.wallet", () => new AccountPage("wallet")),
         (Icons.Creator, "new.v95.hub", () => new MarketPage()),
         (Icons.Cube, "new.v95.mcinto", () => new MinecraftPage("catalog")),
         (Icons.Check, "new.v95.fixes", null),
@@ -161,7 +163,7 @@ public static class WhatsNew
             },
             Child = Ui.Col(2,
                 new TextBlock { Text = $"ModLaunch {Http.Version}", FontSize = 24, FontWeight = FontWeight.Bold, Foreground = Brushes.White },
-                new TextBlock { Text = I18n.T("new.v19.subtitle"), Foreground = new SolidColorBrush(Color.FromArgb(220, 255, 255, 255)), TextWrapping = TextWrapping.Wrap }),
+                new TextBlock { Text = I18n.T("new.v20.subtitle"), Foreground = new SolidColorBrush(Color.FromArgb(220, 255, 255, 255)), TextWrapping = TextWrapping.Wrap }),
         };
         w.Dialog(I18n.T("new.title"), new ScrollViewer { MaxHeight = 560, Content = Ui.Col(12, hero, list) }, 620,
             Ui.Button(I18n.T("new.ok"), w.CloseDialog, "primary", Icons.Check));

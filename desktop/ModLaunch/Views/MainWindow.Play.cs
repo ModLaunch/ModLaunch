@@ -113,9 +113,9 @@ public sealed partial class MainWindow
         if (p.SignedIn)
         {
             col.Children.Add(MenuRow(I18n.T("acc.menu.account"), Icons.User, () => Navigate(() => new AccountPage())));
-            col.Children.Add(MenuRow(I18n.T("acc.s.wallet"), Icons.Bag, () => Navigate(() => new MarketPage("wallet"))));
+            col.Children.Add(MenuRow(I18n.T("acc.s.wallet"), Icons.Bag, () => Navigate(() => new AccountPage("wallet"))));
             col.Children.Add(MenuRow(I18n.T("acc.s.purchases"), Icons.Download, () => Navigate(() => new AccountPage("purchases"))));
-            col.Children.Add(MenuRow(I18n.T("st.tab"), Icons.Chart, () => Navigate(() => new MarketPage("studio"))));
+            col.Children.Add(MenuRow(I18n.T("v20.acc.earnings"), Icons.Chart, () => Navigate(() => new AccountPage("earnings"))));
             col.Children.Add(MenuRow(I18n.T("acc.menu.friends"), Icons.Users, () => Navigate(() => new CommunityPage())));
             var signOut = MenuRow(I18n.T("acc.menu.signout"), Icons.Power, () =>
             {

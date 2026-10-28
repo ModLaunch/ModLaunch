@@ -93,7 +93,7 @@ public sealed class CommissionPanel : UserControl
         var claimCard = Ui.Card(Ui.Col(12,
             Ui.Text(I18n.T("v14.fee.wallet"), "h3"),
             Ui.Text(I18n.T("v14.fee.wallet.text"), "small muted", wrap: true),
-            Ui.Row(10, claim, Ui.Button(I18n.T("v93.mk.tab.wallet"), () => MainWindow.Current?.Navigate(() => new MarketPage("wallet")), "ghost", Icons.Bag))), 22);
+            Ui.Row(10, claim, Ui.Button(I18n.T("v93.mk.tab.wallet"), () => MainWindow.Current?.Navigate(() => new AccountPage("wallet")), "ghost", Icons.Bag))), 22);
         var two = new Grid { ColumnDefinitions = new ColumnDefinitions("*,*"), ColumnSpacing = 18 };
         two.Children.Add(percentCard);
         Grid.SetColumn(claimCard, 1);

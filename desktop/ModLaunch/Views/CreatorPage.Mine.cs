@@ -192,16 +192,22 @@ public sealed partial class CreatorPage
     }
 
     /// <summary>
-    /// Вкладки «Моих проектов» для шапки Hub: проекты мастерской и опубликованные в Hub.
+    /// Вкладки «Моих проектов» для шапки Hub: проекты мастерской, защищённые скрипты (20.0: бывший пункт «Скрипты» слева)
+    /// и опубликованные в Hub.
     /// </summary>
     List<Control> MineTabs()
     {
         var tabs = new List<Control>();
-        foreach (var (id, key) in new[] { ("projects", "cr.mine.projects"), ("published", "cr.mine.published") })
+        foreach (var (id, key) in new[] { ("projects", "cr.mine.projects"), ("scripts", "v18.hub.scripts"), ("published", "cr.mine.published") })
         {
             var part = id;
-            var b = Ui.Button(I18n.T(key), () => { _minePart = part; Build(); }, "hub-tab");
-            if (_minePart == id) b.Classes.Add("active");
+            var b = Ui.Button(I18n.T(key), () =>
+            {
+                if (part == "scripts") { Go("scripts"); return; }
+                _minePart = part;
+                Go("home");
+            }, "hub-tab");
+            if (id == "scripts" ? _tab == "scripts" : _tab != "scripts" && _minePart == id) b.Classes.Add("active");
             tabs.Add(b);
         }
         return tabs;

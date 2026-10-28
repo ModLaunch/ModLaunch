@@ -30,7 +30,7 @@ public sealed partial class CreatorPage
         s.Pump(700);
         s.Save("market-3-editor");
         s.Window.CloseDialog();
-        s.Window.Navigate(() => new MarketPage("studio"));
+        s.Window.Navigate(() => new AccountPage("earnings"));
         s.Pump(600);
         s.Save("market-4-studio");
         s.Window.Navigate(() => new AccountPage());

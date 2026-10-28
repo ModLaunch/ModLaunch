@@ -85,13 +85,6 @@ public static class V93Shots
                     new("daynight", "Day/Night tweaks", "script", "Nox", 0, DateTime.UtcNow.AddDays(-3)),
                     new("sort", "Сортировка инвентаря", "code", "Kira", 9900, DateTime.UtcNow.AddDays(-12)),
                 ]);
-            if (tab == "studio")
-            {
-                var mine = listings.Where(l => l.Author == "Mira").ToList();
-                var sales = Enumerable.Range(0, 26).Select(i => new Sale(mine[i % mine.Count].Id, "b" + i, new[] { "Kira", "Vega", "Nox", "Echo", "Alpin" }[i % 5], "demoMira",
-                    mine[i % mine.Count].Title, mine[i % mine.Count].Price == 0 ? 0 : mine[i % mine.Count].Price, mine[i % mine.Count].Price / 10, DateTime.UtcNow.AddDays(-(i * 7 % 29)).AddHours(-i))).Where(x => x.Price > 0).ToList();
-                MarketPage.DemoStudio(mine, sales, new Wallet(412_300, 1_284_500, 0, 800_000));
-            }
             w.Navigate(() => new MarketPage(tab));
             s.Pump(1100);
             s.Save($"v93-4-market-{tab}");
