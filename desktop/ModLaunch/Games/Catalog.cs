@@ -373,7 +373,7 @@ public static class GameCatalog
             Catalog = CatalogKind.Thunderstore, BrowseUrl = "https://thunderstore.io/c/outward/",
             NexusDomain = "outward", NexusGameId = 2775,
             Sections = Section.Pick("all", "picks", "best", "content", "items", "gameplay", "ui", "tools", "modpacks"),
-            Picks = ["sinai-dev-SideLoader", "Mefino-Outward_Config_Manager", "SpicerXD-Raid_Mode", "sinai-dev-CombatHUD", "sinai-dev-More_Map_Details",
+            Picks = ["Mefino-Outward_Config_Manager", "SpicerXD-Raid_Mode", "sinai-dev-CombatHUD", "sinai-dev-More_Map_Details",
                 "sinai-dev-Shared_Quest_Rewards", "stormcancer-Classfixes_Part_1", "stormcancer-Weaponry_and_Enchantments_Additions", "Faeryn-BetterInventory",
                 "sinai-dev-Minimap", "lasyan3-SoroboreanTravelAgency"],
             SignatureDirs = ["Outward_Data", "Outward Definitive Edition_Data"],
