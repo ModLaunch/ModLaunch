@@ -70,7 +70,7 @@ public sealed class Splash : Panel
         var tag = new Border
         {
             Background = Ui.Res("Surface2"), CornerRadius = new CornerRadius(6), Padding = new Thickness(8, 2), HorizontalAlignment = HorizontalAlignment.Center,
-            Child = new TextBlock { Text = "APP · " + Http.Version, FontSize = 11, FontWeight = FontWeight.SemiBold, LetterSpacing = 1.5, Foreground = Ui.Res("Faint") },
+            Child = new TextBlock { Text = "APP · " + Http.Display, FontSize = 11, FontWeight = FontWeight.SemiBold, LetterSpacing = 1.5, Foreground = Ui.Res("Faint") },
         };
 
         _fill.Background = new LinearGradientBrush

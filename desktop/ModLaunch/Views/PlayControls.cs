@@ -45,12 +45,14 @@ public static class PlayControls
     }
 
     /// <summary>
-    /// Большая кнопка «Играть»: светится цветом акцента, а если у игры есть профили —
+    /// Большая кнопка «Играть»: цветом акцента, а если у игры есть профили —
     /// рядом стрелка выбора профиля перед запуском (как в Modrinth App).
+    /// 2.0: на арте (сцена главной, шапка игры) — светлая кнопка «play».
     /// </summary>
-    public static Control PlayButton(GameState g)
+    public static Control PlayButton(GameState g, bool onArt = false)
     {
-        var play = Ui.Button(I18n.T("games.play"), () => Actions.Play(g), "primary", Icons.Play);
+        var cls = onArt ? "play" : "primary";
+        var play = Ui.Button(I18n.T("games.play"), () => Actions.Play(g), cls, Icons.Play);
         play.FontSize = 17;
         play.Padding = new Thickness(30, 13);
         Control body = play;
@@ -62,7 +64,7 @@ public static class PlayControls
             play.CornerRadius = new CornerRadius(12, 0, 0, 12);
             var chevron = new Button
             {
-                Classes = { "primary" }, Padding = new Thickness(12, 0), CornerRadius = new CornerRadius(0, 12, 12, 0),
+                Classes = { cls }, Padding = new Thickness(12, 0), CornerRadius = new CornerRadius(0, 12, 12, 0),
                 VerticalAlignment = VerticalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Center,
                 Content = Ui.Icon(Icons.ChevronDown, 16),
             };
@@ -107,7 +109,7 @@ public static class PlayControls
         return new Border
         {
             CornerRadius = new CornerRadius(12),
-            BoxShadow = Look.Calm ? default : new BoxShadows(new BoxShadow { OffsetY = 10, Blur = 30, Spread = -6, Color = Color.FromArgb(0xB3, accent.R, accent.G, accent.B) }),
+            BoxShadow = Look.Calm || onArt ? default : new BoxShadows(new BoxShadow { OffsetY = 10, Blur = 30, Spread = -6, Color = Color.FromArgb(0xB3, accent.R, accent.G, accent.B) }),
             VerticalAlignment = VerticalAlignment.Bottom,
             Child = body,
         };

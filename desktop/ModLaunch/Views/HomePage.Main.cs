@@ -235,7 +235,7 @@ public sealed partial class HomePage
         }
 
         if (Setup.Updater.Available && Setup.Updater.Latest is { } latest)
-            list.Add(new("app", Icons.Sparkles, Yellow, I18n.T("h95.a.app", ("version", latest.Version)), I18n.T("h95.a.app.text"),
+            list.Add(new("app", Icons.Sparkles, Yellow, I18n.T("h95.a.app", ("version", Http.DisplayOf(latest.Version))), I18n.T("h95.a.app.text"),
                 I18n.T("h95.a.app.go"), () => MainWindow.Current?.ShowUpdate(), () => MainWindow.Current?.ShowUpdate()));
 
         var updates = mine.SelectMany(g => (Features.ModUpdates.Found.TryGetValue(g.Def.Id, out var l) ? l : []).Select(u => (g, u))).ToList();
@@ -609,7 +609,7 @@ public sealed partial class HomePage
             rows.Children.Add(Row(Icons.Bag, Yellow, I18n.T("h95.new.hub") + ": " + listing.Title, listing.Author + " · " + (listing.Free ? I18n.T("mk.free") : Market.Money(listing.Price)),
                 () => MarketTiles.Open(listing)));
         }
-        var head = CardHead(I18n.T("h95.new"), I18n.T("h95.new.version", ("version", Http.Version)), LinkButton(I18n.T("h95.new.all"), WhatsNew.Show));
+        var head = CardHead(I18n.T("h95.new"), I18n.T("h95.new.version", ("version", Http.Display)), LinkButton(I18n.T("h95.new.all"), WhatsNew.Show));
         return Card(head, rows, 236);
     }
 

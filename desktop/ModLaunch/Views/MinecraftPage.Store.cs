@@ -377,13 +377,9 @@ public sealed partial class MinecraftPage
             chips);
         words.VerticalAlignment = VerticalAlignment.Center;
 
-        var running = Features.Launcher.IsRunning(Mc.Id);
-        var play = Ui.Button(running ? I18n.T("v4.running") : I18n.T("games.play"), () => Play(a), "primary", Icons.Play);
-        play.IsEnabled = !running;
-        play.Padding = new Thickness(22, 11);
+        // 2.0: своей «Играть» у карточки нет — текущую сборку запускает «Играть» в шапке прямо над ней.
         var buttons = Ui.Row(8,
-            play,
-            Ui.Button(I18n.T("mine.add"), () => { _type = "mod"; Go("catalog"); }, "", Icons.Plus),
+            Ui.Button(I18n.T("mine.add"), () => { _type = "mod"; Go("catalog"); }, "soft", Icons.Plus),
             Ui.Button("", () => Actions.OpenFolder(a.Dir), "icon ghost", Icons.Folder, I18n.T("games.openFolder")),
             Ui.Button("", () => Go("settings"), "icon ghost", Icons.Sliders, I18n.T("mine.tab.settings")));
         buttons.VerticalAlignment = VerticalAlignment.Center;
@@ -456,7 +452,10 @@ public sealed partial class MinecraftPage
         return card;
     }
 
-    /// <summary>«О сборке»: версия, загрузчик, память, Java, лаунчер, папка и время в игре.</summary>
+    /// <summary>
+    /// «О сборке»: загрузчик, память, Java и лаунчер. 2.0: версия, папка, время в игре и последний запуск
+    /// уже есть в шапке страницы — второй раз их здесь не повторяем.
+    /// </summary>
     Control BuildAboutCard(McInstance a)
     {
         var rows = Ui.Col(10);
@@ -471,14 +470,10 @@ public sealed partial class MinecraftPage
             rows.Children.Add(row);
         }
         var launcher = Program.Demo ? new Mc.LauncherInfo("store", null) : Mc.FindLauncher();
-        Row(I18n.T("v101.mc.version"), a.GameVersion);
         Row(I18n.T("aside.loader"), a.Loader == "vanilla" ? a.LoaderTitle : $"{a.LoaderTitle} {a.LoaderVersion}".Trim());
         Row(I18n.T("v101.mc.memory"), (a.MemoryMb / 1024.0).ToString("0.#", I18n.Culture) + " " + I18n.T("v101.mc.gb"));
         Row("Java", a.JavaPath == "" ? I18n.T("v101.mc.javaAuto") : Path.GetFileName(Path.GetDirectoryName(Path.GetDirectoryName(a.JavaPath)) ?? a.JavaPath));
         Row(I18n.T("v101.mc.launcher"), launcher is null ? I18n.T("v101.mc.launcher.no") : I18n.T("v101.mc.launcher.ok"), launcher is null ? Ui.Res("Warn") : Ui.Res("Good"));
-        Row(I18n.T("v92.about.folder"), Ui.ShortPath(a.Dir), null, () => Actions.OpenFolder(a.Dir));
-        Row(I18n.T("aside.playtime"), a.PlayMs > 0 ? Features.PlayTime.Format(a.PlayMs) : "—");
-        Row(I18n.T("aside.lastPlayed"), a.LastPlayed is null ? "—" : Ui.Ago(a.LastPlayed));
         return new Border { Classes = { "card" }, Padding = new Thickness(18), Child = Ui.Col(14, Ui.Text(I18n.T("v101.mc.about"), "h3"), rows) };
     }
 

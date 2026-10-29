@@ -80,8 +80,8 @@ public static class Services
                 var latest = await Setup.Updater.Check();
                 if (latest is null) return new ServiceStatus(id, ServiceState.Warn, I18n.T("svc.upd.none"), I18n.T("svc.fix.updates"));
                 return Setup.Updater.Available
-                    ? new ServiceStatus(id, ServiceState.Ok, I18n.T("svc.ok.updates.new", ("version", latest.Version)))
-                    : new ServiceStatus(id, ServiceState.Ok, I18n.T("svc.ok.updates", ("version", Http.Version), ("source", Setup.Updater.Source)));
+                    ? new ServiceStatus(id, ServiceState.Ok, I18n.T("svc.ok.updates.new", ("version", Http.DisplayOf(latest.Version))))
+                    : new ServiceStatus(id, ServiceState.Ok, I18n.T("svc.ok.updates", ("version", Http.Display), ("source", Setup.Updater.Source)));
         }
         return new ServiceStatus(id, ServiceState.Warn, "?");
     }

@@ -126,7 +126,7 @@ public sealed partial class SettingsPage : Page
         FillNav();
 
         var logo = new Image { Source = Images.Asset("icon.png", 64), Width = 38, Height = 38 };
-        var who = Ui.Col(1, Ui.Text("ModLaunch", "h3"), Ui.Text(I18n.T("upd.app.version", ("version", Http.Version)), "small muted"));
+        var who = Ui.Col(1, Ui.Text("ModLaunch", "h3"), Ui.Text(I18n.T("upd.app.version", ("version", Http.Display)), "small muted"));
         who.VerticalAlignment = VerticalAlignment.Center;
         var head = Ui.Row(10, logo, who);
         head.Margin = new Thickness(8, 4, 8, 14);
@@ -340,6 +340,7 @@ public sealed partial class SettingsPage : Page
         var rows = new List<Control> { afterRow };
         if (Settings.Data.Str("afterLaunch") == "minimize")
             rows.Add(Toggle(I18n.T("launch.restore"), I18n.T("launch.restore.hint"), Settings.Data.Bool("restoreAfterGame", true), v => Settings.Data["restoreAfterGame"] = v));
+            rows.Add(Toggle(I18n.T("v2.quiet"), I18n.T("v2.quiet.hint"), Settings.Data.Bool("quietInGame", true), v => Settings.Data["quietInGame"] = v));
         rows.Add(Toggle(I18n.T("launch.track"), I18n.T("launch.track.hint"), PlayTime.Track, v => Settings.Data["trackPlaytime"] = v));
         rows.Add(Toggle(I18n.T("crash.setting"), I18n.T("crash.setting.hint"), Settings.Data.Bool("crashHelper", true), v => Settings.Data["crashHelper"] = v));
         rows.Add(Toggle(I18n.T("set.checkBeforePlay"), I18n.T("set.checkBeforePlay.hint"), Health.BeforePlay, v => Settings.Data["checkBeforePlay"] = v));
@@ -843,7 +844,7 @@ public sealed partial class SettingsPage : Page
     Control AboutTab()
     {
         var logo = new Image { Source = Images.Asset("icon.png", 128), Width = 64, Height = 64 };
-        var version = new Button { Classes = { "ghost" }, Padding = new Thickness(0), Content = Ui.Text($"{I18n.T("upd.app.version", ("version", Http.Version))} · Avalonia UI · .NET {Environment.Version.ToString(2)}", "muted small") };
+        var version = new Button { Classes = { "ghost" }, Padding = new Thickness(0), Content = Ui.Text($"{I18n.T("upd.app.version", ("version", Http.Display))} ({Http.Version}) · Avalonia UI · .NET {Environment.Version.ToString(2)}", "muted small") };
         version.Click += (_, _) =>
         {
             // Пять щелчков по версии — включить или спрятать «Статистику» (для владельца), как в 3.x.

@@ -228,7 +228,7 @@ public sealed class ControlPanelPage : Page
         disk.Children.Add(Ui.Row(8,
             Ui.Button(I18n.T("cp.t.clean"), () => { CleanCache(); _parts = null; Build(); }, "", Icons.Trash),
             Ui.Button(I18n.T("cp.t.data"), () => Actions.OpenFolder(Paths.DataDir), "ghost", Icons.Folder)));
-        disk.Children.Add(Ui.Text($"ModLaunch {Http.Version} · .NET {Environment.Version.ToString(2)} · {Environment.OSVersion.VersionString}", "small muted"));
+        disk.Children.Add(Ui.Text($"ModLaunch {Http.Display} · .NET {Environment.Version.ToString(2)} · {Environment.OSVersion.VersionString}", "small muted"));
         var left = Ui.Card(switches, 22);
         var right = Ui.Card(disk, 22);
         right.VerticalAlignment = left.VerticalAlignment = VerticalAlignment.Top;

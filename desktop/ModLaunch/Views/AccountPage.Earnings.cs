@@ -132,29 +132,21 @@ public sealed partial class AccountPage
             }
             : (Control)Ui.Text(I18n.T("v20.acc.growth.none"), "small muted");
         var left = Ui.Col(8,
-            Ui.Text(I18n.T("v20.acc.total").ToUpper(I18n.Culture), "small muted"),
-            new TextBlock { Text = Market.Money(earned), FontFamily = Gx.Display, FontSize = 46, FontWeight = FontWeight.Black, LetterSpacing = -1, Foreground = Ui.Res("Text") },
+            Ui.Text(I18n.T("v20.acc.total"), "small muted"),
+            new TextBlock { Text = Market.Money(earned), FontSize = Phi.Display, FontWeight = FontWeight.SemiBold, LetterSpacing = -1.6, Foreground = Ui.Res("Text") },
             Ui.Row(12, Ui.Text(I18n.T("v20.acc.month", ("sum", Market.Money(month))), "strong"), trend),
             Ui.Row(10,
                 Ui.Button(I18n.T("acc.payout"), () => { _tab = "wallet"; Build(); }, "primary", Icons.Upload),
                 Ui.Button(I18n.T("mk.sell"), () => ListingWizard.Show(null, ReloadEarn), "", Icons.Plus)));
         left.Children[^1].Margin = new Thickness(0, 8, 0, 0);
-        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,*"), ColumnSpacing = 28 };
+        // 2.0: слева — 61,8 % (сумма и кнопки), справа — 38,2 % под линию дохода; раньше половины налезали друг на друга.
+        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions(Phi.Columns), ColumnSpacing = Phi.S34 };
         grid.Children.Add(left);
         spark.VerticalAlignment = VerticalAlignment.Bottom;
         Grid.SetColumn(spark, 1);
         grid.Children.Add(spark);
-        var brand = (Ui.Res("Brand") as ISolidColorBrush)?.Color ?? Colors.MediumPurple;
-        return new Border
-        {
-            Classes = { "card" }, Padding = new Thickness(28, 24), ClipToBounds = true, BorderBrush = Tint(110), BorderThickness = new Thickness(1),
-            Background = new LinearGradientBrush
-            {
-                StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
-                GradientStops = { new GradientStop(Color.FromArgb(70, brand.R, brand.G, brand.B), 0), new GradientStop(Color.FromArgb(10, brand.R, brand.G, brand.B), 0.7) },
-            },
-            Child = grid,
-        };
+        // 2.0: обычная карточка — без фиолетовой заливки и цветной рамки; цвет остаётся только у линии дохода.
+        return new Border { Classes = { "card" }, Padding = new Thickness(Phi.S34, Phi.S21 + 3), ClipToBounds = true, Child = grid };
     }
 
     /// <summary>Линия дохода по дням за 30 дней с заливкой под ней — в герое, без подписей.</summary>

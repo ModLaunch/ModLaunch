@@ -140,7 +140,7 @@ public sealed partial class SetupWindow : Window
                     Children =
                     {
                         Docked(brand, Dock.Top),
-                        Docked(Ui.Row(12, _lang, new TextBlock { Text = "v" + Http.Version, FontSize = 11, Foreground = Ui.Hex("#7D8596"), VerticalAlignment = VerticalAlignment.Center }), Dock.Bottom),
+                        Docked(Ui.Row(12, _lang, new TextBlock { Text = "v" + Http.Display, FontSize = 11, Foreground = Ui.Hex("#7D8596"), VerticalAlignment = VerticalAlignment.Center }), Dock.Bottom),
                         new Border { Margin = new Thickness(0, 30, 0, 0), Child = features },
                     },
                 },
@@ -261,7 +261,7 @@ public sealed partial class SetupWindow : Window
         {
             Background = new SolidColorBrush(Alpha(Accent, 0x22)), BorderBrush = new SolidColorBrush(Alpha(Accent, 0x55)), BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(20), Padding = new Thickness(10, 4), HorizontalAlignment = HorizontalAlignment.Left,
-            Child = Ui.Row(6, Ui.Icon(Icons.Sparkles, 13, new SolidColorBrush(Accent)), new TextBlock { Text = T("kicker") + " · v" + Http.Version, FontSize = 12, FontWeight = FontWeight.SemiBold, Foreground = Ui.Res("Text") }),
+            Child = Ui.Row(6, Ui.Icon(Icons.Sparkles, 13, new SolidColorBrush(Accent)), new TextBlock { Text = T("kicker") + " · v" + Http.Display, FontSize = 12, FontWeight = FontWeight.SemiBold, Foreground = Ui.Res("Text") }),
         };
         var title = new TextBlock
         {
@@ -272,7 +272,7 @@ public sealed partial class SetupWindow : Window
                 GradientStops = { new GradientStop(((ISolidColorBrush)Ui.Res("Text")).Color, 0.35), new GradientStop(Accent, 1) },
             },
         };
-        var lead = Ui.Text(update ? (version is null ? T("welcome.updateLegacy", ("version", Http.Version)) : T("welcome.update", ("from", version), ("version", Http.Version))) : T("welcome.lead"), "muted", wrap: true);
+        var lead = Ui.Text(update ? (version is null ? T("welcome.updateLegacy", ("version", Http.Display)) : T("welcome.update", ("from", version), ("version", Http.Display))) : T("welcome.lead"), "muted", wrap: true);
         lead.MaxWidth = 500;
         lead.HorizontalAlignment = HorizontalAlignment.Left;
 
@@ -435,7 +435,7 @@ public sealed partial class SetupWindow : Window
             Animate.From(tip, "translateY(8px)", 300);
         });
         tips.Start();
-        var title = Ui.Text(_mode == SetupMode.Update && Updater.Latest is null ? T("update.title", ("version", Http.Version)) : T("progress.install"), "h1");
+        var title = Ui.Text(_mode == SetupMode.Update && Updater.Latest is null ? T("update.title", ("version", Http.Display)) : T("progress.install"), "h1");
         title.HorizontalAlignment = HorizontalAlignment.Center;
         var hint = Ui.Text(_mode == SetupMode.Update ? T("update.lead") : T("progress.hint"), "muted small", wrap: true);
         hint.HorizontalAlignment = HorizontalAlignment.Center;
@@ -578,7 +578,7 @@ public sealed partial class SetupWindow : Window
             Animate.From(cover, "translateY(16px)", 420, 500 + n++ * 50, new CubicEaseOut());
             covers.Children.Add(cover);
         }
-        var title = new TextBlock { Text = _result!.Updated ? T("done.titleUpdate", ("version", Http.Version)) : T("done.title"), FontSize = 32, FontWeight = FontWeight.ExtraBold, LetterSpacing = -0.8, TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
+        var title = new TextBlock { Text = _result!.Updated ? T("done.titleUpdate", ("version", Http.Display)) : T("done.title"), FontSize = 32, FontWeight = FontWeight.ExtraBold, LetterSpacing = -0.8, TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
         var text = Ui.Text(_desktop ? T("done.textDesktop") : T("done.textStart"), "muted", wrap: true);
         text.HorizontalAlignment = HorizontalAlignment.Center;
         text.TextAlignment = TextAlignment.Center;

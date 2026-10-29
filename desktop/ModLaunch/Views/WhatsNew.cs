@@ -12,6 +12,13 @@ public static class WhatsNew
 {
     static readonly (string Icon, string Key, Func<Page>? Open)[] Items =
     [
+        (Icons.Sparkles, "new.v2.design", () => new SettingsPage("configs")),
+        (Icons.Sidebar, "new.v2.side", null),
+        (Icons.Creator, "new.v2.hub", () => CreatorPage.NewForm()),
+        (Icons.Play, "new.v2.home", () => new HomePage()),
+        (Icons.Focus, "new.v2.focus", XStudio.Entry),
+        (Icons.Bell, "new.v2.quiet", () => new SettingsPage("launch")),
+        (Icons.Grid, "new.v2.grid", null),
         (Icons.Grid, "new.v20.hub", () => new CreatorPage("home")),
         (Icons.Chart, "new.v20.earnings", () => new AccountPage("earnings")),
         (Icons.Code, "new.v19.ide", XStudio.Entry),
@@ -162,7 +169,7 @@ public static class WhatsNew
                 GradientStops = { new GradientStop(Color.Parse(Look.Accent), 0), new GradientStop(Look.Mix(Color.Parse(Look.Accent), Color.Parse("#111"), 0.55), 1) },
             },
             Child = Ui.Col(2,
-                new TextBlock { Text = $"ModLaunch {Http.Version}", FontSize = 24, FontWeight = FontWeight.Bold, Foreground = Brushes.White },
+                new TextBlock { Text = $"ModLaunch {Http.Display}", FontSize = 24, FontWeight = FontWeight.Bold, Foreground = Brushes.White },
                 new TextBlock { Text = I18n.T("new.v20.subtitle"), Foreground = new SolidColorBrush(Color.FromArgb(220, 255, 255, 255)), TextWrapping = TextWrapping.Wrap }),
         };
         w.Dialog(I18n.T("new.title"), new ScrollViewer { MaxHeight = 560, Content = Ui.Col(12, hero, list) }, 620,

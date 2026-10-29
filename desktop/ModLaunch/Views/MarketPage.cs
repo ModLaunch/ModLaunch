@@ -65,7 +65,7 @@ public sealed partial class MarketPage : Page
 
     public override bool SameScreenAs(Page? previous) => HubNav.IsHub(previous);
 
-    void Go(string tab) { _tab = tab; Build(); MainWindow.Current?.RenderCrumbs(); }
+    internal void Go(string tab) { _tab = tab; Build(); MainWindow.Current?.RenderCrumbs(); }
 
     public override void Build()
     {
@@ -83,7 +83,8 @@ public sealed partial class MarketPage : Page
             "library" => Library(),
             _ => loading ? Skeleton() : Front(),
         };
-        Content = HubNav.Frame(_tab, HubNav.RailOf(_tab, creator: false), I18n.T("v93.mk.tab." + _tab), body, Go, MarketData.Reload);
+        // 2.0: в шапке — «Рынок», а не название вкладки: оно уже горит на полосе вкладок под шапкой.
+        Content = HubNav.Frame(_tab, HubNav.RailOf(_tab, creator: false), I18n.T("v20.hub.market"), body, Go, MarketData.Reload);
     }
 
     static Control Skeleton()

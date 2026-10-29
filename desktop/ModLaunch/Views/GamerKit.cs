@@ -23,13 +23,14 @@ public static class Gx
     /// <summary>«▍ПОДОБРАНО ДЛЯ ВАС» — подпись капсом с полоской акцента слева.</summary>
     public static Control Eyebrow(string text, IBrush? color = null, double size = 11)
     {
-        var bar = new Border { Width = 3, Height = size + 2, CornerRadius = new CornerRadius(1), Background = Ui.Res("Brand"), VerticalAlignment = VerticalAlignment.Center };
-        var words = new TextBlock
+        // 2.0: подпись над заголовком — без цветной полоски и капса, приглушённым текстом (подписей много, акцент — у одного).
+        // Белый текст на арте (у сцен и баннеров) остаётся белым.
+        var onArt = color is ISolidColorBrush { Color: { R: > 230, G: > 230, B: > 230 } };
+        return new TextBlock
         {
-            Text = text.ToUpper(I18n.Culture), FontSize = size, FontWeight = FontWeight.Bold, LetterSpacing = 1.3,
-            Foreground = color ?? Ui.Res("Muted"), VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis,
+            Text = text, FontSize = Math.Max(size, Phi.Small), FontWeight = FontWeight.SemiBold,
+            Foreground = onArt ? color : Ui.Res("Muted"), VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis,
         };
-        return new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { bar, words } };
     }
 
     /// <summary>Скошенный ярлык (цена, «Бесплатно», тип лота) — как ценники в играх.</summary>

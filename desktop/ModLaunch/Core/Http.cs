@@ -14,6 +14,31 @@ public static class Http
 {
     public static readonly string Version = typeof(Http).Assembly.GetName().Version?.ToString(3) ?? "4.0.0";
 
+    /// <summary>
+    /// 2.0: номер, который видит человек. Внутренний (Version) остался выше 20 — его сравнивает обновление,
+    /// и все, у кого 16.0–20.0, получат новую версию сами. На экране: 21.0.0 → «2.0», 21.0.1 → «2.0.1»,
+    /// 21.1.0 → «2.1», 22.0.0 → «3.0». Версии до 21 показываются как были.
+    /// </summary>
+    public static readonly string Display = DisplayOf(Version);
+
+    public static string DisplayOf(string? version)
+    {
+        var parts = (version ?? "").TrimStart('v', 'V').Split('.');
+        if (parts.Length < 2 || !int.TryParse(parts[0], out var major) || !int.TryParse(parts[1], out var minor) || major < 21) return version ?? "";
+        var patch = parts.Length > 2 && int.TryParse(parts[2], out var p) ? p : 0;
+        return patch > 0 ? $"{major - 19}.{minor}.{patch}" : $"{major - 19}.{minor}";
+    }
+
+    [SelfTest]
+    static string DisplayVersionMapsBack()
+    {
+        foreach (var (inner, shown) in new[] { ("21.0.0", "2.0"), ("21.0.1", "2.0.1"), ("21.1.0", "2.1"), ("22.0.0", "3.0"), ("20.0.0", "20.0.0"), ("16.0.1", "16.0.1") })
+            if (DisplayOf(inner) != shown) throw new Exception($"{inner} shows as {DisplayOf(inner)}, want {shown}");
+        // Обновление сравнивает внутренние номера: 2.0 (21.0.0) новее 20.0.0 и 16.0.0.
+        if (Features.Versions.Compare("21.0.0", "20.0.0") <= 0 || Features.Versions.Compare("21.0.0", "16.0.0") <= 0) throw new Exception("2.0 is not newer than 20.0");
+        return "21.0.0 shows as 2.0 and still updates 16–20";
+    }
+
     public static readonly HttpClient Client = Create();
 
     static HttpClient Create()

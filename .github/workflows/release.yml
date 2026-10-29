@@ -41,6 +41,11 @@ jobs:
         run: |
           $v = ([xml](Get-Content desktop/ModLaunch/ModLaunch.csproj)).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
           "version=$v" >> $env:GITHUB_OUTPUT
+          # 2.0: на экране и в именах файлов — «2.0» (21.0.0 → 2.0, 21.1.0 → 2.1), тег — внутренний номер v21.0.0:
+          # по нему автообновление понимает, что выпуск новее 16–20.
+          $p = $v.Split('.')
+          $d = if ([int]$p[0] -ge 21) { "$([int]$p[0] - 19).$($p[1])" + $(if ([int]$p[2] -gt 0) { ".$($p[2])" } else { "" }) } else { $v }
+          "display=$d" >> $env:GITHUB_OUTPUT
       - name: Publish
         working-directory: desktop/ModLaunch
         run: dotnet publish -c Release -r win-x64 -o ../../out
@@ -55,7 +60,7 @@ jobs:
       - name: Package
         shell: pwsh
         run: |
-          $v = '${{ steps.v.outputs.version }}'
+          $v = '${{ steps.v.outputs.display }}'
           New-Item -ItemType Directory -Force dist | Out-Null
           Copy-Item out/ModLaunch.exe "dist/ModLaunch-Setup-$v.exe"
           Compress-Archive -Path out/ModLaunch.exe -DestinationPath "dist/ModLaunch-$v-win-x64.zip" -Force
@@ -65,9 +70,9 @@ jobs:
           tag_name: v${{ steps.v.outputs.version }}
           # Тег — на тот коммит, из которого собраны файлы, а не на ветку по умолчанию.
           target_commitish: ${{ github.sha }}
-          name: ModLaunch ${{ steps.v.outputs.version }}
+          name: ModLaunch ${{ steps.v.outputs.display }}
           body_path: build/release-notes.md
           make_latest: true
           files: |
-            dist/ModLaunch-Setup-${{ steps.v.outputs.version }}.exe
-            dist/ModLaunch-${{ steps.v.outputs.version }}-win-x64.zip
+            dist/ModLaunch-Setup-${{ steps.v.outputs.display }}.exe
+            dist/ModLaunch-${{ steps.v.outputs.display }}-win-x64.zip

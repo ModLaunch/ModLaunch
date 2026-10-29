@@ -251,6 +251,9 @@ public sealed partial class CreatorPage : Page
         _ => TabTitle(_tab),
     };
 
+    /// <summary>2.0: пункт Hub с боковой панели окна — на этой же странице, если он здесь живёт.</summary>
+    internal bool OpenRail(string rail) => Rail(rail);
+
     /// <summary>ModScript X, «Создать», «Мои проекты» и «Команда» открываются здесь же, без новой страницы.</summary>
     bool Rail(string rail)
     {

@@ -63,6 +63,28 @@ public static class Configs
     public static List<UiConfig> BuiltIn() =>
     [
         // 11.0: по умолчанию — спокойный «взрослый» лаунчер: графит, синий акцент, обычные заголовки, без свечения и игровых счётчиков.
+        // 2.0: «ModLaunch 2.0» — оформление по золотому сечению: графит «Φ», лавандовый акцент логотипа, Inter,
+        // спокойное движение. Раскладка главной — та же, что у «Строгого».
+        Make("phi", "ModLaunch", """
+            theme phi
+            accent "#6D5EF0"
+            font Inter
+            headings ui
+            radius normal
+            glow 0
+            fx_scanlines 0
+            fx_vignette 0
+            anim_open calm
+            anim_launch off
+            home_hero stage
+            widget continue m
+            widget builds s
+            widget playtime s
+            widget friends m
+            widget attention s
+            widget autopilot s
+            widget downloads m
+            """),
         Make("pro", "ModLaunch", """
             theme slate
             accent "#3B82F6"

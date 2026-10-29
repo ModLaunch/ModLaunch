@@ -86,7 +86,7 @@ public sealed partial class AccountPage : Page
 
         var tabs = new StackPanel { Spacing = 4, Width = 230 };
         var head = Ui.Row(12, ProfileKit.Avatar(p.SignedIn ? p.Name ?? p.Email ?? "?" : "?", 46),
-            Ui.Col(2, Ui.Text(p.SignedIn ? p.Name ?? "" : I18n.T("acc.menu.guest"), "h3"), Ui.Text(p.SignedIn ? p.Email ?? "" : I18n.T("acc.page.guest"), "small muted")));
+            Ui.Col(2, Ui.Text(p.SignedIn ? p.Name ?? "" : I18n.T("acc.menu.guest"), "h3"), p.SignedIn ? Ui.Text(p.Email ?? "", "small muted") : Ui.Text(I18n.T("aside.login"), "small", color: Ui.Res("Brand2"))));
         head.Margin = new Thickness(8, 6, 8, 10);
         tabs.Children.Add(head);
         foreach (var (id, key, icon) in sections)

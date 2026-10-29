@@ -191,7 +191,8 @@ public sealed partial class HomePage
             tint ??= TintOf(e.Get("tint"));
         }
         // 14.0: во «взрослом» виде подпись всегда серая, цвет — только у значка.
-        return Ui.Row(6, Ui.Icon(icon, 13, tint ?? Ui.Res("Brand2")), new TextBlock { Text = text.ToUpper(I18n.Culture), FontSize = 10.5, FontWeight = Look.Mature ? FontWeight.SemiBold : FontWeight.Bold, LetterSpacing = 0.9, Foreground = Look.Mature ? Ui.Res("Muted") : tint ?? Ui.Res("Muted"), VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis });
+        // 2.0: обычным регистром, 12 px — капслок с разрядкой на каждом виджете был тем самым «шумом».
+        return Ui.Row(Phi.S5 + 1, Ui.Icon(icon, 13, tint ?? Ui.Res("Muted")), new TextBlock { Text = text, FontSize = Phi.Small, FontWeight = FontWeight.SemiBold, Foreground = Ui.Res("Muted"), VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis });
     }
 
     static TextBlock Big(string text, double size = 34, IBrush? color = null) => new()
@@ -239,6 +240,34 @@ public sealed partial class HomePage
     }
 
     /// <summary>Игра из настройки: своя (id), из Steam (steam:номер) или «авто» — тогда fallback.</summary>
+    /// <summary>2.0: проект ModScript X, который меняли последним (не старше недели), — для «Продолжить».</summary>
+    static Creator.XProject? RecentProject()
+    {
+        try { return Creator.XProjects.List().Where(p => p.Updated > DateTime.UtcNow.AddDays(-7)).MaxBy(p => p.Updated); }
+        catch { return null; }
+    }
+
+    /// <summary>2.0: «Продолжить» для проекта ModScript X: арт его игры, название и «Открыть в ModScript X».</summary>
+    Control XContinue(Creator.XProject p, bool large)
+    {
+        var game = p.Game == "" ? null : GameCatalog.ById(p.Game);
+        void Open() => MainWindow.Current?.Navigate(() => new XStudio(p.Id));
+        var open = Ui.Button(I18n.T("v2.continue.open"), Open, "play", Icons.Code);
+        open.HorizontalAlignment = HorizontalAlignment.Left;
+        var title = Gx.Title(p.Name, large ? 26 : 20, Brushes.White, 2);
+        var line = new TextBlock { Text = (game?.Name ?? I18n.T("v16.sum.noGame")) + " · v" + p.Version, FontSize = 12, Foreground = Ui.Hex("#C9CBD3") };
+        var words = Ui.Col(Phi.S8, Gx.Eyebrow(I18n.T("v2.continue.x", ("when", Ui.Ago(p.Updated))), Ui.Hex("#E6E7EE"), 10), Ui.Col(3, title, line), open);
+        words.VerticalAlignment = VerticalAlignment.Bottom;
+        words.Margin = new Thickness(18, 14, 18, 16);
+        Control art = game is not null ? Ui.GameImage(game, 1024, art: Images.Art.Hero) : new Border { Background = Ui.Res("Surface2") };
+        var mark = CreatorPage.XMark(large ? 34 : 26);
+        mark.HorizontalAlignment = HorizontalAlignment.Right;
+        mark.VerticalAlignment = VerticalAlignment.Top;
+        mark.Margin = new Thickness(0, 14, 16, 0);
+        var layers = new Panel { Children = { art, new Border { Background = Gx.ShadeLeft(0.9, 230) }, new Border { Background = Gx.ShadeUp(0.35, 215) }, mark, words } };
+        return Shell(layers, Open, pad: 0);
+    }
+
     static (GameState? Own, SteamApp? Steam) PickGame(string value, GameState? fallback)
     {
         if (value.StartsWith("steam:", StringComparison.Ordinal) && int.TryParse(value[6..], out var app) && app > 0)
@@ -340,14 +369,20 @@ public sealed partial class HomePage
             }
             case "continue":
             {
-                var g = PickGame(e.Get("game"), _stage is { } s && mine.FirstOrDefault(x => x.Def.Id == s) is { } picked ? picked : mine.FirstOrDefault()).Own;
+                // 2.0: «Продолжить» не повторяет сцену. Игра виджета не выбрана, а сцена включена — здесь то, к чему
+                // вернулись бы после неё: проект ModScript X, который меняли за неделю, иначе следующая по времени игра.
+                var stageOn = mine.Count > 0 && (Settings.Data.Str("homeHero") ?? "stage") != "off";
+                if (e.Get("game") == "" && stageOn && RecentProject() is { } xp) return XContinue(xp, large);
+                var fallback = stageOn ? mine.FirstOrDefault(x => x.Def.Id != _stage) ?? mine.FirstOrDefault()
+                    : _stage is { } s && mine.FirstOrDefault(x => x.Def.Id == s) is { } picked ? picked : mine.FirstOrDefault();
+                var g = PickGame(e.Get("game"), fallback).Own;
                 if (g is null) return Shell(Stack(Cap(Icons.Play, I18n.T("v4.continue")), Small(I18n.T("h95.continue.empty")), Ui.Button(I18n.T("add.title"), () => Go(() => new AddGamePage()), "primary", Icons.Plus)), null);
                 var played = PlayTime.Get(g.Def.Id);
                 var logo = Images.GameAsset(g.Def, Images.Art.Logo, 512);
                 Control title = logo is null ? Gx.Title(g.Def.Name, large ? 26 : 20, Brushes.White, 2) : new Image { Source = logo, MaxHeight = large ? 80 : 52, MaxWidth = large ? 300 : 210, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Left };
                 var when = Launcher.IsRunning(g.Def.Id) ? I18n.T("time.running") : played.LastPlayed is not null ? Ui.Ago(played.LastPlayed) : I18n.T("v93.home.notPlayed");
                 Control play = Launcher.IsRunning(g.Def.Id) ? PlayControls.RunningPill(g.Def.Id, big: false)
-                    : Ui.Button(I18n.T("games.play"), () => Actions.Play(g), "primary", Icons.Play);
+                    : Ui.Button(I18n.T("games.play"), () => Actions.Play(g), "play", Icons.Play);
                 play.HorizontalAlignment = HorizontalAlignment.Left;
                 var words = Ui.Col(8, Gx.Eyebrow(I18n.T("v4.continue") + " · " + when, Ui.Hex("#E6E7EE"), 10), title, play);
                 words.VerticalAlignment = VerticalAlignment.Bottom;

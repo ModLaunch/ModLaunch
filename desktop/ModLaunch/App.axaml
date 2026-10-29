@@ -21,6 +21,7 @@
       <SolidColorBrush x:Key="Brand" Color="#7C5CFF"/>
       <SolidColorBrush x:Key="Brand2" Color="#9D85FF"/>
       <SolidColorBrush x:Key="BrandSoft" Color="#2A2350"/>
+      <SolidColorBrush x:Key="Gold" Color="#F2B544"/>
       <SolidColorBrush x:Key="Good" Color="#3DD68C"/>
       <SolidColorBrush x:Key="Warn" Color="#F2B84B"/>
       <SolidColorBrush x:Key="Bad" Color="#FF6B6B"/>

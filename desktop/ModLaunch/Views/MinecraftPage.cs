@@ -222,18 +222,13 @@ public sealed partial class MinecraftPage : Page
         return button;
     }
 
+    /// <summary>«Играть» в шапке. 2.0: светлая кнопка на арте, без свечения цветом игры.</summary>
     Control PlayButton()
     {
-        var play = Ui.Button(I18n.T("games.play"), () => Play(), "primary", Icons.Play);
+        var play = Ui.Button(I18n.T("games.play"), () => Play(), "play", Icons.Play);
         play.FontSize = 17;
         play.Padding = new Thickness(30, 13);
-        var accent = Color.Parse(G.Def.Accent);
-        return new Border
-        {
-            CornerRadius = new CornerRadius(12),
-            BoxShadow = new BoxShadows(new BoxShadow { OffsetY = 10, Blur = 30, Spread = -6, Color = Color.FromArgb(0xB3, accent.R, accent.G, accent.B) }),
-            Child = play,
-        };
+        return play;
     }
 
     /// <summary>Значок загрузчика: цветная плашка с буквой (F, Q, NF, Fo) или кубик у чистой игры.</summary>

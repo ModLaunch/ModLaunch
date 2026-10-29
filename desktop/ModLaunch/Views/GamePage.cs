@@ -197,7 +197,7 @@ public sealed partial class GamePage : Page
                     stop.Padding = new Thickness(20, 13);
                     buttons.Children.Add(stop);
                 }
-                else buttons.Children.Add(PlayControls.PlayButton(_g));
+                else buttons.Children.Add(PlayControls.PlayButton(_g, onArt: true));
             }
             else
             {

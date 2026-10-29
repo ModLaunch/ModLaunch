@@ -98,6 +98,8 @@ public sealed partial class XStudio : Page
         DetachedFromVisualTree += (_, _) =>
         {
             if (_live == this) _live = null;
+            // 2.0: фокус — только пока открыта среда; ушли на другую страницу — панели окна возвращаются.
+            if (_focus) { _focus = false; MainWindow.Current?.SetFocusMode(false); }
             // Уход со страницы — несохранённое сохраняется (как в редакторе проектов Hub).
             foreach (var d in _s.Docs.Where(d => d.Dirty && d.Path is not null)) Save(d, quiet: true);
         };
@@ -185,13 +187,16 @@ public sealed partial class XStudio : Page
             Background = HubLook.Panel, BorderBrush = HubLook.Edge, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(4), ClipToBounds = true,
             Child = new DockPanel { Children = { Docked(_panelTabs, Dock.Top), _panelBody } },
         };
-        var work = new Grid { RowDefinitions = new RowDefinitions("*,6,230"), Margin = new Thickness(10, 10, 10, 8) };
+        // 2.0: в фокусе (Ctrl+F11) — только код: без нижней панели, панели действий слева и боковой панели окна.
+        var work = new Grid { RowDefinitions = new RowDefinitions(_focus ? "*,0,0" : "*,6,230"), Margin = _focus ? new Thickness(Phi.S34, Phi.S13, Phi.S34, Phi.S8) : new Thickness(10, 10, 10, 8) };
         work.Children.Add(editor);
-        var split = new GridSplitter { Background = Brushes.Transparent, ResizeDirection = GridResizeDirection.Rows };
+        var split = new GridSplitter { Background = Brushes.Transparent, ResizeDirection = GridResizeDirection.Rows, IsVisible = !_focus };
         Grid.SetRow(split, 1);
         work.Children.Add(split);
         Grid.SetRow(panel, 2);
+        panel.IsVisible = !_focus;
         work.Children.Add(panel);
+        _activity.IsVisible = !_focus;
 
         var center = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,Auto,*") };
         center.Children.Add(_activity);
@@ -200,12 +205,23 @@ public sealed partial class XStudio : Page
         Grid.SetColumn(work, 2);
         center.Children.Add(work);
 
-        var line = new Border { Height = 2, Background = HubLook.Premium(), IsHitTestVisible = false };
-        var main = new DockPanel { Children = { Docked(_top, Dock.Top), Docked(line, Dock.Top), Docked(_status, Dock.Bottom), center } };
+        // 2.0: двухпиксельная фирменная полоса под шапкой убрана — шапку отделяет обычная тонкая линия.
+        var main = new DockPanel { Children = { Docked(_top, Dock.Top), Docked(_status, Dock.Bottom), center } };
         var root = new Panel { Classes = { "hub-space" }, Children = { new HubLook.Blueprint(), main, _overlay } };
         HubLook.Scope(root);
         Content = root;
         RenderAll();
+    }
+
+    /// <summary>2.0: фокус — только редактор: панели среды и окна (боковая, строка состояния, реклама) скрыты.</summary>
+    bool _focus;
+
+    internal void ToggleFocus()
+    {
+        _focus = !_focus;
+        MainWindow.Current?.SetFocusMode(_focus);
+        Build();
+        if (_focus) MainWindow.Current?.Toast(I18n.T("v2.focus.on"));
     }
 
     static Control Docked(Control c, Dock where) { DockPanel.SetDock(c, where); return c; }
@@ -241,7 +257,7 @@ public sealed partial class XStudio : Page
         var tile = CreatorPage.XMark(34);
         var name = Ui.Col(1,
             new TextBlock { Text = p.Name, FontSize = 15, FontWeight = FontWeight.Bold, TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = 260 },
-            Ui.Row(6, Ui.Dot(Color, 6), HubLook.MonoText($"v{p.Version}  ·  MODSCRIPT X", 10.5, HubLook.Violet)));
+            Ui.Row(6, Ui.Dot(Color, 6), Ui.Text($"v{p.Version}  ·  ModScript X", "caption")));
         var t = TargetFor(ActiveDoc());
         var b = Bridge;
         Control art = Game?.Def is { } def
@@ -254,7 +270,7 @@ public sealed partial class XStudio : Page
         {
             Classes = { "ghost" }, Padding = new Thickness(8, 4), VerticalAlignment = VerticalAlignment.Center,
             Content = Ui.Row(10, art, Ui.Col(1, new TextBlock { Text = gameName, FontSize = 12.5, FontWeight = FontWeight.SemiBold, MaxWidth = 220, TextTrimming = TextTrimming.CharacterEllipsis },
-                Ui.Row(6, dot, HubLook.MonoText(route, 10.5)))),
+                Ui.Row(6, dot, HubLook.Code(route, 10.5)))),
         };
         ToolTip.SetTip(chip, I18n.T("v16.x.bridge.tip"));
         chip.Click += (_, _) => Side("bridge");
@@ -284,7 +300,8 @@ public sealed partial class XStudio : Page
             Ctx.Item(I18n.T("v16.x.side.settings"), Icons.Settings, () => Side("settings")),
             Ctx.Item(I18n.T("v18.hub.scripts"), Icons.Shield, () => MainWindow.Current?.Navigate(() => new CreatorPage("scripts"))),
             Ctx.Folder(I18n.T("v15.ms.reveal"), p.Dir));
-        var right = Ui.Row(8, run, inject, more);
+        var focus = Ui.Button(_focus ? I18n.T("v2.focus.exit") : "", ToggleFocus, _focus ? "soft" : "icon ghost", _focus ? Icons.Close : Icons.Focus, I18n.T("v2.focus.tip") + "  (Ctrl+F11)");
+        var right = Ui.Row(8, focus, run, inject, more);
         foreach (var c in right.Children) c.VerticalAlignment = VerticalAlignment.Center;
         var bar = new DockPanel();
         DockPanel.SetDock(right, Dock.Right);
@@ -338,7 +355,7 @@ public sealed partial class XStudio : Page
 
     void RenderSide()
     {
-        _side.IsVisible = _s.Side != "";
+        _side.IsVisible = _s.Side != "" && !_focus;
         if (!_side.IsVisible) return;
         var body = _s.Side switch
         {
@@ -354,14 +371,14 @@ public sealed partial class XStudio : Page
         _side.Child = new DockPanel { Children = { Docked(head, Dock.Top), new ScrollViewer { Content = body, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled } } };
     }
 
-    static Control Caption(string text) => new Border { Padding = new Thickness(8, 14, 8, 6), Child = HubLook.MonoText(text.ToUpper(I18n.Culture), 10, Ui.Res("Faint")) };
+    static Control Caption(string text) => new Border { Padding = new Thickness(8, 14, 8, 6), Child = Ui.Text(text, "caption") };
 
     static Button Row(string icon, string text, bool active, Action open, IBrush? mark = null, string? right = null, IBrush? iconColor = null)
     {
         var line = new DockPanel();
         if (right is not null)
         {
-            var r = HubLook.MonoText(right, 10.5, Ui.Res("Faint"));
+            var r = HubLook.Code(right, 10.5, Ui.Res("Faint"));
             DockPanel.SetDock(r, Dock.Right);
             line.Children.Add(r);
         }
@@ -472,7 +489,7 @@ public sealed partial class XStudio : Page
         var t = TargetFor(ActiveDoc());
         if (b is not { Code: false })
         {
-            var where = Ui.Col(4, HubLook.MonoText(I18n.T("v16.x.bridge.files").ToUpper(I18n.Culture), 10, Ui.Res("Faint")));
+            var where = Ui.Col(4, HubLook.Code(I18n.T("v16.x.bridge.files").ToUpper(I18n.Culture), 10, Ui.Res("Faint")));
             try
             {
                 if (ActiveDoc() is { Ok: true } doc)
@@ -490,12 +507,12 @@ public sealed partial class XStudio : Page
                 var tag = new Border
                 {
                     CornerRadius = new CornerRadius(3), Padding = new Thickness(7, 3), Margin = new Thickness(0, 0, 6, 6), BorderBrush = has ? HubLook.Cyan : HubLook.Edge, BorderThickness = new Thickness(1),
-                    Child = Ui.Row(5, Ui.Dot(has ? Ui.Res("Good") : Ui.Res("Faint"), 6), HubLook.MonoText(e, 11, has ? Ui.Res("Text") : Ui.Res("Faint"))),
+                    Child = Ui.Row(5, Ui.Dot(has ? Ui.Res("Good") : Ui.Res("Faint"), 6), HubLook.Code(e, 11, has ? Ui.Res("Text") : Ui.Res("Faint"))),
                 };
                 ToolTip.SetTip(tag, has ? I18n.T($"v16.event.{e}.tip") : I18n.T("v16.event.missing", ("engine", t.Title)));
                 events.Children.Add(tag);
             }
-            col.Children.Add(Ui.Col(6, HubLook.MonoText(I18n.T("v16.x.bridge.events", ("engine", t.Title)).ToUpper(I18n.Culture), 10, Ui.Res("Faint")), events));
+            col.Children.Add(Ui.Col(6, HubLook.Code(I18n.T("v16.x.bridge.events", ("engine", t.Title)).ToUpper(I18n.Culture), 10, Ui.Res("Faint")), events));
         }
         else
         {
@@ -621,7 +638,7 @@ public sealed partial class XStudio : Page
         }
         var builtins = new WrapPanel();
         foreach (var f in MX.ModxDoc.Builtins)
-            builtins.Children.Add(new Border { CornerRadius = new CornerRadius(3), Padding = new Thickness(6, 2), Margin = new Thickness(0, 0, 5, 5), Background = HubLook.Raised, Child = HubLook.MonoText(f + "()", 10.5, Ui.Res("Text")) });
+            builtins.Children.Add(new Border { CornerRadius = new CornerRadius(3), Padding = new Thickness(6, 2), Margin = new Thickness(0, 0, 5, 5), Background = HubLook.Raised, Child = HubLook.Code(f + "()", 10.5, Ui.Res("Text")) });
         col.Children.Add(Ui.Col(6, Ui.Text(I18n.T("v16.x.docs.builtins"), "small strong"), builtins));
         // 19.0: клавиши среды — вместо кнопки на старую страницу языка (её больше нет).
         var keys = Ui.Col(3);
@@ -1256,15 +1273,22 @@ public sealed partial class XStudio : Page
         }
         if (_s.Watch) parts.Add(I18n.T("v15.ms.watching"));
         if (_s is { Debugging: true, Trace: { Frames.Count: > 0 } trace }) parts.Add(I18n.T("v19.status.debug", ("i", _s.Frame + 1), ("n", trace.Frames.Count)));
-        var line = new TextBlock { Text = string.Join("   ·   ", parts), FontSize = 11.5, Foreground = Brushes.White, FontFamily = Mono, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center };
-        var caret = new TextBlock { Text = I18n.T("v15.ms.caret", ("line", _s.Caret.Line), ("col", _s.Caret.Col)) + "   ·   F5 · F9 · F12 · Ctrl+P", FontSize = 11.5, Foreground = Brushes.White, FontFamily = Mono, VerticalAlignment = VerticalAlignment.Center };
+        // 2.0: строка состояния — тихая, цветом панели; цвет проекта — точкой в начале, а не заливкой во всю ширину.
+        var line = new TextBlock { Text = string.Join("   ·   ", parts), FontSize = 11.5, Foreground = Ui.Res("Muted"), TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center };
+        var caret = new TextBlock { Text = I18n.T("v15.ms.caret", ("line", _s.Caret.Line), ("col", _s.Caret.Col)) + "   ·   F5 · F9 · F12 · Ctrl+P", FontSize = 11.5, Foreground = Ui.Res("Faint"), VerticalAlignment = VerticalAlignment.Center };
         var bar = new DockPanel();
         DockPanel.SetDock(caret, Dock.Right);
         bar.Children.Add(caret);
         bar.Children.Add(line);
+        var dot = Ui.Dot(_s.Debugging ? Ui.Res("Warn") : Color, 7);
+        dot.Margin = new Thickness(0, 0, Phi.S8, 0);
+        DockPanel.SetDock(dot, Dock.Left);
+        bar.Children.Insert(0, dot);
         _status.Child = bar;
-        _status.Background = Color;
-        _status.Padding = new Thickness(14, 4);
+        _status.Background = HubLook.Panel;
+        _status.BorderBrush = HubLook.Edge;
+        _status.BorderThickness = new Thickness(0, 1, 0, 0);
+        _status.Padding = new Thickness(14, 5);
     }
 
     void OnKey(object? sender, KeyEventArgs e)

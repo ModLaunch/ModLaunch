@@ -23,7 +23,7 @@ public sealed partial class CreatorPage
     /// </summary>
     Control Available()
     {
-        var col = new StackPanel { Spacing = 16 };
+        var col = new StackPanel { Spacing = Phi.S13 };
         if (_minePart == "published") { col.Children.Add(PublishedView()); return col; }
 
         // Проверка в игре закончится, пока смотрим список, — точка статуса обновится сама.
@@ -39,7 +39,7 @@ public sealed partial class CreatorPage
                 Ui.Text(_filter == "" ? I18n.T("cr.empty") : I18n.T("cr.lib.none"), "h3"),
                 Ui.Text(I18n.T("v18.av.empty"), "muted", wrap: true));
             if (_filter == "") empty.Children.Add(Ui.Row(10, Ui.Button(I18n.T("v18.hub.create"), () => Go("form"), "primary", Icons.Plus)));
-            col.Children.Add(HubLook.Frame(empty, new Thickness(24, 20)));
+            col.Children.Add(HubLook.Frame(empty, new Thickness(Phi.S34, Phi.S34)));
             return col;
         }
         if (xs.Count > 0)
@@ -63,59 +63,61 @@ public sealed partial class CreatorPage
 
     static UniformGrid Tiles(IEnumerable<Control> cards)
     {
-        var grid = new UniformGrid { Columns = 4 };
+        var grid = new UniformGrid { Columns = 4, Margin = new Thickness(0, 0, -Phi.S21, 0) };
         foreach (var c in cards) grid.Children.Add(c);
         return grid;
     }
 
+    /// <summary>Подпись раздела списка (2.0: тихая строка над сеткой, отступ 34 от предыдущего раздела).</summary>
     static Control Section(string title, Control? right = null)
     {
-        var bar = new DockPanel { Margin = new Thickness(0, 6, 0, -4) };
+        var bar = new DockPanel { Margin = new Thickness(0, Phi.S21, 0, 0) };
         if (right is not null) { DockPanel.SetDock(right, Dock.Right); bar.Children.Add(right); }
-        bar.Children.Add(HubLook.Eyebrow(title, HubLook.Violet));
+        bar.Children.Add(HubLook.Eyebrow(title));
         return bar;
     }
 
     /// <summary>
-    /// Плитка «Доступных»: полоса цвета сверху (если есть), картинка с ярлыками, название, подпись и строка внизу.
-    /// Над картинкой при наведении — «Запуск» и «Настройка»; клик по плитке — то же, что главное действие.
+    /// Плитка «Моих проектов». 2.0: картинка — золотой прямоугольник 1,618 : 1, без ярлыков поверх (вид проекта говорит
+    /// подпись раздела, версия — строка внизу); цвет проекта — точкой у названия, а не полосой. Ниже — название, подпись
+    /// и одна строка: слева состояние или путь, справа — когда изменён. «Запуск» и «Настройка» — при наведении.
     /// </summary>
     static Button Tile(Control art, Control[] tags, string title, string sub, Control footLeft, Control footRight, Action launch, Action configure,
         IBrush? stripe = null, string? launchText = null, Action? click = null)
     {
-        var top = new Panel { Children = { art } };
-        foreach (var t in tags) top.Children.Add(t);
         var card = new Button
         {
-            Classes = { "tile" }, Margin = new Thickness(0, 0, 14, 14), Padding = new Thickness(0),
+            Classes = { "tile" }, Margin = new Thickness(0, 0, Phi.S21, Phi.S21), Padding = new Thickness(0), VerticalAlignment = VerticalAlignment.Top,
             HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch,
         };
-        top.Children.Add(HoverActions.OnArt(card, launch, configure, launchText));
-        var name = Ui.Text(title, "h3");
-        name.TextTrimming = TextTrimming.CharacterEllipsis;
+        var top = new Panel { Children = { art, HoverActions.OnArt(card, launch, configure, launchText) } };
+        var name = new TextBlock { Text = title, FontSize = Phi.H3, FontWeight = FontWeight.SemiBold, LetterSpacing = -0.15, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center };
+        var head = new DockPanel();
+        if (stripe is not null)
+        {
+            var dot = new Border { Width = 8, Height = 8, CornerRadius = new CornerRadius(4), Background = stripe, Margin = new Thickness(0, 0, Phi.S8, 0), VerticalAlignment = VerticalAlignment.Center };
+            DockPanel.SetDock(dot, Dock.Left);
+            head.Children.Add(dot);
+        }
+        head.Children.Add(name);
         var subText = Ui.Text(sub, "small muted");
-        subText.TextTrimming = TextTrimming.CharacterEllipsis;
-        footLeft.Margin = new Thickness(0, 0, 8, 0);
-        var foot = new DockPanel { Margin = new Thickness(0, 8, 0, 0) };
+        footLeft.Margin = new Thickness(0, 0, Phi.S8, 0);
+        var foot = new DockPanel { Margin = new Thickness(0, Phi.S13, 0, 0) };
         DockPanel.SetDock(footRight, Dock.Right);
         foot.Children.Add(footRight);
         foot.Children.Add(footLeft);
-        var body = Ui.Col(2, name, subText, new Border { Height = 1, Background = HubLook.Edge, Margin = new Thickness(0, 8, 0, 0) }, foot);
-        body.Margin = new Thickness(14, 12, 14, 12);
-        var content = new StackPanel();
-        if (stripe is not null) content.Children.Add(new Border { Height = 3, Background = stripe });
-        content.Children.Add(new Border { Height = 96, ClipToBounds = true, CornerRadius = stripe is null ? new CornerRadius(4, 4, 0, 0) : new CornerRadius(0), Child = top });
-        content.Children.Add(body);
-        card.Content = content;
+        var body = Ui.Col(3, head, subText, foot);
+        body.Margin = new Thickness(Phi.S13 + 3, Phi.S13, Phi.S13 + 3, Phi.S13 + 3);
+        card.Content = Ui.Col(0, new GoldenBox { ClipToBounds = true, Child = top }, body);
         card.Click += (_, _) => (click ?? launch)();
         return card;
     }
 
-    /// <summary>Ярлык в углу картинки: тёмный (версия) или цветной (вид проекта).</summary>
+    /// <summary>Ярлык в углу картинки (остался для других списков Hub): тёмная плашка с текстом.</summary>
     static Border Tag(string text, IBrush? background, HorizontalAlignment h) => new()
     {
-        Background = background ?? new SolidColorBrush(Color.FromArgb(215, 10, 12, 18)), CornerRadius = new CornerRadius(3), Padding = new Thickness(6, 2),
-        Margin = new Thickness(8), HorizontalAlignment = h, VerticalAlignment = VerticalAlignment.Top, Child = HubLook.MonoText(text, 9.5, Brushes.White),
+        Background = background ?? new SolidColorBrush(Color.FromArgb(215, 10, 12, 18)), CornerRadius = new CornerRadius(Phi.R5), Padding = new Thickness(6, 2),
+        Margin = new Thickness(8), HorizontalAlignment = h, VerticalAlignment = VerticalAlignment.Top, Child = HubLook.MonoText(text, 10, Brushes.White),
     };
 
     static Control NoArt(string icon) => new Border { Background = HubLook.Raised, Child = Ui.Icon(icon, 30, Ui.Res("Faint")) };
@@ -128,13 +130,13 @@ public sealed partial class CreatorPage
     {
         var game = p.Game == "" ? null : GameCatalog.ById(p.Game);
         var target = p.Target is { } t ? MX.Target.Find(t) : null;
-        var route = HubLook.MonoText(target is null ? I18n.T("v16.sum.files") : $"{target.Title} → {XStudio.Lang(target.Language)}", 10.5, HubLook.Cyan);
+        var route = Ui.Text(target is null ? I18n.T("v16.sum.files") : $"{target.Title} → {XStudio.Lang(target.Language)}", "small muted");
         route.TextTrimming = TextTrimming.CharacterEllipsis;
         var hex = XProjects.Hex(p.Color);
         var sub = game?.Name ?? (p.GamePath is { } gp ? Path.GetFileName(gp.TrimEnd('\\', '/')) : I18n.T("v16.sum.noGame"));
         var card = Tile(game is not null ? Ui.GameImage(game, 400) : NoArt(Icons.Code),
             [Tag("MODSCRIPT X", Ui.Hex(hex), HorizontalAlignment.Left), Tag("v" + p.Version, null, HorizontalAlignment.Right)],
-            p.Name, sub, route, HubLook.MonoText(Ui.Ago(p.Updated), 10.5),
+            p.Name, sub, route, HubLook.MonoText($"v{p.Version} · {Ui.Ago(p.Updated)}", 11.5),
             () => MainWindow.Current?.Navigate(() => new XStudio(p.Id)), () => MainWindow.Current?.Navigate(() => new XStudio(p.Id, "settings")), Ui.Hex(hex));
         Ctx.Attach(card, () => Ctx.Menu(
             Ctx.Item(I18n.T("v18.hover.launch"), Icons.Play, () => MainWindow.Current?.Navigate(() => new XStudio(p.Id))),
@@ -155,11 +157,11 @@ public sealed partial class CreatorPage
         var game = GameCatalog.ById(p.Game);
         // 12.0: точка статуса из project.json — собран ли, проверен ли в игре, менялся ли код после сборки.
         var status = p.Meta().Status(p.Updated);
-        var state = Ui.Row(6, Ui.Dot(StatusBrush(status), 8), Ui.Text(I18n.T($"v12.pj.st.{status}.short"), "small"));
+        var state = Ui.Row(6, Ui.Dot(StatusBrush(status), 7), Ui.Text(I18n.T($"v12.pj.st.{status}.short"), "small muted"));
         ToolTip.SetTip(state, I18n.T($"v12.pj.st.{status}"));
         var card = Tile(game is not null ? Ui.GameImage(game, 400) : NoArt(Icons.Creator),
             [Tag("MODSCRIPT", null, HorizontalAlignment.Left), Tag(p.Version == "" ? "v—" : "v" + p.Version, null, HorizontalAlignment.Right)],
-            p.Name, game?.Name ?? p.Game, state, HubLook.MonoText(Ui.Ago(p.Updated), 10.5),
+            p.Name, game?.Name ?? p.Game, state, HubLook.MonoText((p.Version == "" ? "" : $"v{p.Version} · ") + Ui.Ago(p.Updated), 11.5),
             () => OpenProject(p), () => OpenProject(p, "overview"));
         Ctx.Attach(card, () => ProjectMenu(p));
         return card;
@@ -172,7 +174,7 @@ public sealed partial class CreatorPage
     Control OwnedCard(InjectItem i)
     {
         var game = i.Game == "" ? null : GameCatalog.ById(i.Game);
-        var shield = Ui.Row(6, Ui.Icon(Icons.Lock, 12, HubLook.Cyan), HubLook.MonoText(GuardLine(i), 10.5, HubLook.Cyan));
+        var shield = Ui.Row(6, Ui.Icon(Icons.Lock, 12, Ui.Res("Muted")), Ui.Text(GuardLine(i), "small muted"));
         var sub = (i.Source == "market" ? I18n.T("v18.lib.from", ("seller", i.Seller)) : I18n.T("v18.lib.imported")) + (game is null ? "" : " · " + game.Name);
         var card = Tile(game is not null ? Ui.GameImage(game, 400) : NoArt(Icons.Lock),
             [Tag(I18n.T("v18.lib.sealed").ToUpper(I18n.Culture), HubLook.Signature(), HorizontalAlignment.Left), Tag(I18n.T(i.Source == "market" ? "v18.lib.bought" : "v18.lib.import").ToUpper(I18n.Culture), null, HorizontalAlignment.Right)],

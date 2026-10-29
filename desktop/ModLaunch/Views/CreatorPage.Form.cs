@@ -103,7 +103,7 @@ public sealed partial class CreatorPage
         var target = bridge?.Code == true ? MX.Target.Find(bridge.TargetId!) : f.Game is null && f.Folder is null ? MX.Target.Find(f.ManualTarget) : null;
         var filesOnly = bridge is not null && !bridge.Code;
 
-        var left = new StackPanel { Spacing = 16 };
+        var left = new StackPanel { Spacing = Phi.S13 };
 
         // 1. Название и описание
         var name = new TextBox { Text = f.Name, Watermark = I18n.T("v16.form.name.hint"), MaxLength = 80, FontSize = 16, MinHeight = 42, VerticalContentAlignment = VerticalAlignment.Center };
@@ -201,7 +201,8 @@ public sealed partial class CreatorPage
 
         // Справа — будущий проект и кнопка.
         var right = Summary(def, bridge, target, filesOnly, name, about);
-        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,360"), ColumnSpacing = 22 };
+        // 2.0: анкета и будущий проект делят ширину по золотому сечению — 61,8 % : 38,2 %.
+        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions(Phi.Columns), ColumnSpacing = Phi.S34 };
         grid.Children.Add(left);
         Grid.SetColumn(right, 1);
         grid.Children.Add(right);
@@ -226,13 +227,19 @@ public sealed partial class CreatorPage
     /// <summary>Вопрос анкеты: номер в рамке, вопрос, пояснение и поле.</summary>
     static Control Question(int n, string title, string text, Control field)
     {
+        // 2.0: номер — тихий кружок, без цветной рамки и моноширинного шрифта.
         var num = new Border
         {
-            Width = 30, Height = 30, CornerRadius = new CornerRadius(4), BorderBrush = HubLook.Violet, BorderThickness = new Thickness(1.5),
-            Child = new TextBlock { Text = n.ToString(), FontFamily = HubLook.Mono, FontWeight = FontWeight.Bold, Foreground = HubLook.Violet, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
+            Width = 26, Height = 26, CornerRadius = new CornerRadius(13), Background = Ui.Res("Surface2"), VerticalAlignment = VerticalAlignment.Top,
+            Child = new TextBlock { Text = n.ToString(), FontSize = 12, FontWeight = FontWeight.SemiBold, Foreground = Ui.Res("Muted"), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
         };
-        var head = Ui.Row(12, num, Ui.Col(2, Ui.Text(title, "h3"), Ui.Text(text, "small muted", wrap: true)));
-        return HubLook.Frame(Ui.Col(14, head, field), new Thickness(20, 18));
+        var words = Ui.Col(3, Ui.Text(title, "h3"), Ui.Text(text, "small muted", wrap: true));
+        var head = new DockPanel();
+        num.Margin = new Thickness(0, 0, Phi.S13, 0);
+        DockPanel.SetDock(num, Dock.Left);
+        head.Children.Add(num);
+        head.Children.Add(words);
+        return HubLook.Frame(Ui.Col(Phi.S13 + 3, head, field), new Thickness(Phi.S21));
     }
 
     /// <summary>Карточка моста: движок, уверенность, улики, загрузчик и путь (код или файлы).</summary>
@@ -289,21 +296,23 @@ public sealed partial class CreatorPage
     {
         var f = _form;
         var hex = XProjects.Hex(f.Color);
-        var title = new TextBlock { Text = f.Name.Trim() == "" ? I18n.T("v16.form.name.hint") : f.Name.Trim(), FontFamily = Look.Display, FontSize = 20, FontWeight = FontWeight.Bold, TextWrapping = TextWrapping.Wrap, MaxLines = 2 };
+        var title = new TextBlock { Text = f.Name.Trim() == "" ? I18n.T("v16.form.name.hint") : f.Name.Trim(), FontSize = Phi.H2, FontWeight = FontWeight.SemiBold, LetterSpacing = -0.4, TextWrapping = TextWrapping.Wrap, MaxLines = 2 };
         name.TextChanged += (_, _) => title.Text = (name.Text ?? "").Trim() == "" ? I18n.T("v16.form.name.hint") : name.Text!.Trim();
         Control art = def is not null ? Ui.GameImage(def, 480) : new Border { Background = HubLook.Raised, Child = Ui.Icon(Icons.Code, 34, Ui.Res("Faint")) };
-        var stripe = new Border { Height = 4, Background = Ui.Hex(hex) };
-        var top = new Border { Height = 120, ClipToBounds = true, CornerRadius = new CornerRadius(4, 4, 0, 0), Child = new Panel { Children = { art, new Border { Background = Gx.ShadeUp(0.1, 200) } } } };
-        var rows = Ui.Col(6);
-        void Row(string k, string v) => rows.Children.Add(new DockPanel { Children = { Dockd(HubLook.MonoText(k, 10.5)), new TextBlock { Text = v, FontSize = 12.5, HorizontalAlignment = HorizontalAlignment.Right, TextTrimming = TextTrimming.CharacterEllipsis } } });
+        // 2.0: картинка — низкий золотой прямоугольник φ² : 1, цвет проекта — точкой у названия, а не полосой сверху.
+        var top = new GoldenBox { Ratio = Phi.Ratio * Phi.Ratio, ClipToBounds = true, Child = def is null ? art : new Panel { Children = { art, new Border { Background = Gx.ShadeUp(0.1, 200) } } } };
+        var rows = Ui.Col(Phi.S8);
+        void Row(string k, string v) => rows.Children.Add(new DockPanel { Children = { Dockd(Ui.Text(k, "small muted")), new TextBlock { Text = v, FontSize = 13, HorizontalAlignment = HorizontalAlignment.Right, TextTrimming = TextTrimming.CharacterEllipsis } } });
         Row(I18n.T("v16.sum.game"), def?.Name ?? (f.Folder is { } fd ? Path.GetFileName(fd.TrimEnd('\\', '/')) : I18n.T("v16.sum.noGame")));
         Row(I18n.T("v16.sum.engine"), bridge?.Title ?? target?.Title ?? "—");
         Row(I18n.T("v16.sum.lang"), filesOnly ? I18n.T("v16.sum.files") : target is not null ? $"ModScript X → {XStudio.Lang(target.Language)}" : "—");
         Row(I18n.T("v16.sum.kind"), I18n.T($"v16.kind.{f.Kind}"));
         Row(I18n.T("v16.sum.version"), f.Version.Trim() == "" ? "1.0.0" : f.Version.Trim());
-        var files = Ui.Col(3, HubLook.MonoText(filesOnly ? "main.mls  ·  files/" : "main.modx  ·  modscript.json  ·  README.md", 10.5));
-        var body = Ui.Col(12, HubLook.Eyebrow(I18n.T("v16.sum.title"), HubLook.Violet), title, rows, new Border { Height = 1, Background = HubLook.Edge }, files);
-        body.Margin = new Thickness(16, 14);
+        var files = Ui.Col(3, HubLook.Code(filesOnly ? "main.mls  ·  files/" : "main.modx  ·  modscript.json  ·  README.md", 10.5, Ui.Res("Faint")));
+        var dot = new Border { Width = 10, Height = 10, CornerRadius = new CornerRadius(5), Background = Ui.Hex(hex), Margin = new Thickness(0, 0, Phi.S8, 0), VerticalAlignment = VerticalAlignment.Center };
+        var named = new DockPanel { Children = { Dockd(dot), title } };
+        var body = Ui.Col(Phi.S13, Ui.Text(I18n.T("v16.sum.title"), "caption"), named, rows, new Border { Height = 1, Background = HubLook.Edge }, files);
+        body.Margin = new Thickness(Phi.S21);
 
         var go = Ui.Button(f.Busy ? I18n.T("v16.form.creating") : filesOnly ? I18n.T("v16.form.create.files") : I18n.T("v16.form.create"), () => Create(name, about, def, bridge, target, filesOnly), "primary", filesOnly ? Icons.FilePlus : Icons.Code);
         go.HorizontalAlignment = HorizontalAlignment.Stretch;
@@ -311,12 +320,9 @@ public sealed partial class CreatorPage
         go.MinHeight = 46;
         go.IsEnabled = !f.Busy && (target is not null || filesOnly);
         // 18.0: «Отмена» и «Импорт» убраны — уйти можно пунктом слева, импорт — в «Других способах» под анкетой.
-        var steps = Ui.Col(6);
-        foreach (var (n, key) in new[] { (1, "v16.form.flow.1"), (2, "v16.form.flow.2"), (3, "v16.form.flow.3") })
-            steps.Children.Add(Ui.Row(8, HubLook.MonoText($"0{n}", 10.5, HubLook.Cyan), Ui.Text(I18n.T(key), "small muted")));
-
-        var card = new Border { Background = HubLook.Panel, BorderBrush = HubLook.Edge, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(4), ClipToBounds = true, Child = Ui.Col(0, stripe, top, body) };
-        var col = Ui.Col(12, card, go, steps);
+        // 2.0: шаги «01 02 03» убраны — то же говорит строка под заголовком; под кнопкой — чем хороша среда.
+        var card = new Border { Background = HubLook.Panel, BorderBrush = HubLook.Edge, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(Phi.R13), ClipToBounds = true, Child = Ui.Col(0, top, body) };
+        var col = Ui.Col(Phi.S13, card, go, XFacts());
         col.VerticalAlignment = VerticalAlignment.Top;
         return col;
     }

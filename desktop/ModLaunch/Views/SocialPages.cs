@@ -191,7 +191,7 @@ public sealed class StatsPage : Page
         var tiles = new UniformGrid { Columns = 3 };
         tiles.Children.Add(Tile(I18n.T("stats.downloads"), total.ToString("N0"), I18n.T("stats.releasesN", ("n", _releases?.Count ?? 0))));
         tiles.Children.Add(Tile(I18n.T("stats.reviews"), reviews.Count.ToString(), I18n.T("stats.authors", ("n", reviews.Select(r => r.Uid).Distinct().Count()))));
-        tiles.Children.Add(Tile(I18n.T("stats.avg"), reviews.Count == 0 ? "—" : $"{reviews.Average(r => r.Stars):0.00} ★", I18n.T("stats.latest", ("version", _releases?.LastOrDefault().Version ?? Http.Version))));
+        tiles.Children.Add(Tile(I18n.T("stats.avg"), reviews.Count == 0 ? "—" : $"{reviews.Average(r => r.Stars):0.00} ★", I18n.T("stats.latest", ("version", _releases?.LastOrDefault().Version ?? Http.Display))));
         col.Children.Add(tiles);
 
         // Скачивания по версиям — простые столбики (одна величина, одна шкала).
@@ -203,7 +203,7 @@ public sealed class StatsPage : Page
             {
                 var h = Math.Max(4, 140.0 * r.Total / max);
                 var bar = new Border { Width = 34, Height = h, CornerRadius = new CornerRadius(4, 4, 0, 0), Background = Ui.Res("Brand"), VerticalAlignment = VerticalAlignment.Bottom };
-                ToolTip.SetTip(bar, I18n.T("stats.tip", ("version", r.Version), ("n", r.Total), ("setup", r.Setup), ("zip", r.Zip)));
+                ToolTip.SetTip(bar, I18n.T("stats.tip", ("version", Http.DisplayOf(r.Version)), ("n", r.Total), ("setup", r.Setup), ("zip", r.Zip)));
                 var column = new DockPanel { Width = 44 };
                 var label = Ui.Text(r.Version, "small muted");
                 label.HorizontalAlignment = HorizontalAlignment.Center;

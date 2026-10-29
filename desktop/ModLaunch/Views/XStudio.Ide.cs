@@ -151,7 +151,7 @@ public sealed partial class XStudio
         if (_s.FoundTitle != "") col.Children.Add(new Border { Padding = new Thickness(6, 8, 6, 4), Child = Ui.Text(_s.FoundTitle, "small strong") });
         foreach (var group in _s.Found.GroupBy(x => x.Path))
         {
-            if (search) col.Children.Add(new Border { Padding = new Thickness(6, 6, 6, 2), Child = Ui.Row(6, Ui.Icon(Icons.Code, 12, Color), HubLook.MonoText(System.IO.Path.GetFileName(group.Key ?? ""), 11, Ui.Res("Muted"))) });
+            if (search) col.Children.Add(new Border { Padding = new Thickness(6, 6, 6, 2), Child = Ui.Row(6, Ui.Icon(Icons.Code, 12, Color), HubLook.Code(System.IO.Path.GetFileName(group.Key ?? ""), 11, Ui.Res("Muted"))) });
             foreach (var f in group)
             {
                 var hit = f;
@@ -369,7 +369,7 @@ public sealed partial class XStudio
         var stack = new StackPanel { Spacing = 1 };
         stack.Children.Add(Caption(I18n.T("v19.dbg.stack")));
         foreach (var s in f.Stack.Reverse().Append(f.Where))
-            stack.Children.Add(new Border { Padding = new Thickness(8, 1), Child = HubLook.MonoText(s == f.Where ? "hook " + s : s + "()", 12, s == f.Where ? Ui.Res("Muted") : HubLook.Violet) });
+            stack.Children.Add(new Border { Padding = new Thickness(8, 1), Child = HubLook.Code(s == f.Where ? "hook " + s : s + "()", 12, s == f.Where ? Ui.Res("Muted") : HubLook.Violet) });
         stack.Children.Add(Caption(I18n.T("v19.dbg.output")));
         var lines = _s.Run?.Output.Take(f.Output).TakeLast(6).ToList() ?? [];
         stack.Children.Add(new Border
@@ -388,7 +388,7 @@ public sealed partial class XStudio
             var barFill = new Border { Height = 4, CornerRadius = new CornerRadius(2), Background = Color, Width = 90.0 * hits / max, HorizontalAlignment = HorizontalAlignment.Left };
             var row = Ui.Row(8, new TextBlock { Text = I18n.T("v15.ms.line", ("n", line)), FontFamily = Mono, FontSize = 12, Width = 78 },
                 new Border { Width = 90, Background = HubLook.Raised, CornerRadius = new CornerRadius(2), Child = barFill, VerticalAlignment = VerticalAlignment.Center },
-                HubLook.MonoText($"{hits}×  {100.0 * hits / total:0}%", 11, Ui.Res("Muted")));
+                HubLook.Code($"{hits}×  {100.0 * hits / total:0}%", 11, Ui.Res("Muted")));
             var b = new Button { Classes = { "ghost" }, Padding = new Thickness(8, 2), HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Left, Content = row };
             ToolTip.SetTip(b, I18n.T("v19.dbg.hot.tip"));
             b.Click += (_, _) => TraceDoc()?.Editor.GoToLine(at);
@@ -443,7 +443,7 @@ public sealed partial class XStudio
             var removed = diff.Count(x => x.Op == '-');
             var local = e.At.ToLocalTime();
             var row = new DockPanel();
-            var counts = Ui.Row(6, HubLook.MonoText("+" + added, 11, Ui.Res("Good")), HubLook.MonoText("−" + removed, 11, Ui.Res("Bad")));
+            var counts = Ui.Row(6, HubLook.Code("+" + added, 11, Ui.Res("Good")), HubLook.Code("−" + removed, 11, Ui.Res("Bad")));
             DockPanel.SetDock(counts, Dock.Right);
             row.Children.Add(counts);
             row.Children.Add(Ui.Row(8, Ui.Icon(Icons.Clock, 13, added + removed == 0 ? Ui.Res("Good") : Ui.Res("Faint")),
@@ -619,7 +619,7 @@ public sealed partial class XStudio
                 var row = new DockPanel();
                 if (e.Hint != "")
                 {
-                    var hint = HubLook.MonoText(e.Hint, 11, Ui.Res("Faint"));
+                    var hint = HubLook.Code(e.Hint, 11, Ui.Res("Faint"));
                     hint.VerticalAlignment = VerticalAlignment.Center;
                     DockPanel.SetDock(hint, Dock.Right);
                     row.Children.Add(hint);
@@ -644,7 +644,7 @@ public sealed partial class XStudio
             }
             e.Handled = true;
         }, RoutingStrategies.Tunnel);
-        var tips = HubLook.MonoText(I18n.T("v19.palette.tips"), 10.5, Ui.Res("Faint"));
+        var tips = HubLook.Code(I18n.T("v19.palette.tips"), 10.5, Ui.Res("Faint"));
         tips.Margin = new Thickness(12, 6, 12, 8);
         var card = new Border
         {
@@ -685,6 +685,7 @@ public sealed partial class XStudio
             case Key.F5: RunOrContinue(); return true;
             case Key.F9: if (_s.Active is { } d) d.Editor.ToggleBreakpoint(d.Editor.CaretLine); return true;
             case Key.F10: Step(shift ? "back" : "over"); return true;
+            case Key.F11 when ctrl: ToggleFocus(); return true;
             case Key.F11: Step(shift ? "out" : "into"); return true;
             case Key.F12 when shift: FindReferences(); return true;
             case Key.F12: Definition(); return true;

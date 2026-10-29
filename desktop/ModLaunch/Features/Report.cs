@@ -9,7 +9,7 @@ public static class Report
     public static string Build(GameState g)
     {
         var sb = new StringBuilder();
-        sb.AppendLine($"ModLaunch {Http.Version} · {Environment.OSVersion.VersionString} · {(Offline.On ? "offline" : "online")}");
+        sb.AppendLine($"ModLaunch {Http.Display} ({Http.Version}) · {Environment.OSVersion.VersionString} · {(Offline.On ? "offline" : "online")}");
         sb.AppendLine($"Game: {g.Def.Name} ({g.Def.Id}) · loader {g.Def.LoaderName} · {g.Status}");
         sb.AppendLine($"Path: {g.Path}");
 

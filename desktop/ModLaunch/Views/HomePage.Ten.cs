@@ -38,7 +38,7 @@ public sealed partial class HomePage
         if (!Shown) Dispatcher.UIThread.Post(ProfilePage.AnnounceNew, DispatcherPriority.Background);
 
         Widgets.EnsureRoad();
-        var col = StoreKit.Column(spacing: 18, top: 18);
+        var col = StoreKit.Column(spacing: Phi.S21, top: Phi.S21);
         var n = 0;
         if (Starter(mine) is { } starter) col.Children.Add(Intro(starter, n++));
         var hero = Settings.Data.Str("homeHero") ?? "stage";
@@ -65,30 +65,36 @@ public sealed partial class HomePage
         // 12.0: правая кнопка по пустому месту главной — добавить виджет.
         col.Background = Brushes.Transparent;
         col.ContextFlyout = AreaMenu();
-        Content = new ScrollViewer { Content = col, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+        var scroll = new ScrollViewer { Content = col, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+        // 2.0: нижний край сцены лежит на линии 61,8 % листа — приветствие и виджеты начинаются ровно с золотой доли.
+        scroll.SizeChanged += (_, e) => { if (_parts is { } p && hero != "compact") p.Stage.Height = StageHeight(e.NewSize.Height); };
+        Content = scroll;
     }
 
-    /// <summary>Приветствие одной строкой и две кнопки: «Изменить виджеты» и «Стиль».</summary>
+    /// <summary>Высота большой сцены: золотая доля листа минус верхний отступ (на маленьком окне — не ниже 360).</summary>
+    static double StageHeight(double sheet) => Math.Round(Math.Clamp(sheet / Phi.Ratio - Phi.S21, 360, 680));
+
+    /// <summary>
+    /// Приветствие одной строкой и тихие кнопки справа: уровень, «Стиль», «Изменить виджеты».
+    /// 2.0: «Библиотека» и «Центр модов» отсюда убраны — они уже есть слева в панели (и по Ctrl+L / Ctrl+U);
+    /// «Забрать награду» — мягкая кнопка, а не вторая яркая рядом с «Играть».
+    /// </summary>
     Control Greet()
     {
         var name = ProfileKit.PlayerName();
-        var hello = new TextBlock { Text = Greeting() + ", " + name, FontFamily = Look.Display, FontSize = 22, FontWeight = FontWeight.Bold, LetterSpacing = -0.5, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
+        var hello = new TextBlock { Text = Greeting() + ", " + name, FontSize = Phi.H2, FontWeight = FontWeight.SemiBold, LetterSpacing = -0.4, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
         var edit = Ui.Button(_editWidgets ? I18n.T("v10.w.done") : I18n.T("v10.w.edit"), () => { _editWidgets = !_editWidgets; Build(); }, _editWidgets ? "primary" : "ghost", _editWidgets ? Icons.Check : Icons.Grid);
         var style = Ui.Button(I18n.T("v10.cfg.short"), () => MainWindow.Current?.Navigate(() => new SettingsPage("configs")), "ghost", Icons.Palette);
-        // 12.0: быстрые переходы одной кнопкой (у каждой — свой Ctrl-ярлык в подсказке).
-        Button Quick(string text, string icon, string keys, Func<Page> make) => Ui.Button(text, () => MainWindow.Current?.Navigate(make), "ghost", icon, keys);
-        var dock = Ui.Row(6,
-            Quick(I18n.T("lib.title"), Icons.Grid, "Ctrl+L", () => new LibraryPage()),
-            Quick(I18n.T("mc.title"), Icons.Package, "Ctrl+U", () => new ModsCenterPage()));
         // 16.0: уровень рядом с приветствием; есть новые награды пути — кнопка «Забрать».
         var (level, _, next) = RoadKit.Now();
         var fresh = LevelRoad.Fresh(level).Count;
         var lv = fresh > 0
-            ? Ui.Button(I18n.T("v16.road.chip.new", ("level", level), ("n", fresh)), RoadKit.Claim, "primary", Icons.Trophy)
+            ? Ui.Button(I18n.T("v16.road.chip.new", ("level", level), ("n", fresh)), RoadKit.Claim, "soft", Icons.Trophy)
             : Ui.Button(I18n.T("v16.road.lv", ("n", level)), () => MainWindow.Current?.Navigate(() => new ProfilePage("rewards")), "ghost", Icons.Trophy, I18n.T("v98.level.next", ("n", next)) + " · " + RoadKit.NextLine(level));
-        var right = Ui.Row(6, lv, dock, new Border { Width = 1, Height = 22, Background = Ui.Res("Line"), Margin = new Thickness(4, 0), VerticalAlignment = VerticalAlignment.Center }, style, edit);
+        foreach (var b in new[] { edit, style }) if (!_editWidgets || b != edit) b.Foreground = Ui.Res("Muted");
+        var right = Ui.Row(Phi.S5, lv, style, edit);
         right.VerticalAlignment = VerticalAlignment.Center;
-        var row = new DockPanel { Margin = new Thickness(2, 6, 0, 0) };
+        var row = new DockPanel { Margin = new Thickness(2, Phi.S8, 0, 0) };
         DockPanel.SetDock(right, Dock.Right);
         row.Children.Add(right);
         row.Children.Add(hello);
@@ -150,7 +156,7 @@ public sealed partial class HomePage
             buttons.Children.Add(PlayControls.RunningPill(id));
             buttons.Children.Add(Ui.Button(I18n.T("v4.stop"), () => Launcher.Stop(id), "hero-ghost", Icons.Stop));
         }
-        else if (g.LoaderInstalled || g.Def.Loader is Games.LoaderKind.None or Games.LoaderKind.Minecraft) buttons.Children.Add(PlayControls.PlayButton(g));
+        else if (g.LoaderInstalled || g.Def.Loader is Games.LoaderKind.None or Games.LoaderKind.Minecraft) buttons.Children.Add(PlayControls.PlayButton(g, onArt: true));
         else
         {
             var install = Ui.Button(I18n.T("games.installLoader", ("loader", g.Def.LoaderName)), () => Actions.InstallLoader(g), "primary", Icons.Download);
@@ -199,7 +205,7 @@ public sealed partial class HomePage
 
         var stage = new Panel
         {
-            Height = compact ? 230 : 470, ClipToBounds = true,
+            Height = compact ? 230 : StageHeight(MainWindow.Current?.SheetHeight ?? 712), ClipToBounds = true,
             Children =
             {
                 art,
@@ -212,7 +218,7 @@ public sealed partial class HomePage
         };
         _parts = new StageParts(stage, art, tint, [title, meta, buttons], current);
 
-        var radius = new CornerRadius(Look.Radius == "sharp" ? 4 : 22);
+        var radius = new CornerRadius(Look.Radius == "sharp" ? 4 : Phi.R21);
         var frame = new Border { CornerRadius = radius, ClipToBounds = true, Child = stage, ContextFlyout = GameCard.Menu(g) };
         // Если места мало, полка прячется — сцена не налезает сама на себя. 15.1: не целиком — на полке
         // столько обложек, сколько помещается справа от названия и кнопок (выбранная — всегда); с колонкой
@@ -246,8 +252,9 @@ public sealed partial class HomePage
         var cover = new Border
         {
             Width = w, Height = w * 1.5, CornerRadius = new CornerRadius(10), ClipToBounds = true, VerticalAlignment = VerticalAlignment.Bottom,
-            BorderBrush = on ? Ui.Res("Brand") : new SolidColorBrush(Color.FromArgb(60, 255, 255, 255)), BorderThickness = new Thickness(on ? 2.5 : 1),
-            BoxShadow = on ? Gx.Glow(140, 22) : default, Opacity = on ? 1 : 0.82,
+            // 2.0: выбранная обложка — в белой рамке, как фокус на экране телевизора; без цветного свечения.
+            BorderBrush = on ? Brushes.White : new SolidColorBrush(Color.FromArgb(60, 255, 255, 255)), BorderThickness = new Thickness(on ? 2 : 1),
+            Opacity = on ? 1 : 0.82,
             Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand),
             Child = Ui.GameImage(g.Def, 300, art: Images.Art.Cover),
             Transitions = [new DoubleTransition { Property = OpacityProperty, Duration = TimeSpan.FromMilliseconds(160) }],

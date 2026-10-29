@@ -121,141 +121,80 @@ public static class HubNav
 
 
     /// <summary>
-    /// Весь экран Creator Hub — своё пространство: слева «Мои проекты» и разделы (не прокручиваются), справа шапка и тело на сетке чертежа.
+    /// Весь экран Creator Hub. 2.0: без второй боковой панели (пункты Hub — вложенным списком на главной панели окна,
+    /// см. <see cref="SideItems"/>), без сетки чертежа и подписей «// РАЗДЕЛ»: шапка — название страницы (34), строка
+    /// пояснения, справа не больше одного действия, под ней — вкладки; ниже — содержимое. Поля 34 / 55 (шкала φ).
     /// current — вкладка (вкладки магазина запоминаются), rail — горящий пункт, local — переходы внутри страницы,
-    /// action — главная кнопка раздела (null — по разделу: в магазине «Продать работу», в остальных нет), sub — вкладки страницы.
+    /// action — действие раздела (null — по разделу: в магазине «Продать работу»), sub — вкладки страницы.
     /// </summary>
     public static Control Frame(string current, string rail, string title, Control body, Action<string>? inPage = null, Action? sold = null,
         Func<string, bool>? local = null, IReadOnlyList<Control>? sub = null, Control? action = null, string? lead = null, Control? top = null)
     {
         Remember(current);
-        var column = new StackPanel { Spacing = 20, Margin = new Thickness(32, 22, 32, 40), MaxWidth = 1640 };
+        var column = new StackPanel { Spacing = Phi.S21, Margin = Phi.Page, MaxWidth = Ui.PageMaxWidth };
         if (top is not null) column.Children.Add(top);
         column.Children.Add(Head(current, rail, title, lead, inPage, sold, sub, action));
         column.Children.Add(body);
         var scroll = new ScrollViewer { Content = column, HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled };
-        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*") };
-        grid.Children.Add(RailPanel(rail, inPage, local));
-        Grid.SetColumn(scroll, 1);
-        grid.Children.Add(scroll);
-        var root = new Panel { Classes = { "hub-space" }, Children = { new HubLook.Blueprint(), grid } };
+        var root = new Panel { Classes = { "hub-space" }, Children = { scroll } };
         HubLook.Scope(root);
+        // Пункты Hub на боковой панели окна горят по открытой вкладке.
+        MainWindow.Current?.RefreshRail();
         return root;
     }
 
-    /// <summary>Перейти в раздел; local — страница может открыть его у себя, без новой страницы.</summary>
-    static void Go(string rail, Action<string>? inPage, Func<string, bool>? local)
-    {
-        if (local?.Invoke(rail) == true) return;
-        if (rail == "shop") { Open(ShopTarget, inPage); return; }
-        MainWindow.Current?.Navigate(() => new CreatorPage(CreatorTab(rail)));
-    }
-
-    /// <summary>Строка боковой панели: полоска слева, значок, название и (если есть) число справа моноширинно.</summary>
-    static Button RailButton(Rail r, bool on, double indent, Action click, string? count = null)
-    {
-        var bar = new Border { Width = 3, Height = 20, CornerRadius = new CornerRadius(2), Background = on ? HubLook.Signature() : Brushes.Transparent, Margin = new Thickness(0, 0, 10 + indent, 0) };
-        var text = new TextBlock { Text = I18n.T(r.Key), FontSize = indent > 0 ? 13 : 14.5, FontWeight = on ? FontWeight.SemiBold : FontWeight.Normal, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
-        if (indent > 0 && !on) text.Foreground = Ui.Res("Muted");
-        var row = new DockPanel { Children = { bar } };
-        DockPanel.SetDock(bar, Dock.Left);
-        if (count is not null)
-        {
-            var n = HubLook.MonoText(count, 10.5);
-            DockPanel.SetDock(n, Dock.Right);
-            row.Children.Add(n);
-        }
-        row.Children.Add(Ui.Row(12, Ui.Icon(r.Icon, indent > 0 ? 16 : 18, on ? HubLook.Violet : null), text));
-        var b = new Button { Classes = { "hub-rail" }, Content = row, MinHeight = indent > 0 ? 34 : 46 };
-        if (on) b.Classes.Add("active");
-        b.Click += (_, _) => click();
-        return b;
-    }
+    /// <summary>Пункт Hub на боковой панели окна: id, подпись, значок, выбран ли, число справа, уровень вложенности, заголовок группы.</summary>
+    public sealed record SideItem(string Id, string Label, string Icon, bool On, string? Count, int Level, bool Group = false);
 
     /// <summary>
-    /// «ModScript X» — главный блок панели: монограмма и название на фирменной рамке, под ними «Создать» и
-    /// «Мои проекты». Клик по заголовку — «Мои проекты». Блок подсвечен, пока открыт один из его пунктов.
+    /// 2.0: пункты Creator Hub под «Creator Hub» на боковой панели окна — как вложенные пункты команды в Linear:
+    /// «ModScript X» (заголовок группы, ведёт в «Мои проекты») с «Создать» и «Мои проекты», затем «Рынок» и «Команда».
     /// </summary>
-    static Control XGroup(string current, Action<string>? inPage, Func<string, bool>? local)
+    public static IEnumerable<SideItem> SideItems(Page? page)
     {
-        var lit = Main.Any(m => m.Id == current);
-        var words = Ui.Col(1,
-            new TextBlock { Text = "ModScript X", FontFamily = Look.Display, FontSize = 16, FontWeight = FontWeight.Bold, LetterSpacing = -0.3 },
-            HubLook.MonoText(I18n.T("v18.x.sub").ToUpper(I18n.Culture), 9, HubLook.Cyan));
-        words.VerticalAlignment = VerticalAlignment.Center;
-        var head = new Button { Classes = { "hub-rail" }, Content = Ui.Row(11, CreatorPage.XMark(32), words), MinHeight = 54, Padding = new Thickness(8, 0, 10, 0) };
-        head.Click += (_, _) => Go("available", inPage, local);
-        var items = new StackPanel { Spacing = 2, Margin = new Thickness(0, 6, 0, 2) };
-        foreach (var r in Main)
+        var rail = page switch
         {
-            var id = r.Id;
-            // Число проектов — из списков на диске (имена папок), без чтения кода.
-            var count = id == "available" && XProjects.List().Count + Projects.List().Count is > 0 and var n ? n.ToString() : null;
-            items.Children.Add(RailButton(r, id == current, 6, () => Go(id, inPage, local), count));
-        }
-        return new Border
-        {
-            Background = lit ? HubLook.Raised : HubLook.Ink, BorderBrush = HubLook.Premium(lit ? (byte)200 : (byte)110), BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(8), Padding = new Thickness(5), Margin = new Thickness(0, 0, 0, 12),
-            Child = Ui.Col(0, head, new Border { Height = 1, Background = HubLook.Edge, Margin = new Thickness(8, 4, 8, 0) }, items),
+            CreatorPage cp => RailOf(cp.Tab, creator: true),
+            MarketPage or ListingPage or AuthorPage => "shop",
+            XStudio => "available",
+            _ => "",
         };
+        // Число проектов — из списков на диске (имена папок), без чтения кода.
+        var count = XProjects.List().Count + Projects.List().Count;
+        yield return new("x", "ModScript X", Icons.Code, false, null, 0, Group: true);
+        yield return new("create", I18n.T("v18.hub.create"), Icons.Plus, rail == "create", null, 1);
+        yield return new("available", I18n.T("v20.hub.projects"), Icons.Grid, rail == "available", count > 0 ? count.ToString() : null, 1);
+        yield return new("shop", I18n.T(MarketRail.Key), MarketRail.Icon, rail == "shop", null, 0);
+        var team = Social.Teams.Mine.FirstOrDefault();
+        yield return new("team", team?.Name ?? I18n.T("v13.hub.team"), Icons.Users, rail == "team", null, 0);
     }
 
-    /// <summary>Боковая панель: знак Creator Hub, блок «ModScript X», «Рынок»; внизу — «Команда».</summary>
-    static Control RailPanel(string current, Action<string>? inPage, Func<string, bool>? local)
+    /// <summary>Пункт Hub с боковой панели: на той же странице, если она это умеет, иначе — новой страницей.</summary>
+    public static void SideGo(string id)
     {
-        var brand = Ui.Row(10, CreatorLogo.Tile(30), Ui.Col(1,
-            new TextBlock { Text = "Creator Hub", FontSize = 15, FontWeight = FontWeight.Bold, LetterSpacing = -0.2 },
-            HubLook.MonoText(I18n.T("v12d.rail.studio"), 10)));
-        brand.Margin = new Thickness(6, 2, 0, 22);
-
-        var items = new StackPanel { Spacing = 4 };
-        items.Children.Add(XGroup(current, inPage, local));
-        items.Children.Add(RailButton(MarketRail, current == "shop", 0, () => Go("shop", inPage, local)));
-
-        var foot = Ui.Col(2);
-        // Своя команда — строкой с тегом; нет команды — просто «Команда».
-        if (Social.Teams.Mine.FirstOrDefault() is { } team)
+        if (id == "x") id = "available";
+        var page = MainWindow.Current?.CurrentPage;
+        if (page is CreatorPage cp && cp.OpenRail(id)) { MainWindow.Current?.RefreshRail(); return; }
+        if (id == "shop")
         {
-            var chip = new Border { Background = TeamLook.Brush(team.Color), CornerRadius = new CornerRadius(3), Padding = new Thickness(5, 1), Child = HubLook.MonoText(team.Tag, 10, Brushes.White) };
-            var t = new Button { Classes = { "hub-rail" }, Content = Ui.Row(8, chip, new TextBlock { Text = team.Name, FontSize = 12.5, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center }) };
-            if (current == "team") t.Classes.Add("active");
-            t.Click += (_, _) => Go("team", inPage, local);
-            foot.Children.Add(t);
+            if (page is MarketPage mp) mp.Go(ShopTarget);
+            else Open(ShopTarget);
+            return;
         }
-        else
-            foreach (var r in Sections)
-            {
-                var id = r.Id;
-                foot.Children.Add(RailButton(r, id == current, 4, () => Go(id, inPage, local)));
-            }
-        var dock = new DockPanel { Margin = new Thickness(12, 18, 12, 14) };
-        DockPanel.SetDock(brand, Dock.Top);
-        DockPanel.SetDock(foot, Dock.Bottom);
-        dock.Children.Add(brand);
-        dock.Children.Add(foot);
-        dock.Children.Add(items);
-        return new Border
-        {
-            Width = 224, Background = HubLook.Panel, BorderBrush = HubLook.Edge, BorderThickness = new Thickness(0, 0, 1, 0), Child = dock,
-        };
+        MainWindow.Current?.Navigate(() => new CreatorPage(CreatorTab(id)));
     }
 
-    /// <summary>Шапка раздела: «// CREATOR HUB · РАЗДЕЛ», название (и строка пояснения), справа — одна главная кнопка; под ней — вкладки.</summary>
+    /// <summary>Шапка раздела: название (34), строка пояснения, справа — одно действие; под ней — вкладки тонкой линией.</summary>
     static Control Head(string current, string rail, string title, string? lead, Action<string>? inPage, Action? sold, IReadOnlyList<Control>? sub, Control? action)
     {
-        var eyebrow = Main.Any(m => m.Id == rail) ? "ModScript X" : Main.Append(MarketRail).Concat(Sections).FirstOrDefault(s => s.Id == rail) is { } r ? I18n.T(r.Key) : "";
-        var words = Ui.Col(4,
-            HubLook.Eyebrow("Creator Hub · " + eyebrow, HubLook.Violet),
-            new TextBlock { Text = title, FontFamily = Look.Display, FontSize = 26, FontWeight = FontWeight.Bold, LetterSpacing = -0.6, TextTrimming = TextTrimming.CharacterEllipsis });
-        if (lead is not null) words.Children.Add(new TextBlock { Text = lead, FontSize = 13, Foreground = Ui.Res("Muted"), TextWrapping = TextWrapping.Wrap, MaxWidth = 760, HorizontalAlignment = HorizontalAlignment.Left });
+        var words = Ui.Col(Phi.S8, new TextBlock { Text = title, FontSize = Phi.H1, FontWeight = FontWeight.Bold, LetterSpacing = -1, TextTrimming = TextTrimming.CharacterEllipsis });
+        if (lead is not null) words.Children.Add(new TextBlock { Text = lead, FontSize = Phi.Body, Foreground = Ui.Res("Muted"), TextWrapping = TextWrapping.Wrap, MaxWidth = 640, HorizontalAlignment = HorizontalAlignment.Left });
         words.VerticalAlignment = VerticalAlignment.Bottom;
 
-        // 18.0: «Новый проект» в шапке повторял пункт «Создать» слева — убран; главная кнопка осталась у магазина
-        // и у тех страниц, что передают свою (импорт в «Скриптах», команда).
+        // 18.0: «Новый проект» в шапке повторял пункт «Создать» слева — убран; у магазина — «Продать работу».
         action ??= rail switch
         {
-            "shop" => Ui.Button(I18n.T("mk.sell"), () => ListingWizard.Show(null, sold ?? MarketData.Reload), "primary", Icons.Upload),
+            "shop" => Ui.Button(I18n.T("mk.sell"), () => ListingWizard.Show(null, sold ?? MarketData.Reload), "soft", Icons.Upload),
             _ => null,
         };
         var head = new DockPanel();
@@ -266,16 +205,15 @@ public static class HubNav
             head.Children.Add(action);
         }
         head.Children.Add(words);
-        var col = Ui.Col(12, head);
+        var col = Ui.Col(Phi.S21, head);
         if (Bar(current, rail, inPage, sub) is { } bar) col.Children.Add(bar);
-        else col.Children.Add(new Border { Height = 1, Background = HubLook.Edge });
         return col;
     }
 
     /// <summary>Вкладки раздела тонкой линией с фирменным подчёркиванием: у магазина — четыре и «Ещё», у остальных — вкладки страницы.</summary>
     public static Control? Bar(string current, string rail, Action<string>? inPage = null, IReadOnlyList<Control>? sub = null)
     {
-        var tabs = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 22 };
+        var tabs = new StackPanel { Orientation = Orientation.Horizontal, Spacing = Phi.S21 + 3 };
         if (rail == "shop")
         {
             foreach (var (id, key) in ShopTabs)

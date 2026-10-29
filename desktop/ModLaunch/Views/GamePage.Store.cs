@@ -139,7 +139,7 @@ public sealed partial class GamePage
                 stop.Padding = new Thickness(20, 13);
                 buttons.Children.Add(stop);
             }
-            else if (_g.LoaderInstalled || _g.Def.Loader == LoaderKind.None) buttons.Children.Add(PlayControls.PlayButton(_g));
+            else if (_g.LoaderInstalled || _g.Def.Loader == LoaderKind.None) buttons.Children.Add(PlayControls.PlayButton(_g, onArt: true));
             else
             {
                 var busy = Jobs.All.Any(j => j.Active && j.Title == _g.Def.LoaderName && j.GameName == _g.Def.Name);

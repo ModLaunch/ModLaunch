@@ -32,7 +32,9 @@ public sealed partial class MainWindow
             Ctx.Item(I18n.T("cp.title"), Icons.Grid, () => Navigate(() => new SettingsPage("panel")), gesture: "Ctrl+Shift+P"),
             Ctx.Item(I18n.T("lib.title"), Icons.Layers, () => Navigate(() => new LibraryPage()), gesture: "Ctrl+L"),
             Ctx.Item(I18n.T("mc.title"), Icons.Package, () => Navigate(() => new ModsCenterPage()), gesture: "Ctrl+U"),
-            Ctx.Item(Settings.Data.Bool("railHidden") ? I18n.T("top.rail.show") : I18n.T("top.rail.hide"), Icons.Layers, ToggleRail, gesture: "Ctrl+B"),
+            Ctx.Item(I18n.T(_sideNarrow ? "v2.side.expand" : "v2.side.collapse"), Icons.Sidebar, ToggleNarrow, gesture: "Ctrl+B"),
+            Ctx.Item(Settings.Data.Bool("railHidden") ? I18n.T("top.rail.show") : I18n.T("top.rail.hide"), Icons.Layers, ToggleRail),
+            Ctx.Item(I18n.T("v2.grid.menu"), Icons.Grid, TogglePhiGrid, gesture: "Ctrl+Shift+G"),
             "-",
             Ctx.Item(I18n.T("cmd.title"), Icons.Search, CommandPalette, gesture: "Ctrl+P"),
             Ctx.Item(I18n.T("keys.title"), Icons.Keyboard, Shortcuts, gesture: "F1"),
@@ -58,7 +60,7 @@ public sealed partial class MainWindow
     /// </summary>
     void UpdateAdVisibility()
     {
-        _adRail.IsVisible = Ads.Enabled && !AdSlot.SideClosed && !_asideHost.IsVisible
+        _adRail.IsVisible = Ads.Enabled && !AdSlot.SideClosed && !_asideHost.IsVisible && !_focusMode
             && Bounds.Width / Math.Max(0.5, _appliedScale) >= 1360 && _current is { Workspace: false };
     }
 

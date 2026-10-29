@@ -66,6 +66,9 @@ public sealed partial class MainWindow : Window
     Control? _railHost;
     Panel? _layers;
     Border? _sheet;
+
+    /// <summary>2.0: высота «листа» со страницей — от неё сцена главной берёт золотую долю (до первой раскладки — по окну).</summary>
+    public double SheetHeight => _sheet is { Bounds.Height: > 0 } sh ? sh.Bounds.Height : Math.Max(400, ClientSize.Height - 90);
     readonly Button _updatePill = new() { Classes = { "chip" }, IsVisible = false, VerticalAlignment = VerticalAlignment.Center };
     readonly Border _friendsBadge = new() { IsVisible = false };
     readonly Panel _overlay = new() { IsVisible = false };
@@ -413,6 +416,12 @@ public sealed partial class MainWindow : Window
 
     // ---------------------------------------------------------------- шапка, правая панель, свечение
 
+    /// <summary>2.0: перерисовать боковую панель (страница Hub сменила вкладку у себя).</summary>
+    public void RefreshRail()
+    {
+        if (_railHost is not null) RenderRail();
+    }
+
     public void RenderCrumbs()
     {
         _crumbs.Children.Clear();
@@ -543,13 +552,14 @@ public sealed partial class MainWindow : Window
         var k = EffectiveScale();
         _appliedScale = k;
         _scale.LayoutTransform = Math.Abs(k - 1) < 0.001 ? null : new ScaleTransform(k, k);
-        if (_railHost is not null) _railHost.IsVisible = !Settings.Data.Bool("railHidden");
-        // Без боковой панели «лист» с содержимым — без скруглённого угла.
+        if (_railHost is not null) _railHost.IsVisible = !Settings.Data.Bool("railHidden") && !_focusMode;
+        if (_statusBar is not null) _statusBar.IsVisible = !_focusMode;
+        // 2.0: «лист» — отдельный слой с углами 13 и отступом 8 от краёв окна; без боковой панели — и слева.
         if (_sheet is not null)
         {
             var rail = _railHost?.IsVisible == true;
-            _sheet.CornerRadius = rail ? new CornerRadius(8, 0, 0, 0) : new CornerRadius(0);
-            _sheet.BorderThickness = rail ? new Thickness(1, 1, 0, 0) : new Thickness(0, 1, 0, 0);
+            _sheet.Margin = rail ? new Thickness(0, 0, Phi.S8, Phi.S8) : new Thickness(Phi.S8, 0, Phi.S8, Phi.S8);
+            if (_topBrand is not null) _topBrand.IsVisible = !rail;
         }
     }
 
@@ -566,7 +576,30 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    /// <summary>Скрыть или показать боковую панель (Ctrl+B) — «дзен-режим».</summary>
+    /// <summary>2.0: сетка золотого сечения поверх окна (Ctrl+Shift+G) — линии 38,2 % и 61,8 % листа и боковой панели.</summary>
+    readonly PhiGrid _phiGrid = new() { IsVisible = false };
+
+    public void TogglePhiGrid()
+    {
+        _phiGrid.IsVisible = !_phiGrid.IsVisible;
+        _phiGrid.Target = _sheet;
+        _phiGrid.InvalidateVisual();
+        Toast(I18n.T(_phiGrid.IsVisible ? "v2.grid.on" : "v2.grid.off"));
+    }
+
+    bool _focusMode;
+    StatusBar? _statusBar;
+
+    /// <summary>2.0: фокус ModScript X — боковая панель, строка состояния и реклама на время скрыты (настройка не меняется).</summary>
+    public void SetFocusMode(bool on)
+    {
+        if (_focusMode == on) return;
+        _focusMode = on;
+        ApplyScale();
+        UpdateAdVisibility();
+    }
+
+    /// <summary>Скрыть или показать боковую панель — «дзен-режим» (2.0: из меню «…» и настроек; Ctrl+B сворачивает).</summary>
     public void ToggleRail()
     {
         Settings.Data["railHidden"] = !Settings.Data.Bool("railHidden");
@@ -713,7 +746,7 @@ public sealed partial class MainWindow : Window
         var rows = new StackPanel { Spacing = 8 };
         foreach (var (keys, what) in new[]
         {
-            ("Ctrl+P", "keys.palette"), ("Ctrl+K", "keys.search"), ("Ctrl+J", "keys.downloads"), ("Ctrl+B", "keys.rail"),
+            ("Ctrl+P", "keys.palette"), ("Ctrl+K", "keys.search"), ("Ctrl+J", "keys.downloads"), ("Ctrl+B", "v2.keys.narrow"), ("Ctrl+Shift+G", "v2.keys.grid"),
             ("Ctrl+,", "keys.settings"), ("Ctrl+Shift+P", "cp.title"), ("Ctrl+L", "lib.title"), ("Ctrl+U", "mc.title"), ("Ctrl+Shift+M", "keys.minecraft"),
             ("Ctrl+H", "keys.home"), ("Ctrl+1…9", "keys.game"), ("Ctrl+Enter", "keys.play"), ("← / →", "keys.stage"), ("Mouse 4 / 5", "keys.history"),
             ("Ctrl+Shift+C", "keys.creator"), ("Ctrl+I", "keys.aside"), ("F11", "bp.open"), ("Alt+← / Alt+→", "keys.history"), ("F1", "keys.help"), ("Esc", "keys.close"),
@@ -891,7 +924,10 @@ public sealed partial class MainWindow : Window
         else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.K) { _search.Focus(); _search.SelectAll(); }
         else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.J) TogglePanel(_downloadsPanel);
         else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.P) CommandPalette();
-        else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.B) ToggleRail();
+        // 2.0: Ctrl+B сворачивает панель до значков (спрятать совсем — в меню «…» и в настройках).
+        else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.B) ToggleNarrow();
+        // 2.0: Ctrl+Shift+G — сетка золотого сечения поверх окна.
+        else if (e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift) && e.Key == Key.G) TogglePhiGrid();
         else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.I && _aside.Content is not null) ToggleAside();
         else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.OemComma) Navigate(() => new SettingsPage());
         else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.L) Navigate(() => new LibraryPage());
@@ -1005,6 +1041,7 @@ public sealed partial class MainWindow : Window
         if (Settings.Data.Str("afterLaunch") == "minimize" && Settings.Data.Bool("restoreAfterGame", true) && WindowState == WindowState.Minimized)
             WindowState = WindowState.Normal;
         if (counted) Toast(I18n.T("time.session", ("game", game.Def.Name), ("time", Features.PlayTime.Format(ms))));
+        ShowWhilePlaying();
         AppState.Notify();
         // Закрылась сама и быстро — возможно, вылет: смотрим лог.
         if (Features.Launcher.LastExit(gameId) is { ByUser: false } exit && exit.Ms < 90_000 && Settings.Data.Bool("crashHelper", true))
@@ -1025,7 +1062,7 @@ public sealed partial class MainWindow : Window
     {
         if (Setup.Updater.Latest is not { } latest) return;
         var notes = new SelectableTextBlock { Text = latest.Notes, TextWrapping = TextWrapping.Wrap, Foreground = Ui.Res("Muted") };
-        var body = Ui.Col(10, Ui.Text(I18n.T("upd.app.now", ("version", Http.Version)), "small muted"), new ScrollViewer { Content = notes, MaxHeight = 300 });
+        var body = Ui.Col(10, Ui.Text(I18n.T("upd.app.now", ("version", Http.Display)), "small muted"), new ScrollViewer { Content = notes, MaxHeight = 300 });
         var actions = new List<Control> { Ui.Button(I18n.T("upd.app.later"), CloseDialog) };
         if (latest.Page is string page) actions.Add(Ui.Button(I18n.T("upd.app.page"), () => Ui.OpenUrl(page), "", Icons.External));
         if (Setup.Updater.CanInstall)
@@ -1050,7 +1087,7 @@ public sealed partial class MainWindow : Window
             }, "primary", Icons.Download);
             actions.Add(go);
         }
-        Dialog(I18n.T("upd.app.title", ("version", latest.Version)), body, actions.ToArray());
+        Dialog(I18n.T("upd.app.title", ("version", Http.DisplayOf(latest.Version))), body, actions.ToArray());
     }
 
     // ---------------------------------------------------------------- загрузки и уведомления
@@ -1087,6 +1124,7 @@ public sealed partial class MainWindow : Window
 
     public void Toast(string text, bool bad = false)
     {
+        if (HoldWhilePlaying(text, bad)) return;
         var t = new Border
         {
             Background = Ui.Res("Surface3"),

@@ -65,6 +65,9 @@ jobs:
         shell: pwsh
         run: |
           $v = ([xml](Get-Content desktop/ModLaunch/ModLaunch.csproj)).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
+          # 2.0: в имени файла — номер с экрана (21.0.0 → 2.0).
+          $p = $v.Split('.')
+          if ([int]$p[0] -ge 21) { $v = "$([int]$p[0] - 19).$($p[1])" + $(if ([int]$p[2] -gt 0) { ".$($p[2])" } else { "" }) }
           New-Item -ItemType Directory -Force dist | Out-Null
           Copy-Item out/ModLaunch.exe "dist/ModLaunch-Setup-$v.exe"
           "name=ModLaunch-Setup-$v" >> $env:GITHUB_OUTPUT

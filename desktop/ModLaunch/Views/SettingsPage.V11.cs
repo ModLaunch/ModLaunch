@@ -485,8 +485,8 @@ public sealed partial class SettingsPage
         var latest = Setup.Updater.Latest;
         var status = !Setup.Updater.Configured ? I18n.T("upd.app.off")
             : latest is null ? I18n.T("upd.never")
-            : Setup.Updater.Available ? I18n.T("upd.app.available", ("version", latest.Version))
-            : I18n.T("upd.app.latest", ("version", Http.Version));
+            : Setup.Updater.Available ? I18n.T("upd.app.available", ("version", Http.DisplayOf(latest.Version)))
+            : I18n.T("upd.app.latest", ("version", Http.Display));
         var list = new StackPanel { Spacing = 8 };
         var total = 0;
         foreach (var g in AppState.Games)

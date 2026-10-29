@@ -10,7 +10,10 @@ namespace ModLaunch.Core;
 /// </summary>
 public static class Look
 {
-    public static readonly string[] Themes = ["slate", "store", "snow", "jet", "ink", "graphite", "paper", "dark", "black", "light", "midnight", "nord", "forest", "grape", "mocha", "sand", "contrast",
+    public static readonly string[] Themes = [
+        // 2.0: «Φ» — тёмный графит и светлый вариант к нему (оформление 2.0 по умолчанию).
+        "phi", "phi-light",
+        "slate", "store", "snow", "jet", "ink", "graphite", "paper", "dark", "black", "light", "midnight", "nord", "forest", "grape", "mocha", "sand", "contrast",
         // 17.0: восемь новых — пять тёмных и три светлых.
         "ocean", "crimson", "cyber", "olive", "rose", "mint", "sky", "blossom"];
     public static readonly string[] Designs = ["store", "vitrina", "studio", "aurora"];
@@ -72,8 +75,40 @@ public static class Look
         Apply();
     }
 
-    /// <summary>Первый запуск 8.3: включить «Студию» и её тему, если оформление не меняли.</summary>
+    /// <summary>
+    /// 2.0: сначала прежние переходы (9.0 → 11.0), затем — оформление «Φ» тем, у кого вид не меняли:
+    /// стандартный конфиг 11.0 («Строгий») или ничего. Своя тема, акцент или чужой конфиг остаются, раскладка главной — тоже.
+    /// Рамка окна, шрифты и отступы 2.0 — у всех (их задаёт AddPhi, а не конфиг).
+    /// </summary>
     static void Migrate()
+    {
+        MigrateOld();
+        if (Settings.Data.Bool("look2")) return;
+        Settings.Data["look2"] = true;
+        if (Look2Untouched()) Configs.Apply(Phi2("widget"), apply: false);
+        Settings.Save();
+    }
+
+    /// <summary>Вид 11.0 не трогали: конфиг «Строгий» (или никакой) и его тема, акцент и шрифт.</summary>
+    static bool Look2Untouched()
+    {
+        var d = Settings.Data;
+        return d.Str("config") is null or "pro" or "modlaunch"
+            && d.Str("theme") is null or "slate" or "store"
+            && d.Str("accent")?.ToUpperInvariant() is null or "#3B82F6" or "#7B5CFF"
+            && d.Str("font") is null or "Inter" or "Onest"
+            && d["customPalette"] is null;
+    }
+
+    /// <summary>Конфиг «ModLaunch 2.0» без части строк (widget…) — чтобы не трогать раскладку главной.</summary>
+    public static UiConfig Phi2(params string[] skip)
+    {
+        var phi = Configs.BuiltIn().First(c => c.Id == "phi");
+        return phi with { Lines = phi.Lines.Where(l => !skip.Contains(l.Key)).ToList() };
+    }
+
+    /// <summary>Первый запуск 8.3: включить «Студию» и её тему, если оформление не меняли.</summary>
+    static void MigrateOld()
     {
         // 11.0: «взрослый» вид по умолчанию — конфиг «Строгий», если оформление не меняли (стандартный конфиг 10.0 или ничего).
         if (!Settings.Data.Bool("look11"))
@@ -157,7 +192,7 @@ public static class Look
         {
             Settings.Data.Clear();
             setup(Settings.Data);
-            Migrate();
+            MigrateOld();
             return ok(Settings.Data) ? null : Settings.Data.ToJsonString();
         }
         try
@@ -194,7 +229,51 @@ public static class Look
         }
     }
 
-    public static readonly string[] Accents = ["#7B5CFF", "#D7262E", "#2BD46F", "#6E4BFF", "#F2483A", "#7C5CFF","#3B82F6", "#14B8A6", "#22C55E", "#EAB308", "#F97316", "#EF4444", "#EC4899", "#06B6D4", "#A3E635", "#F43F5E", "#8B5CF6", "#1BD96A", "#0078D4", "#FFFFFF",
+    [SelfTest]
+    static string Look2SwitchesOnlyDefault()
+    {
+        var saved = (System.Text.Json.Nodes.JsonObject)Settings.Data.DeepClone();
+        string? Run(Action<System.Text.Json.Nodes.JsonObject> setup, Func<System.Text.Json.Nodes.JsonObject, bool> ok)
+        {
+            Settings.Data.Clear();
+            setup(Settings.Data);
+            Migrate();
+            return ok(Settings.Data) ? null : Settings.Data.ToJsonString();
+        }
+        try
+        {
+            var widgets = new System.Text.Json.Nodes.JsonArray("clock m", "level s");
+            var fails = new[]
+            {
+                ("fresh", Run(_ => { }, d => d.Str("theme") == "phi" && d.Str("config") == "phi" && d.Bool("look2"))),
+                // Стандартный «Строгий» 11.0–20.0 со своей раскладкой главной: вид — «Φ», раскладка — своя.
+                ("pro", Run(d => { d["look11"] = true; d["look92"] = true; d["look9"] = true; d["config"] = "pro"; d["theme"] = "slate"; d["accent"] = "#3B82F6"; d["widgets"] = widgets.DeepClone(); },
+                    d => d.Str("theme") == "phi" && d["widgets"]?.ToJsonString() == widgets.ToJsonString())),
+                // Свой акцент или чужой конфиг — остаются.
+                ("accent", Run(d => { d["look11"] = true; d["look92"] = true; d["look9"] = true; d["config"] = "pro"; d["theme"] = "slate"; d["accent"] = "#22C55E"; },
+                    d => d.Str("theme") == "slate" && d.Str("accent") == "#22C55E")),
+                ("retro", Run(d => { d["look11"] = true; d["look92"] = true; d["look9"] = true; d["config"] = "retro"; d["theme"] = "jet"; }, d => d.Str("theme") == "jet" && d.Str("config") == "retro")),
+            }.Where(f => f.Item2 is not null).ToList();
+            if (fails.Count > 0) throw new Exception(string.Join("; ", fails.Select(f => $"{f.Item1}: {f.Item2}")));
+            return "2.0 look only for untouched looks, home layout kept";
+        }
+        finally
+        {
+            Settings.Data.Clear();
+            foreach (var key in saved.Select(kv => kv.Key).ToList())
+            {
+                var v = saved[key];
+                saved.Remove(key);
+                Settings.Data[key] = v;
+            }
+            Settings.Save();
+        }
+    }
+
+    public static readonly string[] Accents = [
+        // 2.0: лавандовый с логотипа ModLaunch (белый текст на нём читается, контраст 4,7 : 1) и золото его четвёртой точки.
+        "#6D5EF0", "#F2B544",
+        "#7B5CFF", "#D7262E", "#2BD46F", "#6E4BFF", "#F2483A", "#7C5CFF","#3B82F6", "#14B8A6", "#22C55E", "#EAB308", "#F97316", "#EF4444", "#EC4899", "#06B6D4", "#A3E635", "#F43F5E", "#8B5CF6", "#1BD96A", "#0078D4", "#FFFFFF",
         // 17.0: коралл, аква, небесный, лаванда, мандарин, сталь, мята и вишня.
         "#FF7A59", "#00C2A8", "#38BDF8", "#B79CFF", "#FFA94D", "#94A3B8", "#5EEAD4", "#E11D74"];
     public static readonly string[] Fonts = ["Onest", "Inter", "Segoe UI", "Segoe UI Variable Display", "Arial", "Verdana", "Bahnschrift", "Consolas", "Cascadia Code"];
@@ -275,7 +354,7 @@ public static class Look
     }
     public static readonly double[] Scales = [0.85, 0.9, 1.0, 1.1, 1.25];
 
-    public static string Theme => Settings.Data.Str("theme") == "custom" && Custom() is not null ? "custom" : Themes.Contains(Settings.Data.Str("theme")) ? Settings.Data.Str("theme")! : "store";
+    public static string Theme => Settings.Data.Str("theme") == "custom" && Custom() is not null ? "custom" : Themes.Contains(Settings.Data.Str("theme")) ? Settings.Data.Str("theme")! : "phi";
 
     /// <summary>10.0: ключи цветов темы — их можно задать по одному в конфиге (color_bg, color_text…).</summary>
     public static readonly string[] ColorKeys = ["Bg", "Rail", "Layer", "Surface", "Surface2", "Surface3", "Line", "Text", "Muted", "Faint"];
@@ -331,6 +410,18 @@ public static class Look
 
     static readonly Dictionary<string, Dictionary<string, string>> Palettes = new()
     {
+        // 2.0 «Φ»: почти чёрный графит без синевы. Шаги светлоты Bg → Layer → Surface → Surface2 → Surface3 одинаковые,
+        // линия — едва заметнее листа: иерархию задают поверхность и шрифт, а не рамки и цвет.
+        ["phi"] = new()
+        {
+            ["Bg"] = "#0B0B0D", ["Rail"] = "#0B0B0D", ["Layer"] = "#111114", ["Surface"] = "#17171B", ["Surface2"] = "#1E1E23", ["Surface3"] = "#28282E",
+            ["Line"] = "#24242A", ["Text"] = "#EEEEF0", ["Muted"] = "#A0A0AA", ["Faint"] = "#68686F",
+        },
+        ["phi-light"] = new()
+        {
+            ["Bg"] = "#F2F2F4", ["Rail"] = "#F2F2F4", ["Layer"] = "#FFFFFF", ["Surface"] = "#FFFFFF", ["Surface2"] = "#F4F4F6", ["Surface3"] = "#E9E9EE",
+            ["Line"] = "#E3E3E8", ["Text"] = "#141417", ["Muted"] = "#5F5F69", ["Faint"] = "#94949D",
+        },
         // 11.0 «Строгий»: холодный графит без фиолетового оттенка — спокойный фон, на котором работают арты игр и один акцент.
         ["slate"] = new()
         {
@@ -530,6 +621,8 @@ public static class Look
         if (Studio) AddStudio(_custom);
         if (Vitrina) AddVitrina(_custom);
         if (Store) AddStore(_custom);
+        // 2.0: поверх всего — правила «Φ» (шрифты, углы, кнопки, карточки, вкладки) у любой темы.
+        AddPhi(_custom);
         app.Styles.Add(_custom);
     }
 
@@ -703,6 +796,143 @@ public static class Look
             (Avalonia.Controls.Presenters.ContentPresenter.BackgroundProperty, R("BrandSoft")));
     }
 
+    /// <summary>
+    /// 2.0 «Φ»: одна система для всего приложения. Шрифты — лестница φ (34 / 21 / 16 / 14 / 12 / 11), углы 8 у кнопок
+    /// и полей, 13 у карточек, 21 у сцен; карточки — плоские листы с волосяной линией, без теней и свечения;
+    /// выбранное — спокойной подложкой, а не цветной обводкой; акцент — только у главного действия,
+    /// «Играть» — светлой кнопкой (как в Apple TV), установка в списках — мягкой кнопкой (не стена ярких плашек).
+    /// </summary>
+    static void AddPhi(Styles s)
+    {
+        IBrush R(string key) => Application.Current!.Resources.TryGetResource(key, null, out var v) && v is IBrush b ? b : Brushes.Gray;
+        void Add(Func<Selector?, Selector> sel, params (AvaloniaProperty P, object V)[] setters)
+        {
+            var style = new Style(sel);
+            foreach (var (p, v) in setters) style.Setters.Add(new Setter(p, v));
+            s.Add(style);
+        }
+        var round = Radius switch { "round" => 1.4, "sharp" => 0.35, _ => 1.0 };
+        CornerRadius Cr(double r) => new(Math.Round(r * round));
+        var font = UiFont;
+        var none = new BoxShadows();
+        var palette = Current;
+        var text = Color.Parse(palette["Text"]);
+        var bg = Color.Parse(palette["Bg"]);
+        var accent = Color.Parse(Accent);
+        var light = IsLight;
+
+        // ---- шрифты: лестница φ
+        Add(x => x.OfType<Avalonia.Controls.TextBlock>().Class("h1"),
+            (Avalonia.Controls.TextBlock.FontFamilyProperty, font), (Avalonia.Controls.TextBlock.FontSizeProperty, Phi.H1),
+            (Avalonia.Controls.TextBlock.FontWeightProperty, FontWeight.Bold), (Avalonia.Controls.TextBlock.LetterSpacingProperty, -1.0));
+        Add(x => x.OfType<Avalonia.Controls.TextBlock>().Class("h2"),
+            (Avalonia.Controls.TextBlock.FontFamilyProperty, font), (Avalonia.Controls.TextBlock.FontSizeProperty, Phi.H2),
+            (Avalonia.Controls.TextBlock.FontWeightProperty, FontWeight.SemiBold), (Avalonia.Controls.TextBlock.LetterSpacingProperty, -0.4));
+        Add(x => x.OfType<Avalonia.Controls.TextBlock>().Class("h3"),
+            (Avalonia.Controls.TextBlock.FontSizeProperty, Phi.H3), (Avalonia.Controls.TextBlock.FontWeightProperty, FontWeight.SemiBold),
+            (Avalonia.Controls.TextBlock.LetterSpacingProperty, -0.15));
+        Add(x => x.OfType<Avalonia.Controls.TextBlock>().Class("small"),
+            (Avalonia.Controls.TextBlock.FontSizeProperty, Phi.Small), (Avalonia.Controls.TextBlock.LineHeightProperty, 18.0));
+        Add(x => x.OfType<Avalonia.Controls.TextBlock>().Class("caption"),
+            (Avalonia.Controls.TextBlock.FontSizeProperty, Phi.Caption), (Avalonia.Controls.TextBlock.FontWeightProperty, FontWeight.SemiBold),
+            (Avalonia.Controls.TextBlock.ForegroundProperty, R("Faint")), (Avalonia.Controls.TextBlock.LetterSpacingProperty, 0.2));
+        Add(x => x.OfType<Avalonia.Controls.TextBlock>().Class("brand"), (Avalonia.Controls.TextBlock.ForegroundProperty, R("Brand2")));
+
+        // ---- листы и плитки: плоские, волосяная линия, угол 13, без теней
+        Add(x => x.OfType<Avalonia.Controls.Border>().Class("card"),
+            (Avalonia.Controls.Border.BackgroundProperty, R("Surface")), (Avalonia.Controls.Border.BorderBrushProperty, R("Line")),
+            (Avalonia.Controls.Border.BorderThicknessProperty, new Thickness(1)), (Avalonia.Controls.Border.CornerRadiusProperty, Cr(Phi.R13)),
+            (Avalonia.Controls.Border.BoxShadowProperty, none));
+        foreach (var cls in new[] { "tile", "card-btn" })
+        {
+            Add(x => x.OfType<Avalonia.Controls.Button>().Class(cls),
+                (Avalonia.Controls.Primitives.TemplatedControl.BackgroundProperty, R("Surface")),
+                (Avalonia.Controls.Primitives.TemplatedControl.BorderBrushProperty, R("Line")),
+                (Avalonia.Controls.Primitives.TemplatedControl.BorderThicknessProperty, new Thickness(1)),
+                (Avalonia.Controls.Primitives.TemplatedControl.CornerRadiusProperty, Cr(Phi.R13)));
+            Add(x => x.OfType<Avalonia.Controls.Button>().Class(cls).Class(":pointerover").Template().OfType<Avalonia.Controls.Presenters.ContentPresenter>(),
+                (Avalonia.Controls.Presenters.ContentPresenter.BackgroundProperty, R("Surface2")), (Avalonia.Controls.Presenters.ContentPresenter.BorderBrushProperty, R("Surface3")),
+                (Avalonia.Controls.Presenters.ContentPresenter.BoxShadowProperty, none));
+        }
+        Add(x => x.OfType<Avalonia.Controls.Border>().Class("store-tile"), (Avalonia.Controls.Border.CornerRadiusProperty, Cr(Phi.R13)));
+        Add(x => x.OfType<Avalonia.Controls.Border>().Class("store-tile").Class(":pointerover"),
+            (Avalonia.Controls.Border.BoxShadowProperty, none), (Avalonia.Controls.Border.BorderBrushProperty, R("Surface3")));
+
+        // ---- кнопки: угол 8; главная — акцентом без свечения
+        Add(x => x.OfType<Avalonia.Controls.Button>(), (Avalonia.Controls.Primitives.TemplatedControl.CornerRadiusProperty, Cr(Phi.R8)));
+        Add(x => x.OfType<Avalonia.Controls.TextBox>(), (Avalonia.Controls.Primitives.TemplatedControl.CornerRadiusProperty, Cr(Phi.R8)));
+        Add(x => x.OfType<Avalonia.Controls.ComboBox>(), (Avalonia.Controls.Primitives.TemplatedControl.CornerRadiusProperty, Cr(Phi.R8)));
+        Add(x => x.OfType<Avalonia.Controls.Button>().Class("primary").Class(":pointerover").Template().OfType<Avalonia.Controls.Presenters.ContentPresenter>(),
+            (Avalonia.Controls.Presenters.ContentPresenter.BoxShadowProperty, none));
+        // «Играть» на арте (сцена главной, шапка игры) — светлая кнопка, как на Apple TV: на любой картинке она
+        // заметнее всего и не спорит с акцентом. Арт всегда затемнён, поэтому цвет один для тёмных и светлых тем.
+        var playBg = Color.Parse("#F4F4F6");
+        Add(x => x.OfType<Avalonia.Controls.Button>().Class("play"),
+            (Avalonia.Controls.Primitives.TemplatedControl.BackgroundProperty, new SolidColorBrush(playBg)),
+            (Avalonia.Controls.Primitives.TemplatedControl.ForegroundProperty, new SolidColorBrush(Color.Parse("#0B0B0D"))),
+            (Avalonia.Controls.Primitives.TemplatedControl.BorderThicknessProperty, new Thickness(0)),
+            (Avalonia.Controls.Primitives.TemplatedControl.FontWeightProperty, FontWeight.Bold));
+        Add(x => x.OfType<Avalonia.Controls.Button>().Class("play").Class(":pointerover").Template().OfType<Avalonia.Controls.Presenters.ContentPresenter>(),
+            (Avalonia.Controls.Presenters.ContentPresenter.BackgroundProperty, new SolidColorBrush(Colors.White)),
+            (Avalonia.Controls.Presenters.ContentPresenter.ForegroundProperty, new SolidColorBrush(Color.Parse("#0B0B0D"))), (Avalonia.Controls.Presenters.ContentPresenter.BoxShadowProperty, none));
+        Add(x => x.OfType<Avalonia.Controls.Button>().Class("play").Class(":pressed").Template().OfType<Avalonia.Controls.Presenters.ContentPresenter>(),
+            (Avalonia.Controls.Presenters.ContentPresenter.BackgroundProperty, new SolidColorBrush(Color.Parse("#D9D9DE"))));
+        // Мягкая кнопка: подложка цвета акцента и акцентный текст — для «Установить» в списках и вторых действий.
+        var soft = Mix(Color.Parse(palette["Surface2"]), accent, light ? 0.12 : 0.18);
+        var softHover = Mix(Color.Parse(palette["Surface2"]), accent, light ? 0.2 : 0.28);
+        var softText = light ? Mix(accent, Colors.Black, 0.2) : Mix(accent, Colors.White, 0.35);
+        Add(x => x.OfType<Avalonia.Controls.Button>().Class("soft"),
+            (Avalonia.Controls.Primitives.TemplatedControl.BackgroundProperty, new SolidColorBrush(soft)),
+            (Avalonia.Controls.Primitives.TemplatedControl.ForegroundProperty, new SolidColorBrush(softText)),
+            (Avalonia.Controls.Primitives.TemplatedControl.BorderThicknessProperty, new Thickness(0)));
+        Add(x => x.OfType<Avalonia.Controls.Button>().Class("soft").Class(":pointerover").Template().OfType<Avalonia.Controls.Presenters.ContentPresenter>(),
+            (Avalonia.Controls.Presenters.ContentPresenter.BackgroundProperty, new SolidColorBrush(softHover)),
+            (Avalonia.Controls.Presenters.ContentPresenter.ForegroundProperty, new SolidColorBrush(softText)));
+
+        // ---- фильтры-«пилюли»: выбранный — спокойная подложка, без акцентной обводки
+        Add(x => x.OfType<Avalonia.Controls.Button>().Class("chip"), (Avalonia.Controls.Primitives.TemplatedControl.CornerRadiusProperty, new CornerRadius(999)));
+        Add(x => x.OfType<Avalonia.Controls.Button>().Class("chip").Class("side"), (Avalonia.Controls.Primitives.TemplatedControl.CornerRadiusProperty, Cr(Phi.R8)));
+        Add(x => x.OfType<Avalonia.Controls.Button>().Class("chip").Class("active").Not(y => y.Class("side")),
+            (Avalonia.Controls.Primitives.TemplatedControl.BackgroundProperty, R("Surface3")), (Avalonia.Controls.Primitives.TemplatedControl.ForegroundProperty, R("Text")),
+            (Avalonia.Controls.Primitives.TemplatedControl.BorderBrushProperty, R("Surface3")));
+        Add(x => x.OfType<Avalonia.Controls.Button>().Class("chip").Class("active").Not(y => y.Class("side")).Template().OfType<Avalonia.Controls.Presenters.ContentPresenter>(),
+            (Avalonia.Controls.Presenters.ContentPresenter.BackgroundProperty, R("Surface3")), (Avalonia.Controls.Presenters.ContentPresenter.ForegroundProperty, R("Text")),
+            (Avalonia.Controls.Presenters.ContentPresenter.BorderBrushProperty, R("Surface3")));
+
+        // ---- вкладки-кнопки и разделы рынка: выбранное — подложкой Surface3, текст обычный
+        Add(x => x.OfType<Avalonia.Controls.Button>().Class("tab").Class("active").Not(y => y.Class("line")),
+            (Avalonia.Controls.Primitives.TemplatedControl.BackgroundProperty, R("Surface3")));
+        Add(x => x.OfType<Avalonia.Controls.Button>().Class("tab").Class("active").Not(y => y.Class("line")).Template().OfType<Avalonia.Controls.Presenters.ContentPresenter>(),
+            (Avalonia.Controls.Presenters.ContentPresenter.BackgroundProperty, R("Surface3")));
+        Add(x => x.OfType<Avalonia.Controls.Button>().Class("tab").Class("line"), (Avalonia.Layout.Layoutable.MarginProperty, new Thickness(0, 0, Phi.S21, 0)));
+        Add(x => x.OfType<Avalonia.Controls.Border>().Class("market-nav").Descendant().OfType<Avalonia.Controls.Button>().Class("pivot").Class("active"),
+            (Avalonia.Controls.Primitives.TemplatedControl.BackgroundProperty, R("Surface3")), (Avalonia.Controls.Primitives.TemplatedControl.ForegroundProperty, R("Text")));
+        Add(x => x.OfType<Avalonia.Controls.Border>().Class("market-nav").Descendant().OfType<Avalonia.Controls.Button>().Class("pivot").Class("active").Template().OfType<Avalonia.Controls.Presenters.ContentPresenter>(),
+            (Avalonia.Controls.Presenters.ContentPresenter.BackgroundProperty, R("Surface3")));
+        Add(x => x.OfType<Avalonia.Controls.Border>().Class("home-row").Class(":pointerover"), (Avalonia.Controls.Border.BackgroundProperty, R("Surface2")));
+
+        // ---- боковая панель 2.0: тихие строки высотой 34, выбранная — подложкой Surface2 и значком акцента
+        Add(x => x.OfType<Avalonia.Controls.Button>().Class("sidenav"),
+            (Avalonia.Controls.Primitives.TemplatedControl.BackgroundProperty, Brushes.Transparent),
+            (Avalonia.Controls.Primitives.TemplatedControl.ForegroundProperty, R("Muted")),
+            (Avalonia.Controls.Primitives.TemplatedControl.BorderThicknessProperty, new Thickness(0)),
+            (Avalonia.Controls.Primitives.TemplatedControl.PaddingProperty, new Thickness(Phi.S8, 0)),
+            (Avalonia.Controls.Primitives.TemplatedControl.CornerRadiusProperty, Cr(Phi.R8)),
+            (Avalonia.Controls.Primitives.TemplatedControl.FontWeightProperty, FontWeight.Medium),
+            (Avalonia.Layout.Layoutable.HorizontalAlignmentProperty, Avalonia.Layout.HorizontalAlignment.Stretch),
+            (Avalonia.Controls.ContentControl.HorizontalContentAlignmentProperty, Avalonia.Layout.HorizontalAlignment.Stretch),
+            (Avalonia.Controls.ContentControl.VerticalContentAlignmentProperty, Avalonia.Layout.VerticalAlignment.Center));
+        Add(x => x.OfType<Avalonia.Controls.Button>().Class("sidenav").Class(":pointerover").Template().OfType<Avalonia.Controls.Presenters.ContentPresenter>(),
+            (Avalonia.Controls.Presenters.ContentPresenter.BackgroundProperty, R("Hover")), (Avalonia.Controls.Presenters.ContentPresenter.ForegroundProperty, R("Text")));
+        // На светлых темах Surface2 почти совпадает с фоном панели — выбранная строка берёт Surface3.
+        var sideOn = light ? R("Surface3") : R("Surface2");
+        Add(x => x.OfType<Avalonia.Controls.Button>().Class("sidenav").Class("active"),
+            (Avalonia.Controls.Primitives.TemplatedControl.BackgroundProperty, sideOn), (Avalonia.Controls.Primitives.TemplatedControl.ForegroundProperty, R("Text")),
+            (Avalonia.Controls.Primitives.TemplatedControl.FontWeightProperty, FontWeight.SemiBold));
+        Add(x => x.OfType<Avalonia.Controls.Button>().Class("sidenav").Class("active").Class(":pointerover").Template().OfType<Avalonia.Controls.Presenters.ContentPresenter>(),
+            (Avalonia.Controls.Presenters.ContentPresenter.BackgroundProperty, sideOn));
+    }
+
     /// <summary>Применить сохранённые настройки (при запуске и после любой смены).</summary>
     public static void Apply()
     {
@@ -724,6 +954,8 @@ public static class Look
         var bg = Color.Parse(palette["Bg"]);
         var light = IsLight;
         Set(app, "Brand", accent);
+        // 2.0: золото — для редких отметок (уровень, награды, сетка φ); на светлых темах темнее, чтобы читалось.
+        Set(app, "Gold", light ? Color.Parse("#B07A12") : Color.Parse("#F2B544"));
         Set(app, "Brand2", light ? Mix(accent, Colors.Black, 0.12) : Mix(accent, Colors.White, 0.22));
         Set(app, "BrandSoft", Mix(bg, accent, light ? 0.16 : 0.24));
         if (Studio && !Vitrina)

@@ -117,6 +117,7 @@ public sealed class StatusBar : Border
             _left.Children.Add(b);
         }
 
-        _right.Children.Add(Item(Icons.Info, "ModLaunch " + Http.Version, Ui.Res("Faint"), () => w?.Navigate(() => new SettingsPage("about"))));
+        // 2.0: номер версии уже стоит у логотипа — здесь вместо него «Что нового».
+        _right.Children.Add(Item(Icons.Sparkles, I18n.T("v2.sb.news", ("v", Http.Display)), Ui.Res("Faint"), WhatsNew.Show));
     }
 }

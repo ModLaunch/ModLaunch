@@ -225,7 +225,7 @@ public sealed partial class HomePage
             buttons.Children.Add(PlayControls.RunningPill(id));
             buttons.Children.Add(Ui.Button(I18n.T("v4.stop"), () => Features.Launcher.Stop(id), "hero-ghost", Icons.Stop));
         }
-        else if (g.LoaderInstalled || g.Def.Loader is Games.LoaderKind.None) buttons.Children.Add(PlayControls.PlayButton(g));
+        else if (g.LoaderInstalled || g.Def.Loader is Games.LoaderKind.None) buttons.Children.Add(PlayControls.PlayButton(g, onArt: true));
         else
         {
             var install = Ui.Button(I18n.T("games.installLoader", ("loader", g.Def.LoaderName)), () => Actions.InstallLoader(g), "primary", Icons.Download);

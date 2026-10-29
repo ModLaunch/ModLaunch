@@ -61,28 +61,54 @@ public sealed partial class MainWindow
     void RenderAccount()
     {
         var p = Social.Account.Get();
+        Control avatar;
+        string name;
         if (p.SignedIn)
         {
-            var name = p.Name ?? p.Email ?? "?";
+            name = p.Name ?? p.Email ?? "?";
             var online = new Border
             {
-                Width = 12, Height = 12, CornerRadius = new CornerRadius(6), Background = Ui.Res("Good"),
+                Width = 11, Height = 11, CornerRadius = new CornerRadius(6), Background = Ui.Res("Good"),
                 BorderBrush = Ui.Res("Rail"), BorderThickness = new Thickness(2),
                 HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom,
             };
             // 9.9: аватар в надетой рамке (награда за достижения).
-            var ring = ProfileKit.Avatar(name, 40, ring: 3);
-            _accountButton.Content = new Panel { Width = 40, Height = 40, Children = { ring, online } };
+            var size = _sideNarrow ? 38 : 30;
+            avatar = new Panel { Width = size, Height = size, Children = { ProfileKit.Avatar(name, size, ring: _sideNarrow ? 3 : 2), online } };
+        }
+        else
+        {
+            name = I18n.T("acc.menu.signin");
+            var size = _sideNarrow ? 36 : 30;
+            avatar = new Border
+            {
+                Width = size, Height = size, CornerRadius = new CornerRadius(size / 2.0), Background = Ui.Res("Surface2"), BorderBrush = Ui.Res("Line"), BorderThickness = new Thickness(1),
+                Child = Ui.Icon(Icons.User, 16, Ui.Res("Muted")),
+            };
+        }
+        if (_sideNarrow)
+        {
+            _accountButton.Content = avatar;
             ToolTip.SetTip(_accountButton, name);
         }
         else
         {
-            _accountButton.Content = new Border
-            {
-                Width = 38, Height = 38, CornerRadius = new CornerRadius(19), Background = Ui.Res("Surface2"), BorderBrush = Ui.Res("Line"), BorderThickness = new Thickness(1),
-                Child = Ui.Icon(Icons.User, 18, Ui.Res("Muted")),
-            };
-            ToolTip.SetTip(_accountButton, I18n.T("acc.menu.signin"));
+            // 2.0: на широкой панели — аватар, имя и уровень одной строкой (уровень — золотом, как на пути наград).
+            var (level, _, _) = RoadKit.Now();
+            var words = Ui.Col(0,
+                new TextBlock { Text = p.SignedIn ? name : ProfileKit.PlayerName(), FontSize = 13, FontWeight = FontWeight.SemiBold, Foreground = Ui.Res("Text"), TextTrimming = TextTrimming.CharacterEllipsis },
+                new TextBlock { Text = p.SignedIn ? I18n.T("v16.road.lv", ("n", level)) : name, FontSize = Phi.Caption, Foreground = p.SignedIn ? Ui.Res("Gold") : Ui.Res("Faint"), TextTrimming = TextTrimming.CharacterEllipsis });
+            words.VerticalAlignment = VerticalAlignment.Center;
+            avatar.Margin = new Thickness(0, 0, Phi.S13 - 3, 0);
+            var row = new DockPanel { LastChildFill = true };
+            var more = Ui.Icon(Icons.More, 15, Ui.Res("Faint"));
+            DockPanel.SetDock(more, Dock.Right);
+            DockPanel.SetDock(avatar, Dock.Left);
+            row.Children.Add(more);
+            row.Children.Add(avatar);
+            row.Children.Add(words);
+            _accountButton.Content = row;
+            ToolTip.SetTip(_accountButton, null);
         }
         _accountButton.Foreground = Ui.Res("Muted");
         _accountButton.Classes.Set("active", _accountPanel.IsVisible);

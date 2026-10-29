@@ -87,7 +87,7 @@ public sealed partial class CreatorPage
             if (!text.Contains("\nmod ") && !text.StartsWith("mod ")) text = $"mod \"{name}\"\nversion 1.0.0\ngame stardew-valley\n\n" + text;
             OpenProject(Projects.Create(name, text));
         }, "ghost", Icons.FilePlus);
-        var file = Ui.Row(8, Ui.Dot(HubLook.Violet, 6), HubLook.MonoText("console.mls", 12, Ui.Res("Text")));
+        var file = Ui.Row(8, Ui.Dot(HubLook.Violet, 6), HubLook.Code("console.mls", 12, Ui.Res("Text")));
         var strip = new DockPanel { Margin = new Thickness(0, 0, 0, 8) };
         // 18.0: «Запустить» убрана — консоль и так выполняется на лету, пока вы пишете.
         var actions = Ui.Row(6, example, toProject);
@@ -143,7 +143,7 @@ public sealed partial class CreatorPage
             foreach (var (k, v) in b.Vars.Where(kv => kv.Key != "args").Take(24))
             {
                 vars.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
-                var name = HubLook.MonoText(k, 12, HubLook.Violet);
+                var name = HubLook.Code(k, 12, HubLook.Violet);
                 var value = new TextBlock { Text = v.Length > 120 ? v[..120] + "…" : v, FontFamily = mono, FontSize = 12, TextTrimming = TextTrimming.CharacterEllipsis };
                 Grid.SetRow(name, row);
                 Grid.SetRow(value, row);
@@ -178,7 +178,7 @@ public sealed partial class CreatorPage
                     },
                 });
             }
-            foreach (var f in files.Take(8)) parts.Children.Add(HubLook.MonoText("+ " + f, 11.5));
+            foreach (var f in files.Take(8)) parts.Children.Add(HubLook.Code("+ " + f, 11.5));
             col.Children.Add(parts);
         }
         return col;
@@ -244,8 +244,8 @@ public sealed partial class CreatorPage
     Control CommandCard(ModScriptCommands.Cmd c)
     {
         var syntax = ModScriptCommands.Syntax(c).Replace("\\n", "\n");
-        var name = Ui.Row(8, HubLook.MonoText(c.Name, 14, HubLook.Violet));
-        if (c.New) name.Children.Add(new Border { Background = HubLook.Signature(), CornerRadius = new CornerRadius(3), Padding = new Thickness(5, 1), VerticalAlignment = VerticalAlignment.Center, Child = HubLook.MonoText("13.0", 9.5, Brushes.White) });
+        var name = Ui.Row(8, HubLook.Code(c.Name, 14, HubLook.Violet));
+        if (c.New) name.Children.Add(new Border { Background = HubLook.Signature(), CornerRadius = new CornerRadius(3), Padding = new Thickness(5, 1), VerticalAlignment = VerticalAlignment.Center, Child = HubLook.Code("13.0", 9.5, Brushes.White) });
         var copy = Ui.Button("", () => { MainWindow.Current?.Clipboard?.SetTextAsync(syntax); MainWindow.Current?.Toast(I18n.T("ctx.copied")); }, "icon ghost", Icons.Copy, I18n.T("v13.ms.copy"));
         var send = Ui.Button("", () =>
         {
