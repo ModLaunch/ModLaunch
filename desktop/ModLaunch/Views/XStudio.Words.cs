@@ -286,7 +286,10 @@ public sealed partial class XStudio
                     if (!doc.Ok) throw new Exception($"{l.Id}: {string.Join("; ", doc.Diags.Where(d => !d.Warning).Select(d => $"{d.Line}: {d.Message}"))}");
                     var r = MX.Sandbox.Run(doc, MX.Sandbox.ParseVars(LessonVars, []), 600);
                     if (!r.Ok || r.Output.Count == 0) throw new Exception($"{l.Id}: {string.Join(" | ", r.Errors.Select(e => e.Message))} out={r.Output.Count}");
-                    if (!I18n.Has($"v21.l.{l.Id}") || !I18n.Has($"v21.l.{l.Id}.text")) throw new Exception("no text for lesson " + l.Id);
+                    // Строки есть только при загруженных ресурсах (в --selfcheck без окна их нет).
+                    if (I18n.Raw("en", "v21.side.learn") is not null)
+                        foreach (var lang in new[] { "ru", "en" })
+                            if (I18n.Raw(lang, $"v21.l.{l.Id}") is null || I18n.Raw(lang, $"v21.l.{l.Id}.text") is null) throw new Exception($"no {lang} text for lesson {l.Id}");
                 }
             // Урок «Файлы»: команды ModScript попадают в сборку вместе с кодом X.
             var files = MX.ModxDoc.Parse("mod \"L\"\n" + Lessons.First(l => l.Id == "files").Ru);
