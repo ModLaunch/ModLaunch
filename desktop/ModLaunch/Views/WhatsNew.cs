@@ -12,9 +12,10 @@ public static class WhatsNew
 {
     static readonly (string Icon, string Key, Func<Page>? Open)[] Items =
     [
-        (Icons.Grid, "new.v21.blocks", XStudio.Entry),
+        (Icons.Code, "new.v21.words", () => CreatorPage.NewForm()),
+        (Icons.Book, "new.v21.learn", XStudio.Entry),
         (Icons.Package, "new.v21.pieces", XStudio.Entry),
-        (Icons.Sparkles, "new.v21.kids", () => CreatorPage.NewForm()),
+        (Icons.Layers, "new.v21.classic", XStudio.Entry),
         (Icons.Grid, "new.v20.hub", () => new CreatorPage("home")),
         (Icons.Chart, "new.v20.earnings", () => new AccountPage("earnings")),
         (Icons.Code, "new.v19.ide", XStudio.Entry),

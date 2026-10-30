@@ -108,22 +108,6 @@ public sealed partial class ScriptEditor : UserControl
         }
     }
 
-    /// <summary>
-    /// 21.0: заменить текст одной правкой, которую можно отменить (Ctrl+Z): меняется только отличающаяся середина,
-    /// так что свёртки и точки останова в остальном коде остаются на месте. Так пишут в код блоки.
-    /// </summary>
-    public void ReplaceText(string text)
-    {
-        var doc = _editor.Document;
-        var old = doc.Text;
-        if (old == text) return;
-        var start = 0;
-        while (start < old.Length && start < text.Length && old[start] == text[start]) start++;
-        var end = 0;
-        while (end < old.Length - start && end < text.Length - start && old[^(end + 1)] == text[^(end + 1)]) end++;
-        doc.Replace(start, old.Length - start - end, text.Substring(start, text.Length - start - end));
-    }
-
     public int CaretIndex
     {
         get => _editor.CaretOffset;
@@ -293,14 +277,20 @@ public sealed partial class ScriptEditor : UserControl
     {
         public HashSet<int> Errors = [];
 
-        [GeneratedRegex(@"#.*$|""(?:\\.|[^""\\])*""?|\$\{?\w+\}?|\[[^\]\r\n]*\]|\b\d+(?:\.\d+)*\b|[=+\-*/%{}]|\b[A-Za-z_][\w.\-]*\b")]
+        [GeneratedRegex(@"#.*$|""(?:\\.|[^""\\])*""?|\$\{?\w+\}?|\[[^\]\r\n]*\]|\b\d+(?:\.\d+)*\b|[=+\-*/%{}]|\b[\p{L}_][\p{L}\w.\-]*\b")]
         private static partial Regex Tokens();
 
         static IBrush B(string hex) => new SolidColorBrush(Color.Parse(hex));
         static readonly IBrush Keyword = B("#C792EA"), Str = B("#C3E88D"), Var = B("#82AAFF"), Num = B("#F78C6C"),
             Comment = B("#6B7385"), Section = B("#FFCB6B"), Op = B("#89DDFF"), Word = B("#E8EBF2"), Func = B("#7FDBCA");
         static readonly IBrush ErrorBg = new SolidColorBrush(Color.FromArgb(46, 255, 107, 107));
-        static readonly HashSet<string> Words = new(Commands.Concat(ModScriptX.ModxDoc.Keywords).Concat(["to", "from", "in", "mod", "version", "engine", "var"]), StringComparer.OrdinalIgnoreCase);
+        static readonly HashSet<string> Words = new(Commands.Concat(ModScriptX.ModxDoc.Keywords).Concat(ModScriptX.Words.Keywords).Concat(["to", "from", "in", "mod", "version", "engine", "var"]), StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>Слова, которые подсвечиваются и в середине строки: связки условий и простых команд (21.0).</summary>
+        static readonly HashSet<string> Joins = new(["to", "from", "in", "and", "or", "not", "if", "else", "и", "или", "не", "больше", "меньше", "равно", "равен", "равна", "чем",
+            "иначе", "раз", "раза", "на", "в", "из", "от", "до", "то", "секунд", "секунды", "секунду", "минут", "минуты", "минуту", "кадр", "шансом", "случайно",
+            "игра", "началась", "загрузился", "загрузилось", "сохранение", "otherwise", "times", "by", "than", "least", "most", "equals", "seconds", "second",
+            "minutes", "minute", "frame", "chance", "starts", "loads", "random", "each"], StringComparer.OrdinalIgnoreCase);
 
         /// <summary>21.0: название кусочка в строке use — золотой плашкой, как предмет из магазина.</summary>
         static readonly IBrush PieceText = B("#FFD58A"), PieceBg = new SolidColorBrush(Color.FromArgb(52, 0xF5, 0xB9, 0x4A));
@@ -310,10 +300,11 @@ public sealed partial class ScriptEditor : UserControl
             var text = CurrentContext.Document.GetText(line);
             if (Errors.Contains(line.LineNumber) && line.Length > 0)
                 ChangeLinePart(line.Offset, line.EndOffset, el => el.BackgroundBrush = ErrorBg);
-            if (text.StartsWith("use ", StringComparison.Ordinal) && ModScriptX.ModxDoc.ReadUse(text, line.LineNumber) is { } use)
+            if ((text.StartsWith("use ", StringComparison.Ordinal) || text.StartsWith("использовать ", StringComparison.Ordinal) || text.StartsWith("подключить ", StringComparison.Ordinal))
+                && ModScriptX.ModxDoc.ReadUse(text, line.LineNumber) is { } use)
             {
                 var at = text.IndexOf('"');
-                ChangeLinePart(line.Offset, line.Offset + 3, el => el.TextRunProperties.SetForegroundBrush(Look.IsLight ? Darker(Keyword) : Keyword));
+                ChangeLinePart(line.Offset, line.Offset + text.IndexOf(' '), el => el.TextRunProperties.SetForegroundBrush(Look.IsLight ? Darker(Keyword) : Keyword));
                 ChangeLinePart(line.Offset + at, line.Offset + at + use.Name.Length + 2, el =>
                 {
                     el.BackgroundBrush = PieceBg;
@@ -335,7 +326,7 @@ public sealed partial class ScriptEditor : UserControl
                     '[' => Section,
                     _ when char.IsDigit(t[0]) => Num,
                     _ when "=+-*/%{}".Contains(t[0]) && t.Length == 1 => Op,
-                    _ when Words.Contains(t) && (first || t is "to" or "from" or "in" or "and" or "or" or "not" or "if" or "else") => Keyword,
+                    _ when Words.Contains(t) && (first || Joins.Contains(t)) => Keyword,
                     _ when m.Index + m.Length < text.Length && text[m.Index + m.Length] == '(' => Func,
                     _ => light ? null : Word,
                 };

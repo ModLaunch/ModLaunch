@@ -41,8 +41,6 @@ public sealed partial class XStudio : Page
         public double CheckMs;
         /// <summary>19.0: находки понимания кода (опечатки, лишние переменные…) — с местом и исправлением.</summary>
         public List<ModxInsight.Issue> Lints = [];
-        /// <summary>21.0: тот же файл блоками (создаётся при первом показе).</summary>
-        public BlockCanvas? Canvas;
     }
 
     /// <summary>Что открыто в проекте: живёт дольше страницы.</summary>
@@ -50,9 +48,7 @@ public sealed partial class XStudio : Page
     {
         public readonly List<Doc> Docs = [];
         public Doc? Active;
-        public string Side = DefaultView == "blocks" ? "blocks" : "files";
-        /// <summary>21.0: «blocks» — блоки, «code» — код.</summary>
-        public string View = DefaultView;
+        public string Side = "files";
         public string Panel = "problems";
         public bool Watch;
         public string Vars = "gold = 100\nhealth = 80\nspeed = 5\nenemy_damage = 10";
@@ -84,7 +80,7 @@ public sealed partial class XStudio : Page
     DispatcherTimer? _analyze;
     readonly Border _top = new(), _activity = new(), _side = new(), _tabs = new(), _editorHost = new(), _panelTabs = new(), _panelBody = new(), _status = new();
 
-    public XStudio(string projectId, string? side = null, string? panel = null, string? view = null)
+    public XStudio(string projectId, string? side = null, string? panel = null)
     {
         _id = projectId;
         _p = XProjects.Get(projectId);
@@ -92,7 +88,6 @@ public sealed partial class XStudio : Page
         _s = s;
         if (side is not null) _s.Side = side;
         if (panel is not null) _s.Panel = panel;
-        if (view is not null) _s.View = view;
         if (_p is not null)
         {
             if (_s.Docs.Count == 0) Open(_p.Main, focus: false);
@@ -190,9 +185,7 @@ public sealed partial class XStudio : Page
             Background = HubLook.Panel, BorderBrush = HubLook.Edge, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(4), ClipToBounds = true,
             Child = new DockPanel { Children = { Docked(_panelTabs, Dock.Top), _panelBody } },
         };
-        // 21.0: в блоках нижняя панель — по содержимому (не выше 150): холсту нужно место, а «Проблем нет» — одна строка.
-        var work = new Grid { RowDefinitions = new RowDefinitions(BlocksOn ? "*,6,Auto" : "*,6,230"), Margin = new Thickness(10, 10, 10, 8) };
-        _panelBody.MaxHeight = BlocksOn ? 150 : double.PositiveInfinity;
+        var work = new Grid { RowDefinitions = new RowDefinitions("*,6,230"), Margin = new Thickness(10, 10, 10, 8) };
         work.Children.Add(editor);
         var split = new GridSplitter { Background = Brushes.Transparent, ResizeDirection = GridResizeDirection.Rows };
         Grid.SetRow(split, 1);
@@ -304,8 +297,8 @@ public sealed partial class XStudio : Page
 
     static readonly (string Id, string Icon, string Key)[] Sides =
     [
-        ("files", Icons.Folder, "v16.x.side.files"), ("bridge", Icons.Layers, "v16.x.side.bridge"), ("blocks", Icons.Wand, "v16.x.side.blocks"),
-        ("docs", Icons.Book, "v16.x.side.docs"), ("history", Icons.Clock, "v19.side.history"), ("settings", Icons.Settings, "v16.x.side.settings"),
+        ("files", Icons.Folder, "v16.x.side.files"), ("bridge", Icons.Layers, "v16.x.side.bridge"), ("blocks", Icons.Wand, "v21.side.words"),
+        ("docs", Icons.Book, "v21.side.learn"), ("history", Icons.Clock, "v19.side.history"), ("settings", Icons.Settings, "v16.x.side.settings"),
     ];
 
     void Side(string id)
@@ -350,7 +343,7 @@ public sealed partial class XStudio : Page
         var body = _s.Side switch
         {
             "bridge" => BridgeSide(),
-            "blocks" => BlocksOn ? PaletteSide() : BlocksSide(),
+            "blocks" => BlocksSide(),
             "docs" => DocsSide(),
             "history" => HistorySide(),
             "settings" => SettingsSide(),
@@ -540,106 +533,11 @@ public sealed partial class XStudio : Page
         Retarget();
     }
 
-    /// <summary>Блоки: готовые куски кода, клик — вставить там, где курсор.</summary>
-    Control BlocksSide()
-    {
-        var col = new StackPanel { Spacing = 2, Margin = new Thickness(8, 0, 8, 14) };
-        col.Children.Add(new Border { Padding = new Thickness(8, 0, 8, 4), Child = Ui.Text(I18n.T("v16.x.blocks.lead"), "small muted", wrap: true) });
-        var t = TargetFor(ActiveDoc());
-        foreach (var (group, items) in Blocks())
-        {
-            col.Children.Add(Caption(I18n.T("v16.x.blocks." + group)));
-            foreach (var (key, code, ev) in items)
-            {
-                var text = code;
-                var can = ev is null || t.Events.Contains(ev);
-                var b = new Button
-                {
-                    Classes = { "ghost" }, Padding = new Thickness(8, 6), HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch, IsEnabled = can,
-                    Content = Ui.Col(2, Ui.Text(I18n.T(key), "small strong"),
-                        new TextBlock { Text = code.Split('\n')[0], FontFamily = Mono, FontSize = 11, Foreground = HubLook.Cyan, TextTrimming = TextTrimming.CharacterEllipsis }),
-                };
-                ToolTip.SetTip(b, can ? code : I18n.T("v16.event.missing", ("engine", t.Title)));
-                b.Click += (_, _) => InsertBlock(text);
-                col.Children.Add(b);
-            }
-        }
-        return col;
-    }
-
-    internal static IEnumerable<(string Group, (string Key, string Code, string? Event)[] Items)> Blocks() =>
-    [
-        ("events", [
-            ("v16.event.ready", "hook ready {\n    log \"mod loaded\"\n}\n", "ready"),
-            ("v16.event.start", "hook start {\n    say \"Hello from ModScript X\"\n}\n", "start"),
-            ("v16.event.load", "hook load {\n    log \"save loaded\"\n}\n", "load"),
-            ("v16.event.tick", "hook tick {\n    add ticks 1\n}\n", "tick"),
-        ]),
-        ("data", [
-            ("v16.x.b.let", "let bonus = 100\n", null),
-            ("v16.x.b.set", "set gold = gold + bonus\n", null),
-            ("v16.x.b.add", "add score 1\n", null),
-        ]),
-        ("logic", [
-            ("v16.x.b.if", "if health < 20 {\n    say \"Low health!\"\n} else {\n    log \"ok\"\n}\n", null),
-            ("v16.x.b.for", "for i in 1..3 {\n    add gold 10\n}\n", null),
-            ("v16.x.b.while", "while gold < 100 {\n    add gold 10\n}\n", null),
-            ("v16.x.b.fn", "fn double(value) {\n    return value * 2\n}\n", null),
-        ]),
-        ("talk", [
-            ("v16.x.b.say", "say \"Gold: {gold}\"\n", null),
-            ("v16.x.b.log", "log \"debug: {gold}\"\n", null),
-        ]),
-        ("tricks", [
-            ("v16.x.b.timer", "add timer 1\nif timer >= 600 {\n    set timer = 0\n    say \"Another 10 seconds\"\n}\n", null),
-            ("v16.x.b.chance", "if chance(10) {\n    add gold rand(1, 50)\n    say \"Lucky!\"\n}\n", null),
-            ("v16.x.b.clamp", "set health = clamp(health, 0, 100)\n", null),
-        ]),
-    ];
-
     void InsertBlock(string code)
     {
         if (_s.Active is not { Modx: true } d) { NewFile(); d = _s.Active!; }
         d.Editor.Insert(code);
         d.Editor.FocusText();
-    }
-
-    Control DocsSide()
-    {
-        var col = new StackPanel { Spacing = 10, Margin = new Thickness(14, 0, 14, 14) };
-        col.Children.Add(Ui.Text(I18n.T("v16.x.docs.lead"), "small muted", wrap: true));
-        foreach (var (key, code) in new[]
-        {
-            ("v16.x.docs.head", "mod \"My mod\"\nversion 1.0.0\nauthor \"Me\"\nengine unity"),
-            ("v16.x.docs.hooks", "hook start {\n    say \"Hi\"\n}"),
-            ("v16.x.docs.vars", "let gold = 100\nset gold = gold * 2\nadd gold 5\ngold += 1"),
-            ("v16.x.docs.logic", "if gold > 10 { … } else { … }\nfor i in 1..5 { … }\nwhile alive { … }"),
-            ("v16.x.docs.fn", "fn reward(wave) {\n    return wave * 50\n}"),
-            ("v16.x.docs.text", "say \"Gold: {gold}\"\nlog \"x = {x}\""),
-            ("v16.x.docs.native", "native csharp {\n    // C# / lua / python / js / gdscript\n}"),
-        })
-        {
-            var box = new Border
-            {
-                Background = HubLook.Raised, CornerRadius = new CornerRadius(4), Padding = new Thickness(10, 8),
-                Child = new SelectableTextBlock { Text = code, FontFamily = Mono, FontSize = 11.5, LineHeight = 17, TextWrapping = TextWrapping.Wrap },
-            };
-            col.Children.Add(Ui.Col(6, Ui.Text(I18n.T(key), "small strong"), box));
-        }
-        var builtins = new WrapPanel();
-        foreach (var f in MX.ModxDoc.Builtins)
-            builtins.Children.Add(new Border { CornerRadius = new CornerRadius(3), Padding = new Thickness(6, 2), Margin = new Thickness(0, 0, 5, 5), Background = HubLook.Raised, Child = HubLook.MonoText(f + "()", 10.5, Ui.Res("Text")) });
-        col.Children.Add(Ui.Col(6, Ui.Text(I18n.T("v16.x.docs.builtins"), "small strong"), builtins));
-        // 19.0: клавиши среды — вместо кнопки на старую страницу языка (её больше нет).
-        var keys = Ui.Col(3);
-        foreach (var (k, key) in new[]
-        {
-            ("Ctrl+Space", "v15.ms.key.suggest"), ("F12 · Ctrl+клик", "v19.cmd.definition"), ("Shift+F12", "v19.cmd.references"), ("F2", "v19.cmd.rename"),
-            ("Shift+Alt+F", "v19.cmd.format"), ("F9", "v19.cmd.breakpoint"), ("F10 · Shift+F10", "v19.docs.step"), ("Ctrl+P", "v19.key.palette"), ("Ctrl+Shift+F", "v19.cmd.search"),
-        })
-            keys.Children.Add(Ui.Row(8, new TextBlock { Text = k, FontFamily = Mono, FontSize = 11, Width = 104, Foreground = HubLook.Cyan }, Ui.Text(I18n.T(key), "tiny muted", wrap: true)));
-        col.Children.Add(Ui.Col(6, Ui.Text(I18n.T("v19.docs.keys"), "small strong"), keys));
-        return col;
     }
 
     Control SettingsSide()
@@ -868,12 +766,7 @@ public sealed partial class XStudio : Page
             };
             row.Children.Add(tab);
         }
-        var tabs = new DockPanel();
-        var view = ViewSwitch();
-        DockPanel.SetDock(view, Dock.Right);
-        tabs.Children.Add(view);
-        tabs.Children.Add(new ScrollViewer { HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled, Content = row });
-        _tabs.Child = tabs;
+        _tabs.Child = new ScrollViewer { HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled, Content = row };
         _tabs.BorderBrush = HubLook.Edge;
         _tabs.BorderThickness = new Thickness(0, 0, 0, 1);
     }
@@ -882,14 +775,6 @@ public sealed partial class XStudio : Page
     {
         if (_s.Active is { } d)
         {
-            if (BlocksOn)
-            {
-                var canvas = CanvasOf(d);
-                if (canvas.Parent is Decorator was && was != _editorHost) was.Child = null;
-                _editorHost.Child = canvas;
-                MarkBlocks(d);
-                return;
-            }
             if (d.Editor.Parent is Decorator old && old != _editorHost) old.Child = null;
             _editorHost.Child = d.Editor;
             return;
@@ -931,7 +816,6 @@ public sealed partial class XStudio : Page
             _analyze!.Stop();
             if (_s.Active is not { } d) return;
             Analyze(d);
-            MarkBlocks(d);
             RenderTabs();
             if (_s.Side == "files") RenderSide();
             if (_s.Panel is "problems" or "code") RenderPanel();
@@ -1185,6 +1069,7 @@ public sealed partial class XStudio : Page
             Log(built, I18n.T(built ? "v15.ms.inj.done" : "v15.ms.inj.notBuilt", ("mod", r.Doc.Name), ("game", gameName), ("engine", r.Target.Title), ("n", r.Files.Count)));
             foreach (var f in r.Files.Take(8)) Log(true, "  + " + f);
             if (r.Note is { } note) foreach (var line in note.Split('\n').Where(l => l.Trim() != "").Take(20)) Log(built, "  " + line.Trim());
+            if (r.Doc.HasClassic) await InstallClassic(r.Doc);
             if (!quiet) w?.Toast(built ? I18n.T("v15.ms.inj.toast", ("game", gameName)) : I18n.T("v15.ms.inj.failed"), bad: !built);
         }
         catch (Exception e)
@@ -1199,11 +1084,39 @@ public sealed partial class XStudio : Page
         }
     }
 
+    /// <summary>
+    /// 21.0: ModScript и ModScript X вместе — команды ModScript из того же файла (файл, настройка, копировать) ставятся
+    /// в игру обычным модом ModLaunch: файлы — в папку мода, строки настроек — прямо в .cfg/.ini игры.
+    /// </summary>
+    async Task InstallClassic(MX.ModxDoc doc)
+    {
+        if (Game is not { Registry: not null } g) { Log(false, I18n.T("v21.classic.needGame")); return; }
+        var b = ClassicBuild(doc, g.Def.Id);
+        var packed = await Projects.Pack(b, _p?.Dir);
+        await Task.Run(() => Projects.Install(g, b, packed));
+        Log(true, I18n.T("v21.classic.done", ("n", packed.Files.Count + b.Configs.Count + b.Inis.Count), ("game", g.Def.Name)));
+        foreach (var f in packed.Files.Take(8)) Log(true, "  + " + f);
+        foreach (var w in packed.Warnings.Take(4)) Log(false, "  " + w);
+    }
+
+    /// <summary>Сборка ModScript из верха .modx: имя и игра — от мода X (в .modx строки game может не быть).</summary>
+    internal static ModBuild ClassicBuild(MX.ModxDoc doc, string game)
+    {
+        var b = doc.Classic;
+        b.Diags.RemoveAll(x => x.Message is "err.noGame" or "err.noName");
+        if (b.Name == "") b.Name = doc.Name == "" ? doc.Id : doc.Name;
+        b.Game = game;
+        return b;
+    }
+
+    static string ClassicId(MX.ModxDoc doc) => "creator:" + Projects.PackageName(doc.Name == "" ? doc.Id : doc.Name);
+
     async Task EjectNow()
     {
         if (ActiveDoc() is not { } doc || GamePath is not { } path) { _s.Panel = "inject"; RenderPanel(); return; }
         try
         {
+            if (doc.HasClassic && Game is { Registry: { } reg } && reg.Has(ClassicId(doc))) await Task.Run(() => reg.Remove(ClassicId(doc)));
             var removed = await Task.Run(() => MX.Injector.Eject(doc.Id, path));
             Log(true, I18n.T("v15.ms.inj.ejected", ("n", removed.Count)));
             MainWindow.Current?.Toast(I18n.T("v15.ms.inj.ejected", ("n", removed.Count)));
@@ -1358,16 +1271,6 @@ public sealed partial class XStudio : Page
         if (!t.Contains("version 2.0.0\nauthor \"Me\"\nengine")) throw new Exception("author goes after version: " + t);
         var back = SetHeader(t, "author", null);
         if (back.Contains("author") || MX.ModxDoc.Parse(back).Version != "2.0.0") throw new Exception("remove author: " + back);
-        // Каждый блок вставляется в хук и не ломает разбор.
-        var n = 0;
-        foreach (var (_, items) in Blocks())
-            foreach (var (key, code, ev) in items)
-            {
-                var src = ev is not null || code.StartsWith("fn ") ? "mod \"T\"\n" + code : "mod \"T\"\nlet gold = 1\nlet health = 1\nlet score = 0\nlet timer = 0\nlet ticks = 0\nlet bonus = 1\nhook start {\n" + string.Join("\n", code.TrimEnd().Split('\n').Select(l => "    " + l)) + "\n}\n";
-                var d = MX.ModxDoc.Parse(src);
-                if (!d.Ok) throw new Exception(key + ": " + string.Join("; ", d.Diags.Where(x => !x.Warning).Select(x => x.Message)));
-                n++;
-            }
-        return $"header lines kept in order, {n} blocks parse";
+        return "header lines kept in order";
     }
 }

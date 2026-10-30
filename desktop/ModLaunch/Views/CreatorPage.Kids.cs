@@ -11,8 +11,8 @@ using MX = ModScriptX;
 namespace ModLaunch.Views;
 
 /// <summary>
-/// 21.0: «Собери мод из блоков» — первый шаг для того, кто ни разу не программировал. Четыре идеи: нажал — и через
-/// секунду открыт ModScript X в блоках с уже собранным модом для твоей игры: поменяй слова, числа, добавь кусочек.
+/// 21.0: «Первый мод за минуту» — первый шаг для того, кто ни разу не программировал. Четыре идеи: нажал — и через
+/// секунду открыт ModScript X с модом для твоей игры, написанным простыми словами, и учебником рядом.
 /// </summary>
 public sealed partial class CreatorPage
 {
@@ -60,7 +60,7 @@ public sealed partial class CreatorPage
                     Child = new TextBlock { Text = n, FontSize = 11, FontWeight = FontWeight.Bold, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
                 }, Ui.Text(I18n.T(key), "small")),
             });
-        var col = Ui.Col(14, Ui.Col(6, Ui.Row(10, Ui.Icon(Icons.Grid, 20, HubLook.Cyan), title), Ui.Text(I18n.T("v21.kids.text"), "muted", wrap: true), steps), tiles);
+        var col = Ui.Col(14, Ui.Col(6, Ui.Row(10, Ui.Icon(Icons.Book, 20, HubLook.Cyan), title), Ui.Text(I18n.T("v21.kids.text"), "muted", wrap: true), steps), tiles);
         return new Border
         {
             Background = HubLook.Panel, BorderBrush = HubLook.Premium(150), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(8),
@@ -70,7 +70,7 @@ public sealed partial class CreatorPage
 
     /// <summary>
     /// Проект одной кнопкой: игра — последняя (или первая найденная, где мост умеет код), движок — по мосту, код —
-    /// собранный мод идеи. Открывается в блоках.
+    /// мод идеи простыми словами. Открывается с учебником слева.
     /// </summary>
     internal static XProject? QuickStart(string idea, bool open = true)
     {
@@ -84,9 +84,7 @@ public sealed partial class CreatorPage
             var p = XProjects.Create(new XForm(name, I18n.T($"v21.idea.{idea}.text"), bridge is { Code: true } ? pick!.Def.Id : "", bridge is { Code: true } ? pick!.Path : null,
                 "empty", bridge?.Engine ?? target.Id, target.Id, ["start"], "", "1.0.0", idea switch { "gold" => "orange", "god" => "pink", "blank" => "cyan", _ => "violet" }));
             File.WriteAllText(p.Main, IdeaCode(idea, p.Name, target));
-            Settings.Data["xView"] = "blocks";
-            Settings.Save();
-            if (open) MainWindow.Current?.Navigate(() => new XStudio(p.Id, side: "blocks"));
+            if (open) MainWindow.Current?.Navigate(() => new XStudio(p.Id, side: "docs"));
             return p;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
@@ -96,17 +94,23 @@ public sealed partial class CreatorPage
         }
     }
 
-    /// <summary>Код идеи: шапка мода и пара блоков — то, что ребёнок сразу увидит и поменяет.</summary>
+    static string Quote(string text) => "\"" + text.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", " ") + "\"";
+
+    /// <summary>Код идеи простыми словами (на языке программы): шапка мода и пара строк — то, что новичок сразу поменяет.</summary>
     internal static string IdeaCode(string idea, string name, MX.Target target)
     {
-        var head = $"mod {XBlock.Quote(name)}\nversion 1.0.0\nengine {target.Id}\n\n";
-        string Piece(string key) => $"use {XBlock.Quote(I18n.T($"v21.piece.{key}"))}\n\n";
+        var ru = SimpleWords.Ru;
+        var head = ru ? $"мод {Quote(name)}\nверсия 1.0.0\nдвижок {target.Id}\n\n" : $"mod {Quote(name)}\nversion 1.0.0\nengine {target.Id}\n\n";
+        var start = ru ? "когда игра началась {" : "when the game starts {";
+        string Say(string key) => $"    {(ru ? "сказать" : "say")} {Quote(I18n.T(key))}\n";
         return head + idea switch
         {
-            "gold" => Piece("gold") + $"hook start {{\n    say {XBlock.Quote(I18n.T("v21.idea.gold.say"))}\n}}\n",
-            "god" => Piece("god") + $"hook start {{\n    say {XBlock.Quote(I18n.T("v21.idea.god.say"))}\n}}\n",
-            "blank" => "hook start {\n}\n",
-            _ => $"hook start {{\n    say {XBlock.Quote(I18n.T("v21.idea.hello.say"))}\n    if chance(50) {{\n        say {XBlock.Quote(I18n.T("v21.idea.hello.luck"))}\n    }}\n}}\n",
+            "gold" => Pieces.Line(I18n.T("v21.piece.gold")) + "\n\n" + start + "\n" + (ru ? "    дать золото 100\n" : "    give gold 100\n")
+                + $"    {(ru ? "сказать" : "say")} {Quote(I18n.T("v21.idea.gold.say") + (ru ? " {золото}" : " {gold}"))}\n}}\n",
+            "god" => Pieces.Line(I18n.T("v21.piece.god")) + "\n\n" + start + "\n" + Say("v21.idea.god.say") + "}\n",
+            "blank" => start + "\n" + Say("v21.idea.blank.say") + "}\n",
+            _ => start + "\n" + Say("v21.idea.hello.say") + (ru ? "    с шансом 50 {\n" : "    with chance 50 {\n") + "    " + Say("v21.idea.hello.luck") + "    }\n}\n\n"
+                + (ru ? "каждые 60 секунд {\n" : "every 60 seconds {\n") + Say("v21.idea.hello.minute") + "}\n",
         };
     }
 
@@ -120,9 +124,8 @@ public sealed partial class CreatorPage
                 var code = IdeaCode(id, "Idea " + id, target);
                 var doc = MX.ModxDoc.Parse(code);
                 if (!doc.Ok) throw new Exception($"{id}/{t}: {doc.Diags[0].Message}");
-                if (XBlockDoc.Parse(code) is { Error: { } e }) throw new Exception($"{id} blocks: {e}");
                 target.Emit(doc, null);
             }
-        return $"{Ideas.Length} ideas × 3 engines parse, show as blocks and translate";
+        return $"{Ideas.Length} ideas × 3 engines parse and translate";
     }
 }

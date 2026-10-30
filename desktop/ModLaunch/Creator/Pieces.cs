@@ -8,7 +8,7 @@ namespace ModLaunch.Creator;
 
 /// <summary>
 /// Кусочек кода ModScript X: готовое умение мода, которое ставится в проект одной строкой use "Название"
-/// (в блоках — одним блоком). Бесплатные идут с ModLaunch, остальные покупаются на Рынке (лот «Часть кода» или
+/// (по-русски — использовать "Название"). Бесплатные идут с ModLaunch, остальные покупаются на Рынке (лот «Часть кода» или
 /// «Скрипт» с файлом .modx) — их исходник закрыт, в проекте видно только название.
 /// </summary>
 public sealed record Piece(string Name, string Title, string About, string Icon, string Color, string Seller, bool Free, string? Listing,
@@ -118,11 +118,11 @@ public static class Pieces
         return code ?? free?.Code;
     }
 
-    /// <summary>Строка use для кода: название и настройки, которые отличаются от значений кусочка.</summary>
+    /// <summary>Строка use для кода (в русской программе — «использовать»): название и настройки, которые отличаются от значений кусочка.</summary>
     public static string Line(string name, IEnumerable<(string Name, string Value)>? settings = null)
     {
         var list = settings?.Where(s => s.Value.Trim() != "").Select(s => $"{s.Name} = {s.Value.Trim()}").ToList() ?? [];
-        return $"use \"{name.Replace("\"", "'")}\"" + (list.Count > 0 ? $" ({string.Join(", ", list)})" : "");
+        return $"{(SimpleWords.Ru ? "использовать" : "use")} \"{name.Replace("\"", "'")}\"" + (list.Count > 0 ? $" ({string.Join(", ", list)})" : "");
     }
 
     /// <summary>Кусочек есть в проекте (строкой use): чтобы не вставить его дважды.</summary>
