@@ -12,6 +12,9 @@ public static class WhatsNew
 {
     static readonly (string Icon, string Key, Func<Page>? Open)[] Items =
     [
+        (Icons.Gamepad, "new.v22.engines", XStudio.Entry),
+        (Icons.Chart, "new.v22.numbers", XStudio.Entry),
+        (Icons.Download, "new.v22.setup", XStudio.Entry),
         (Icons.Code, "new.v21.words", () => CreatorPage.NewForm()),
         (Icons.Book, "new.v21.learn", XStudio.Entry),
         (Icons.Package, "new.v21.pieces", XStudio.Entry),
@@ -167,7 +170,7 @@ public static class WhatsNew
             },
             Child = Ui.Col(2,
                 new TextBlock { Text = $"ModLaunch {Http.Version}", FontSize = 24, FontWeight = FontWeight.Bold, Foreground = Brushes.White },
-                new TextBlock { Text = I18n.T("new.v21.subtitle"), Foreground = new SolidColorBrush(Color.FromArgb(220, 255, 255, 255)), TextWrapping = TextWrapping.Wrap }),
+                new TextBlock { Text = I18n.T("new.v22.subtitle"), Foreground = new SolidColorBrush(Color.FromArgb(220, 255, 255, 255)), TextWrapping = TextWrapping.Wrap }),
         };
         w.Dialog(I18n.T("new.title"), new ScrollViewer { MaxHeight = 560, Content = Ui.Col(12, hero, list) }, 620,
             Ui.Button(I18n.T("new.ok"), w.CloseDialog, "primary", Icons.Check));

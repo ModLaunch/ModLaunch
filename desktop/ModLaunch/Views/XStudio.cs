@@ -466,7 +466,9 @@ public sealed partial class XStudio : Page
         col.Children.Add(Ui.Col(8, pick, folder));
         if (path is not null) col.Children.Add(new TextBlock { Text = path, FontSize = 11, Foreground = Ui.Res("Faint"), TextWrapping = TextWrapping.Wrap });
 
-        col.Children.Add(CreatorPage.BridgeCard(b, path is null && !Program.Demo));
+        var setup = SetupCard(b, path);
+        col.Children.Add(CreatorPage.BridgeCard(b, path is null && !Program.Demo, setup is not null));
+        if (setup is not null) col.Children.Add(setup);
 
         // Куда лягут файлы и какие события есть у движка.
         var t = TargetFor(ActiveDoc());
@@ -1065,7 +1067,7 @@ public sealed partial class XStudio : Page
                 if (!quiet) w?.Toast(I18n.T("v15.ms.inj.failed"), bad: true);
                 return;
             }
-            var built = r.Target.Id != "unity" || Features.Inject.Built(path, r.Doc.Id);
+            var built = Features.Inject.Built(path, r.Doc.Id, r.Target);
             Log(built, I18n.T(built ? "v15.ms.inj.done" : "v15.ms.inj.notBuilt", ("mod", r.Doc.Name), ("game", gameName), ("engine", r.Target.Title), ("n", r.Files.Count)));
             foreach (var f in r.Files.Take(8)) Log(true, "  + " + f);
             if (r.Note is { } note) foreach (var line in note.Split('\n').Where(l => l.Trim() != "").Take(20)) Log(built, "  " + line.Trim());

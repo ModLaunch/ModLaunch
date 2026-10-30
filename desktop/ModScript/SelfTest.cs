@@ -211,6 +211,34 @@ static class SelfTest
                 var r = Injector.Inject(example, g, null);
                 Has(File.ReadAllText(Path.Combine(g, r.Files.Single())), "start_gold = 500", "say((\"Gold Boost: you start with \" .. tostring(start_gold) .. \" gold\"))", "gold = gold + (bonus)", "return M");
             });
+            Check("cyberpunk 2077: CET Lua with game numbers", () =>
+            {
+                var g = Game("cp2077", "bin/x64/Cyberpunk2077.exe", "archive/pc/content/basegame_1_engine.archive", "bin/x64/plugins/cyber_engine_tweaks.asi");
+                var b = Bridge.Scan(g);
+                if (b.Engine != "redengine" || !b.Code || !b.LoaderReady) throw new Exception($"bridge: {b.Engine} {b.Path} {b.LoaderReady}");
+                var r = Injector.Inject(example, g, null);
+                if (r.Files.Single() != "bin/x64/plugins/cyber_engine_tweaks/mods/modscript_gold_boost/init.lua") throw new Exception("path: " + r.Files.Single());
+                Has(File.ReadAllText(Path.Combine(g, r.Files.Single())), "registerForEvent(\"onInit\", function()", "Observe(\"PlayerPuppet\", \"OnGameAttached\", function()",
+                    "pcall(function() gold = Game.GetTransactionSystem():GetItemQuantity(p, MarketSystem.Money()); mx_was.gold = gold end)",
+                    "Game.AddToInventory(\"Items.money\", d)", "if not mx_started then mx_started = true mx_run(M.start) end", "return M");
+            });
+            Check("gta v and rdr2: story mode C# with game numbers", () =>
+            {
+                var g = Game("gta", "GTA5.exe", "x64a.rpf", "BattlEye/BEClient_x64.dll", "ScriptHookV.dll");
+                var b = Bridge.Scan(g);
+                if (b.Engine != "rage-gta5" || !b.Code || b.LoaderReady) throw new Exception($"bridge: {b.Engine} {b.Path} {b.LoaderReady} {b.AntiCheat}");
+                var r = Injector.Inject(example, g, null);
+                if (r.Target?.Id != "gta5") throw new Exception("engine: " + r.Target?.Id + " " + string.Join("; ", r.Doc.Diags.Select(d => d.Message)));
+                Has(File.ReadAllText(Path.Combine(g, r.Files.Single())), "public class ModScript_Gold_Boost : GTA.Script", "Tick += (sender, e) => Frame();",
+                    "public static dynamic gold { get { try { return Game.Player.Money; } catch { return 0; } } set { try { Game.Player.Money = Convert.ToInt32(value); } catch { } } }",
+                    "GTA.UI.Notification.Show(Convert.ToString(text));");
+                if (r.Note?.Contains("ScriptHookV .NET is not installed") != true) throw new Exception("note: " + r.Note);
+                Injector.Eject("Gold_Boost", g);
+                if (Directory.Exists(Path.Combine(g, "ModScriptX"))) throw new Exception("eject left the source");
+                var rd = Game("rdr2", "RDR2.exe", "ScriptHookRDR2.dll");
+                if (Bridge.Scan(rd).Engine != "rage-rdr2") throw new Exception("rdr2: " + Bridge.Scan(rd).Engine);
+                Has(File.ReadAllText(Path.Combine(rd, Injector.Inject(example, rd, null).Files.Single())), "public class ModScript_Gold_Boost : RDR2.Script", "return mx_get(\"Player.Money\");");
+            });
             Check("anti-cheat refused", () =>
             {
                 var g = Game("online", "EasyAntiCheat/settings.json", "main.lua");

@@ -236,7 +236,7 @@ public sealed partial class CreatorPage
     }
 
     /// <summary>Карточка моста: движок, уверенность, улики, загрузчик и путь (код или файлы).</summary>
-    internal static Control BridgeCard(MX.BridgeReport? r, bool noPath)
+    internal static Control BridgeCard(MX.BridgeReport? r, bool noPath, bool setupBelow = false)
     {
         if (r is null)
             return new Border
@@ -248,7 +248,7 @@ public sealed partial class CreatorPage
         var target = MX.Bridge.TargetOf(r);
         var color = r.AntiCheat is not null ? Ui.Res("Bad") : r.Code ? Ui.Res("Good") : Ui.Res("Warn");
         var route = r.Code
-            ? I18n.T("v16.bridge.code", ("lang", XStudio.Lang(target!.Language)), ("loader", r.Loader))
+            ? I18n.T("v22.bridge.code", ("lang", XStudio.Lang(target!.Language)))
             : I18n.T("v16.bridge.files");
         var head = new WrapPanel();
         foreach (var part in new Control[] { Ui.Icon(Icons.Layers, 16, HubLook.Cyan), Ui.Text(I18n.T("v16.bridge.title"), "strong"),
@@ -272,7 +272,8 @@ public sealed partial class CreatorPage
             Ui.Text(r.LoaderReady ? I18n.T("v16.bridge.loader.ok", ("loader", r.Loader)) : I18n.T("v16.bridge.loader.no", ("loader", r.Loader)), "small", wrap: true) } };
         var col = Ui.Col(10, head, sure, clues);
         if (r.Code) col.Children.Add(loader);
-        if (r.Hint is { } hint) col.Children.Add(Ui.Text(BridgeHint(r), "small muted", wrap: true));
+        // 22.0: загрузчик — строкой ниже, а не ещё раз в ярлыке пути; под карточкой шаги установки — подсказку не повторяем.
+        if (r.Hint is { } hint && !setupBelow) col.Children.Add(Ui.Text(BridgeHint(r), "small muted", wrap: true));
         return new Border { Padding = new Thickness(14, 12), CornerRadius = new CornerRadius(4), BorderBrush = HubLook.Edge, BorderThickness = new Thickness(1), Background = HubLook.Raised, Child = col };
     }
 

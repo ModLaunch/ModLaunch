@@ -25,6 +25,9 @@ public sealed partial class XStudio
     {
         var col = new StackPanel { Spacing = 2, Margin = new Thickness(8, 0, 8, 14) };
         col.Children.Add(new Border { Padding = new Thickness(8, 0, 8, 4), Child = Ui.Text(I18n.T("v21.w.lead"), "small muted", wrap: true) });
+        // 22.0: числа именно этой игры — первыми: ради них большие игры и модят.
+        var t = TargetFor(ActiveDoc());
+        NumbersGroup(col, t);
         foreach (var group in SimpleWords.Groups)
         {
             col.Children.Add(Caption(I18n.T("v21.wg." + group)));
@@ -45,7 +48,6 @@ public sealed partial class XStudio
         }
         col.Children.Add(Caption(I18n.T("v21.wg.pieces")));
         col.Children.Add(new Border { Padding = new Thickness(8, 0, 8, 6), Child = Ui.Text(I18n.T("v21.w.pieces"), "small muted", wrap: true) });
-        var t = TargetFor(ActiveDoc());
         var pieces = new StackPanel { Spacing = 6, Margin = new Thickness(4, 0) };
         foreach (var p in Pieces.All()) pieces.Children.Add(PieceItem(p, t));
         col.Children.Add(pieces);

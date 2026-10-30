@@ -18,7 +18,7 @@ public static class UnityCompiler
     public static string? Compile(string source, string assembly, string outDir, string gameDir)
     {
         var refs = References(gameDir, out var bundleCSharp);
-        if (refs.Count == 0) return "no game assemblies found (*_Data/Managed)";
+        if (refs.Count == 0) return "no game assemblies found (*_Data/Managed or ScriptHook .NET)";
         var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Latest), path: assembly + ".cs");
         var compilation = CSharpCompilation.Create(assembly, [tree], refs.Select(r => r.Reference),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release, allowUnsafe: true,
@@ -51,7 +51,22 @@ public static class UnityCompiler
                 if (names.Add(Path.GetFileNameWithoutExtension(file)) && IsManaged(file))
                     try { list.Add(new Ref(Path.GetFileNameWithoutExtension(file), MetadataReference.CreateFromFile(file))); } catch { }
         }
+        void AddFile(string file)
+        {
+            if (File.Exists(file) && names.Add(Path.GetFileNameWithoutExtension(file)) && IsManaged(file))
+                try { list.Add(new Ref(Path.GetFileNameWithoutExtension(file), MetadataReference.CreateFromFile(file))); } catch { }
+        }
         AddDir(Directory.Exists(gameDir) ? Directory.EnumerateDirectories(gameDir, "*_Data").Select(d => Path.Combine(d, "Managed")).FirstOrDefault(Directory.Exists) : null);
+        if (list.Count == 0 && ScriptHooks(gameDir) is { Count: > 0 } hooks)
+        {
+            // 22.0: GTA V и RDR2 — скрипты ScriptHook .NET живут в .NET Framework 4.8 из Windows; на Linux (проверки) — свой рантайм.
+            var fw = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "Microsoft.NET", "Framework64", "v4.0.30319");
+            if (Directory.Exists(fw))
+                foreach (var n in new[] { "mscorlib", "System", "System.Core", "Microsoft.CSharp", "System.Drawing", "System.Windows.Forms", "System.Xml" }) AddFile(Path.Combine(fw, n + ".dll"));
+            else AddDir(Path.GetDirectoryName(typeof(object).Assembly.Location));
+            foreach (var h in hooks) AddFile(h);
+            return list;
+        }
         if (list.Count == 0) return list;
         AddDir(Path.Combine(gameDir, "BepInEx", "core"));
         if (!names.Contains("Microsoft.CSharp") && Embedded() is { } csharp)
@@ -60,6 +75,18 @@ public static class UnityCompiler
             list.Add(new Ref("Microsoft.CSharp", MetadataReference.CreateFromImage(csharp)));
         }
         return list;
+    }
+
+    /// <summary>
+    /// 22.0: dll ScriptHook .NET в корне игры (ScriptHookVDotNet3.dll, ScriptHookRDR2DotNet.dll). Если рядом лежат версии 2 и 3
+    /// для GTA V — только 3: у обеих пространство имён GTA, вместе компилятор не различит Game и Script.
+    /// </summary>
+    static List<string> ScriptHooks(string gameDir)
+    {
+        if (!Directory.Exists(gameDir)) return [];
+        var all = Directory.EnumerateFiles(gameDir, "ScriptHook*DotNet*.dll").Where(IsManaged).ToList();
+        var v3 = all.Where(f => Path.GetFileNameWithoutExtension(f).EndsWith("DotNet3", StringComparison.OrdinalIgnoreCase)).ToList();
+        return v3.Count > 0 ? v3 : all;
     }
 
     /// <summary>Нативные dll (в Managed их не бывает, в BepInEx/core — бывают) компилятору не нужны.</summary>
@@ -127,17 +154,88 @@ public static class UnityCompiler
             return $"{r.Doc.Name}: C# built in-process into the plugin folder, eject removes it";
         }
         finally { try { Directory.Delete(game, true); } catch { } }
+    }
 
-        static string Stub(string name, string code, string dir, string[] extra)
+    static string Stub(string name, string code, string dir, string[] extra)
+    {
+        var refs = Directory.EnumerateFiles(Path.GetDirectoryName(typeof(object).Assembly.Location)!, "*.dll").Where(IsManaged).Concat(extra)
+            .Select(f => (MetadataReference)MetadataReference.CreateFromFile(f));
+        var c = CSharpCompilation.Create(name, [CSharpSyntaxTree.ParseText(code)], refs, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var path = Path.Combine(dir, name + ".dll");
+        var emit = c.Emit(path);
+        if (!emit.Success) throw new Exception("stub " + name + ": " + string.Join("; ", emit.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error)));
+        return path;
+    }
+
+    /// <summary>
+    /// 22.0: GTA V и RDR2 по-настоящему: заглушки ScriptHookVDotNet3 и ScriptHookRDR2DotNet с тем же API (Game.Player, Script.Tick,
+    /// GTA.UI.Notification, RDR2.UI.Screen) → мост узнаёт игру, мод на простых словах собирается в scripts/ModScript_&lt;id&gt;.dll,
+    /// загруженная dll на первом кадре меняет деньги, здоровье и розыск игрока и показывает текст; eject снимает всё.
+    /// </summary>
+    [SelfTest]
+    static string RageInjectRunsInGame()
+    {
+        var core = typeof(object).Assembly.Location;
+        if (core == "") return "skipped: single-file build has no assembly paths";
+        var root = Path.Combine(Path.GetTempPath(), "modlaunch-rage-" + Environment.ProcessId);
+        const string mod = "мод \"Богач\"\nкогда игра началась {\n    дать деньги 500\n    забрать здоровье 50\n    поставить розыск = 0\n    сказать \"Деньги: {деньги}\"\n}\n";
+        try
         {
-            var refs = Directory.EnumerateFiles(Path.GetDirectoryName(typeof(object).Assembly.Location)!, "*.dll").Where(IsManaged).Concat(extra)
-                .Select(f => (MetadataReference)MetadataReference.CreateFromFile(f));
-            var c = CSharpCompilation.Create(name, [CSharpSyntaxTree.ParseText(code)], refs, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            var path = Path.Combine(dir, name + ".dll");
-            var emit = c.Emit(path);
-            if (!emit.Success) throw new Exception("stub " + name + ": " + string.Join("; ", emit.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error)));
-            return path;
+            var results = new List<string>();
+            foreach (var (ns, exe, hook, stubName, sayType, sayMethod) in new[]
+            {
+                ("GTA", "GTA5.exe", "ScriptHookV.dll", "ScriptHookVDotNet3", "GTA.UI.Notification", "public static int Show(string message, bool blinking = false) { Last = message; return 0; }"),
+                ("RDR2", "RDR2.exe", "ScriptHookRDR2.dll", "ScriptHookRDR2DotNet", "RDR2.UI.Screen", "public static void DisplaySubtitle(string text) { Last = text; }"),
+            })
+            {
+                var game = Directory.CreateDirectory(Path.Combine(root, ns)).FullName;
+                File.WriteAllText(Path.Combine(game, exe), "");
+                File.WriteAllText(Path.Combine(game, hook), "");
+                var uiNs = sayType[..sayType.LastIndexOf('.')];
+                var uiClass = sayType[(sayType.LastIndexOf('.') + 1)..];
+                var stub = Stub(stubName, $$"""
+                    namespace {{ns}}
+                    {
+                        public abstract class Script { public event System.EventHandler Tick; public void Fire() { if (Tick != null) Tick(this, System.EventArgs.Empty); } }
+                        public class Ped { public int Health { get; set; } = 200; public int MaxHealth { get; set; } = 200; public int Armor { get; set; } }
+                        public class Player { public int Money { get; set; } = 1000; public int WantedLevel { get; set; } = 3; public Ped Character { get; } = new Ped(); }
+                        public static class Game { public static Player Player { get; } = new Player(); }
+                    }
+                    namespace {{uiNs}} { public static class {{uiClass}} { public static string Last; {{sayMethod}} } }
+                    """, game, []);
+                var bridge = ModScriptX.Bridge.Scan(game);
+                if (!bridge.Code || !bridge.LoaderReady) throw new Exception($"{ns} bridge: {bridge.Engine} {bridge.Path} loader {bridge.LoaderReady}");
+                var r = ModScriptX.Injector.Inject(mod, game, null);
+                if (r.Target is null || !Features.Inject.Built(game, r.Doc.Id, r.Target)) throw new Exception($"{ns} not built: {r.Target?.Id} {r.Note} {string.Join("; ", r.Doc.Diags.Select(d => d.Message))}");
+
+                // Как ScriptHook .NET: загрузить dll, создать скрипт, дать кадр.
+                var alc = new System.Runtime.Loader.AssemblyLoadContext("rage-" + ns, isCollectible: true);
+                try
+                {
+                    var api = alc.LoadFromStream(new MemoryStream(File.ReadAllBytes(stub)));
+                    alc.Resolving += (_, name) => name.Name == stubName ? api : null;
+                    var dll = alc.LoadFromStream(new MemoryStream(File.ReadAllBytes(Path.Combine(game, r.Target.Dll(r.Doc.Id)!))));
+                    var script = Activator.CreateInstance(dll.GetType("ModScript_" + r.Doc.Id)!)!;
+                    script.GetType().GetMethod("Fire")!.Invoke(script, null);
+                    var player = api.GetType(ns + ".Game")!.GetProperty("Player")!.GetValue(null)!;
+                    var money = player.GetType().GetProperty("Money")!.GetValue(player);
+                    var health = player.GetType().GetProperty("Character")!.GetValue(player)!.GetType().GetProperty("Health")!.GetValue(player.GetType().GetProperty("Character")!.GetValue(player));
+                    var wanted = player.GetType().GetProperty("WantedLevel")!.GetValue(player);
+                    var said = api.GetType(sayType)!.GetField("Last")!.GetValue(null);
+                    // RDR2: розыск не привязан (у порта нет такого свойства) — остаётся числом мода, игрок не меняется.
+                    var wantWanted = ns == "GTA" ? 0 : 3;
+                    if ((int)money! != 1500 || (int)health! != 150 || (int)wanted! != wantWanted || (string?)said != "Деньги: 1500")
+                        throw new Exception($"{ns} in game: money {money}, health {health}, wanted {wanted}, said '{said}'");
+                }
+                finally { alc.Unload(); }
+
+                ModScriptX.Injector.Eject(r.Doc.Id, game);
+                if (File.Exists(Path.Combine(game, r.Target.Dll(r.Doc.Id)!)) || Directory.Exists(Path.Combine(game, "ModScriptX"))) throw new Exception(ns + ": eject left files");
+                results.Add(r.Target.Id);
+            }
+            return string.Join(" and ", results) + ": plain words built into scripts/*.dll, money, health and wanted change in game, eject cleans up";
         }
+        finally { try { Directory.Delete(root, true); } catch { } }
     }
 
     /// <summary>Сборка без SDK: «игра» с базовой библиотекой .NET вместо Unity — dll появляется, ошибка — с номером строки.</summary>

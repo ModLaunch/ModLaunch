@@ -44,11 +44,22 @@ public static class Injector
         return new Result(doc, t, files, null);
     }
 
+    /// <summary>
+    /// 22.0: GTA V и RDR2 — BattlEye у Rockstar защищает только онлайн, а ScriptHook сам выключается в сети:
+    /// сюжетному моду античит в папке не мешает.
+    /// </summary>
+    static bool StoryMode(ModxDoc doc, string gameDir, string? targetId)
+    {
+        var id = targetId ?? doc.Engine;
+        var t = id is null ? Engines.Detect(gameDir) : Target.Find(id);
+        return t?.Id is "gta5" or "rdr2";
+    }
+
     public static Result Inject(string source, string gameDir, string? targetId)
     {
         var doc = ModxDoc.Parse(source);
         var ac = Engines.FindAntiCheat(gameDir);
-        if (ac != null)
+        if (ac != null && !StoryMode(doc, gameDir, targetId))
         {
             doc.Diags.Add(new Diag(0, $"{ac} found: ModScript X is for single-player mods and does not work with anti-cheat protected games"));
             return new Result(doc, null, [], null);
