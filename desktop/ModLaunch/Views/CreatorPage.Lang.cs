@@ -40,6 +40,11 @@ public sealed partial class CreatorPage
     /// <summary>Сообщение ModScript X: ключи err.* — переводом (cr.err.*, как в редакторе), остальное и непереведённое — как есть.</summary>
     internal static string LxMsg(Diag d)
     {
+        // 21.0: кусочки кода — понятными словами, с названием.
+        if (System.Text.RegularExpressions.Regex.Match(d.Message, @"^piece ""(.+?)"" (not found|has errors|has no setting '(.+)')") is { Success: true } pm)
+            return pm.Groups[2].Value == "not found" ? I18n.T("v21.err.piece", ("name", pm.Groups[1].Value))
+                : pm.Groups[3].Success ? I18n.T("v21.err.pieceSetting", ("name", pm.Groups[1].Value), ("setting", pm.Groups[3].Value))
+                : I18n.T("v21.err.pieceBroken", ("name", pm.Groups[1].Value));
         if (!d.Message.StartsWith("err.")) return d.Message;
         var text = Msg(d);
         return text.StartsWith("cr.err.") ? d.Message : text;

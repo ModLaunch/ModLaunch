@@ -41,6 +41,8 @@ public sealed partial class XStudio : Page
         public double CheckMs;
         /// <summary>19.0: находки понимания кода (опечатки, лишние переменные…) — с местом и исправлением.</summary>
         public List<ModxInsight.Issue> Lints = [];
+        /// <summary>21.0: тот же файл блоками (создаётся при первом показе).</summary>
+        public BlockCanvas? Canvas;
     }
 
     /// <summary>Что открыто в проекте: живёт дольше страницы.</summary>
@@ -48,7 +50,9 @@ public sealed partial class XStudio : Page
     {
         public readonly List<Doc> Docs = [];
         public Doc? Active;
-        public string Side = "files";
+        public string Side = DefaultView == "blocks" ? "blocks" : "files";
+        /// <summary>21.0: «blocks» — блоки, «code» — код.</summary>
+        public string View = DefaultView;
         public string Panel = "problems";
         public bool Watch;
         public string Vars = "gold = 100\nhealth = 80\nspeed = 5\nenemy_damage = 10";
@@ -80,7 +84,7 @@ public sealed partial class XStudio : Page
     DispatcherTimer? _analyze;
     readonly Border _top = new(), _activity = new(), _side = new(), _tabs = new(), _editorHost = new(), _panelTabs = new(), _panelBody = new(), _status = new();
 
-    public XStudio(string projectId, string? side = null, string? panel = null)
+    public XStudio(string projectId, string? side = null, string? panel = null, string? view = null)
     {
         _id = projectId;
         _p = XProjects.Get(projectId);
@@ -88,6 +92,7 @@ public sealed partial class XStudio : Page
         _s = s;
         if (side is not null) _s.Side = side;
         if (panel is not null) _s.Panel = panel;
+        if (view is not null) _s.View = view;
         if (_p is not null)
         {
             if (_s.Docs.Count == 0) Open(_p.Main, focus: false);
@@ -185,7 +190,9 @@ public sealed partial class XStudio : Page
             Background = HubLook.Panel, BorderBrush = HubLook.Edge, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(4), ClipToBounds = true,
             Child = new DockPanel { Children = { Docked(_panelTabs, Dock.Top), _panelBody } },
         };
-        var work = new Grid { RowDefinitions = new RowDefinitions("*,6,230"), Margin = new Thickness(10, 10, 10, 8) };
+        // 21.0: в блоках нижняя панель — по содержимому (не выше 150): холсту нужно место, а «Проблем нет» — одна строка.
+        var work = new Grid { RowDefinitions = new RowDefinitions(BlocksOn ? "*,6,Auto" : "*,6,230"), Margin = new Thickness(10, 10, 10, 8) };
+        _panelBody.MaxHeight = BlocksOn ? 150 : double.PositiveInfinity;
         work.Children.Add(editor);
         var split = new GridSplitter { Background = Brushes.Transparent, ResizeDirection = GridResizeDirection.Rows };
         Grid.SetRow(split, 1);
@@ -343,7 +350,7 @@ public sealed partial class XStudio : Page
         var body = _s.Side switch
         {
             "bridge" => BridgeSide(),
-            "blocks" => BlocksSide(),
+            "blocks" => BlocksOn ? PaletteSide() : BlocksSide(),
             "docs" => DocsSide(),
             "history" => HistorySide(),
             "settings" => SettingsSide(),
@@ -861,7 +868,12 @@ public sealed partial class XStudio : Page
             };
             row.Children.Add(tab);
         }
-        _tabs.Child = new ScrollViewer { HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled, Content = row };
+        var tabs = new DockPanel();
+        var view = ViewSwitch();
+        DockPanel.SetDock(view, Dock.Right);
+        tabs.Children.Add(view);
+        tabs.Children.Add(new ScrollViewer { HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled, Content = row });
+        _tabs.Child = tabs;
         _tabs.BorderBrush = HubLook.Edge;
         _tabs.BorderThickness = new Thickness(0, 0, 0, 1);
     }
@@ -870,6 +882,14 @@ public sealed partial class XStudio : Page
     {
         if (_s.Active is { } d)
         {
+            if (BlocksOn)
+            {
+                var canvas = CanvasOf(d);
+                if (canvas.Parent is Decorator was && was != _editorHost) was.Child = null;
+                _editorHost.Child = canvas;
+                MarkBlocks(d);
+                return;
+            }
             if (d.Editor.Parent is Decorator old && old != _editorHost) old.Child = null;
             _editorHost.Child = d.Editor;
             return;
@@ -911,6 +931,7 @@ public sealed partial class XStudio : Page
             _analyze!.Stop();
             if (_s.Active is not { } d) return;
             Analyze(d);
+            MarkBlocks(d);
             RenderTabs();
             if (_s.Side == "files") RenderSide();
             if (_s.Panel is "problems" or "code") RenderPanel();

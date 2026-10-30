@@ -51,6 +51,15 @@ public sealed partial class MarketPage : Page
         AttachedToVisualTree += (_, _) => { MarketLocal.Changed -= OnLocal; MarketData.Changed -= OnData; MarketLocal.Changed += OnLocal; MarketData.Changed += OnData; };
     }
 
+    /// <summary>21.0: Рынок с частями кода и скриптами — кусочки для ModScript X.</summary>
+    public static MarketPage CodePieces()
+    {
+        var page = new MarketPage("browse");
+        page._kinds.Add("code");
+        page._kinds.Add("script");
+        return page;
+    }
+
     void OnLocal() { if (_tab is "wishlist" or "authors") Build(); }
     void OnData() { if (MainWindow.Current?.CurrentPage == this) Build(); }
 

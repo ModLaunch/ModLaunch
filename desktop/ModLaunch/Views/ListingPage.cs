@@ -89,6 +89,8 @@ public sealed class ListingPage : Page
         var left = Ui.Col(22);
         left.Children.Add(Ui.Col(10, Section(I18n.T("v93.mk.about")), new SelectableTextBlock { Text = l.Description == "" ? l.Summary : l.Description, TextWrapping = TextWrapping.Wrap, FontSize = 14, LineHeight = 22, Foreground = Ui.Res("Text") }));
         if (Moderation.Sealed(l)) left.Children.Add(MarketViews.SealedNote(l));
+        // 21.0: часть кода .modx — кусочек ModScript X: как он будет выглядеть в проекте и кнопка «В проект».
+        if (XStudio.IsPiece(l)) left.Children.Add(XStudio.PieceNote(l));
         else if (l.Preview != "") left.Children.Add(Ui.Col(10, Section(I18n.T("mk.preview")), Code(l.Preview)));
         left.Children.Add(Reviews(l));
         body.Children.Add(left);

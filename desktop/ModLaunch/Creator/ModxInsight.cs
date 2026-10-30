@@ -81,7 +81,7 @@ public static partial class ModxInsight
 
     static readonly HashSet<string> Keywords = new(MX.ModxDoc.Keywords.Concat(["var", "const", "elif"]), StringComparer.Ordinal);
     static readonly HashSet<string> Builtins = new(MX.ModxDoc.Builtins, StringComparer.Ordinal);
-    static readonly HashSet<string> Headers = new(["mod", "version", "author", "about", "game", "engine"], StringComparer.Ordinal);
+    static readonly HashSet<string> Headers = new(["mod", "version", "author", "about", "game", "engine", "use"], StringComparer.Ordinal);
 
     [GeneratedRegex(@"^(\s*)fn\s+([\p{L}_][\p{L}\w]*)\s*\(([^)]*)\)\s*\{\s*$")]
     private static partial Regex FnStart();
@@ -463,6 +463,9 @@ public static partial class ModxInsight
             return [.. MX.ModxDoc.Events.Select(e => new Item(e, e, I18n.T($"v19.event.{e}"), Kind.Event, 5))];
         if (Regex.IsMatch(before, @"^\s*native\s+\w*$"))
             return [.. MX.ModxDoc.Languages.Select(l => new Item(l, l, I18n.T("v19.native.lang"), Kind.Keyword, 5))];
+        // 21.0: после use " — кусочки по названию (купленные и бесплатные).
+        if (Regex.IsMatch(before, @"^use\s+""[^""]*$"))
+            return [.. Pieces.All().Select(p => new Item(p.Title, p.Title + "\"", p.Free ? I18n.T("v21.piece.free") + " · " + p.About : I18n.T("v21.piece.bought", ("seller", p.Seller)), Kind.Function, 6))];
         if (Regex.IsMatch(before, @"^\s*engine\s+[\w-]*$"))
             return [.. MX.Target.All.Select(t => new Item(t.Id, t.Id, $"{t.Title} · {t.Language}", Kind.Keyword, 5))];
         if (inString)

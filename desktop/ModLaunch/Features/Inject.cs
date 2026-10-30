@@ -236,6 +236,14 @@ public static class Inject
     /// Содержимое инжекта: чужой — расшифровать, сверить подпись (SHA-256 защищённой копии: подменённый файл не
     /// запустится) и распаковать; свой — прочитать с диска.
     /// </summary>
+    /// <summary>21.0: код купленного или импортированного .modx для кусочков ModScript X — только в память.</summary>
+    public static string? Code(InjectItem i)
+    {
+        if (i.Kind != "modx") return null;
+        try { return System.Text.Encoding.UTF8.GetString(Load(i)); }
+        catch { return null; }
+    }
+
     static byte[] Load(InjectItem i)
     {
         if (!i.Sealed) return File.ReadAllBytes(i.LocalPath!);

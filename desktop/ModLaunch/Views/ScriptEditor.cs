@@ -108,6 +108,22 @@ public sealed partial class ScriptEditor : UserControl
         }
     }
 
+    /// <summary>
+    /// 21.0: заменить текст одной правкой, которую можно отменить (Ctrl+Z): меняется только отличающаяся середина,
+    /// так что свёртки и точки останова в остальном коде остаются на месте. Так пишут в код блоки.
+    /// </summary>
+    public void ReplaceText(string text)
+    {
+        var doc = _editor.Document;
+        var old = doc.Text;
+        if (old == text) return;
+        var start = 0;
+        while (start < old.Length && start < text.Length && old[start] == text[start]) start++;
+        var end = 0;
+        while (end < old.Length - start && end < text.Length - start && old[^(end + 1)] == text[^(end + 1)]) end++;
+        doc.Replace(start, old.Length - start - end, text.Substring(start, text.Length - start - end));
+    }
+
     public int CaretIndex
     {
         get => _editor.CaretOffset;
@@ -286,11 +302,26 @@ public sealed partial class ScriptEditor : UserControl
         static readonly IBrush ErrorBg = new SolidColorBrush(Color.FromArgb(46, 255, 107, 107));
         static readonly HashSet<string> Words = new(Commands.Concat(ModScriptX.ModxDoc.Keywords).Concat(["to", "from", "in", "mod", "version", "engine", "var"]), StringComparer.OrdinalIgnoreCase);
 
+        /// <summary>21.0: название кусочка в строке use — золотой плашкой, как предмет из магазина.</summary>
+        static readonly IBrush PieceText = B("#FFD58A"), PieceBg = new SolidColorBrush(Color.FromArgb(52, 0xF5, 0xB9, 0x4A));
+
         protected override void ColorizeLine(DocumentLine line)
         {
             var text = CurrentContext.Document.GetText(line);
             if (Errors.Contains(line.LineNumber) && line.Length > 0)
                 ChangeLinePart(line.Offset, line.EndOffset, el => el.BackgroundBrush = ErrorBg);
+            if (text.StartsWith("use ", StringComparison.Ordinal) && ModScriptX.ModxDoc.ReadUse(text, line.LineNumber) is { } use)
+            {
+                var at = text.IndexOf('"');
+                ChangeLinePart(line.Offset, line.Offset + 3, el => el.TextRunProperties.SetForegroundBrush(Look.IsLight ? Darker(Keyword) : Keyword));
+                ChangeLinePart(line.Offset + at, line.Offset + at + use.Name.Length + 2, el =>
+                {
+                    el.BackgroundBrush = PieceBg;
+                    el.TextRunProperties.SetForegroundBrush(Look.IsLight ? Darker(PieceText) : PieceText);
+                    el.TextRunProperties.SetTypeface(new Typeface(el.TextRunProperties.Typeface.FontFamily, FontStyle.Normal, FontWeight.Bold));
+                });
+                return;
+            }
             var light = Look.IsLight;
             var first = true;
             foreach (Match m in Tokens().Matches(text))
