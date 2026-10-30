@@ -35,6 +35,9 @@ public static class Bridge
         new("rpgmaker", "RPG Maker MV/MZ", "rpgmaker", "js/plugins.js", "code"),
         new("html5", "HTML5 (NW.js / Electron)", "html5", "index.html", "code"),
         new("reengine", "RE Engine", "reengine", "REFramework", "code"),
+        new("redengine", "REDengine (Cyberpunk 2077)", "cyberpunk", "Cyber Engine Tweaks", "code"),
+        new("rage-gta5", "RAGE (GTA V)", "gta5", "ScriptHookV .NET", "code"),
+        new("rage-rdr2", "RAGE (Red Dead Redemption 2)", "rdr2", "ScriptHookRDR2 .NET", "code"),
         new("love", "LÖVE (Lua)", "lua", "mods/*.lua", "code"),
         new("lua", "Lua-moddable game", "lua", "mods/*.lua", "code"),
         new("rpgmaker-ruby", "RPG Maker XP/VX/VX Ace", null, "Scripts.rvdata", "files"),
@@ -128,6 +131,14 @@ public static class Bridge
         // RE Engine
         Add(t.Files.Any(f => f.StartsWith("re_chunk_000.pak", StringComparison.OrdinalIgnoreCase)), "reengine", 85, "re_chunk_000.pak");
         Add(t.Dir("reframework") || t.File("dinput8.dll") && t.Files.Any(f => f.StartsWith("re_chunk", StringComparison.OrdinalIgnoreCase)), "reengine", 10, "reframework/");
+        // 22.0: REDengine 4 (Cyberpunk 2077) и RAGE (GTA V, RDR2)
+        Add(t.File("bin/x64/Cyberpunk2077.exe"), "redengine", 85, "bin/x64/Cyberpunk2077.exe");
+        Add(t.Dir("archive/pc/content"), "redengine", 20, "archive/pc/content");
+        Add(t.Dir("r6") || t.Dir("red4ext"), "redengine", 5, "r6/ (redscript)");
+        Add(t.File("GTA5.exe") || t.File("GTA5_Enhanced.exe"), "rage-gta5", 80, t.File("GTA5_Enhanced.exe") ? "GTA5_Enhanced.exe" : "GTA5.exe");
+        Add(t.File("x64a.rpf") || t.File("common.rpf") && t.File("update/update.rpf"), "rage-gta5", 20, "x64a.rpf / update/update.rpf");
+        Add(t.File("RDR2.exe"), "rage-rdr2", 85, "RDR2.exe");
+        Add(t.File("ScriptHookRDR2.dll"), "rage-rdr2", 10, "ScriptHookRDR2.dll");
         // LÖVE и Lua
         Add(t.File("love.dll") || t.File("love.exe"), "love", 60, "love.dll");
         Add(t.Ext(".love", 1), "love", 50, "*.love");
@@ -168,6 +179,9 @@ public static class Bridge
         "unreal" => t.Files.Any(f => f.EndsWith("/UE4SS.dll", StringComparison.OrdinalIgnoreCase) || f.EndsWith("/ue4ss/UE4SS.dll", StringComparison.OrdinalIgnoreCase)),
         "reengine" => t.Dir("reframework") && t.File("dinput8.dll"),
         "godot" => t.Dir("mods") || t.File("override.cfg"),
+        "redengine" => t.File("bin/x64/plugins/cyber_engine_tweaks.asi"),
+        "rage-gta5" => t.File("ScriptHookV.dll") && t.File("ScriptHookVDotNet3.dll"),
+        "rage-rdr2" => t.File("ScriptHookRDR2.dll") && t.Files.Any(f => !f.Contains('/') && f.StartsWith("ScriptHookRDR2DotNet", StringComparison.OrdinalIgnoreCase) && f.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)),
         "renpy" or "rpgmaker" or "html5" or "love" or "lua" => true,
         _ => false,
     };
@@ -180,6 +194,11 @@ public static class Bridge
         ("unreal", false) => "install UE4SS into <Project>/Binaries/Win64 (next to the game exe)",
         ("reengine", false) => "install REFramework (dinput8.dll) for this game",
         ("godot", false) => "set up Godot Mod Loader (mods/*.zip) for this game",
+        ("redengine", false) => "install Cyber Engine Tweaks into bin/x64 and start the game once (CET asks for an overlay key)",
+        ("rage-gta5", false) => "install ScriptHookV (ScriptHookV.dll, dinput8.dll) and ScriptHookVDotNet 3 into the game folder; story mode only",
+        ("rage-gta5", true) => "story mode only: ScriptHookV switches itself off in GTA Online",
+        ("rage-rdr2", false) => "install ScriptHookRDR2 (ScriptHookRDR2.dll, dinput8.dll) and ScriptHookRDR2 .NET into the game folder; story mode only",
+        ("rage-rdr2", true) => "story mode only: ScriptHookRDR2 switches itself off in Red Dead Online",
         ("html5", _) => "packed Electron games (resources/app.asar) need unpacking first",
         ("creation", _) => "Bethesda games: plugins (.esp) and Papyrus need the Creation Kit; ModScript manages Data files and ini",
         ("source" or "source2", _) => "Source games: ModScript manages addons/custom files, cfg and launch options",
@@ -199,6 +218,8 @@ public static class Bridge
             .OrderByDescending(x => x.Score).ThenBy(x => Array.FindIndex(Engines, e => e.Id == x.Engine)).FirstOrDefault();
         var engine = Engines.First(e => e.Id == (best.Engine ?? "generic"));
         var score = best.Engine is null ? 0 : Math.Min(99, 30 + best.Score * 7 / 10);
+        // RAGE: BattlEye у Rockstar — для GTA Online и Red Dead Online, а ScriptHook сам не работает в сети: сюжету код можно.
+        if (engine.Id.StartsWith("rage-")) ac = null;
         var ready = LoaderReady(engine.Id, t, gameDir);
         var path = ac is not null ? "files" : engine.Path;
         var evidence = best.What ?? ["no engine fingerprints found"];

@@ -489,7 +489,8 @@ public static partial class ModScript
             case "let":
             {
                 var eq = Eq();
-                if (eq != 2 || t[1].Kind != T.Word || !Regex.IsMatch(t[1].Text, @"^[A-Za-z_]\w*$")) throw new ScriptError("err.let");
+                // 21.0: имя может быть и русским (пусть бонус = 50 в ModScript X).
+                if (eq != 2 || t[1].Kind != T.Word || !Regex.IsMatch(t[1].Text, @"^[\p{L}_][\p{L}\w]*$")) throw new ScriptError("err.let");
                 env.Vars[t[1].Text] = Value(t.Skip(3).ToList(), env, line, d);
                 break;
             }

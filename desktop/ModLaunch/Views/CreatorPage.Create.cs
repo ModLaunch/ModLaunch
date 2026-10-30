@@ -23,7 +23,7 @@ public sealed partial class CreatorPage
     /// 20.0: «ModScript X → Создать»: знак среды, анкета нового проекта и другие способы начать — шаблон, импорт,
     /// а также консоль и справка ModScript (своего пункта слева у них больше нет).
     /// </summary>
-    Control CreateView() => Ui.Col(20, XBanner(), Form(), OtherWays());
+    Control CreateView() => Ui.Col(20, KidStart(), XBanner(), Form(), OtherWays());
 
     /// <summary>Значок слева, название и пояснение справа (пояснение переносится по ширине плитки).</summary>
     static Control WayContent(string icon, string key)

@@ -79,23 +79,25 @@ public static partial class ModxInsight
         }
     }
 
-    static readonly HashSet<string> Keywords = new(MX.ModxDoc.Keywords.Concat(["var", "const", "elif"]), StringComparer.Ordinal);
+    // 21.0: и простые слова (сказать, дать, если, больше …) — не переменные.
+    static readonly HashSet<string> Keywords = new(MX.ModxDoc.Keywords.Concat(["var", "const", "elif"]).Concat(MX.Words.Keywords), StringComparer.OrdinalIgnoreCase);
     static readonly HashSet<string> Builtins = new(MX.ModxDoc.Builtins, StringComparer.Ordinal);
-    static readonly HashSet<string> Headers = new(["mod", "version", "author", "about", "game", "engine"], StringComparer.Ordinal);
+    static readonly HashSet<string> Headers = new(["mod", "version", "author", "about", "game", "engine", "use"], StringComparer.Ordinal);
 
-    [GeneratedRegex(@"^(\s*)fn\s+([\p{L}_][\p{L}\w]*)\s*\(([^)]*)\)\s*\{\s*$")]
+    [GeneratedRegex(@"^(\s*)(?:fn|функция|function)\s+([\p{L}_][\p{L}\w]*)\s*\(([^)]*)\)\s*\{\s*$", RegexOptions.IgnoreCase)]
     private static partial Regex FnStart();
 
     [GeneratedRegex(@"^(\s*)(hook|native)\s+([\p{L}\w]+)\s*\{\s*$")]
     private static partial Regex BlockStart();
 
-    [GeneratedRegex(@"^\s*(?:let|var|const)\s+([\p{L}_][\p{L}\w]*)\s*=")]
+    [GeneratedRegex(@"^\s*(?:let|var|const|пусть|переменная)\s+([\p{L}_][\p{L}\w]*)\s*=", RegexOptions.IgnoreCase)]
     private static partial Regex LetLine();
 
-    [GeneratedRegex(@"^\s*for\s+([\p{L}_][\p{L}\w]*)\s+in\s")]
+    [GeneratedRegex(@"^\s*(?:for(?:\s+each)?|для\s+каждого)\s+([\p{L}_][\p{L}\w]*)\s+(?:in|в|из)\s", RegexOptions.IgnoreCase)]
     private static partial Regex ForLine();
 
-    [GeneratedRegex(@"^\s*(?:set\s+|add\s+)?([\p{L}_][\p{L}\w]*)[\p{L}\w.\[\]]*\s*(?:=(?!=)|\+=|-=|\*=|/=|\s+\S)")]
+    /// <summary>Запись в переменную: set/add и простые слова (дать золото 100, поставить скорость = 8 …).</summary>
+    [GeneratedRegex(@"^\s*(?:set\s+|add\s+|(?:дать|дай|прибавить|прибавь|добавить|добавь|забрать|забери|отнять|отними|убрать|поставить|поставь|сделать|сделай|умножить|умножь|разделить|раздели|give|take|make|multiply|divide)\s+)?([\p{L}_][\p{L}\w]*)[\p{L}\w.\[\]]*\s*(?:=(?!=)|\+=|-=|\*=|/=|\s+\S)")]
     private static partial Regex Assign();
 
     [GeneratedRegex(@"^[\p{L}_][\p{L}\w]*$")]
@@ -113,11 +115,14 @@ public static partial class ModxInsight
         for (var i = 0; i < lines.Length; i++)
         {
             m.Scope[i] = "";
+            // 21.0: «когда игра началась {», «каждые 5 секунд {» — тоже хуки (верх файла переводится в строки языка).
+            var head = Indent(lines[i]) == 0 ? MX.Words.Line(lines[i], i + 1) : lines[i];
             var f = FnStart().Match(lines[i]);
-            var b = f.Success ? Match.Empty : BlockStart().Match(lines[i]);
-            if (f.Success || b.Success)
+            var b = f.Success ? Match.Empty : BlockStart().Match(head);
+            var every = !f.Success && !b.Success && Indent(lines[i]) == 0 && Regex.IsMatch(head, @"^every\s+.+\{\s*$");
+            if (f.Success || b.Success || every)
             {
-                var indent = (f.Success ? f : b).Groups[1].Value.Length;
+                var indent = f.Success ? f.Groups[1].Value.Length : b.Success ? b.Groups[1].Value.Length : 0;
                 var end = i + 1;
                 while (end < lines.Length && !(lines[end].Trim() == "}" && Indent(lines[end]) <= indent)) end++;
                 string scope;
@@ -131,6 +136,7 @@ public static partial class ModxInsight
                     foreach (var w in Words(pars))
                         if (!w.Member) m.Symbols.Add(new Symbol(w.Name, Kind.Param, i + 1, at + w.Col, scope, $"{name}({string.Join(", ", Split(pars))})"));
                 }
+                else if (every) scope = $"hook:tick:{i + 1}";
                 else if (b.Groups[2].Value == "native") { scope = "native"; m.HasNatives = true; }
                 else scope = $"hook:{b.Groups[3].Value}:{i + 1}";
                 for (var k = i + 1; k < Math.Min(end + 1, lines.Length); k++) m.Scope[k] = scope;
@@ -139,8 +145,8 @@ public static partial class ModxInsight
                 continue;
             }
             var t = lines[i].TrimStart();
-            var head = Regex.Match(t, @"^[a-z]+").Value;
-            if (Headers.Contains(head) && !LetLine().IsMatch(t)) continue;
+            var word = Regex.Match(t, @"^[a-z]+").Value;
+            if (Headers.Contains(word) && !LetLine().IsMatch(t)) continue;
             var l = LetLine().Match(lines[i]);
             if (l.Success && Indent(lines[i]) == 0)
             {
@@ -165,7 +171,7 @@ public static partial class ModxInsight
             var code = Code(line);
             var t = code.Trim();
             if (t == "") continue;
-            if (t is "break" or "continue" || t.StartsWith("return", StringComparison.Ordinal) && (t.Length == 6 || !char.IsLetterOrDigit(t[6]) && t[6] != '_')) m.Exits.Add(i + 1);
+            if (t is "break" or "continue" or "стоп" or "хватит" or "stop" or "прервать" or "дальше" || Regex.IsMatch(t, @"^(?:return|вернуть|верни)(?![\p{L}\w])")) m.Exits.Add(i + 1);
             int? decl = null, write = null;
             if (LetLine().Match(code) is { Success: true } l)
             {
@@ -463,6 +469,9 @@ public static partial class ModxInsight
             return [.. MX.ModxDoc.Events.Select(e => new Item(e, e, I18n.T($"v19.event.{e}"), Kind.Event, 5))];
         if (Regex.IsMatch(before, @"^\s*native\s+\w*$"))
             return [.. MX.ModxDoc.Languages.Select(l => new Item(l, l, I18n.T("v19.native.lang"), Kind.Keyword, 5))];
+        // 21.0: после use " — кусочки по названию (купленные и бесплатные).
+        if (Regex.IsMatch(before, @"^(?:use|использовать|подключить)\s+""[^""]*$"))
+            return [.. Pieces.All().Select(p => new Item(p.Title, p.Title + "\"", p.Free ? I18n.T("v21.piece.free") + " · " + p.About : I18n.T("v21.piece.bought", ("seller", p.Seller)), Kind.Function, 6))];
         if (Regex.IsMatch(before, @"^\s*engine\s+[\w-]*$"))
             return [.. MX.Target.All.Select(t => new Item(t.Id, t.Id, $"{t.Title} · {t.Language}", Kind.Keyword, 5))];
         if (inString)
@@ -492,6 +501,9 @@ public static partial class ModxInsight
             }
             if (statement)
             {
+                // 21.0: простые слова — первыми, на языке программы.
+                foreach (var c in SimpleWords.All.Where(c => c.Top == top || c.Group == "numbers" && c.Id == "let"))
+                    items.Add(new Item(SimpleWords.Label(c), SimpleWords.Code(c), I18n.T($"v21.w.{c.Id}"), Kind.Keyword, top ? 8 : 6, true));
                 foreach (var (label, insert, key) in Snippets)
                     if (top ? label is "hook" or "fn" or "native" : label is not ("hook" or "fn" or "native"))
                         items.Add(new Item(label, insert, I18n.T(key), Kind.Keyword, top ? 7 : 3, true));

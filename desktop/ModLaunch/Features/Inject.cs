@@ -236,6 +236,14 @@ public static class Inject
     /// Содержимое инжекта: чужой — расшифровать, сверить подпись (SHA-256 защищённой копии: подменённый файл не
     /// запустится) и распаковать; свой — прочитать с диска.
     /// </summary>
+    /// <summary>21.0: код купленного или импортированного .modx для кусочков ModScript X — только в память.</summary>
+    public static string? Code(InjectItem i)
+    {
+        if (i.Kind != "modx") return null;
+        try { return System.Text.Encoding.UTF8.GetString(Load(i)); }
+        catch { return null; }
+    }
+
     static byte[] Load(InjectItem i)
     {
         if (!i.Sealed) return File.ReadAllBytes(i.LocalPath!);
@@ -308,12 +316,12 @@ public static class Inject
                 // инжектом с тем же именем. Уборка после игры снимает ровно этот id.
                 var r = MX.Injector.Inject(Namespaced(Encoding.UTF8.GetString(bytes), item.Id), root, null);
                 if (!r.Doc.Ok || r.Target is null) return null;
-                if (r.Target.Id == "unity")
+                if (r.Target.Dll(r.Doc.Id) is not null)
                 {
                     // C# нужно собрать. Нет BepInEx или ошибка сборки — dll не появится: инжект не применён.
                     // 15.0: сборка кладёт dll в свою папку plugins/ModScript_<id>/ — раньше её искали прямо в plugins/,
                     // не находили и снимали каждый Unity-инжект как «не собрался».
-                    if (!Built(root, r.Doc.Id))
+                    if (!Built(root, r.Doc.Id, r.Target))
                     {
                         try { MX.Injector.Eject(r.Doc.Id, root); } catch { }
                         notes.Add(I18n.T("v11fix.inj.buildFailed", ("title", item.Title)) + Reason(r.Note));
@@ -364,9 +372,13 @@ public static class Inject
         }
     }
 
-    /// <summary>Собранный Unity-мод: dll в своей папке плагина (15.0) или прямо в plugins (старая раскладка).</summary>
-    internal static bool Built(string root, string id)
+    /// <summary>
+    /// Собран ли мод там, где C# собирается при инжекте: Unity — dll в своей папке плагина (15.0) или прямо в plugins
+    /// (старая раскладка), GTA V и RDR2 (22.0) — scripts/ModScript_&lt;id&gt;.dll. У остальных движков собирать нечего.
+    /// </summary>
+    internal static bool Built(string root, string id, MX.Target? target = null)
     {
+        if (target is { Id: not "unity" }) return target.Dll(id) is not { } dll || File.Exists(Path.Combine(root, dll));
         var plugins = Path.Combine(root, "BepInEx", "plugins");
         return File.Exists(Path.Combine(plugins, $"ModScript_{id}", $"ModScript_{id}.dll")) || File.Exists(Path.Combine(plugins, $"ModScript_{id}.dll"));
     }
@@ -377,6 +389,7 @@ public static class Inject
         if (note is null) return "";
         var line = note.Replace("build failed:", "").Trim().Split('\n').FirstOrDefault(l => l.Trim() != "")?.Trim() ?? "";
         if (line.Contains("BepInEx is not installed")) return ": " + I18n.T("v15.inj.noBepinex");
+        if (line.Contains("ScriptHook") && line.Contains("is not installed")) return ": " + I18n.T("v22.inj.noHook");
         return line == "" ? "" : ": " + (line.Length > 140 ? line[..140] + "…" : line);
     }
 

@@ -20,7 +20,8 @@ public abstract class Target
     public abstract string Language { get; }
     public virtual string[] Events => ModxDoc.Events;
 
-    public static readonly Target[] All = [new RenPy(), new RpgMaker(), new Unity(), new Godot(), new LuaMods(), new Unreal(), new Html5(), new ReEngine()];
+    public static readonly Target[] All = [new RenPy(), new RpgMaker(), new Unity(), new Godot(), new LuaMods(), new Unreal(), new Html5(), new ReEngine(),
+        new Cyberpunk(), new Gta5(), new Rdr2()];
     public static Target? Find(string id) => All.FirstOrDefault(t => t.Id == id || t.Aliases.Contains(id));
     protected virtual string[] Aliases => [];
 
@@ -36,6 +37,23 @@ public abstract class Target
     /// </summary>
     public static Func<string, string, string, string, string?>? CompileCSharp;
     public virtual void AfterEject(string id, string gameDir) { }
+
+    /// <summary>22.0: собранная dll мода (путь от папки игры) — у движков, где C# собирается при инжекте; иначе null.</summary>
+    public virtual string? Dll(string id) => null;
+
+    /// <summary>
+    /// 22.0: «числа игры», которые мод читает и меняет прямо в игре (деньги, здоровье…): имя в коде и только ли чтение.
+    /// У движков без привязок пусто — там gold и health остаются своими числами мода.
+    /// </summary>
+    public virtual IReadOnlyList<(string Name, bool ReadOnly)> GameNumbers => [];
+
+    /// <summary>Числа игры, которые встречаются в коде мода и не заведены им самим (let, fn).</summary>
+    protected static List<string> Bound(ModxDoc d, IEnumerable<string> numbers)
+    {
+        var own = d.Shared.Select(s => s.Name).Concat(d.Functions.Select(f => f.Name)).ToHashSet();
+        var text = string.Join("\n", d.Hooks.SelectMany(h => h.Body).Concat(d.Functions.SelectMany(f => f.Body)).Select(s => s.Target + " " + s.Expr));
+        return numbers.Where(n => !own.Contains(n) && System.Text.RegularExpressions.Regex.IsMatch(text, $@"\b{n}\b")).ToList();
+    }
 
     protected Lang L => Lang.For(Language);
 
@@ -617,6 +635,8 @@ public abstract class Target
             ];
         }
 
+        public override string? Dll(string id) => $"BepInEx/plugins/ModScript_{id}/ModScript_{id}.dll";
+
         static string? FindManaged(string? gameDir) =>
             gameDir == null ? null : Directory.EnumerateDirectories(gameDir, "*_Data").Select(p => Path.Combine(p, "Managed")).FirstOrDefault(Directory.Exists)?.Replace('\\', '/');
 
@@ -950,6 +970,312 @@ public abstract class Target
             if (d.Hooks.Any(h => h.Event == "ready")) w.Line("M.ready()");
             return [new OutFile($"reframework/autorun/modscript_{d.Id}.lua", w.ToString())];
         }
+    }
+
+
+    // ---------------------------------------------------------------- 22.0: Cyberpunk 2077 (REDengine 4) + Cyber Engine Tweaks (Lua)
+
+    /// <summary>
+    /// 22.0: Cyberpunk 2077 — мод для Cyber Engine Tweaks: bin/x64/plugins/cyber_engine_tweaks/mods/modscript_&lt;id&gt;/init.lua.
+    /// События: ready — onInit, start — первый раз, когда игрок в мире, load — каждая загрузка сохранения
+    /// (PlayerPuppet:OnGameAttached), tick — 60 раз в секунду по onUpdate. Числа игры (деньги, здоровье в процентах,
+    /// уровень) читаются перед каждым событием и записываются после — в коде это обычные gold и health.
+    /// </summary>
+    sealed class Cyberpunk : Target
+    {
+        public override string Id => "cyberpunk";
+        public override string Title => "Cyberpunk 2077 (CET Lua)";
+        public override string Language => "lua";
+        protected override string[] Aliases => ["cet", "redengine", "cp2077"];
+
+        /// <summary>Число → (чтение, запись). p — игрок, d — на сколько изменилось, v — новое значение; запись null — только чтение.</summary>
+        static readonly (string Name, string Get, string? Set)[] Numbers =
+        [
+            ("gold", "Game.GetTransactionSystem():GetItemQuantity(p, MarketSystem.Money())",
+                "if d > 0 then Game.AddToInventory(\"Items.money\", d) elseif d < 0 then Game.GetTransactionSystem():RemoveItem(p, MarketSystem.Money(), -d) end"),
+            ("health", "Game.GetStatPoolsSystem():GetStatPoolValue(p:GetEntityID(), gamedataStatPoolType.Health, true)",
+                "Game.GetStatPoolsSystem():RequestSettingStatPoolValue(p:GetEntityID(), gamedataStatPoolType.Health, math.max(0, math.min(100, v)), nil)"),
+            ("level", "Game.GetStatsSystem():GetStatValue(p:GetEntityID(), gamedataStatType.Level)", null),
+        ];
+
+        public override IReadOnlyList<(string Name, bool ReadOnly)> GameNumbers => Numbers.Select(n => (n.Name, n.Set is null)).ToList();
+
+        public override List<OutFile> Emit(ModxDoc d, string? gameDir)
+        {
+            Warn(d);
+            var w = new Code("  ");
+            w.Raw(Header(d, "--"));
+            w.Line("-- say: a warning line on screen and the CET console; log: the CET console and cyber_engine_tweaks.log.");
+            w.Line("local function log(text) print(\"[ModScript] \" .. tostring(text)) end");
+            w.Line("local function say(text) log(text) pcall(function() Game.GetPlayer():SetWarningMessage(tostring(text)) end) end");
+            w.Line("local M = {}");
+            foreach (var (name, v) in d.Shared) w.Line($"{name} = {L.Literal(v)}");
+            var bound = Bound(d, Numbers.Select(n => n.Name));
+            foreach (var name in bound) w.Line($"{name} = 0");
+            Prelude(w, d);
+            foreach (var code in NativeCode(d)) w.Block(code);
+            Functions(w, d, e => $"say({e})", e => $"log({e})");
+            foreach (var h in d.Hooks)
+            {
+                w.Line($"function M.{h.Event}({(h.Event == "tick" ? "dt" : "")})");
+                w.In();
+                Declare(w, [h.Body], h.Event == "tick" ? ["dt"] : []);
+                Body(w, h.Body, e => $"say({e})", e => $"log({e})");
+                w.Out();
+                w.Line("end");
+            }
+            // Числа игры: прочитать перед событием, после — записать то, что код поменял (деньги — разницей, как в магазине).
+            w.Line("local mx_was = {}");
+            w.Line("local function mx_pull()");
+            w.In();
+            w.Line("local p = Game.GetPlayer()");
+            w.Line("if p == nil then return nil end");
+            foreach (var n in Numbers.Where(n => bound.Contains(n.Name)))
+                w.Line($"pcall(function() {n.Name} = {n.Get}; mx_was.{n.Name} = {n.Name} end)");
+            w.Line("return p");
+            w.Out();
+            w.Line("end");
+            w.Line("local function mx_push(p)");
+            w.In();
+            w.Line("if p == nil then return end");
+            foreach (var n in Numbers.Where(n => bound.Contains(n.Name) && n.Set is not null))
+                w.Line($"if mx_was.{n.Name} ~= nil and {n.Name} ~= mx_was.{n.Name} then pcall(function() local v = {n.Name}; local d = math.floor(v - mx_was.{n.Name} + 0.5); {n.Set} end) end");
+            w.Line("mx_was = {}");
+            w.Out();
+            w.Line("end");
+            w.Line("local function mx_run(f, ...)");
+            w.In();
+            w.Line("local p = mx_pull()");
+            w.Line("local ok, err = pcall(f, ...)");
+            w.Line("if not ok then log(err) end");
+            w.Line("mx_push(p)");
+            w.Out();
+            w.Line("end");
+            var has = d.Hooks.Select(h => h.Event).ToHashSet();
+            w.Line("local mx_in, mx_started, mx_acc = false, false, 0");
+            w.Line("registerForEvent(\"onInit\", function()");
+            w.In();
+            w.Line("pcall(function() local p = Game.GetPlayer() if p ~= nil and p:IsAttached() then mx_in = true mx_started = true end end)");
+            w.Line("Observe(\"PlayerPuppet\", \"OnGameAttached\", function()");
+            w.In();
+            w.Line("mx_in = true");
+            w.Line(has.Contains("start") ? "if not mx_started then mx_started = true mx_run(M.start) end" : "mx_started = true");
+            if (has.Contains("load")) w.Line("mx_run(M.load)");
+            w.Out();
+            w.Line("end)");
+            w.Line("Observe(\"PlayerPuppet\", \"OnDetach\", function() mx_in = false end)");
+            if (has.Contains("ready")) w.Line("mx_run(M.ready)");
+            w.Out();
+            w.Line("end)");
+            if (has.Contains("tick"))
+            {
+                // Тик — 60 раз в секунду по часам, а не по кадрам: «каждые 5 секунд» не зависят от FPS.
+                w.Line("registerForEvent(\"onUpdate\", function(dt)");
+                w.In();
+                w.Line("if not mx_in then return end");
+                w.Line("mx_acc = mx_acc + dt");
+                w.Line("local n = 0");
+                w.Line("while mx_acc >= 1 / 60 and n < 4 do mx_acc = mx_acc - 1 / 60; n = n + 1; mx_run(M.tick, 1 / 60) end");
+                w.Line("if mx_acc > 0.1 then mx_acc = 0 end");
+                w.Out();
+                w.Line("end)");
+            }
+            w.Line("return M");
+            return [new OutFile($"bin/x64/plugins/cyber_engine_tweaks/mods/modscript_{d.Id.ToLowerInvariant()}/init.lua", w.ToString())];
+        }
+    }
+
+    // ---------------------------------------------------------------- 22.0: RAGE (GTA V, RDR2) + ScriptHook .NET (C#)
+
+    /// <summary>
+    /// 22.0: игры Rockstar на RAGE. Мод — C#-скрипт для ScriptHookV .NET (GTA V) или ScriptHookRDR2 .NET (RDR2).
+    /// Исходник лежит в ModScriptX/&lt;id&gt;/, а не в scripts/ (иначе загрузчик собрал бы его второй раз); ModLaunch
+    /// собирает его встроенным компилятором в scripts/ModScript_&lt;id&gt;.dll. Числа игры — свойства, которые читают
+    /// и пишут игрока прямо в игре. ScriptHook сам выключается в сети: моды работают только в сюжете.
+    /// </summary>
+    abstract class ScriptHookNet : Target
+    {
+        public override string Language => "csharp";
+        /// <summary>Пространство имён загрузчика: GTA или RDR2.</summary>
+        protected abstract string Ns { get; }
+        protected abstract string Loader { get; }
+        protected abstract bool LoaderReady(string gameDir);
+        /// <summary>Число → (чтение, запись) на C#; в записи value — новое значение, запись null — только чтение.</summary>
+        protected abstract (string Name, string Get, string? Set)[] Numbers { get; }
+        /// <summary>Тело mx_say(object text): показать текст в игре.</summary>
+        protected abstract string SayCode { get; }
+        protected virtual void Helpers(Code w) { }
+
+        public override IReadOnlyList<(string Name, bool ReadOnly)> GameNumbers => Numbers.Select(n => (n.Name, n.Set is null)).ToList();
+        public override string? Dll(string id) => $"scripts/ModScript_{id}.dll";
+
+        public override List<OutFile> Emit(ModxDoc d, string? gameDir)
+        {
+            Warn(d);
+            var cls = "ModScript_" + d.Id;
+            var w = new Code("    ");
+            w.Raw(Header(d, "//"));
+            w.Line("using System;");
+            w.Line($"using {Ns};");
+            w.Line("");
+            w.Line($"public class {cls} : {Ns}.Script");
+            w.Line("{");
+            w.In();
+            foreach (var (name, v) in d.Shared) w.Line($"public static {Lang.CSharp.TypeOf(v)} {name} = {L.Literal(v)};");
+            var bound = Bound(d, Numbers.Select(n => n.Name));
+            foreach (var name in GameVars(d).Where(n => !bound.Contains(n))) w.Line($"public static dynamic {name} = 0;");
+            foreach (var n in Numbers.Where(n => bound.Contains(n.Name)))
+                w.Line($"public static dynamic {n.Name} {{ get {{ try {{ return {n.Get}; }} catch {{ return 0; }} }} set {{ {(n.Set is null ? "" : $"try {{ {n.Set}; }} catch {{ }} ")}}} }}");
+            w.Line($"static void mx_log(object text) {{ try {{ System.IO.File.AppendAllText(System.IO.Path.Combine(\"scripts\", \"{cls}.log\"), DateTime.Now.ToString(\"HH:mm:ss \") + Convert.ToString(text) + Environment.NewLine); }} catch {{ }} }}");
+            w.Line($"static void mx_say(object text) {{ try {{ {SayCode} }} catch {{ mx_log(text); }} }}");
+            Helpers(w);
+            Prelude(w, d);
+            foreach (var code in NativeCode(d)) w.Block(code);
+            Functions(w, d, e => $"mx_say({e})", e => $"mx_log({e})");
+            var has = d.Hooks.Select(h => h.Event).ToHashSet();
+            w.Line("bool _started;");
+            w.Line("int _last;");
+            w.Line("double _acc;");
+            w.Line($"public {cls}()");
+            w.Line("{");
+            w.In();
+            w.Line("Tick += (sender, e) => Frame();");
+            w.Line("OnReady();");
+            w.Out();
+            w.Line("}");
+            // Старт и загрузка — первый кадр в мире (ScriptHook запускает скрипты заново на каждой загрузке).
+            // Тик — 60 раз в секунду по часам, а не по кадрам: «каждые 5 секунд» не зависят от FPS.
+            w.Line("void Frame()");
+            w.Line("{");
+            w.In();
+            w.Line("if (!_started) { _started = true; _last = Environment.TickCount; OnStart(); OnLoad(); }");
+            if (has.Contains("tick"))
+            {
+                w.Line("var now = Environment.TickCount;");
+                w.Line("_acc += now - _last;");
+                w.Line("_last = now;");
+                w.Line("for (var i = 0; _acc >= 1000.0 / 60 && i < 4; i++) { _acc -= 1000.0 / 60; OnTick(); }");
+                w.Line("if (_acc > 100) _acc = 0;");
+            }
+            w.Out();
+            w.Line("}");
+            foreach (var ev in ModxDoc.Events)
+            {
+                w.Line($"void On{char.ToUpperInvariant(ev[0])}{ev[1..]}()");
+                w.Line("{");
+                w.In();
+                var hooks = d.Hooks.Where(h => h.Event == ev).ToList();
+                Declare(w, hooks.Select(h => h.Body), []);
+                foreach (var h in hooks) Body(w, h.Body, e => $"mx_say({e})", e => $"mx_log({e})");
+                w.Out();
+                w.Line("}");
+            }
+            w.Out();
+            w.Line("}");
+            return [new OutFile($"ModScriptX/{d.Id}/{cls}.cs", w.ToString())];
+        }
+
+        public override string? AfterInstall(ModxDoc d, string gameDir)
+        {
+            if (!LoaderReady(gameDir)) return $"{Loader} is not installed in this game: install it first";
+            var cls = $"ModScript_{d.Id}";
+            if (CompileCSharp is not { } compile) return $"{Title}: open the mod in ModLaunch to build scripts/{cls}.dll (built-in C# compiler)";
+            var source = File.ReadAllText(Path.Combine(gameDir, "ModScriptX", d.Id, cls + ".cs"));
+            var error = compile(source, cls, Path.Combine(gameDir, "scripts"), gameDir);
+            return error is null ? $"built into scripts/{cls}.dll (story mode only: ScriptHook is off online)" : "build failed:\n" + error;
+        }
+
+        public override void AfterEject(string id, string gameDir)
+        {
+            if (!System.Text.RegularExpressions.Regex.IsMatch(id, @"^[\p{L}\p{Nd}_]+$")) return;
+            foreach (var ext in new[] { ".dll", ".pdb", ".log" })
+                if (Path.Combine(gameDir, "scripts", $"ModScript_{id}{ext}") is var f && File.Exists(f)) File.Delete(f);
+            var src = Path.Combine(gameDir, "ModScriptX", id);
+            if (Directory.Exists(src)) Directory.Delete(src, true);
+            var root = Path.Combine(gameDir, "ModScriptX");
+            if (Directory.Exists(root) && !Directory.EnumerateFileSystemEntries(root).Any()) Directory.Delete(root);
+        }
+
+        protected static bool Has(string gameDir, string pattern)
+        {
+            try { return Directory.Exists(gameDir) && Directory.EnumerateFiles(gameDir, pattern).Any(); }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return false; }
+        }
+    }
+
+    /// <summary>GTA V (Legacy и Enhanced): ScriptHookV + ScriptHookVDotNet 3, API GTA.* (Game.Player, GTA.UI).</summary>
+    sealed class Gta5 : ScriptHookNet
+    {
+        public override string Id => "gta5";
+        public override string Title => "GTA V (ScriptHookV .NET)";
+        protected override string[] Aliases => ["rage", "gtav", "scripthookv", "shvdn"];
+        protected override string Ns => "GTA";
+        protected override string Loader => "ScriptHookV .NET";
+        protected override bool LoaderReady(string gameDir) => Has(gameDir, "ScriptHookV.dll") && Has(gameDir, "ScriptHookVDotNet3.dll");
+        protected override string SayCode => "GTA.UI.Notification.Show(Convert.ToString(text));";
+
+        protected override (string Name, string Get, string? Set)[] Numbers =>
+        [
+            ("gold", "Game.Player.Money", "Game.Player.Money = Convert.ToInt32(value)"),
+            ("health", "Game.Player.Character.Health", "Game.Player.Character.Health = Convert.ToInt32(value)"),
+            ("max_health", "Game.Player.Character.MaxHealth", "Game.Player.Character.MaxHealth = Convert.ToInt32(value)"),
+            ("armor", "Game.Player.Character.Armor", "Game.Player.Character.Armor = Convert.ToInt32(value)"),
+            ("wanted", "Game.Player.WantedLevel", "Game.Player.WantedLevel = Convert.ToInt32(value)"),
+        ];
+    }
+
+    /// <summary>
+    /// RDR2: ScriptHookRDR2 + ScriptHookRDR2 .NET (порт SHVDN, пространство имён RDR2). У разных сборок порта API
+    /// немного разный, поэтому числа и текст на экране ищутся по имени при запуске: нет свойства — мод не падает.
+    /// </summary>
+    sealed class Rdr2 : ScriptHookNet
+    {
+        public override string Id => "rdr2";
+        public override string Title => "RDR2 (ScriptHookRDR2 .NET)";
+        protected override string[] Aliases => ["reddead", "scripthookrdr2"];
+        protected override string Ns => "RDR2";
+        protected override string Loader => "ScriptHookRDR2 .NET";
+        protected override bool LoaderReady(string gameDir) => Has(gameDir, "ScriptHookRDR2.dll") && Has(gameDir, "ScriptHookRDR2DotNet*.dll");
+        protected override string SayCode =>
+            "var t = mx_type(\"RDR2.UI.Screen\"); var m = t == null ? null : (t.GetMethod(\"DisplaySubtitle\", new[] { typeof(string) }) ?? t.GetMethod(\"ShowSubtitle\", new[] { typeof(string) })); " +
+            "if (m == null) mx_log(text); else m.Invoke(null, new object[] { Convert.ToString(text) });";
+
+        protected override (string Name, string Get, string? Set)[] Numbers =>
+        [
+            ("gold", "mx_get(\"Player.Money\")", "mx_set(\"Player.Money\", value)"),
+            ("health", "mx_get(\"Player.Character.Health\")", "mx_set(\"Player.Character.Health\", value)"),
+            ("max_health", "mx_get(\"Player.Character.MaxHealth\")", "mx_set(\"Player.Character.MaxHealth\", value)"),
+        ];
+
+        protected override void Helpers(Code w) => w.Block("""
+            static Type mx_type(string name)
+            {
+                foreach (var a in AppDomain.CurrentDomain.GetAssemblies()) { var t = a.GetType(name); if (t != null) return t; }
+                return null;
+            }
+            static object mx_get(string path)
+            {
+                object o = null;
+                var t = mx_type("RDR2.Game");
+                foreach (var part in path.Split('.'))
+                {
+                    var p = t == null ? null : t.GetProperty(part);
+                    if (p == null) return 0;
+                    o = p.GetValue(o, null);
+                    if (o == null) return 0;
+                    t = o.GetType();
+                }
+                return o;
+            }
+            static void mx_set(string path, object value)
+            {
+                var parts = path.Split('.');
+                var owner = parts.Length == 1 ? null : mx_get(string.Join(".", parts, 0, parts.Length - 1));
+                var t = parts.Length == 1 ? mx_type("RDR2.Game") : owner == null ? null : owner.GetType();
+                var p = t == null ? null : t.GetProperty(parts[parts.Length - 1]);
+                if (p != null && p.CanWrite) p.SetValue(owner, Convert.ChangeType(value, p.PropertyType), null);
+            }
+            """);
     }
 
     protected static string Plain(string s) => JsonSerializer.Serialize(s);
