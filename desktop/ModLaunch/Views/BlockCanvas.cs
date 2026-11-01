@@ -923,6 +923,8 @@ public sealed class BlockCanvas : UserControl
     [SelfTest]
     static string BlocksBuildAMod()
     {
+        // --selfcheck перед выпуском идёт без интерфейса (нет стилей и ресурсов): холст блоков проверяется в --selftest.
+        if (Avalonia.Application.Current is null) return "skipped (no UI in --selfcheck)";
         var code = "mod \"Kid\"\nengine renpy\n";
         var canvas = new BlockCanvas(() => code, t => code = t, () => ["ready", "start", "load", "tick"], () => { });
         canvas.Insert("say");                 // событий нет — появится «Когда игра началась»
