@@ -11,7 +11,7 @@ document.documentElement.classList.add('js');
 
 // Число модов — по всем каталогам игры (Thunderstore, Nexus, ModLinks), данные самопроверки 5.5.
 const GAMES = [
-  { id: 'minecraft', color: '#3FB950', name: 'Minecraft: Java Edition', steam: 'minecraft', loader: 'Fabric · Quilt · Forge · NeoForge', src: 'Modrinth', mods: 19000, fresh: true },
+  { id: 'minecraft', color: '#3FB950', name: 'Minecraft: Java Edition', steam: 'minecraft', loader: 'Fabric · Quilt · Forge · NeoForge', src: 'Modrinth', mods: 19000 },
   { id: 'lethal-company', color: '#C9A227', name: 'Lethal Company', steam: 1966720, loader: 'BepInEx', src: 'Thunderstore · Nexus', mods: 39275 },
   { id: 'stardew-valley', color: '#6BAA3C', name: 'Stardew Valley', steam: 413150, loader: 'SMAPI', src: 'Nexus Mods', mods: 32660 },
   { id: 'valheim', color: '#E09F3E', name: 'Valheim', steam: 892970, loader: 'BepInEx', src: 'Thunderstore · Nexus', mods: 9276 },
@@ -20,13 +20,13 @@ const GAMES = [
   { id: 'risk-of-rain-2', color: '#4FB0C6', name: 'Risk of Rain 2', steam: 632360, loader: 'BepInEx', src: 'Thunderstore', mods: 4784 },
   { id: 'subnautica', color: '#2BB3C0', name: 'Subnautica', steam: 264710, loader: 'BepInEx', src: 'Nexus · Thunderstore', mods: 2312 },
   { id: 'peak', color: '#E8743B', name: 'PEAK', steam: 3527290, loader: 'BepInEx', src: 'Thunderstore · Nexus', mods: 2124 },
-  { id: 'hollow-knight-silksong', color: '#C8394B', name: 'Hollow Knight: Silksong', steam: 1030300, loader: 'BepInEx', src: 'Nexus · Thunderstore', mods: 1231, fresh: true },
+  { id: 'hollow-knight-silksong', color: '#C8394B', name: 'Hollow Knight: Silksong', steam: 1030300, loader: 'BepInEx', src: 'Nexus · Thunderstore', mods: 1231 },
   { id: 'content-warning', color: '#F5D90A', name: 'Content Warning', steam: 2881650, loader: 'BepInEx', src: 'Thunderstore · Nexus', mods: 1009 },
   { id: 'ultrakill', color: '#E03C31', name: 'ULTRAKILL', steam: 1229490, loader: 'BepInEx', src: 'Thunderstore · Nexus', mods: 1000 },
   { id: 'rounds', color: '#F2C14E', name: 'ROUNDS', steam: 1557740, loader: 'BepInEx', src: 'Thunderstore', mods: 967 },
-  { id: 'gtfo', color: '#9FB4C7', name: 'GTFO', steam: 493520, loader: 'BepInEx', src: 'Thunderstore · Nexus', mods: 839, fresh: true },
+  { id: 'gtfo', color: '#9FB4C7', name: 'GTFO', steam: 493520, loader: 'BepInEx', src: 'Thunderstore · Nexus', mods: 839 },
   { id: 'hollow-knight', color: '#6F9BFF', name: 'Hollow Knight', steam: 367520, loader: 'Modding API', src: 'ModLinks · Nexus', mods: 805 },
-  { id: 'outward', color: '#B98B4E', name: 'Outward', steam: 794260, loader: 'BepInEx', src: 'Thunderstore · Nexus', mods: 669, fresh: true },
+  { id: 'outward', color: '#B98B4E', name: 'Outward', steam: 794260, loader: 'BepInEx', src: 'Thunderstore · Nexus', mods: 669 },
   { id: 'subnautica-below-zero', color: '#7FB4E6', name: 'Subnautica: Below Zero', steam: 848450, loader: 'BepInEx', src: 'Nexus · Thunderstore', mods: 569 },
   { id: 'dyson-sphere-program', color: '#3FA7F5', name: 'Dyson Sphere Program', steam: 1366540, loader: 'BepInEx', src: 'Thunderstore · Nexus', mods: 561 },
 ];
@@ -39,10 +39,11 @@ const steamHeader = (id) => `https://cdn.akamai.steamstatic.com/steam/apps/${id}
 
 // Русский текст берётся прямо из разметки, английский — из словарей страниц.
 const EN = {
-  'nav.features': 'Features',
-  'nav.games': 'Games',
+  'nav.platform': 'Platform',
+  'nav.library': 'Library',
+  'nav.mods': 'Mods',
+  'nav.community': 'Community',
   'nav.hub': 'Hub',
-  'nav.creator': 'ModScript',
   'nav.faq': 'FAQ',
   'nav.download': 'Download',
   'nav.new': 'new',
@@ -50,8 +51,8 @@ const EN = {
   'foot.issues': 'Report a bug',
   'foot.hub': 'ModLaunch Hub',
   'foot.modscript': 'ModScript language',
-  'foot.note': 'Game names and art belong to their owners. ModLaunch is an unofficial fan project.',
-  meta: 'Windows 10 / 11 · free',
+  'foot.note': 'The official ModLaunch site is modlaunchapp.com. ModLaunch is not affiliated with Valve, Epic Games, GOG, Mojang, Microsoft or game publishers; game names and art belong to their owners.',
+  meta: 'free',
   mb: 'MB',
   'hero.download': 'Download for Windows',
 };
@@ -61,7 +62,7 @@ function collectRu() {
   document.querySelectorAll('[data-tp]').forEach((n) => { if (!(n.dataset.tp in ru)) ru[n.dataset.tp] = n.getAttribute('placeholder') || ''; });
 }
 collectRu();
-Object.assign(ru, { meta: 'Windows 10 / 11 · бесплатно', mb: 'МБ' });
+Object.assign(ru, { meta: 'бесплатно', mb: 'МБ' });
 
 let lang = 'ru';
 try {
@@ -97,7 +98,7 @@ document.getElementById('lang')?.addEventListener('click', () => {
 function setTheme(theme) {
   document.documentElement.dataset.theme = theme;
   try { localStorage.setItem('theme', theme); } catch { /* без сохранения */ }
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'light' ? '#f5f6fa' : '#0b0c12');
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'light' ? '#ececef' : '#17171a');
 }
 (() => {
   let saved = null;
@@ -113,8 +114,10 @@ if (nav) {
   const onScroll = () => nav.classList.toggle('is-scrolled', window.scrollY > 10);
   addEventListener('scroll', onScroll, { passive: true });
   onScroll();
-  document.getElementById('burger')?.addEventListener('click', () => nav.classList.toggle('is-open'));
-  nav.querySelectorAll('.nav__links a').forEach((a) => a.addEventListener('click', () => nav.classList.remove('is-open')));
+  const burger = document.getElementById('burger');
+  const setOpen = (open) => { nav.classList.toggle('is-open', open); burger?.setAttribute('aria-expanded', String(open)); };
+  burger?.addEventListener('click', () => setOpen(!nav.classList.contains('is-open')));
+  nav.querySelectorAll('.nav__links a').forEach((a) => a.addEventListener('click', () => setOpen(false)));
 }
 
 /* ---------------------------------------------------------------- свежий выпуск */
