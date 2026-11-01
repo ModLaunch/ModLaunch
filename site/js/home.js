@@ -181,7 +181,7 @@ function renderShelf() {
   if (!shelf) return;
   shelf.innerHTML = HERO.map((h, i) => {
     const g = gameById(h.key);
-    return `<li style="--i:${i}"><button type="button" aria-pressed="${i === heroAt}" aria-label="${esc(g.name)}" data-i="${i}">
+    return `<li style="--i:${i}"${i === heroAt ? ' class="is-on"' : ''}><button type="button" aria-pressed="${i === heroAt}" aria-label="${esc(g.name)}" data-i="${i}">
       <img src="img/art/${esc(String(h.art))}.webp" alt="" width="200" height="300" /></button></li>`;
   }).join('');
   shelf.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => setHero(Number(b.dataset.i))));
@@ -193,7 +193,7 @@ function setHero(i) {
   heroAt = i;
   const hero = document.getElementById('hero');
   hero.style.setProperty('--game', g.color);
-  document.querySelectorAll('#shelf button').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.i) === i)));
+  document.querySelectorAll('#shelf button').forEach((b) => { const on = Number(b.dataset.i) === i; b.setAttribute('aria-pressed', String(on)); b.parentElement.classList.toggle('is-on', on); });
   const scene = document.getElementById('scene');
   const next = new Image();
   next.alt = '';
