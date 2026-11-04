@@ -413,7 +413,10 @@ public static partial class CrashDoctor
             // Чистый лог, но после последней удачной игры поставили мод — он первый подозреваемый.
             Settings.Data.Obj("goodRuns")[def.Id] = DateTime.UtcNow.AddHours(-1).ToString("o");
             var empty = Diagnose(g, [], null);
-            Expect(empty.Causes.Single().Kind == "recent" && empty.Causes[0].Recent.Count == 3, "recent mods not suspected", []);
+            // Список модов общий на игру (games/<id>.json): в самопроверке там бывают и свежие моды других проверок.
+            var mine = new[] { "Evaisa-LethalThings", "notnotnotswipez-MoreCompany", "tinyhoot-ShipLoot" };
+            if (empty.Causes.Single().Kind != "recent" || !mine.All(empty.Causes[0].Recent.Contains))
+                throw new Exception("recent mods not suspected: " + string.Join(" | ", empty.Causes.Select(c => c.Kind + ":" + string.Join(",", c.Recent))));
             Settings.Data.Obj("goodRuns")[def.Id] = DateTime.UtcNow.AddHours(1).ToString("o");
             Expect(Diagnose(g, [], null).Causes.Single().Kind == "unknown", "nothing to suspect → unknown", []);
             return "missing → install, outdated → update 1.11.0, broken → disable, clean log → recent mods";
