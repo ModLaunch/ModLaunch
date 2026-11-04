@@ -238,26 +238,28 @@ public sealed partial class HomePage
             list.Add(new("app", Icons.Sparkles, Yellow, I18n.T("h95.a.app", ("version", latest.Version)), I18n.T("h95.a.app.text"),
                 I18n.T("h95.a.app.go"), () => MainWindow.Current?.ShowUpdate(), () => MainWindow.Current?.ShowUpdate()));
 
+        // 23.9: одна строка на все обновления — моды игр и сборки Minecraft — и «Обновить всё» одним нажатием.
         var updates = mine.SelectMany(g => (Features.ModUpdates.Found.TryGetValue(g.Def.Id, out var l) ? l : []).Select(u => (g, u))).ToList();
-        if (updates.Count > 0)
+        var mcBuilds = Mc.State is { Status: Detect.Found } ? Mc.Instances() : [];
+        var withUpdates = mcBuilds.Select(i => (Build: i, N: McContent.UpdateCount(i))).Where(x => x.N > 0).ToList();
+        var total = updates.Count + withUpdates.Sum(x => x.N);
+        if (total > 0)
         {
-            var games = string.Join(", ", updates.GroupBy(x => x.g).Select(x => $"{x.Key.Def.ShortName} ({x.Count()})"));
-            var first = updates[0].g.Def.Id;
-            list.Add(new("mods", Icons.ArrowUp, Pink, I18n.T("h95.a.mods", ("n", updates.Count)), I18n.T("h95.a.mods.text", ("games", games)),
-                I18n.T("h95.a.mods.go"), () => UpdateReview.Show(updates), () => Go(() => new GamePage(first, "installed"))));
+            var parts = updates.GroupBy(x => x.g).Select(x => $"{x.Key.Def.ShortName} ({x.Count()})").Concat(withUpdates.Select(x => $"{x.Build.Name} ({x.N})"));
+            var patched = updates.Select(x => x.g).Distinct().FirstOrDefault(g => Features.GamePatch.Patched.ContainsKey(g.Def.Id));
+            var text = string.Join(", ", parts) + (patched is not null ? " · " + I18n.T("v23.upd.afterPatch", ("game", patched.Def.ShortName)) : "");
+            void Open()
+            {
+                if (updates.Count > 0) UpdateReview.Show(updates);
+                else { Mc.Active = withUpdates[0].Build; Go(() => new MinecraftPage("mods")); }
+            }
+            list.Add(new("mods", Icons.ArrowUp, Pink, I18n.T("v23.upd.title." + I18n.Plural(total, "one", "few", "many"), ("n", total)), text,
+                I18n.T("h95.a.mods.go"), () => Actions.UpdateAll(updates), Open));
         }
 
         if (Mc.State is { Status: Detect.Found })
         {
-            var builds = Mc.Instances();
-            var withUpdates = builds.Select(i => (Build: i, N: McContent.UpdateCount(i))).Where(x => x.N > 0).ToList();
-            if (withUpdates.Count > 0)
-            {
-                var target = withUpdates[0].Build;
-                void Open() { Mc.Active = target; Go(() => new MinecraftPage("mods")); }
-                list.Add(new("mc", Icons.Cube, Ui.Res("Good"), I18n.T("h95.a.mc", ("n", withUpdates.Sum(x => x.N))),
-                    I18n.T("h95.a.mc.text", ("builds", string.Join(", ", withUpdates.Select(x => $"{x.Build.Name} ({x.N})")))), I18n.T("h95.a.mc.go"), Open, Open));
-            }
+            var builds = mcBuilds;
             foreach (var b in builds)
             {
                 if (McModrinth.PackUpdate(b) is not { } v) continue;

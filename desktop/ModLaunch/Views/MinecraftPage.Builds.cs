@@ -20,6 +20,8 @@ public sealed partial class MinecraftPage
         col.Children.Add(Ui.Row(10,
             Ui.Button(I18n.T("mine.build.new"), CreateDialog, "primary", Icons.Plus),
             Ui.Button(I18n.T("mine.import.mrpack"), () => ImportMrpack(), "", Icons.FilePlus),
+            Ui.Button(I18n.T("v23.code.shareShort"), () => { if (Mc.Active is not null) BuildShare.Share(AppState.Game(Mc.Id)); }, "", Icons.Upload),
+            Ui.Button(I18n.T("code.enter"), () => BuildShare.Enter(), "", Icons.Download),
             Ui.Button(I18n.T("mine.tab.catalog") + " · " + I18n.T("mine.kind.modpack.many"), () => { _type = "modpack"; _category = ""; Go("catalog"); }, "ghost", Icons.Bag)));
 
         var builds = Mc.Instances();

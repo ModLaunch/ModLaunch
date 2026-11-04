@@ -40,6 +40,8 @@ public sealed partial class GamePage
             Ui.Button(I18n.T("inst.fromFile"), () => Actions.InstallFromFile(_g), "", Icons.FilePlus),
             Ui.Button(I18n.T("games.openFolder"), () => Actions.OpenFolder(registry.ModsDir), "", Icons.Folder));
         ((Button)actions.Children[0]).IsEnabled = !_checkingUpdates;
+        // 23.9: поделиться сборкой с друзьями — там же, где список модов.
+        if (BuildShare.Supported(_g) && registry.List().Count > 0) actions.Children.Insert(0, Ui.Button(I18n.T("v23.code.shareShort"), () => BuildShare.Share(_g), "", Icons.Upload));
         DockPanel.SetDock(actions, Dock.Right);
         head.Children.Add(actions);
         head.Children.Add(Ui.Text(I18n.T("inst.title"), "h2"));
@@ -312,10 +314,13 @@ public sealed partial class GamePage
         var n = updates.Count;
         var head = new DockPanel();
         // Сначала окно со списком: что обновится, что нового, что оставить как есть.
-        var all = Ui.Button(I18n.T("upd.all"), () => UpdateReview.Show(updates.Select(u => (_g, u)).ToList()), "primary", Icons.ArrowUp);
+        // 23.9: «Обновить всё» — сразу, одной кнопкой (перед этим снимок «как было»); список с галочками — рядом.
+        var all = Ui.Row(8,
+            Ui.Button(I18n.T("v23.upd.pick"), () => UpdateReview.Show(updates.Select(u => (_g, u)).ToList()), "ghost", Icons.List),
+            Ui.Button(I18n.T("upd.all"), () => Actions.UpdateAll(updates.Select(u => (_g, u)).ToList(), minecraft: false), "primary", Icons.ArrowUp));
         DockPanel.SetDock(all, Dock.Right);
         head.Children.Add(all);
-        var label = Ui.Row(10, Ui.Icon(Icons.ArrowUp, 18, Ui.Res("Brand2")), Ui.Text(I18n.T("upd.found." + I18n.Plural(n, "one", "few", "many"), ("n", n)), "h3"));
+        var label = Ui.Row(10, Ui.Icon(Icons.ArrowUp, 18, Ui.Res("Brand2")), Ui.Text(I18n.T("v23.upd.title." + I18n.Plural(n, "one", "few", "many"), ("n", n)), "h3"));
         label.VerticalAlignment = VerticalAlignment.Center;
         head.Children.Add(label);
         return new Border { Background = Ui.Res("BrandSoft"), CornerRadius = new CornerRadius(14), Padding = new Thickness(16, 12), Child = head };

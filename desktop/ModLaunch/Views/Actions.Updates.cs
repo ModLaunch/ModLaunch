@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using Avalonia.Threading;
 using ModLaunch.Core;
 using ModLaunch.Features;
+using ModLaunch.Games;
 using ModLaunch.Mods;
 
 namespace ModLaunch.Views;
@@ -120,6 +121,71 @@ public static partial class Actions
         }
         finally { PreparingPlay.Remove(g.Def.Id); }
         Play(g, animate, skipUpdate: true);
+    }
+
+    /// <summary>Сколько обновлений ждёт везде: моды игр и сборки Minecraft.</summary>
+    public static int PendingUpdates() =>
+        ModUpdates.Found.Sum(kv => kv.Value.Count) + (Minecraft.Mc.State is { Status: Detect.Found } ? Minecraft.Mc.Instances().Sum(Minecraft.McContent.UpdateCount) : 0);
+
+    /// <summary>
+    /// 23.9: «Обновить всё» одной кнопкой — без окна со списком: моды всех игр (каждая игра — своя задача,
+    /// перед ней снимок «как было») и сборки Minecraft. Запущенные игры пропускаются.
+    /// </summary>
+    public static void UpdateAll(IReadOnlyList<(GameState Game, ModUpdate Update)>? only = null, bool minecraft = true)
+    {
+        var items = only ?? AppState.Games.SelectMany(g => (ModUpdates.Found.GetValueOrDefault(g.Def.Id) ?? []).Select(u => (g, u))).ToList();
+        var n = 0;
+        var skipped = new List<string>();
+        foreach (var group in items.GroupBy(x => x.Game))
+        {
+            if (Launcher.IsRunning(group.Key.Def.Id)) { skipped.Add(group.Key.Def.ShortName); continue; }
+            var list = group.Select(x => x.Update).ToList();
+            n += list.Count;
+            _ = UpdateMods(group.Key, list);
+        }
+        if (minecraft && Minecraft.Mc.State is { Status: Detect.Found } && !Launcher.IsRunning(Minecraft.Mc.Id))
+            foreach (var i in Minecraft.Mc.Instances())
+            {
+                var ups = Minecraft.McContent.Updates(i);
+                if (ups.Count == 0) continue;
+                n += ups.Count;
+                Jobs.Run(I18n.T("mine.updates.job", ("n", ups.Count)), "Minecraft · " + i.Name, async (_, progress, ct) =>
+                {
+                    var failed = 0;
+                    foreach (var u in ups)
+                    {
+                        try { await Minecraft.McModrinth.Update(i, u, progress, ct); }
+                        catch (OperationCanceledException) { throw; }
+                        catch (Exception e) { failed++; Guard.Log(e); }
+                    }
+                    Dispatcher.UIThread.Post(Minecraft.Mc.Notify);
+                    if (failed > 0) throw new InvalidOperationException(I18n.T("mine.updates.failed", ("n", failed)));
+                });
+            }
+        if (n > 0) W.Toast(I18n.T("v23.upd.started", ("n", n)) + (skipped.Count > 0 ? " " + I18n.T("v23.upd.running", ("list", string.Join(", ", skipped))) : ""));
+        else if (skipped.Count > 0) W.Toast(I18n.T("vanilla.running"), bad: true);
+        AppState.Notify();
+    }
+
+    /// <summary>
+    /// Проверить обновления всех игр с модами (при запуске и раз в 6 часов). Игра обновилась в Steam —
+    /// проверяем её в любом случае и говорим, сколько модов можно обновить.
+    /// </summary>
+    public static async Task CheckAllUpdates(bool startup)
+    {
+        var libraries = await Task.Run(Games.Locator.SteamLibraries);
+        var patched = new List<(GameState Game, int N)>();
+        foreach (var g in AppState.Games.Where(g => g.Status == Detect.Found && (g.ModCount > 0 || g.Def.IsMinecraft)))
+        {
+            var changed = false;
+            try { changed = GamePatch.Changed(g, libraries); } catch { }
+            if (!changed && !ModUpdates.OnStart) continue;
+            try { var found = await ModUpdates.Check(g); if (changed) patched.Add((g, found.Count)); } catch { }
+        }
+        AppState.Notify();
+        foreach (var (g, n) in patched.Where(p => p.N > 0))
+            W.Toast(I18n.T("v23.upd.patched", ("game", g.Def.Name), ("n", n)));
+        if (startup || ModUpdates.Auto) AutoUpdate();
     }
 
     /// <summary>«Обновлять моды сами»: после проверки при запуске программы — всё, что можно без браузера.</summary>

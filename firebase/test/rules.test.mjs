@@ -542,3 +542,28 @@ test('комиссия: все продажи разом видит только
   await assertFails(getDocs(collectionGroup(db(SELLER), 'sales')));
   await assertFails(getDocs(collectionGroup(db(BUYER), 'sales')));
 });
+
+// 23.9: коды сборок — пишет любой вход (и безымянный) свой документ, читают только по точному коду.
+function build(uid, extra = {}) {
+  return { uid, game: 'lethal-company', name: 'Ночь с друзьями', mods: 12, data: 'UEsDBAo=', app: '23.9.0', created: serverTimestamp(), ...extra };
+}
+
+test('коды сборок: свой — можно (и анониму), читают по коду, список — нельзя, удалить — только автор', async () => {
+  await assertSucceeds(setDoc(doc(anon('anon1'), 'builds', '7K3Q9XZD'), build('anon1')));
+  await assertSucceeds(getDoc(doc(anon('anon2'), 'builds', '7K3Q9XZD')));
+  await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), 'builds', '7K3Q9XZD')));
+  await assertFails(getDocs(collection(anon('anon2'), 'builds')));
+  await assertFails(setDoc(doc(anon('anon2'), 'builds', '7K3Q9XZD'), build('anon2')));
+  await assertFails(deleteDoc(doc(anon('anon2'), 'builds', '7K3Q9XZD')));
+  await assertSucceeds(deleteDoc(doc(anon('anon1'), 'builds', '7K3Q9XZD')));
+});
+
+test('коды сборок: чужой uid, кривой код, лишнее поле, «created» не сервером, больше 900 000 знаков — отказ', async () => {
+  await assertFails(setDoc(doc(anon('anon1'), 'builds', 'AAAABBBB'), build('anon2')));
+  await assertFails(setDoc(doc(anon('anon1'), 'builds', 'aaaa1111'), build('anon1')));
+  await assertFails(setDoc(doc(anon('anon1'), 'builds', 'AAAABBBC'), build('anon1', { extra: 1 })));
+  await assertFails(setDoc(doc(anon('anon1'), 'builds', 'AAAABBBD'), build('anon1', { created: new Date(2020, 0, 1) })));
+  await assertFails(setDoc(doc(anon('anon1'), 'builds', 'AAAABBBE'), build('anon1', { data: 'x'.repeat(900001) })));
+  await assertSucceeds(setDoc(doc(anon('anon1'), 'builds', 'AAAABBBF'), build('anon1')));
+  await assertFails(updateDoc(doc(anon('anon1'), 'builds', 'AAAABBBF'), { name: 'new' }));
+});

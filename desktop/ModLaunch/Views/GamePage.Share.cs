@@ -18,22 +18,15 @@ public sealed partial class GamePage
 
     // ---------------------------------------------------------------- код сборки
 
+    /// <summary>23.9: код ModLaunch — для любой игры; у игр с Thunderstore рядом и код для r2modman и Gale.</summary>
     Control ShareCard()
     {
-        var (inCode, left) = ProfileCode.Pick(_g.Registry!);
-        var get = Ui.Button(_sharing ? I18n.T("code.getting") : I18n.T("code.get"), GetCode, "primary", Icons.Upload);
-        get.IsEnabled = !_sharing && inCode.Count > 0;
-        var col = Ui.Col(14,
-            Ui.Text(I18n.T("code.title"), "h2"),
-            Ui.Text(I18n.T("code.hint"), "muted", wrap: true),
-            Ui.Row(10,
-                get,
-                Ui.Button(I18n.T("code.enter"), EnterCode, "", Icons.Download),
-                Ui.Button(I18n.T("code.saveFile"), SaveR2z, "ghost", Icons.Save),
-                Ui.Button(I18n.T("code.openFile"), OpenR2z, "ghost", Icons.FilePlus)));
-        if (left.Count > 0)
-            col.Children.Add(Ui.Row(8, Ui.Icon(Icons.Info, 15, Ui.Res("Muted")), Ui.Text(I18n.T("code.left", ("list", string.Join(", ", left.Take(5)))), "small muted", wrap: true)));
-        return Ui.Card(col, 22);
+        if (!ProfileCode.Supported(_g.Def)) return BuildShare.Card(_g, null);
+        var r2m = Ui.Button(_sharing ? I18n.T("code.getting") : I18n.T("v23.code.r2m"), GetCode, "ghost", Icons.Upload);
+        r2m.IsEnabled = !_sharing && ProfileCode.Pick(_g.Registry!).In.Count > 0;
+        return BuildShare.Card(_g, PreviewCode, r2m,
+            Ui.Button(I18n.T("code.saveFile"), SaveR2z, "ghost", Icons.Save),
+            Ui.Button(I18n.T("code.openFile"), OpenR2z, "ghost", Icons.FilePlus));
     }
 
     string ProfileName() => Profiles.List(_g.Def.Id).FirstOrDefault(p => p.Active)?.Name ?? _g.Def.Name;
@@ -65,33 +58,6 @@ public sealed partial class GamePage
                 Ui.Row(8, Ui.Icon(Icons.Check, 15, Ui.Res("Good")), Ui.Text(I18n.T("code.copied"), "small muted"))),
             Ui.Button(I18n.T("common.close"), w.CloseDialog),
             Ui.Button(I18n.T("code.copy"), () => { _ = TopLevel.GetTopLevel(w)?.Clipboard?.SetTextAsync(code); w.Toast(I18n.T("code.copied")); }, "primary", Icons.List));
-    }
-
-    void EnterCode()
-    {
-        var w = MainWindow.Current!;
-        var box = new TextBox { Watermark = I18n.T("code.placeholder"), FontFamily = new FontFamily("Consolas, monospace") };
-        var status = Ui.Text("", "small muted", wrap: true);
-        Button? show = null;
-        async void Load()
-        {
-            var text = (box.Text ?? "").Trim();
-            if (!ProfileCode.LooksLikeCode(text)) { status.Text = I18n.T("code.bad"); return; }
-            show!.IsEnabled = false;
-            status.Text = I18n.T("common.loading");
-            try
-            {
-                var profile = Program.Demo ? DemoCode() : await ProfileCode.Fetch(text);
-                w.CloseDialog();
-                PreviewCode(profile);
-            }
-            catch (Exception e) { status.Text = e is InvalidDataException ? e.Message : Jobs.Explain(e); show.IsEnabled = true; }
-        }
-        box.KeyDown += (_, e) => { if (e.Key == Avalonia.Input.Key.Enter) Load(); };
-        show = Ui.Button(I18n.T("code.show"), Load, "primary", Icons.Search);
-        w.Dialog(I18n.T("code.enter.title"), Ui.Col(10, Ui.Text(I18n.T("code.enter.text"), "muted", wrap: true), box, status),
-            Ui.Button(I18n.T("common.cancel"), w.CloseDialog), show);
-        Avalonia.Threading.Dispatcher.UIThread.Post(() => box.Focus());
     }
 
     /// <summary>Что в сборке друга: есть, другая версия, поставим. Галочки: настройки и лишние моды.</summary>

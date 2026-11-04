@@ -180,7 +180,7 @@ public sealed partial class HomePage : Page
         var pending = Features.ModUpdates.Found.TryGetValue(id, out var found) ? found : null;
         if (withFan && pending is { Count: > 0 })
         {
-            var all = Ui.Button($"{I18n.T("v91.home.updates")} · {pending.Count}", () => UpdateReview.Show(pending.Select(u => (g, u)).ToList()), "hero-ghost", Icons.ArrowUp);
+            var all = Ui.Button($"{I18n.T("v91.home.updates")} · {pending.Count}", () => Actions.UpdateAll(pending.Select(u => (g, u)).ToList(), minecraft: false), "hero-ghost", Icons.ArrowUp);
             all.Padding = new Thickness(18, 13);
             buttons.Children.Add(all);
         }
@@ -218,7 +218,7 @@ public sealed partial class HomePage : Page
                 row.Children.Add(new TextBlock { Text = u.Name, FontSize = 13, Foreground = soft, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 0, 10, 0) });
                 list.Children.Add(row);
             }
-            var all = Ui.Button(I18n.T("upd.all"), () => UpdateReview.Show(updates.Select(u => (g, u)).ToList()), "hero-light", Icons.ArrowUp);
+            var all = Ui.Button(I18n.T("upd.all"), () => Actions.UpdateAll(updates.Select(u => (g, u)).ToList(), minecraft: false), "hero-light", Icons.ArrowUp);
             all.HorizontalAlignment = HorizontalAlignment.Stretch;
             all.HorizontalContentAlignment = HorizontalAlignment.Center;
             layers.Children.Add(new Border

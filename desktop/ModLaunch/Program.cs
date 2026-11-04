@@ -316,11 +316,11 @@ public static class Program
         Save("15c-running");
         Features.Launcher.DemoRunning("subnautica", false);
         AppState.Notify();
-        window.ShowCrash(sub, 12_000, -532462766,
+        window.ShowWhy(sub, Features.CrashDoctor.Diagnose(sub,
         [
-            new MainWindow.Culprit("Nautilus", "NullReferenceException: Object reference not set to an instance of an object at Nautilus.Handlers.CraftDataHandler.Awake()", null),
-            new MainWindow.Culprit("Slot Extender", "Could not load type 'SlotExtender.Patches.uGUI_QuickSlots_Patch' from assembly 'SlotExtender'", null),
-        ]);
+            new("missing", "Nautilus", "com.snmodding.nautilus", "Could not load [Slot Extender 1.9] because it has missing dependencies: com.snmodding.nautilus"),
+            new("outdated", "Slot Extender", null, "Could not load type 'SlotExtender.Patches.uGUI_QuickSlots_Patch' from assembly 'SlotExtender'"),
+        ], null), 12_000);
         Save("15d-crash");
         window.CloseDialog();
         window.OpenAccountPanel();

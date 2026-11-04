@@ -180,6 +180,61 @@ public static class SelfCheck
             var ups = await Features.ModUpdates.Check(state);
             return ups.Count == 1 ? $"MoreCompany 0.0.1 → {ups[0].Latest}" : throw new Exception($"{ups.Count} updates");
         });
+        // 23.9, этап 1: то, что «Исправить», «Поделиться сборкой» и «Обновить всё» берут из живых каталогов
+        // четырёх игр: Lethal Company (Thunderstore), Stardew (smapi.io → Nexus), Hollow Knight (ModLinks), Minecraft (Modrinth).
+        await Check("stage 1: lethal company code + update + crash fix", async () =>
+        {
+            var game = GameCatalog.ById("lethal-company")!;
+            var dir = Path.Combine(root, "LC-stage1");
+            Directory.CreateDirectory(Path.Combine(dir, "Lethal Company_Data"));
+            // Один список на всю проверку: второй ModRegistry на ту же папку не увидел бы правку версии ниже.
+            var state = new GameState { Def = game, Path = dir, Status = Detect.Found };
+            var registry = state.Registry!;
+            // Код сборки ставит Thunderstore точной версии — так же, как InstallSetupMod.
+            var info = await Thunderstore.Get("lethal-company", "x753-More_Suits") ?? throw new Exception("More_Suits not found");
+            await Installer.InstallFromCatalog(registry, info, new Progress<InstallStep>(_ => { }), default, reinstall: true, pinVersion: info.Version,
+                pinUrl: $"https://thunderstore.io/package/download/x753/More_Suits/{info.Version}/");
+            if (registry.Get("x753-More_Suits")?.Str("version") != info.Version) throw new Exception("pinned version not installed");
+            var (zip, count) = await BuildCode.Pack(state, "stage1");
+            var back = BuildCode.Read("TESTCODE", game.Id, "stage1", count, zip).Mods;
+            if (!back.Any(m => m.Id == "x753-More_Suits" && m.Version == info.Version)) throw new Exception("code lost More_Suits " + info.Version);
+            // Старая версия в списке → «Обновить всё» её видит, а «Почему игра упала» предлагает именно это обновление.
+            registry.Edit("x753-More_Suits", r => r["version"] = "0.0.1");
+            var ups = await ModUpdates.Check(state);
+            var why = CrashDoctor.Diagnose(state, [new CrashClue("outdated", "More_Suits", null, "MissingMethodException")], null);
+            if (ups.Count == 0 || why.Causes.FirstOrDefault()?.Update?.Latest != info.Version) throw new Exception($"update {ups.Count}, cause {why.Causes.FirstOrDefault()?.Kind}");
+            return $"More_Suits {info.Version} pinned, in the code ({count} mods), update and crash fix both point at {info.Version}";
+        });
+        await Check("stage 1: stardew missing dependency", async () =>
+        {
+            var found = await SmapiIndex.Lookup(["spacechase0.SpaceCore"], default);
+            return found.TryGetValue("spacechase0.SpaceCore", out var hit) && hit.NexusId is not null ? $"SpaceCore → Nexus #{hit.NexusId}" : throw new Exception("SpaceCore not resolved");
+        });
+        await Check("stage 1: hollow knight missing dependency", async () =>
+        {
+            var mod = await Catalog.Get(GameCatalog.ById("hollow-knight")!, "Satchel") ?? throw new Exception("Satchel not in ModLinks");
+            return $"Satchel {mod.Version} from ModLinks";
+        });
+        await Check("stage 1: minecraft missing dependency", async () =>
+        {
+            var p = await Minecraft.McModrinth.Project("sodium");
+            return $"sodium → {p.Title}";
+        });
+        await Check("stage 1: build code server", async () =>
+        {
+            var game = GameCatalog.ById("hollow-knight")!;
+            var dir = Path.Combine(root, "HK-stage1");
+            Directory.CreateDirectory(Path.Combine(dir, "hollow_knight_Data", "Managed", "Mods", "Benchwarp"));
+            var registry = new ModRegistry(game, dir);
+            registry.Add(new JsonObject { ["id"] = "Benchwarp", ["name"] = "Benchwarp", ["version"] = "1.0", ["source"] = "modlinks", ["folder"] = "Benchwarp" });
+            var state = new GameState { Def = game, Path = dir, Status = Detect.Found };
+            string code;
+            try { code = await BuildCode.Upload(state, "stage1"); }
+            catch (Social.ServiceError e) when (e.Code is "DENIED" or "NOT_CONFIGURED") { return $"skipped: {e.Code} (firestore.rules with builds/ not published yet)"; }
+            var back = await BuildCode.Fetch(code);
+            if (back.Game != game.Id || !back.Mods.Any(m => m.Id == "Benchwarp")) throw new Exception("round trip changed the build");
+            return $"{BuildCode.Show(code)} uploaded and read back";
+        });
         await Check("dxvk", async () =>
         {
             if (!OperatingSystem.IsWindows()) return "skipped (not Windows)";
