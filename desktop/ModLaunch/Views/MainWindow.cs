@@ -963,7 +963,13 @@ public sealed partial class MainWindow : Window
         _started = true;
         // 15.1: игры, установленные с прошлого раза, — сразу в библиотеку; потом — каждый раз, когда окно снова активно.
         _ = Features.NewGames.Check(force: true);
-        Activated += (_, _) => { if (_started) _ = Features.NewGames.Check(); };
+        Activated += (_, _) =>
+        {
+            if (!_started) return;
+            _ = Features.NewGames.Check();
+            _ = BuildShare.CheckClipboard();
+            if (Features.GamePatch.Due()) _ = Actions.CheckAllUpdates(startup: false);
+        };
         // 11.0: инжекты, оставшиеся от ModLaunch, закрытого посреди игры, — снять; сеть — под присмотром (авто-офлайн).
         try { Features.Inject.Recover(); } catch { }
         Offline.StartWatching();
@@ -975,15 +981,8 @@ public sealed partial class MainWindow : Window
             await CloudFlow.Check();
         });
         if (Program.StartupLink is string link) OnExternal(link);
-        if (Features.ModUpdates.OnStart)
-        {
-            foreach (var g in AppState.Games.Where(g => g.Status == Detect.Found && g.ModCount > 0))
-            {
-                try { await Features.ModUpdates.Check(g); } catch { }
-            }
-            AppState.Notify();
-            Actions.AutoUpdate();
-        }
+        // 23.9: проверка обновлений модов; игра обновилась в Steam — её моды проверяются в любом случае.
+        await Actions.CheckAllUpdates(startup: true);
     }
 
     bool _closing;
@@ -1007,8 +1006,11 @@ public sealed partial class MainWindow : Window
         if (counted) Toast(I18n.T("time.session", ("game", game.Def.Name), ("time", Features.PlayTime.Format(ms))));
         AppState.Notify();
         // Закрылась сама и быстро — возможно, вылет: смотрим лог.
-        if (Features.Launcher.LastExit(gameId) is { ByUser: false } exit && exit.Ms < 90_000 && Settings.Data.Bool("crashHelper", true))
-            _ = CheckCrash(game, exit);
+        if (Features.Launcher.LastExit(gameId) is { } exit)
+        {
+            if (Features.CrashDoctor.LooksLikeCrash(exit) && Settings.Data.Bool("crashHelper", true)) _ = CheckCrash(game, exit);
+            else if (exit.Ms >= 90_000 && exit.Code is null or 0) Features.CrashDoctor.MarkGood(gameId);
+        }
     }
 
     /// <summary>Второй запуск программы передал нам ссылку nxm:// (или просто просит показаться).</summary>
@@ -1146,6 +1148,9 @@ public sealed partial class MainWindow : Window
         var middle = body is ScrollViewer ? body : new ScrollViewer { Content = body, HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled };
         return new DockPanel { LastChildFill = true, Children = { title, buttons, middle } };
     }
+
+    /// <summary>Сейчас открыто окно поверх страницы.</summary>
+    public bool DialogOpen => _overlay.IsVisible;
 
     public void CloseDialog()
     {

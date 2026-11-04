@@ -81,27 +81,78 @@ public static partial class Actions
                 ct.ThrowIfCancellationRequested();
                 var m = items[i];
                 var step = new NumberedSteps(progress, i + 1, items.Count, m.Name);
-                try
-                {
-                    // Из архива мод ставится включённым — выключенный в составе выключаем и тут.
-                    if (await ModSetup.FromArchive(g, m)) { if (!m.Enabled) registry.SetEnabled(m.Id, false); continue; }
-                    var source = g.Def.SourceOf(m.Id, m.Source);
-                    var catalogId = g.Def.CatalogId(m.Id);
-                    if (catalogId is null || m.Source == "file") { failed.Add(m.Name); continue; }
-                    if (source == "nexus") await Reinstall(g, m.Id, () => InstallNexus(g, registry, catalogId, m.Name, null, job, step, ct, withDeps: true));
-                    else
-                    {
-                        var info = Program.Demo ? Demo.Many(g.Def, [catalogId])[0] : await Catalog.Get(g.Def, catalogId, ct, source) ?? throw new InvalidOperationException(I18n.T("err.modNotInCatalog"));
-                        string? url = source == "thunderstore" && m.Version != "" && Thunderstore.Split(catalogId) is var (ns, name) ? $"https://thunderstore.io/package/download/{ns}/{name}/{m.Version}/" : null;
-                        await Reinstall(g, m.Id, () => Installer.InstallFromCatalog(registry, info, step, ct, reinstall: true, pinVersion: url is null ? null : m.Version, pinUrl: url));
-                    }
-                    if (registry.Has(m.Id) && !m.Enabled) registry.SetEnabled(m.Id, false);
-                }
+                try { if (!await InstallSetupMod(g, registry, m, job, step, ct)) failed.Add(m.Name); }
                 catch (Exception) when (!ct.IsCancellationRequested) { failed.Add(m.Name); }
             }
             Dispatcher.UIThread.Post(AppState.Notify);
             if (failed.Count > 0) throw new InvalidOperationException(I18n.T("code.failedSome", ("list", string.Join(", ", failed.Take(8)))));
         });
+    }
+
+    /// <summary>
+    /// Один мод состава: из архива загрузок, с Thunderstore — точной версии, с Nexus и ModLinks — последней.
+    /// false — мод из файла или его нет в каталоге: поставить его нечем.
+    /// </summary>
+    static async Task<bool> InstallSetupMod(GameState g, ModRegistry registry, SetupMod m, Job job, IProgress<InstallStep> step, CancellationToken ct)
+    {
+        // Из архива мод ставится включённым — выключенный в составе выключаем и тут.
+        if (await ModSetup.FromArchive(g, m)) { if (!m.Enabled) registry.SetEnabled(m.Id, false); return true; }
+        var source = g.Def.SourceOf(m.Id, m.Source);
+        var catalogId = g.Def.CatalogId(m.Id);
+        if (catalogId is null || m.Source == "file") return false;
+        if (source == "nexus") await Reinstall(g, m.Id, () => InstallNexus(g, registry, catalogId, m.Name, null, job, step, ct, withDeps: true));
+        else
+        {
+            var info = Program.Demo ? Demo.Many(g.Def, [catalogId])[0] : await Catalog.Get(g.Def, catalogId, ct, source) ?? throw new InvalidOperationException(I18n.T("err.modNotInCatalog"));
+            string? url = source == "thunderstore" && m.Version != "" && Thunderstore.Split(catalogId) is var (ns, name) ? $"https://thunderstore.io/package/download/{ns}/{name}/{m.Version}/" : null;
+            await Reinstall(g, m.Id, () => Installer.InstallFromCatalog(registry, info, step, ct, reinstall: true, pinVersion: url is null ? null : m.Version, pinUrl: url));
+        }
+        if (registry.Has(m.Id) && !m.Enabled) registry.SetEnabled(m.Id, false);
+        return true;
+    }
+
+    /// <summary>
+    /// 23.9: сборка по коду ModLaunch — любой игры: недостающее и другие версии ставятся, лишнее (по желанию)
+    /// выключается, настройки — из кода. Перед этим — снимок «как было». true — всё встало.
+    /// </summary>
+    public static Task<bool> InstallBuild(GameState g, SharedBuild build, bool withConfig, bool disableOthers)
+    {
+        if (g.Registry is null || NeedLoader(g)) return Task.FromResult(false);
+        var registry = g.Registry;
+        var job = Jobs.Run(build.Name, g.Def.Name, async (job, progress, ct) =>
+        {
+            Snapshots.Take(g, "code");
+            var mods = build.Mods.Where(m => !Installer.IsLoader(g.Def, m.Id)).ToList();
+            var failed = new List<string>();
+            for (var i = 0; i < mods.Count; i++)
+            {
+                ct.ThrowIfCancellationRequested();
+                var m = mods[i];
+                if (registry.Get(m.Id) is { } have && !have.Bool("missing") && (m.Version == "" || Versions.Same(have.Str("version"), m.Version))) continue;
+                var step = new NumberedSteps(progress, i + 1, mods.Count, m.Name);
+                try { if (!await InstallSetupMod(g, registry, m, job, step, ct)) failed.Add(m.Name); }
+                catch (Exception) when (!ct.IsCancellationRequested) { failed.Add(m.Name); }
+            }
+            if (disableOthers) ModSetup.ApplyEnabled(registry, mods);
+            else foreach (var m in mods.Where(w => registry.Has(w.Id))) try { registry.SetEnabled(m.Id, m.Enabled); } catch { }
+            if (withConfig)
+            {
+                using var zip = new ZipArchive(new MemoryStream(build.Zip));
+                ModSetup.RestoreConfig(registry, zip);
+            }
+            try { Profiles.Save(g.Def.Id, Profiles.FreeName(g.Def.Id, build.Name), registry); } catch { }
+            Dispatcher.UIThread.Post(AppState.Notify);
+            if (failed.Count > 0) throw new InvalidOperationException(I18n.T("code.failedSome", ("list", string.Join(", ", failed.Take(8)))));
+        });
+        var done = new TaskCompletionSource<bool>();
+        void OnFinished(Job j)
+        {
+            if (j != job) return;
+            Jobs.Finished -= OnFinished;
+            done.TrySetResult(j.Status == JobStatus.Done);
+        }
+        Jobs.Finished += OnFinished;
+        return done.Task;
     }
 
     /// <summary>Другая версия уже стоит — ставим поверх так же, как обновление: старая папка не остаётся рядом.</summary>

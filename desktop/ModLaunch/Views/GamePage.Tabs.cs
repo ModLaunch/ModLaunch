@@ -62,7 +62,7 @@ public sealed partial class GamePage
         }
         col.Children.Add(Ui.Card(Ui.Col(14, Ui.Text(I18n.T("prof.title"), "h2"), Ui.Text(I18n.T("prof.hint"), "muted"), bar, list), 22));
         // Код сборки (Thunderstore), история «как было», перенос из r2modman и Gale.
-        if (Features.ProfileCode.Supported(_g.Def)) col.Children.Add(ShareCard());
+        if (BuildShare.Supported(_g)) col.Children.Add(ShareCard());
         if (ManagersCard() is { } managers) col.Children.Add(managers);
         if (HistoryCard() is { } history) col.Children.Add(history);
 

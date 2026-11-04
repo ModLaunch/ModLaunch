@@ -12,6 +12,9 @@ public static class WhatsNew
 {
     static readonly (string Icon, string Key, Func<Page>? Open)[] Items =
     [
+        (Icons.Alert, "new.v23.crash", null),
+        (Icons.Upload, "new.v23.code", null),
+        (Icons.ArrowUp, "new.v23.updates", null),
         (Icons.Gamepad, "new.v22.engines", XStudio.Entry),
         (Icons.Chart, "new.v22.numbers", XStudio.Entry),
         (Icons.Download, "new.v22.setup", XStudio.Entry),
@@ -143,7 +146,9 @@ public static class WhatsNew
         var list = Ui.Col(10);
         foreach (var (icon, key, open) in Items)
         {
-            var words = Ui.Col(2, Ui.Text(I18n.T(key), "h3"), Ui.Text(I18n.T(key + ".text"), "small muted", wrap: true));
+            // У пунктов 21–22 нет второй строки — не показываем вместо неё сам ключ.
+            var words = Ui.Col(2, Ui.Text(I18n.T(key), "h3"));
+            if (I18n.T(key + ".text") is var more && more != key + ".text") words.Children.Add(Ui.Text(more, "small muted", wrap: true));
             words.VerticalAlignment = VerticalAlignment.Center;
             var row = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"), ColumnSpacing = 14 };
             var badge = new Border { Width = 40, Height = 40, CornerRadius = new CornerRadius(12), Background = Ui.Res("BrandSoft"), Child = Ui.Icon(icon, 19, Ui.Res("Brand2")), VerticalAlignment = VerticalAlignment.Center };
@@ -170,7 +175,7 @@ public static class WhatsNew
             },
             Child = Ui.Col(2,
                 new TextBlock { Text = $"ModLaunch {Http.Version}", FontSize = 24, FontWeight = FontWeight.Bold, Foreground = Brushes.White },
-                new TextBlock { Text = I18n.T("new.v22.subtitle"), Foreground = new SolidColorBrush(Color.FromArgb(220, 255, 255, 255)), TextWrapping = TextWrapping.Wrap }),
+                new TextBlock { Text = I18n.T("new.v23.subtitle"), Foreground = new SolidColorBrush(Color.FromArgb(220, 255, 255, 255)), TextWrapping = TextWrapping.Wrap }),
         };
         w.Dialog(I18n.T("new.title"), new ScrollViewer { MaxHeight = 560, Content = Ui.Col(12, hero, list) }, 620,
             Ui.Button(I18n.T("new.ok"), w.CloseDialog, "primary", Icons.Check));
