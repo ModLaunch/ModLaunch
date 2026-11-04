@@ -187,13 +187,14 @@ public static class SelfCheck
             var game = GameCatalog.ById("lethal-company")!;
             var dir = Path.Combine(root, "LC-stage1");
             Directory.CreateDirectory(Path.Combine(dir, "Lethal Company_Data"));
-            var registry = new ModRegistry(game, dir);
+            // Один список на всю проверку: второй ModRegistry на ту же папку не увидел бы правку версии ниже.
+            var state = new GameState { Def = game, Path = dir, Status = Detect.Found };
+            var registry = state.Registry!;
             // Код сборки ставит Thunderstore точной версии — так же, как InstallSetupMod.
             var info = await Thunderstore.Get("lethal-company", "x753-More_Suits") ?? throw new Exception("More_Suits not found");
             await Installer.InstallFromCatalog(registry, info, new Progress<InstallStep>(_ => { }), default, reinstall: true, pinVersion: info.Version,
                 pinUrl: $"https://thunderstore.io/package/download/x753/More_Suits/{info.Version}/");
             if (registry.Get("x753-More_Suits")?.Str("version") != info.Version) throw new Exception("pinned version not installed");
-            var state = new GameState { Def = game, Path = dir, Status = Detect.Found };
             var (zip, count) = await BuildCode.Pack(state, "stage1");
             var back = BuildCode.Read("TESTCODE", game.Id, "stage1", count, zip).Mods;
             if (!back.Any(m => m.Id == "x753-More_Suits" && m.Version == info.Version)) throw new Exception("code lost More_Suits " + info.Version);
