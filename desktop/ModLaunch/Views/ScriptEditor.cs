@@ -293,8 +293,13 @@ public sealed partial class ScriptEditor : UserControl
     {
         public HashSet<int> Errors = [];
 
-        [GeneratedRegex(@"#.*$|""(?:\\.|[^""\\])*""?|\$\{?\w+\}?|\[[^\]\r\n]*\]|\b\d+(?:\.\d+)*\b|[=+\-*/%{}]|\b[A-Za-z_][\w.\-]*\b")]
+        [GeneratedRegex(@"#.*$|""(?:\\.|[^""\\])*""?|\$\{?\w+\}?|\[[^\]\r\n]*\]|\b\d+(?:\.\d+)*\b|[=+\-*/%{}]|«[^»\r\n]*»?|\b[\p{L}_][\p{L}\w.\-]*\b")]
         private static partial Regex Tokens();
+
+        /// <summary>22.0: слова простого синтаксиса, которые подсвечиваются и в середине строки (больше, и, раз, от…).</summary>
+        static readonly HashSet<string> Inline = new(
+            ModScriptX.Simple.Vocabulary.Where(e => e.Group is "op").SelectMany(e => e.Word.Split(' '))
+                .Concat(["раз", "раза", "на", "от", "до", "из", "в", "то", "тогда", "чем", "равен", "равна", "каждого", "times", "to", "by", "then"]), StringComparer.OrdinalIgnoreCase);
 
         static IBrush B(string hex) => new SolidColorBrush(Color.Parse(hex));
         static readonly IBrush Keyword = B("#C792EA"), Str = B("#C3E88D"), Var = B("#82AAFF"), Num = B("#F78C6C"),
@@ -324,13 +329,29 @@ public sealed partial class ScriptEditor : UserControl
             }
             var light = Look.IsLight;
             var first = true;
+            // 22.0: «когда игра началась», «каждый кадр» — событие подсвечивается целиком, как hook start.
+            var simple = ModScriptX.Simple.Reserved.Contains(Regex.Match(text, @"^\s*([\p{L}]+)").Groups[1].Value);
+            if (simple && ModScriptX.Simple.Classify(text) == "hook")
+            {
+                var code = text.Split('#')[0].TrimEnd();
+                var at = text.Length - text.TrimStart().Length;
+                var hookBrush = light ? Darker(Func) : Func;
+                ChangeLinePart(line.Offset + at, line.Offset + Math.Max(at, code.Length), el =>
+                {
+                    el.TextRunProperties.SetForegroundBrush(hookBrush);
+                    el.TextRunProperties.SetTypeface(new Typeface(el.TextRunProperties.Typeface.FontFamily, FontStyle.Normal, FontWeight.Bold));
+                });
+                if (code.Length < text.Length) ChangeLinePart(line.Offset + code.Length, line.EndOffset, el => el.TextRunProperties.SetForegroundBrush(Comment));
+                return;
+            }
             foreach (Match m in Tokens().Matches(text))
             {
                 var t = m.Value;
                 IBrush? brush = t[0] switch
                 {
                     '#' => Comment,
-                    '"' => Str,
+                    '"' or '«' => Str,
+                    _ when (first || Inline.Contains(t)) && ModScriptX.Simple.Reserved.Contains(t) => Keyword,
                     '$' => Var,
                     '[' => Section,
                     _ when char.IsDigit(t[0]) => Num,

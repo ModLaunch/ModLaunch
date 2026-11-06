@@ -15,9 +15,19 @@ public static class UnityCompiler
     public static void Register() => ModScriptX.Target.CompileCSharp = Compile;
 
     /// <summary>Собрать исходник в outDir/assembly.dll. null — получилось, иначе — ошибки компилятора (до 20 строк).</summary>
-    public static string? Compile(string source, string assembly, string outDir, string gameDir)
+    public static string? Compile(string source, string assembly, string outDir, string gameDir) => Compile(source, assembly, outDir, gameDir, false);
+
+    /// <summary>
+    /// 23.2: engineOnly — только библиотеки Unity, .NET и BepInEx, без кода самой игры: у игр бывают свои классы с именами
+    /// Unity (SceneManager в Hollow Knight), и они перекрыли бы настоящие. Так собирается конструктор ModScript Studio.
+    /// </summary>
+    public static string? Compile(string source, string assembly, string outDir, string gameDir, bool engineOnly)
     {
         var refs = References(gameDir, out var bundleCSharp);
+        if (engineOnly)
+            refs = refs.Where(r => r.Name.StartsWith("UnityEngine", StringComparison.OrdinalIgnoreCase) || r.Name.StartsWith("System", StringComparison.OrdinalIgnoreCase)
+                || r.Name.StartsWith("BepInEx", StringComparison.OrdinalIgnoreCase) || r.Name is "mscorlib" or "netstandard" or "Microsoft.CSharp" or "0Harmony"
+                || r.Name.StartsWith("Mono.", StringComparison.OrdinalIgnoreCase)).ToList();
         if (refs.Count == 0) return "no game assemblies found (*_Data/Managed)";
         var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Latest), path: assembly + ".cs");
         var compilation = CSharpCompilation.Create(assembly, [tree], refs.Select(r => r.Reference),
@@ -90,6 +100,8 @@ public static class UnityCompiler
     [SelfTest]
     static string UnityInjectEndToEnd()
     {
+        // --selfcheck идёт без интерфейса: пример мода читается из ресурсов Avalonia — эта проверка идёт в --selftest.
+        if (Avalonia.Application.Current is null) return "skipped (no UI in --selfcheck)";
         var core = typeof(object).Assembly.Location;
         if (core == "") return "skipped: single-file build has no assembly paths";
         var game = Path.Combine(Path.GetTempPath(), "modlaunch-unity-" + Environment.ProcessId);

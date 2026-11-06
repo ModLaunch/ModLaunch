@@ -61,7 +61,10 @@ public sealed partial class ModxDoc
     {
         get
         {
-            var id = Regex.Replace(Name, @"[^\p{L}\p{Nd}]+", "_").Trim('_');
+            // 22.0: у модов простым синтаксисом имя файла и кода — латиницей («Много золота» → Mnogo_zolota):
+            // так его примут и старые Python 2 / Lua, и любые папки модов.
+            var name = IsSimpleSyntax ? string.Join(" ", Regex.Split(Name, @"[^\p{L}\p{Nd}]+").Where(w => w != "").Select(w => char.IsUpper(w[0]) ? char.ToUpperInvariant(Simple.Latin(w)[0]) + Simple.Latin(w)[1..] : Simple.Latin(w))) : Name;
+            var id = Regex.Replace(name, @"[^\p{L}\p{Nd}]+", "_").Trim('_');
             if (id == "") id = "mod";
             return char.IsDigit(id[0]) ? "m" + id : id;
         }
@@ -103,6 +106,37 @@ public sealed partial class ModxDoc
     public static ModxDoc Parse(string source) => Parse(source, 0);
 
     static ModxDoc Parse(string source, int depth)
+    {
+        // 22.0: простой синтаксис (русские слова, «конец» вместо «}») сначала переводится в обычный .modx.
+        if (Simple.IsSimple(source))
+        {
+            var simple = Simple.ToModx(source);
+            var translated = ParseModx(simple.Text, depth);
+            translated.Remap(simple.Map);
+            translated.IsSimpleSyntax = true;
+            return translated;
+        }
+        return ParseModx(source, depth);
+    }
+
+    /// <summary>22.0: написан ли файл простым синтаксисом.</summary>
+    public bool IsSimpleSyntax { get; private set; }
+
+    /// <summary>Номера строк переведённого текста → номера строк, которые написал автор.</summary>
+    void Remap(int[] map)
+    {
+        int L(int line) => line >= 1 && line <= map.Length ? map[line - 1] : line;
+        Stmt S(Stmt s) => s with { Line = L(s.Line) };
+        for (var i = 0; i < Hooks.Count; i++) Hooks[i] = Hooks[i] with { Line = L(Hooks[i].Line), Body = Hooks[i].Body.Select(S).ToList() };
+        for (var i = 0; i < Functions.Count; i++) Functions[i] = Functions[i] with { Line = L(Functions[i].Line), Body = Functions[i].Body.Select(S).ToList() };
+        for (var i = 0; i < Natives.Count; i++) Natives[i] = Natives[i] with { Line = L(Natives[i].Line) };
+        for (var i = 0; i < Uses.Count; i++) Uses[i] = Uses[i] with { Line = L(Uses[i].Line) };
+        var diags = Diags.Select(d => d with { Line = L(d.Line) }).DistinctBy(d => (d.Line, d.Message)).OrderBy(d => d.Line).ToList();
+        Diags.Clear();
+        Diags.AddRange(diags);
+    }
+
+    static ModxDoc ParseModx(string source, int depth)
     {
         var doc = new ModxDoc();
         var lines = source.Replace("\r\n", "\n").Split('\n');

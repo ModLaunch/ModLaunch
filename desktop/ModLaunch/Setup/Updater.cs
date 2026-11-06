@@ -112,6 +112,8 @@ public static partial class Updater
             try
             {
                 var release = Latest ?? throw new InvalidOperationException("no update");
+                // 23.8: без контрольной суммы установщик не скачиваем и не запускаем — подменённый файл не пройдёт.
+                if (release.Sha256 is null) throw new InvalidOperationException(I18n.T("v23.upd.noHash"));
                 var file = await Http.Download(release.SetupUrl!, release.SetupName!, progress, release.Sha256);
                 var target = Path.Combine(Path.GetTempPath(), release.SetupName!);
                 File.Move(file, target, true);

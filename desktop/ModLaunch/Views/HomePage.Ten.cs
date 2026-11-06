@@ -78,6 +78,8 @@ public sealed partial class HomePage
         // 12.0: быстрые переходы одной кнопкой (у каждой — свой Ctrl-ярлык в подсказке).
         Button Quick(string text, string icon, string keys, Func<Page> make) => Ui.Button(text, () => MainWindow.Current?.Navigate(make), "ghost", icon, keys);
         var dock = Ui.Row(6,
+            // 24.0: код сборки от друга — на виду с первого запуска (ради него ModLaunch часто и ставят).
+            Ui.Button(I18n.T("v24.share.enter"), () => ShareUi.Enter(), "ghost", Icons.Users),
             Quick(I18n.T("lib.title"), Icons.Grid, "Ctrl+L", () => new LibraryPage()),
             Quick(I18n.T("mc.title"), Icons.Package, "Ctrl+U", () => new ModsCenterPage()));
         // 16.0: уровень рядом с приветствием; есть новые награды пути — кнопка «Забрать».

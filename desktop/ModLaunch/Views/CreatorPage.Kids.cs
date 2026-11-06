@@ -32,12 +32,9 @@ public sealed partial class CreatorPage
             var mark = new Border
             {
                 Width = 42, Height = 42, CornerRadius = new CornerRadius(11), HorizontalAlignment = HorizontalAlignment.Left,
-                Background = new LinearGradientBrush
-                {
-                    StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
-                    GradientStops = { new GradientStop(c, 0), new GradientStop(Look.Mix(c, Colors.Black, 0.45), 1) },
-                },
-                Child = Ui.Icon(icon, 20, Brushes.White),
+                // 22.0: цвет идеи — значком на лёгкой подложке того же цвета, без градиента.
+                Background = new SolidColorBrush(Color.FromArgb(40, c.R, c.G, c.B)),
+                Child = Ui.Icon(icon, 20, new SolidColorBrush(c)),
             };
             var b = new Button
             {
@@ -48,7 +45,7 @@ public sealed partial class CreatorPage
             b.Click += (_, _) => QuickStart(idea);
             tiles.Children.Add(b);
         }
-        var title = new TextBlock { Text = I18n.T("v21.kids.title"), FontFamily = Look.Display, FontSize = 24, FontWeight = FontWeight.Black, LetterSpacing = -0.4 };
+        var title = new TextBlock { Text = I18n.T("v21.kids.title"), FontFamily = Look.Display, FontSize = 20, FontWeight = FontWeight.Bold };
         var steps = new WrapPanel();
         foreach (var (n, key) in new[] { ("1", "v21.kids.step1"), ("2", "v21.kids.step2"), ("3", "v21.kids.step3") })
             steps.Children.Add(new Border
@@ -56,14 +53,14 @@ public sealed partial class CreatorPage
                 Margin = new Thickness(0, 0, 16, 6),
                 Child = Ui.Row(7, new Border
                 {
-                    Width = 20, Height = 20, CornerRadius = new CornerRadius(10), Background = HubLook.Premium(),
-                    Child = new TextBlock { Text = n, FontSize = 11, FontWeight = FontWeight.Bold, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
+                    Width = 20, Height = 20, CornerRadius = new CornerRadius(10), Background = HubLook.Amber,
+                    Child = new TextBlock { Text = n, FontSize = 11, FontWeight = FontWeight.Bold, Foreground = HubLook.OnAmber, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
                 }, Ui.Text(I18n.T(key), "small")),
             });
-        var col = Ui.Col(14, Ui.Col(6, Ui.Row(10, Ui.Icon(Icons.Grid, 20, HubLook.Cyan), title), Ui.Text(I18n.T("v21.kids.text"), "muted", wrap: true), steps), tiles);
+        var col = Ui.Col(14, Ui.Col(6, title, Ui.Text(I18n.T("v21.kids.text"), "muted", wrap: true), steps), tiles);
         return new Border
         {
-            Background = HubLook.Panel, BorderBrush = HubLook.Premium(150), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(8),
+            Background = HubLook.Panel, BorderBrush = HubLook.Edge, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(10),
             Padding = new Thickness(24, 20), Child = col,
         };
     }

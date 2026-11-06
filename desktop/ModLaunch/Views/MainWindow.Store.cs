@@ -29,19 +29,15 @@ public sealed partial class MainWindow
     Border? _railGamesHost;
 
     /// <summary>
-    /// Сколько недавних игр показать на панели: столько, сколько влезает по высоте целиком,
-    /// и всегда кнопка «+». Остальные игры — в библиотеке; панель не превращается в обрезанную ленту.
+    /// 23.2: лента игр прокручивается — видны все игры на компьютере. Раньше показывалось столько, сколько
+    /// влезало по высоте, и пятая игра пропадала с панели.
     /// </summary>
     void FitRailGames(double height)
     {
         if (height <= 0) return;
-        const double item = 52, gap = 7, caption = 14, plus = 42;
         var slots = _railGames.Children.Where(c => c is Panel p && p.Children.OfType<Button>().Any(b => b.Classes.Contains("rail-game"))).ToList();
-        var captionBlock = _railGames.Children.OfType<TextBlock>().FirstOrDefault();
-        var free = height - 2 - plus - gap - (captionBlock is null ? 0 : caption + gap);
-        var fit = Math.Max(0, (int)Math.Floor((free + gap) / (item + gap)));
-        for (var i = 0; i < slots.Count; i++) slots[i].IsVisible = i < fit;
-        if (captionBlock is not null) captionBlock.IsVisible = fit > 0;
+        foreach (var slot in slots) slot.IsVisible = true;
+        if (_railGames.Children.OfType<TextBlock>().FirstOrDefault() is { } caption) caption.IsVisible = slots.Count > 0;
     }
     /// <summary>Второстепенные пункты (друзья, «На чай», настройки) — всегда значками, без подписей.</summary>
     readonly HashSet<Button> _secondary = [];
@@ -156,8 +152,12 @@ public sealed partial class MainWindow
         rail.Children.Add(bottom);
         // 9.3: недавние игры — только те, что помещаются целиком: без обрезанной обложки внизу.
         _railGames.VerticalAlignment = VerticalAlignment.Top;
-        _railGamesHost = new Border { ClipToBounds = true, Child = _railGames, Padding = new Thickness(0, 2, 0, 0) };
-        _railGamesHost.SizeChanged += (_, e) => FitRailGames(e.NewSize.Height);
+        // 23.2: все игры — лентой с прокруткой (раньше лишние прятались, и пятая игра «пропадала»).
+        var railScroll = new ScrollViewer { Content = _railGames, VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Hidden, HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled };
+        // 23.3: игр больше, чем влезает, — край ленты растворяется: видно, что дальше есть ещё (колесо мыши листает).
+        railScroll.ScrollChanged += (_, _) => RailFade(railScroll);
+        _railGamesHost = new Border { ClipToBounds = true, Padding = new Thickness(0, 2, 0, 0), Child = railScroll };
+        // Подпись «Игры» и все обложки видны всегда; колесо мыши прокручивает ленту.
         rail.Children.Add(_railGamesHost);
         var railBorder = new Border { Child = rail, Background = Ui.Res("Rail") };
         _railHost = railBorder;
@@ -178,6 +178,8 @@ public sealed partial class MainWindow
             if (e.Key != Key.Enter) return;
             // Вставили ссылку на мод — сразу его страница.
             if (Features.ModLink.Parse(_search.Text ?? "") is not null) { OpenLink(_search.Text!); return; }
+            // 24.0: вставили код сборки друга («ABCD-EFGH», ML1-…, modlaunch://pack/…) — его сборка.
+            if (Features.ShareCode.LooksLikeCode(_search.Text)) { var code = _search.Text!.Trim(); _search.Text = ""; ShareUi.Enter(prefill: code); return; }
             _current?.Search(_search.Text ?? "");
         };
         _search.TextChanged += (_, _) => OnSearchTyping();
@@ -357,6 +359,27 @@ public sealed partial class MainWindow
     string? _railKey;
     readonly List<(string Id, Panel Slot, Button Button)> _railGameSlots = [];
     Button? _railPlus;
+
+    /// <summary>Перерисовать игры на боковой панели (снимки и проверки).</summary>
+    internal void RefreshRail() { _railKey = null; RenderRail(); }
+
+    /// <summary>Лента игр на боковой панели (снимки: прокрутить до конца).</summary>
+    internal ScrollViewer? RailScroll => _railGamesHost?.Child as ScrollViewer;
+
+    /// <summary>Растворить верхний и/или нижний край ленты, если за ним ещё есть игры.</summary>
+    static void RailFade(ScrollViewer sv)
+    {
+        var more = sv.Extent.Height - sv.Viewport.Height;
+        var top = sv.Offset.Y > 1;
+        var bottom = more - sv.Offset.Y > 1;
+        if (!top && !bottom) { sv.OpacityMask = null; return; }
+        var mask = new LinearGradientBrush { StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(0, 1, RelativeUnit.Relative) };
+        mask.GradientStops.Add(new GradientStop(top ? Colors.Transparent : Colors.Black, 0));
+        mask.GradientStops.Add(new GradientStop(Colors.Black, 0.1));
+        mask.GradientStops.Add(new GradientStop(Colors.Black, 0.88));
+        mask.GradientStops.Add(new GradientStop(bottom ? Colors.Transparent : Colors.Black, 1));
+        sv.OpacityMask = mask;
+    }
 
     void RenderRail()
     {

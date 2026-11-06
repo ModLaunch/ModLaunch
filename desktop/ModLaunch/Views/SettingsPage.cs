@@ -344,6 +344,8 @@ public sealed partial class SettingsPage : Page
         rows.Add(Toggle(I18n.T("crash.setting"), I18n.T("crash.setting.hint"), Settings.Data.Bool("crashHelper", true), v => Settings.Data["crashHelper"] = v));
         rows.Add(Toggle(I18n.T("set.checkBeforePlay"), I18n.T("set.checkBeforePlay.hint"), Health.BeforePlay, v => Settings.Data["checkBeforePlay"] = v));
         rows.Add(Toggle(I18n.T("v10.ap.before"), I18n.T("v10.ap.before.hint"), Autopilot.BeforePlay, v => Settings.Data["autopilotBeforePlay"] = v));
+        // 23.0: защита прогресса для игр с модами из Creator Hub.
+        rows.Add(Toggle(I18n.T("v23.pg.setting"), I18n.T("v23.pg.setting.hint"), ProgressGuard.Enabled, v => Settings.Data["protectProgress"] = v));
         col.Children.Add(Section(I18n.T("settings.tab.launch"), null, rows.ToArray()));
         col.Children.Add(InjectorSection());
 
@@ -646,7 +648,7 @@ public sealed partial class SettingsPage : Page
         var check = Ui.Button(I18n.T("settings.nexus.check"), async () =>
         {
             var key = box.Text?.Trim() ?? "";
-            Settings.Data["nexusApiKey"] = key == "" ? null : key;
+            Settings.Data["nexusApiKey"] = Settings.Seal(key);
             Settings.Data["nexusPremium"] = false;
             Settings.Save();
             if (key == "") { _keyStatus = null; Build(); return; }
@@ -680,11 +682,11 @@ public sealed partial class SettingsPage : Page
         rows.Add(nxm);
 
         // 9.8: ключ Claude для «ИИ-сборок» (без ключа работает встроенный подборщик).
-        var aiBox = new TextBox { Text = Settings.Data.Str("aiKey") ?? "", PasswordChar = '•', Watermark = "sk-ant-…", Width = 420 };
+        var aiBox = new TextBox { Text = Settings.Secret("aiKey") ?? "", PasswordChar = '•', Watermark = "sk-ant-…", Width = 420 };
         var aiSave = Ui.Button(I18n.T("v98.key.save"), () =>
         {
             var key = aiBox.Text?.Trim() ?? "";
-            Settings.Data["aiKey"] = key == "" ? null : key;
+            Settings.Data["aiKey"] = Settings.Seal(key);
             Settings.Save();
             MainWindow.Current?.Toast(I18n.T(key == "" ? "v98.key.removed" : "v98.key.saved"));
         }, "", Icons.Sparkles);

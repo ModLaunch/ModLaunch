@@ -105,12 +105,18 @@ public sealed partial class GamePage
             case "conflicts" when issue.Mods.Count > 0:
                 yield return Ui.Button(I18n.T("health.fix.duplicates"), () => SetMany(issue.Mods, false), "primary", Icons.Check);
                 break;
+            case "overlap" when issue.Mods.Count > 0:
+                // 23.0: разные моды спорят за файл — оставить тот, у кого файл новее (второй выключается, его можно включить обратно).
+                yield return Ui.Button(I18n.T("v23.cf.keepNewer"), () => SetMany(issue.Mods, false), "primary", Icons.Check);
+                break;
             case "log":
                 yield return Ui.Button(I18n.T("crash.log"), () => w.Navigate(() => new GamePage(_g.Def.Id, "log")), "", Icons.Alert);
-                if (issue.Mods.Count > 0) yield return Ui.Button(I18n.T("health.fix.disable"), () => SetMany(issue.Mods, false), "primary", Icons.Power);
+                // 24.0: разбор с понятными причинами и «Исправить» (обновить, поставить нужное) вместо «просто выключить».
+                yield return Ui.Button(I18n.T("v24.crash.why"), () => w.ExplainCrash(_g), "primary", Icons.Wand);
                 break;
             case "crash":
                 yield return Ui.Button(I18n.T("crash.log"), () => w.Navigate(() => new GamePage(_g.Def.Id, "log")), "", Icons.Alert);
+                yield return Ui.Button(I18n.T("v24.crash.why"), () => w.ExplainCrash(_g), "primary", Icons.Wand);
                 break;
             case "unmanaged" when registry is not null:
                 yield return Ui.Button(I18n.T("local.adopt"), () => Actions.AdoptAll(_g, registry.Unmanaged()), "primary", Icons.Plus);

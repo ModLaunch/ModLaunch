@@ -60,6 +60,7 @@ public static partial class ModScript
         JsonValue v when v.TryGetValue<double>(out var d) => d,
         JsonValue v when v.TryGetValue<long>(out var l) => (double)l,
         JsonValue v => v.ToString(),
+        _ => n.ToJsonString(),
     };
 
     /// <summary>Значение переменной: число, логическое, список/словарь (JSON) или строка.</summary>

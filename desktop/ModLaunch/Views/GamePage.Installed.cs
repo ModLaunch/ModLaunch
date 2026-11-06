@@ -311,10 +311,15 @@ public sealed partial class GamePage
     {
         var n = updates.Count;
         var head = new DockPanel();
-        // Сначала окно со списком: что обновится, что нового, что оставить как есть.
-        var all = Ui.Button(I18n.T("upd.all"), () => UpdateReview.Show(updates.Select(u => (_g, u)).ToList()), "primary", Icons.ArrowUp);
-        DockPanel.SetDock(all, Dock.Right);
-        head.Children.Add(all);
+        // 24.0: «Обновить всё» — сразу, одной кнопкой (снимок «как было» делается сам); выбрать по одному — рядом.
+        var busy = updates.Any(u => Actions.IsUpdating(_g, u.RecordId));
+        var all = Ui.Button(busy ? I18n.T("upd.updating") : I18n.T("upd.all"), () => { Actions.UpdateEverything(_g); Build(); }, "primary", Icons.ArrowUp);
+        all.IsEnabled = !busy;
+        var pick = Ui.Button(I18n.T("v24.upd.pick"), () => UpdateReview.Show(updates.Select(u => (_g, u)).ToList()), "ghost", Icons.List);
+        var right = Ui.Row(8, pick, all);
+        right.VerticalAlignment = VerticalAlignment.Center;
+        DockPanel.SetDock(right, Dock.Right);
+        head.Children.Add(right);
         var label = Ui.Row(10, Ui.Icon(Icons.ArrowUp, 18, Ui.Res("Brand2")), Ui.Text(I18n.T("upd.found." + I18n.Plural(n, "one", "few", "many"), ("n", n)), "h3"));
         label.VerticalAlignment = VerticalAlignment.Center;
         head.Children.Add(label);

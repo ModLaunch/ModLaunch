@@ -3,6 +3,29 @@ namespace ModScriptX;
 /// <summary>Встроенные проверки: перевод примера во все движки, установка в поддельные папки игр и снятие.</summary>
 static class SelfTest
 {
+    /// <summary>22.0: мод, каким его пишет человек, который программирует первый раз.</summary>
+    const string KidMod = """
+        # Мой первый мод!
+        мод «Много золота»
+        автор Вася
+        версия 1
+
+        пусть бонус = 500
+
+        когда игра началась
+            дай золото бонус
+            скажи Привет! У тебя {золото} золота
+
+        каждый кадр
+            если здоровье меньше 10
+                здоровье = 100
+                скажи «Держи здоровье!»
+            иначе если здоровье больше или равно 200
+                поставь здоровье в 200
+            повтори 3 раза
+                дай очки 1
+        """;
+
     public static int Run()
     {
         var failed = 0;
@@ -16,6 +39,7 @@ static class SelfTest
             foreach (var p in parts) if (!text.Contains(p)) throw new Exception($"missing «{p}» in:\n{text}");
         }
         var example = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Examples", "gold-boost.modx"));
+        var arenaText = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Examples", "arena.modx"));
 
         Check("parse", () =>
         {
@@ -28,6 +52,26 @@ static class SelfTest
         {
             var d = ModxDoc.Parse("mod \"X\"\nhook boom {\n}\nhook start {\n  jump x\n");
             if (d.Ok || d.Diags.Count < 3) throw new Exception(string.Join("; ", d.Diags.Select(x => x.Line + " " + x.Message)));
+        });
+        Check("simple syntax: Russian words, no braces", () =>
+        {
+            var d = ModxDoc.Parse(KidMod);
+            if (!d.Ok || !d.IsSimpleSyntax) throw new Exception(string.Join("; ", d.Diags.Select(x => x.Line + " " + x.Message)));
+            if (d.Name != "Много золота" || d.Version != "1.0.0" || d.Id != "Mnogo_zolota") throw new Exception($"{d.Name} {d.Version} {d.Id}");
+            var r = Sandbox.Run(d, new Dictionary<string, object?> { ["gold"] = 0d, ["health"] = 5d, ["score"] = 0d }, ticks: 2);
+            if (!r.Ok) throw new Exception(string.Join("; ", r.Errors.Select(e => e.Line + " " + e.Message)));
+            if (Sandbox.Text(r.Vars["gold"]) != "500" || Sandbox.Text(r.Vars["health"]) != "100" || Sandbox.Text(r.Vars["score"]) != "6")
+                throw new Exception($"gold {Sandbox.Text(r.Vars["gold"])}, health {Sandbox.Text(r.Vars["health"])}, score {Sandbox.Text(r.Vars["score"])}");
+            Has(string.Join("\n", r.Output), "Привет! У тебя 500 золота", "Держи здоровье!");
+        });
+        Check("simple syntax: «конец» without indents, English words, error lines", () =>
+        {
+            var d = ModxDoc.Parse("мод \"Б\"\nкогда старт\nесли золото = 0\nдай золото 50\nконец\nконец\nwhen game loads\ngive gold 5\nend\n");
+            var r = Sandbox.Run(d, new Dictionary<string, object?> { ["gold"] = 0d });
+            if (!r.Ok || Sandbox.Text(r.Vars["gold"]) != "55") throw new Exception(string.Join("; ", d.Diags.Select(x => x.Line + " " + x.Message)) + " gold " + Sandbox.Text(r.Vars["gold"]));
+            var bad = ModxDoc.Parse("мод \"Б\"\n\nкогда старт\n    прыгни выше\n");
+            if (bad.Ok || bad.Diags.All(x => x.Line != 4)) throw new Exception("error not on line 4: " + string.Join("; ", bad.Diags.Select(x => x.Line + " " + x.Message)));
+            if (Simple.IsSimple(example) || Simple.IsSimple(arenaText)) throw new Exception("regular .modx taken for simple syntax");
         });
         Check("expressions", () =>
         {
@@ -216,6 +260,21 @@ static class SelfTest
                 var g = Game("online", "EasyAntiCheat/settings.json", "main.lua");
                 var r = Injector.Inject(example, g, null);
                 if (r.Doc.Ok || r.Files.Count > 0) throw new Exception("injected into a protected game");
+            });
+            Check("custom engine from modscript.engine.json", () =>
+            {
+                var g = Game("custom", "engine.exe", "scripts/a.py");
+                File.WriteAllText(Path.Combine(g, EngineProfile.FileName), """
+                    { "name": "Homemade", "language": "python", "file": "scripts/mods/{id}.py",
+                      "say": "Engine.toast({text})", "events": { "start": "Engine.on('start', {fn})" } }
+                    """);
+                if (Bridge.Scan(g).Engine != "custom") throw new Exception("profile not detected: " + Bridge.Scan(g).Engine);
+                var r = Injector.Inject(KidMod, g, null);
+                if (!r.Doc.Ok) throw new Exception(string.Join("; ", r.Doc.Diags.Select(x => x.Line + " " + x.Message)));
+                var code = File.ReadAllText(Path.Combine(g, r.Files.Single()));
+                Has(r.Files.Single(), "scripts/mods/Mnogo_zolota.py");
+                Has(code, "def mx_say(text): Engine.toast(text)", "def mx_start(*args):", "gold += bonus", "Engine.on('start', mx_start)");
+                if (Injector.Eject("Mnogo_zolota", g).Count == 0) throw new Exception("eject");
             });
         }
         finally

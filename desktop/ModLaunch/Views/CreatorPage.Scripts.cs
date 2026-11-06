@@ -28,6 +28,7 @@ public sealed partial class CreatorPage
     /// <summary>20.0: консоль и справка ModScript (открываются из «ModScript X → Создать»); библиотека скриптов — в «Моих проектах».</summary>
     Control XHub() => _ms switch
     {
+        "scripts" => ScriptsGuide(),
         "commands" => Commands(),
         "functions" => LibraryDocs(),
         _ => Console(),
@@ -43,7 +44,8 @@ public sealed partial class CreatorPage
         var sealedOnes = all.Where(i => i.Sealed).ToList();
         var own = all.Where(i => !i.Sealed).ToList();
         var col = new StackPanel { Spacing = 16 };
-        col.Children.Add(GuardHero(sealedOnes));
+        // 22.0: что делает защита, сказано в строке под заголовком — отдельный баннер её повторял.
+        _ = sealedOnes;
 
         if (!Features.Inject.On)
         {
@@ -82,40 +84,20 @@ public sealed partial class CreatorPage
         return col;
     }
 
-    /// <summary>Что делает защита — три шага и итог по библиотеке (сколько скриптов, насколько сжаты, сколько имён скрыто).</summary>
+    /// <summary>
+    /// 22.0: что делает защита — одной строкой со значком, без баннера с цифрами «−60 % в среднем» и шагами 01/02/03:
+    /// подробности защиты конкретного скрипта — в его строке и настройках.
+    /// </summary>
     static Control GuardHero(List<InjectItem> items)
     {
-        var mark = new Border
-        {
-            Width = 44, Height = 44, CornerRadius = new CornerRadius(8), Background = HubLook.Signature(), VerticalAlignment = VerticalAlignment.Top,
-            Child = Ui.Icon(Icons.Shield, 22, Brushes.White),
-        };
-        var steps = new UniformGrid { Columns = 3, Margin = new Thickness(0, 4, 0, 0) };
-        foreach (var (n, icon, key) in new[] { (1, Icons.Wand, "v18.guard.1"), (2, Icons.Code, "v18.guard.2"), (3, Icons.Lock, "v18.guard.3") })
-            steps.Children.Add(new Border
-            {
-                BorderBrush = HubLook.Edge, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(4), Padding = new Thickness(12, 10), Margin = new Thickness(0, 0, 10, 0), Background = HubLook.Raised,
-                Child = Ui.Col(6, Ui.Row(8, HubLook.MonoText($"0{n}", 11, HubLook.Cyan), Ui.Icon(icon, 15, HubLook.Violet), Ui.Text(I18n.T(key), "strong")),
-                    Ui.Text(I18n.T(key + ".text"), "small muted", wrap: true)),
-            });
-        var left = Ui.Col(10,
-            HubLook.Eyebrow(I18n.T("v18.guard.eyebrow"), HubLook.Violet),
-            new TextBlock { Text = I18n.T("v18.guard.title"), FontFamily = Look.Display, FontSize = 22, FontWeight = FontWeight.Bold, TextWrapping = TextWrapping.Wrap },
-            Ui.Text(I18n.T("v18.guard.text"), "muted", wrap: true), steps);
-        var guarded = items.Where(i => i.Guard is not null).ToList();
-        var saved = guarded.Count == 0 ? 0 : (int)Math.Round(guarded.Average(i => i.Guard!.Saved));
-        var stats = Ui.Col(14,
-            Gx.Stat(items.Count.ToString(), I18n.T("v18.guard.stat.n"), HubLook.Cyan),
-            Gx.Stat(guarded.Count == 0 ? "—" : $"−{saved} %", I18n.T("v18.guard.stat.saved"), HubLook.Violet),
-            Gx.Stat(guarded.Sum(i => i.Guard!.Names).ToString(), I18n.T("v18.guard.stat.names"), null));
-        stats.VerticalAlignment = VerticalAlignment.Center;
-        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"), ColumnSpacing = 22 };
-        grid.Children.Add(mark);
-        Grid.SetColumn(left, 1);
-        grid.Children.Add(left);
-        Grid.SetColumn(stats, 2);
-        grid.Children.Add(stats);
-        return HubLook.Frame(grid, new Thickness(24, 20));
+        var icon = Ui.Icon(Icons.Shield, 18, HubLook.Violet);
+        icon.Margin = new Thickness(0, 1, 12, 0);
+        icon.VerticalAlignment = VerticalAlignment.Top;
+        var row = new DockPanel { MaxWidth = 860, HorizontalAlignment = HorizontalAlignment.Left };
+        DockPanel.SetDock(icon, Dock.Left);
+        row.Children.Add(icon);
+        row.Children.Add(Ui.Text(I18n.T("v18.guard.text"), "muted", wrap: true));
+        return row;
     }
 
     /// <summary>Итог защиты одной строкой: «AES-256 · −38 % · 5 имён скрыто» (покупки до 18.0 — пока только шифр).</summary>
@@ -317,5 +299,67 @@ public sealed partial class CreatorPage
     internal void DemoSettings(string id)
     {
         if (Features.Inject.Get(id) is { } i) ScriptSettings(i);
+    }
+}
+public sealed partial class CreatorPage
+{
+    /// <summary>
+    /// 22.0: справочник по скриптам в игре (.modx) — тем же текстом, что боковая справка среды, но на всю ширину:
+    /// слева разделы с примерами, справа готовые функции и клавиши среды. Правки файлов (.mls) — соседняя вкладка.
+    /// </summary>
+    static Control ScriptsGuide()
+    {
+        var examples = Ui.Col(16);
+        foreach (var (key, code) in new[]
+        {
+            ("v16.x.docs.head", "mod \"My mod\"\nversion 1.0.0\nauthor \"Me\"\nengine unity"),
+            ("v16.x.docs.hooks", "hook start {\n    say \"Hi\"\n}"),
+            ("v16.x.docs.vars", "let gold = 100\nset gold = gold * 2\nadd gold 5\ngold += 1"),
+            ("v16.x.docs.logic", "if gold > 10 { … } else { … }\nfor i in 1..5 { … }\nwhile alive { … }"),
+            ("v16.x.docs.fn", "fn reward(wave) {\n    return wave * 50\n}"),
+            ("v16.x.docs.text", "say \"Gold: {gold}\"\nlog \"x = {x}\""),
+            ("v16.x.docs.native", "native csharp {\n    // C# / lua / python / js / gdscript\n}"),
+        })
+        {
+            var box = new Border
+            {
+                Background = HubLook.Raised, CornerRadius = new CornerRadius(8), Padding = new Thickness(14, 10),
+                Child = new SelectableTextBlock { Text = code, FontFamily = HubLook.Mono, FontSize = 12.5, LineHeight = 19, TextWrapping = TextWrapping.Wrap },
+            };
+            examples.Children.Add(Ui.Col(6, Ui.Text(I18n.T(key), "strong"), box));
+        }
+        var left = examples;
+        left.MaxWidth = 720;
+
+        var builtins = new WrapPanel();
+        foreach (var f in ModScriptX.ModxDoc.Builtins)
+            builtins.Children.Add(new Border
+            {
+                CornerRadius = new CornerRadius(6), Padding = new Thickness(7, 3), Margin = new Thickness(0, 0, 6, 6), Background = HubLook.Raised,
+                Child = new TextBlock { Text = f + "()", FontFamily = HubLook.Mono, FontSize = 11.5 },
+            });
+        var keys = Ui.Col(6);
+        foreach (var (k, key) in new[]
+        {
+            ("F5", "v15.ms.key.run"), ("F6", "v15.ms.key.inject"), ("Ctrl+Space", "v15.ms.key.suggest"), ("F12", "v19.cmd.definition"), ("F2", "v19.cmd.rename"),
+            ("F9", "v19.cmd.breakpoint"), ("Ctrl+P", "v19.key.palette"),
+        })
+        {
+            var cap = new Border { Width = 96, Child = HubLook.Key(k), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top };
+            var row = new DockPanel();
+            DockPanel.SetDock(cap, Dock.Left);
+            row.Children.Add(cap);
+            row.Children.Add(Ui.Text(I18n.T(key), "small muted", wrap: true));
+            keys.Children.Add(row);
+        }
+        var right = Ui.Col(24,
+            Ui.Col(10, HubLook.Eyebrow(I18n.T("v16.x.docs.builtins")), builtins),
+            Ui.Col(10, HubLook.Eyebrow(I18n.T("v19.docs.keys")), keys));
+
+        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,340"), ColumnSpacing = 40 };
+        grid.Children.Add(left);
+        Grid.SetColumn(right, 1);
+        grid.Children.Add(right);
+        return grid;
     }
 }

@@ -10,7 +10,8 @@ public sealed record Backup(string Name, DateTime At, string Reason, long Size);
 /// <summary>Резервные копии сохранений: backups/&lt;игра&gt;/ГГГГММДД-ЧЧММСС-причина.zip, как в 3.x.</summary>
 public static partial class Backups
 {
-    [GeneratedRegex(@"^(\d{8}-\d{6})-(manual|launch|restore)\.zip$")] private static partial Regex FileName();
+    // 23.0: guard — копия «до игры» защиты прогресса (ProgressGuard).
+    [GeneratedRegex(@"^(\d{8}-\d{6})-(manual|launch|restore|guard)\.zip$")] private static partial Regex FileName();
 
     public static string Root => Path.Combine(Paths.DataDir, "backups");
 

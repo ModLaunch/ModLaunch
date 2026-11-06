@@ -133,4 +133,59 @@ public static partial class Actions
             if (auto.Count > 0 && !Launcher.IsRunning(g.Def.Id)) _ = UpdateMods(g, auto);
         }
     }
+
+    /// <summary>Сколько обновлений ждёт: моды игр и сборки Minecraft (only — только эта игра).</summary>
+    public static int PendingUpdates(GameState? only = null)
+    {
+        var n = AppState.Games.Where(g => !g.Def.IsMinecraft && (only is null || g == only))
+            .Sum(g => ModUpdates.Found.TryGetValue(g.Def.Id, out var l) ? l.Count : 0);
+        if ((only is null || only.Def.IsMinecraft) && Minecraft.Mc.State is { Status: Detect.Found })
+            n += Minecraft.Mc.Instances().Sum(Minecraft.McContent.UpdateCount);
+        return n;
+    }
+
+    /// <summary>
+    /// 24.0: «Обновить всё» одной кнопкой — без окна выбора: моды всех игр (или одной) и сборки Minecraft.
+    /// Перед обновлением модов игры делается снимок — «Профили» → «История изменений» вернёт как было.
+    /// Моды Nexus без Premium идут последними: их страницы откроются в браузере по очереди.
+    /// </summary>
+    public static void UpdateEverything(GameState? only = null, IEnumerable<GameState>? games = null, bool minecraft = true)
+    {
+        var n = 0;
+        var browser = 0;
+        var already = 0;
+        var busy = new List<string>();
+        var targets = (games ?? AppState.Games).Where(g => !g.Def.IsMinecraft && (only is null || g == only)).ToList();
+        foreach (var g in targets)
+        {
+            if (!ModUpdates.Found.TryGetValue(g.Def.Id, out var found) || found.Count == 0) continue;
+            if (Launcher.IsRunning(g.Def.Id)) { busy.Add(g.Def.ShortName); continue; }
+            // Считаем только то, что правда начнёт обновляться (повторное нажатие ничего не запускает).
+            var list = found.Where(u => !IsUpdating(g, u.RecordId)).ToList();
+            already += found.Count - list.Count;
+            if (list.Count == 0) continue;
+            n += list.Count;
+            browser += list.Count(u => u.Manual);
+            _ = UpdateMods(g, list);
+        }
+        if (minecraft && (only is null || only.Def.IsMinecraft) && Minecraft.Mc.State is { Status: Detect.Found } mc)
+        {
+            if (Launcher.IsRunning(mc.Def.Id)) busy.Add("Minecraft");
+            else
+                foreach (var i in Minecraft.Mc.Instances())
+                {
+                    var ups = Minecraft.McContent.Updates(i).Where(u => !IsMcUpdating(i, u.Item)).ToList();
+                    already += Minecraft.McContent.UpdateCount(i) - ups.Count;
+                    if (ups.Count == 0) continue;
+                    n += ups.Count;
+                    _ = UpdateMc(i, ups);
+                }
+        }
+        if (n > 0) W.Toast(I18n.T("v24.upd.started." + I18n.Plural(n, "one", "few", "many"), ("n", n)));
+        else if (already > 0) W.Toast(I18n.T("upd.wait"));
+        else if (busy.Count == 0) W.Toast(I18n.T("upd.none"));
+        if (browser > 0) W.Toast(I18n.T("v24.upd.browser", ("n", browser)));
+        if (busy.Count > 0) W.Toast(I18n.T("v24.upd.running", ("list", string.Join(", ", busy))), bad: true);
+        AppState.Notify();
+    }
 }

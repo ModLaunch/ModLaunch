@@ -80,40 +80,26 @@ public sealed class AiBuildsPage : Page
 
     static Control Hero()
     {
+        // 23.8: шапка в общем стиле программы — поверхность и акцент темы, без розового градиента, «Новое в 9.8» и свечения.
         var accent = Gx.Accent;
-        var background = new Border
-        {
-            Background = new LinearGradientBrush
-            {
-                StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
-                GradientStops =
-                {
-                    new GradientStop(Look.Mix(accent, Colors.Black, 0.1), 0),
-                    new GradientStop(Color.Parse("#B23ACF"), 0.55),
-                    new GradientStop(Color.Parse("#E83E8C"), 1),
-                },
-            },
-        };
+        var soft = new SolidColorBrush(accent, 0.14);
+        var ink = new SolidColorBrush(Look.Mix(accent, Colors.White, 0.25));
         var engine = AiBuilds.HasClaude ? I18n.T("v98.engine.claude") : I18n.T("v98.engine.local");
         var words = Ui.Col(8,
-            Gx.Eyebrow(I18n.T("v98.hero.eyebrow"), Ui.Hex("#FFE3F3")),
-            Gx.Title(I18n.T("v98.hero.title"), 34, Brushes.White, 1),
-            new TextBlock { Text = I18n.T("v98.hero.text"), FontSize = 14, Foreground = Ui.Hex("#F5ECFF"), TextWrapping = TextWrapping.Wrap, MaxWidth = 620, HorizontalAlignment = HorizontalAlignment.Left },
-            Ui.Row(8, Gx.Tag(engine, new SolidColorBrush(Color.FromArgb(60, 255, 255, 255)), Brushes.White),
-                Gx.Tag(I18n.T("v98.hero.real"), new SolidColorBrush(Color.FromArgb(60, 255, 255, 255)), Brushes.White)));
+            Gx.Title(I18n.T("v98.hero.title"), 30, Ui.Res("Text"), 1),
+            new TextBlock { Text = I18n.T("v98.hero.text"), FontSize = 14, Foreground = Ui.Res("Muted"), TextWrapping = TextWrapping.Wrap, MaxWidth = 640, HorizontalAlignment = HorizontalAlignment.Left },
+            Ui.Row(8, Gx.Tag(engine, soft, ink), Gx.Tag(I18n.T("v98.hero.real"), soft, ink)));
         words.VerticalAlignment = VerticalAlignment.Center;
-        var orb = new Border
+        var badge = new Border
         {
-            Width = 112, Height = 112, CornerRadius = new CornerRadius(56), VerticalAlignment = VerticalAlignment.Center,
-            Background = new RadialGradientBrush { GradientStops = { new GradientStop(Color.FromArgb(150, 255, 255, 255), 0), new GradientStop(Color.FromArgb(20, 255, 255, 255), 1) } },
-            BoxShadow = Gx.Glow(140, 40),
-            Child = Ui.Icon(Icons.Sparkles, 52, Brushes.White),
+            Width = 72, Height = 72, CornerRadius = new CornerRadius(18), VerticalAlignment = VerticalAlignment.Center,
+            Background = soft, Child = Ui.Icon(Icons.Sparkles, 32, ink),
         };
-        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), ColumnSpacing = 24, Margin = new Thickness(30, 26) };
+        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*"), ColumnSpacing = 22, Margin = new Thickness(26, 22) };
+        grid.Children.Add(badge);
+        Grid.SetColumn(words, 1);
         grid.Children.Add(words);
-        Grid.SetColumn(orb, 1);
-        grid.Children.Add(orb);
-        return new Border { CornerRadius = new CornerRadius(22), ClipToBounds = true, MinHeight = 170, Child = new Panel { Children = { background, Gx.Scanlines(), grid } } };
+        return new Border { CornerRadius = new CornerRadius(16), Background = Ui.Res("Surface2"), BorderBrush = Ui.Res("Line"), BorderThickness = new Thickness(1), Child = grid };
     }
 
     // ---------------------------------------------------------------- конструктор
@@ -262,7 +248,10 @@ public sealed class AiBuildsPage : Page
         text.VerticalAlignment = VerticalAlignment.Center;
         var row = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,Auto,*,Auto,Auto"), ColumnSpacing = 12 };
         row.Children.Add(check);
-        var thumb = Ui.Thumb(p.Mod.Icon, p.Mod.Name, 44);
+        // 23.0: у мода в сборке — подобранная обложка (как в каталоге), а не маленький значок.
+        Control thumb = ModLaunch.Games.GameCatalog.ById(b.Game) is { } def
+            ? new Border { Width = 112, Height = 63, CornerRadius = new CornerRadius(8), ClipToBounds = true, Child = ModCovers.Art(def, p.Mod, 63), VerticalAlignment = VerticalAlignment.Center }
+            : Ui.Thumb(p.Mod.Icon, p.Mod.Name, 44);
         Grid.SetColumn(thumb, 1);
         row.Children.Add(thumb);
         Grid.SetColumn(text, 2);

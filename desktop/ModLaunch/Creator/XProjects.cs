@@ -30,7 +30,19 @@ public sealed class XProject
     public List<string> Events = [];
     public DateTime Created = DateTime.UtcNow;
 
-    public string Main => Path.Combine(Dir, "main" + MX.ModxDoc.Extension);
+    /// <summary>
+    /// Главный файл: main.modx (скрипт в игре), а у проекта правок файлов — main.mls (22.0: обе формы ModScript
+    /// открываются в одной среде).
+    /// </summary>
+    public string Main
+    {
+        get
+        {
+            var modx = Path.Combine(Dir, "main" + MX.ModxDoc.Extension);
+            var mls = Path.Combine(Dir, "main" + ModLaunch.Creator.ModScript.Extension);
+            return !File.Exists(modx) && File.Exists(mls) ? mls : modx;
+        }
+    }
     public string Id => Path.GetFileName(Dir);
     public DateTime Updated => File.Exists(Main) ? File.GetLastWriteTimeUtc(Main) : Created;
 
@@ -74,7 +86,7 @@ public static class XProjects
     /// <summary>Цвета проекта (плитка в Hub, полоса в среде).</summary>
     public static readonly (string Id, string Hex)[] Colors =
     [
-        ("violet", "#8B6CFF"), ("blue", "#4C8DFF"), ("cyan", "#3CC8E6"), ("green", "#3FCB7E"), ("orange", "#FF9640"), ("pink", "#FF6FB1"), ("red", "#FF5A5F"),
+        ("amber", "#F0B429"), ("violet", "#8B6CFF"), ("blue", "#4C8DFF"), ("cyan", "#3CC8E6"), ("green", "#3FCB7E"), ("orange", "#FF9640"), ("pink", "#FF6FB1"), ("red", "#FF5A5F"),
     ];
 
     public static string Hex(string color) => Colors.FirstOrDefault(c => c.Id == color).Hex ?? Colors[0].Hex;
@@ -102,7 +114,29 @@ public static class XProjects
         return list.OrderByDescending(p => p.Updated).ToList();
     }
 
-    public static XProject? Get(string id) => XProject.Load(Path.Combine(Root, id)) is { } p ? p : null;
+    /// <summary>Проект среды: из папки проектов ModScript, а если там нет — проект правок файлов (creator\id), уже открытый в среде.</summary>
+    public static XProject? Get(string id)
+    {
+        if (id.Contains('/') || id.Contains('\\') || id.Contains("..")) return null;
+        return XProject.Load(Path.Combine(Root, id)) ?? XProject.Load(Path.Combine(ModLaunch.Creator.Projects.Root, id));
+    }
+
+    /// <summary>
+    /// 22.0: проект правок файлов (main.mls) — в общую среду ModScript. Ничего не переносится: рядом с main.mls
+    /// появляется только описание проекта (modscript.json), и папка остаётся там же, где была.
+    /// </summary>
+    public static XProject Adopt(ModLaunch.Creator.Project classic)
+    {
+        if (XProject.Load(classic.Dir) is { } known) return known;
+        var p = new XProject
+        {
+            Dir = classic.Dir, Name = classic.Name, Game = classic.Game, Kind = "files", Engine = "generic", Target = null,
+            Version = classic.Version == "" ? "1.0.0" : classic.Version, Color = "amber",
+            Created = Directory.GetCreationTimeUtc(classic.Dir),
+        };
+        p.Save();
+        return p;
+    }
 
     /// <summary>Создать проект по анкете: папка, modscript.json, main.modx из шаблона вида, README.md.</summary>
     public static XProject Create(XForm f) => Create(f, Root);
@@ -122,7 +156,7 @@ public static class XProjects
         };
         p.Save();
         File.WriteAllText(p.Main, Template(p));
-        File.WriteAllText(Path.Combine(dir, "README.md"), $"# {p.Name}\n\n{(p.About == "" ? "" : p.About + "\n\n")}Made with ModLaunch Creator Hub · ModScript X.\n");
+        File.WriteAllText(Path.Combine(dir, "README.md"), $"# {p.Name}\n\n{(p.About == "" ? "" : p.About + "\n\n")}Made with ModLaunch Creator Hub and ModScript.\n");
         return p;
     }
 

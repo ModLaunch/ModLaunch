@@ -173,25 +173,7 @@ public sealed partial class MainWindow
     /// <summary>Мод, на который ругается лог: имя, первая строка ошибки и id в реестре (чтобы выключить).</summary>
     public sealed record Culprit(string Name, string Message, string? ModId);
 
-    /// <summary>
-    /// Игра закрылась сама в первые полторы минуты — смотрим свежий лог загрузчика.
-    /// Нашлись моды с ошибками — предлагаем выключить их и запустить снова.
-    /// </summary>
-    async Task CheckCrash(GameState g, Launcher.ExitInfo exit)
-    {
-        if (g.Path is null) return;
-        await Task.Delay(700);
-        var path = g.Path;
-        var report = await Task.Run(() => Logs.Read(g.Def, path));
-        var fresh = report.Available && report.Modified is DateTime m && m >= exit.Started.ToLocalTime().AddSeconds(-5);
-        var culprits = fresh ? Culprits(g, report.Issues) : [];
-        // Безобидные ошибки в логе бывают всегда: без кода ошибки или совсем короткого сеанса
-        // это обычный выход из игры, а не вылет.
-        var crashed = exit.Code is int code && code != 0;
-        var suspicious = culprits.Count > 0 ? crashed || exit.Ms < 30_000 : crashed && exit.Ms < 30_000;
-        if (!suspicious) return;
-        ShowCrash(g, exit.Ms, exit.Code, culprits);
-    }
+    // 24.0: разбор вылета и окно «Почему игра упала» — в MainWindow.Crash.cs.
 
     public static List<Culprit> Culprits(GameState g, List<LogIssue> issues)
     {
@@ -215,41 +197,5 @@ public sealed partial class MainWindow
             result.Add(new Culprit(mod.Str("name") ?? issue.Mod, message, id));
         }
         return result.Take(5).ToList();
-    }
-
-    public void ShowCrash(GameState g, long ms, int? code, List<Culprit> culprits)
-    {
-        var body = Ui.Col(12, Ui.Text(I18n.T("crash.time", ("time", PlayControls.Clock(TimeSpan.FromMilliseconds(ms)))), "muted", wrap: true));
-        if (culprits.Count > 0)
-        {
-            body.Children.Add(Ui.Text(I18n.T("crash.mods"), "h3"));
-            var list = Ui.Col(8);
-            foreach (var c in culprits)
-                list.Children.Add(new Border
-                {
-                    Background = Ui.Res("Surface2"), CornerRadius = new CornerRadius(12), Padding = new Thickness(14, 10),
-                    Child = Ui.Col(4,
-                        Ui.Row(8, Ui.Icon(Icons.Alert, 15, Ui.Res("Warn")), Ui.Text(c.Name, "h3")),
-                        Ui.Text(c.Message, "small muted", wrap: true)),
-                });
-            body.Children.Add(list);
-        }
-        else body.Children.Add(Ui.Text(I18n.T("crash.code", ("code", code?.ToString() ?? "?")), "small muted", wrap: true));
-
-        var actions = new List<Control>();
-        if (culprits.Count == 0) actions.Add(Ui.Button(I18n.T("common.close"), CloseDialog));
-        actions.Add(Ui.Button(I18n.T("crash.log"), () => { CloseDialog(); Navigate(() => new GamePage(g.Def.Id, "log")); }, "", Icons.Alert));
-        if (culprits.Count > 0 && g.Registry is not null)
-            actions.Add(Ui.Button(I18n.T("crash.disable"), () =>
-            {
-                CloseDialog();
-                var off = 0;
-                foreach (var c in culprits)
-                    if (c.ModId is not null) try { g.Registry!.SetEnabled(c.ModId, false); off++; } catch { }
-                Toast(I18n.T("crash.disabled", ("n", off)));
-                AppState.Notify();
-                Actions.Play(g);
-            }, "primary", Icons.Play));
-        Dialog(I18n.T("crash.title", ("game", g.Def.Name)), body, actions.ToArray());
     }
 }

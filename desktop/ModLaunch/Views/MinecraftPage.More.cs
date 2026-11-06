@@ -185,7 +185,12 @@ public sealed partial class MinecraftPage
         catch { }
         if (crashes.Count > 0)
         {
-            var list = Ui.Col(6, Ui.Text(I18n.T("mine.log.crashes"), "h3"));
+            // 24.0: «Почему упала?» — разбор свежего отчёта простыми словами и «Исправить».
+            var why = Ui.Button(I18n.T("v24.crash.why"), () => { if (Mc.State is { } st) W.ExplainCrash(st); }, "primary", Icons.Wand);
+            DockPanel.SetDock(why, Dock.Right);
+            var crashTitle = Ui.Text(I18n.T("mine.log.crashes"), "h3");
+            crashTitle.VerticalAlignment = VerticalAlignment.Center;
+            var list = Ui.Col(6, new DockPanel { Children = { why, crashTitle } });
             foreach (var c in crashes)
             {
                 var file = c.FullName;

@@ -15,8 +15,8 @@ public sealed record PilotStep(string Kind, HealthLevel Level, string Title, str
 /// </summary>
 public static class Autopilot
 {
-    /// <summary>Чинить сборку перед каждым запуском (Настройки → Запуск), по умолчанию выключено.</summary>
-    public static bool BeforePlay => Settings.Data.Bool("autopilotBeforePlay");
+    /// <summary>Чинить сборку перед каждым запуском (Настройки → Запуск). 23.0: по умолчанию включено — шаги безопасные и со снимком «как было».</summary>
+    public static bool BeforePlay => Settings.Data.Bool("autopilotBeforePlay", true);
 
     static readonly Dictionary<string, (int Penalty, bool Auto, bool Optimize)> Rules = new()
     {
@@ -25,6 +25,8 @@ public static class Autopilot
         ["deps"] = (25, true, false),
         ["depsOff"] = (20, true, false),
         ["conflicts"] = (12, true, true),
+        // 23.0: разные моды с одним файлом — не чиним сами, только предлагаем «оставить новее».
+        ["overlap"] = (8, false, false),
         ["log"] = (10, false, false),
         ["files"] = (8, true, false),
         ["crash"] = (6, false, false),

@@ -163,7 +163,8 @@ public sealed partial class HomePage
         var problems = notices.Count(x => x.Kind is "failed" or "health");
         var friends = Social.Friends.View().Friends.Count(f => f.State != "offline");
         if (problems > 0) Part(Ui.Res("Bad"), I18n.T("h95.sub.problems", ("n", problems)));
-        if (updates > 0) Part(Pink, I18n.T("h95.sub.updates", ("n", updates)));
+        // 24.0: нажали «N обновлений» — обновляется всё сразу.
+        if (updates > 0) Part(Pink, I18n.T("h95.sub.updates", ("n", updates)), () => Actions.UpdateEverything(games: mine));
         if (Jobs.ActiveCount > 0) Part(Ui.Res("Brand2"), I18n.T("h95.sub.downloads", ("n", Jobs.ActiveCount)), () => MainWindow.Current?.OpenDownloads());
         if (friends > 0) Part(Ui.Res("Good"), I18n.T("h95.sub.friends", ("n", friends)), () => MainWindow.Current?.Navigate(() => new CommunityPage()));
         if (Setup.Updater.Available) Part(Yellow, I18n.T("h95.sub.app"), () => MainWindow.Current?.ShowUpdate());
@@ -182,7 +183,9 @@ public sealed partial class HomePage
         stats.HorizontalAlignment = HorizontalAlignment.Right;
         var profile = Ui.Button(I18n.T("v99.home.profile"), () => MainWindow.Current?.Navigate(() => new ProfilePage()), "primary", Icons.Trophy);
         var add = Ui.Button(I18n.T("add.title"), () => MainWindow.Current?.Navigate(() => new AddGamePage()), "hero-ghost", Icons.Plus);
-        var buttons = Ui.Row(8, add, profile);
+        // 24.0: код сборки от друга — прямо с главной (друг мог только что поставить ModLaunch ради него).
+        var code = Ui.Button(I18n.T("v24.share.enter"), () => ShareUi.Enter(), "hero-ghost", Icons.Users);
+        var buttons = Ui.Row(8, code, add, profile);
         buttons.HorizontalAlignment = HorizontalAlignment.Right;
         var right = Ui.Col(12, stats, buttons);
         right.VerticalAlignment = VerticalAlignment.Center;
@@ -244,7 +247,8 @@ public sealed partial class HomePage
             var games = string.Join(", ", updates.GroupBy(x => x.g).Select(x => $"{x.Key.Def.ShortName} ({x.Count()})"));
             var first = updates[0].g.Def.Id;
             list.Add(new("mods", Icons.ArrowUp, Pink, I18n.T("h95.a.mods", ("n", updates.Count)), I18n.T("h95.a.mods.text", ("games", games)),
-                I18n.T("h95.a.mods.go"), () => UpdateReview.Show(updates), () => Go(() => new GamePage(first, "installed"))));
+                // 24.0: «Обновить всё» — сразу, без окна выбора (выбрать по одному можно на вкладке модов игры).
+                I18n.T("h95.a.mods.go"), () => Actions.UpdateEverything(games: mine, minecraft: false), () => Go(() => new GamePage(first, "installed"))));
         }
 
         if (Mc.State is { Status: Detect.Found })
@@ -256,7 +260,8 @@ public sealed partial class HomePage
                 var target = withUpdates[0].Build;
                 void Open() { Mc.Active = target; Go(() => new MinecraftPage("mods")); }
                 list.Add(new("mc", Icons.Cube, Ui.Res("Good"), I18n.T("h95.a.mc", ("n", withUpdates.Sum(x => x.N))),
-                    I18n.T("h95.a.mc.text", ("builds", string.Join(", ", withUpdates.Select(x => $"{x.Build.Name} ({x.N})")))), I18n.T("h95.a.mc.go"), Open, Open));
+                    I18n.T("h95.a.mc.text", ("builds", string.Join(", ", withUpdates.Select(x => $"{x.Build.Name} ({x.N})")))), I18n.T("upd.all"),
+                    () => { foreach (var (b, _) in withUpdates) _ = Actions.UpdateMc(b, McContent.Updates(b)); }, Open));
             }
             foreach (var b in builds)
             {
@@ -601,7 +606,7 @@ public sealed partial class HomePage
         foreach (var (icon, key, open) in WhatsNew.Latest(3))
         {
             var o = open;
-            rows.Children.Add(Row(icon, tints[k++ % tints.Length], I18n.T(key), I18n.T(key + ".text"), o is null ? WhatsNew.Show : () => MainWindow.Current?.Navigate(o)));
+            rows.Children.Add(Row(icon, tints[k++ % tints.Length], WhatsNew.Split(key).Title, WhatsNew.Split(key).Text, o is null ? WhatsNew.Show : () => MainWindow.Current?.Navigate(o)));
         }
         var listing = (MarketData.Listings ?? []).Where(l => l.Active && !l.Mine).OrderByDescending(l => l.Created ?? DateTime.MinValue).FirstOrDefault();
         if (listing is not null)

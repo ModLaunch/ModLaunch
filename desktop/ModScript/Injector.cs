@@ -17,13 +17,13 @@ public static class Injector
         var id = targetId ?? doc.Engine;
         if (id != null)
         {
-            var t = Target.Find(id);
+            var t = CustomTarget.Bind(Target.Find(id), gameDir);
             if (t == null) diags.Add(new Diag(0, $"unknown engine '{id}' (use {string.Join(", ", Target.All.Select(x => x.Id))})"));
             return t;
         }
         if (gameDir != null)
         {
-            var t = Engines.Detect(gameDir);
+            var t = CustomTarget.Bind(Engines.Detect(gameDir), gameDir);
             if (t == null) diags.Add(new Diag(0, "could not detect the game engine: add 'engine <id>' to the .modx or pass --target"));
             return t;
         }
@@ -84,6 +84,13 @@ public static class Injector
     }
 
     public static IEnumerable<string> Installed(string gameDir) => Load(gameDir).Select(kv => $"{kv.Key} ({kv.Value?["engine"]})");
+
+    /// <summary>23.0: когда мод с этим id поставлен в папку игры (null — не стоит). Для статуса «В игре» в списке модов.</summary>
+    public static DateTime? InstalledAt(string id, string gameDir)
+    {
+        if (Load(gameDir)[id] is not JsonObject entry) return null;
+        return entry["at"]?.GetValue<string>() is { } at && DateTime.TryParse(at, null, System.Globalization.DateTimeStyles.RoundtripKind, out var t) ? t.ToUniversalTime() : DateTime.MinValue;
+    }
 
     static List<string> Write(List<OutFile> files, string root)
     {

@@ -374,6 +374,8 @@ public sealed partial class MinecraftPage : Page
             return;
         }
         if (Features.Launcher.IsRunning(Mc.Id)) { w.Toast(I18n.T("launch.already")); return; }
+        // 24.0: моды сборки сейчас заменяются — игра загрузила бы половину старых, половину новых.
+        if (Actions.McBuildUpdating(i)) { w.Toast(I18n.T("upd.wait")); return; }
         if (!Mc.VersionReady(i))
         {
             // Загрузчик ещё не стоит — ставим задачей (видно в загрузках), потом открываем лаунчер.

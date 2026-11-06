@@ -136,6 +136,8 @@ public static partial class Actions
             ["id"] = game.RecordId(modId, "nexus"),
             ["name"] = mod.Name,
             ["version"] = file.Version is { Length: > 0 } fv ? fv : mod.Version,
+            // 24.0: номер файла — чтобы код сборки дал другу ту же версию, а не последнюю.
+            ["fileId"] = file.FileId > 0 ? file.FileId : null,
             ["author"] = mod.Author,
             ["source"] = "nexus",
             ["url"] = mod.Url,
@@ -169,6 +171,8 @@ public static partial class Actions
         {
             progress.Report(new InstallStep("install.extract", mod.Name));
             await Installer.InstallAny(registry, archive, meta, progress, ct);
+            // 24.0: запись мода собирается заново — номер файла Nexus дописываем отдельно (для кода сборки «та же версия»).
+            if (file.FileId > 0) try { registry.Edit(game.RecordId(modId, "nexus"), r => r["fileId"] = file.FileId); } catch { }
             DownloadArchive.Add(game.Id, game.RecordId(modId, "nexus"), meta.Str("version") ?? "", archive);
         }
         finally
@@ -257,11 +261,13 @@ public static partial class Actions
                     ["id"] = g.Def.RecordId(parsed.ModId, "nexus"),
                     ["name"] = info.Name,
                     ["version"] = info.Version,
+                    ["fileId"] = parsed.FileId,
                     ["author"] = info.Author,
                     ["source"] = "nexus",
                     ["url"] = $"https://www.nexusmods.com/{parsed.Domain}/mods/{parsed.ModId}",
                     ["icon"] = info.Icon,
                 }, progress, ct);
+                try { registry.Edit(g.Def.RecordId(parsed.ModId, "nexus"), r => r["fileId"] = parsed.FileId); } catch { }
                 // Этот мод ждали из браузера — ожидание закончено.
                 lock (BrowserWaits) if (BrowserWaits.TryGetValue($"{g.Def.Id}:{parsed.ModId}", out var wait)) wait.TrySetResult(record);
             }
@@ -449,6 +455,8 @@ public static partial class Actions
             var meta = (JsonObject)record.DeepClone();
             meta["version"] = file.Version;
             meta.Remove("installedAt");
+            // Файл из архива может быть другой версии — прежний номер файла Nexus к нему не относится.
+            meta.Remove("fileId");
             progress.Report(new InstallStep("install.extract", record.Str("name") ?? id));
             await Installer.InstallAny(registry, file.Path, meta, progress, ct);
             var fresh = registry.Get(id);

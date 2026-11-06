@@ -1,0 +1,643 @@
+
+// ===================================================================== Studio.Kits — готовые детали (200+), собираются кодом
+// Стены, полы, лестницы, арки, заборы, дома; фигуры; деревья, камни; мебель; транспорт; свет; игровые предметы.
+// Деталь задаётся строкой kit:семейство:размеры — по ней она пересобирается при загрузке карты в любой игре на Unity.
+public partial class ModScriptStudio
+{
+    class KitEntry { public string Id, Name, Group, Icon; }
+    List<KitEntry> _kits;
+
+    static readonly Color Wood = new Color(0.58f, 0.40f, 0.24f), DarkWood = new Color(0.36f, 0.24f, 0.15f), Stone = new Color(0.62f, 0.62f, 0.64f),
+        Concrete = new Color(0.78f, 0.77f, 0.74f), Metal = new Color(0.52f, 0.54f, 0.58f), Leaf = new Color(0.32f, 0.62f, 0.26f), Pine = new Color(0.17f, 0.42f, 0.24f),
+        Trunk = new Color(0.42f, 0.28f, 0.17f), Rock = new Color(0.52f, 0.50f, 0.48f), Roof = new Color(0.68f, 0.26f, 0.20f), Paper = new Color(0.93f, 0.92f, 0.89f),
+        Glass = new Color(0.62f, 0.82f, 0.92f), Gold = new Color(1f, 0.80f, 0.22f), Ink0 = new Color(0.13f, 0.13f, 0.14f), Grass = new Color(0.40f, 0.70f, 0.30f);
+
+    static string Num(float v) { return v.ToString("0.##", Inv); }
+
+    string Fmt(string template, params object[] a)
+    {
+        try { return string.Format(Inv, template, a); } catch { return template; }
+    }
+
+    /// <summary>Каталог деталей: семейство × размеры. Имена — из шаблонов на языке ModLaunch.</summary>
+    List<KitEntry> Kits()
+    {
+        if (_kits != null) return _kits;
+        var k = new List<KitEntry>();
+        Action<string, string, string, string> add = (id, name, group, icon) => k.Add(new KitEntry { Id = id, Name = name, Group = group, Icon = icon });
+        foreach (var w in new[] { 1f, 2f, 4f, 8f }) foreach (var h in new[] { 1f, 2f, 3f, 4f }) add("wall:" + Num(w) + ":" + Num(h), Fmt(T("k.wall", "Wall {0}×{1} m"), Num(w), Num(h)), "build", "quad");
+        foreach (var s in new[] { 1f, 2f, 4f, 8f, 16f }) add("floor:" + Num(s), Fmt(T("k.floor", "Floor {0}×{0} m"), Num(s)), "build", "plane");
+        foreach (var s in new[] { 2f, 4f, 8f }) foreach (var h in new[] { 0.5f, 1f }) add("platform:" + Num(s) + ":" + Num(h), Fmt(T("k.platform", "Platform {0}×{0}, {1} m high"), Num(s), Num(h)), "build", "cube");
+        foreach (var l in new[] { 2f, 4f, 8f }) foreach (var t in new[] { 0.2f, 0.4f }) add("beam:" + Num(l) + ":" + Num(t), Fmt(T("k.beam", "Beam {0} m, {1} m thick"), Num(l), Num(t)), "build", "array");
+        foreach (var h in new[] { 2f, 3f, 4f, 6f }) foreach (var r in new[] { 0.2f, 0.4f }) add("pillar:" + Num(h) + ":" + Num(r), Fmt(T("k.pillar", "Column {0} m, Ø {1} m"), Num(h), Num(r * 2)), "build", "cylinder");
+        foreach (var l in new[] { 2f, 4f }) foreach (var h in new[] { 0.5f, 1f, 2f }) add("ramp:" + Num(l) + ":" + Num(h), Fmt(T("k.ramp", "Ramp {0} m, {1} m up"), Num(l), Num(h)), "build", "plane");
+        foreach (var n in new[] { 3, 5, 8, 12 }) foreach (var w in new[] { 1f, 2f }) add("stairs:" + n + ":" + Num(w), Fmt(T("k.stairs", "Stairs: {0} steps, {1} m wide"), n, Num(w)), "build", "ground");
+        foreach (var n in new[] { 12, 24 }) add("spiral:" + n, Fmt(T("k.spiral", "Spiral stairs: {0} steps"), n), "build", "rotate");
+        foreach (var w in new[] { 2f, 4f }) foreach (var h in new[] { 3f, 5f }) add("arch:" + Num(w) + ":" + Num(h), Fmt(T("k.arch", "Arch {0}×{1} m"), Num(w), Num(h)), "build", "house");
+        foreach (var w in new[] { 1f, 2f }) add("door:" + Num(w), Fmt(T("k.door", "Door frame {0} m"), Num(w)), "build", "quad");
+        foreach (var w in new[] { 1f, 2f }) add("window:" + Num(w), Fmt(T("k.window", "Window frame {0} m"), Num(w)), "build", "grid");
+        foreach (var l in new[] { 2f, 4f, 8f }) add("fence:" + Num(l), Fmt(T("k.fence", "Fence {0} m"), Num(l)), "build", "array");
+        foreach (var l in new[] { 2f, 4f }) add("railing:" + Num(l), Fmt(T("k.railing", "Railing {0} m"), Num(l)), "build", "array");
+        add("house", T("k.house", "Small house"), "build", "house");
+        add("hut", T("k.hut", "Hut"), "build", "house");
+        foreach (var h in new[] { 6f, 10f }) add("tower:" + Num(h), Fmt(T("k.tower", "Tower {0} m"), Num(h)), "build", "cylinder");
+        foreach (var l in new[] { 6f, 12f }) add("bridge:" + Num(l), Fmt(T("k.bridge", "Bridge {0} m"), Num(l)), "build", "plane");
+        add("gate", T("k.gate", "Gate"), "build", "house");
+        foreach (var l in new[] { 4f, 8f }) add("castle:" + Num(l), Fmt(T("k.castle", "Castle wall {0} m"), Num(l)), "build", "group");
+
+        foreach (var shape in new[] { "Cube", "Sphere", "Cylinder", "Capsule" })
+            foreach (var s in new[] { 0.5f, 1f, 2f, 4f })
+                add("prim:" + shape + ":" + Num(s), Fmt(T("k.prim", "{0}, {1} m"), T("shape." + shape, shape), Num(s)), "shapes", shape.ToLowerInvariant());
+        foreach (var s in new[] { 1f, 2f, 4f }) add("cone:" + Num(s), Fmt(T("k.cone", "Cone {0} m"), Num(s)), "shapes", "spot");
+        foreach (var s in new[] { 1f, 2f, 4f }) add("pyramid:" + Num(s), Fmt(T("k.pyramid", "Pyramid {0} m"), Num(s)), "shapes", "spot");
+        foreach (var s in new[] { 1f, 2f }) add("prism:" + Num(s), Fmt(T("k.prism", "Prism {0} m"), Num(s)), "shapes", "spot");
+        foreach (var s in new[] { 1f, 2f }) add("wedge:" + Num(s), Fmt(T("k.wedge", "Wedge {0} m"), Num(s)), "shapes", "plane");
+        foreach (var s in new[] { 1f, 2f }) add("torus:" + Num(s), Fmt(T("k.torus", "Torus {0} m"), Num(s)), "shapes", "sphere");
+        foreach (var s in new[] { 1f, 2f }) add("tube:" + Num(s), Fmt(T("k.tube", "Pipe {0} m"), Num(s)), "shapes", "cylinder");
+        foreach (var s in new[] { 2f, 4f, 8f }) add("dome:" + Num(s), Fmt(T("k.dome", "Dome {0} m"), Num(s)), "shapes", "sphere");
+        foreach (var s in new[] { 2f, 4f }) add("ring:" + Num(s), Fmt(T("k.ring", "Ring {0} m"), Num(s)), "shapes", "sphere");
+        foreach (var s in new[] { 1f, 2f }) add("hex:" + Num(s), Fmt(T("k.hex", "Hexagonal column {0} m"), Num(s)), "shapes", "cylinder");
+
+        foreach (var s in new[] { 1f, 1.5f, 2.2f }) add("tree:" + Num(s), Fmt(T("k.tree", "Tree ×{0}"), Num(s)), "nature", "tree");
+        foreach (var s in new[] { 1f, 1.5f, 2.2f }) add("pine:" + Num(s), Fmt(T("k.pine", "Pine ×{0}"), Num(s)), "nature", "tree");
+        foreach (var s in new[] { 0.6f, 1f }) add("bush:" + Num(s), Fmt(T("k.bush", "Bush ×{0}"), Num(s)), "nature", "tree");
+        foreach (var s in new[] { 0.5f, 1f, 2f, 4f }) foreach (var seed in new[] { 1, 2 }) add("rock:" + Num(s) + ":" + seed, Fmt(T("k.rock", "Rock {0} m, shape {1}"), Num(s), seed), "nature", "model");
+        add("boulders", T("k.boulders", "Boulder pile"), "nature", "model");
+        foreach (var l in new[] { 2f, 4f }) add("log:" + Num(l), Fmt(T("k.log", "Log {0} m"), Num(l)), "nature", "cylinder");
+        add("stump", T("k.stump", "Stump"), "nature", "cylinder");
+        add("flowers", T("k.flowers", "Flower bed"), "nature", "tree");
+        add("cactus", T("k.cactus", "Cactus"), "nature", "tree");
+        add("mushroom", T("k.mushroom", "Mushroom"), "nature", "tree");
+
+        foreach (var s in new[] { 1f, 2f }) add("table:" + Num(s), Fmt(T("k.table", "Table {0} m"), Num(s)), "furniture", "model");
+        add("chair", T("k.chair", "Chair"), "furniture", "model");
+        add("bench", T("k.bench", "Bench"), "furniture", "model");
+        add("stool", T("k.stool", "Stool"), "furniture", "model");
+        add("shelf", T("k.shelf", "Shelf"), "furniture", "model");
+        add("bed", T("k.bed", "Bed"), "furniture", "model");
+        add("sofa", T("k.sofa", "Sofa"), "furniture", "model");
+        foreach (var s in new[] { 0.5f, 1f }) add("crate:" + Num(s), Fmt(T("k.crate", "Crate {0} m"), Num(s)), "furniture", "cube");
+        add("barrel", T("k.barrel", "Barrel"), "furniture", "cylinder");
+        add("bin", T("k.bin", "Bin"), "furniture", "trash");
+        add("sign", T("k.sign", "Sign"), "furniture", "quad");
+        add("chest", T("k.chest", "Chest"), "furniture", "cube");
+        add("fountain", T("k.fountain", "Fountain"), "furniture", "cylinder");
+        add("well", T("k.well", "Well"), "furniture", "cylinder");
+        foreach (var h in new[] { 2f, 4f }) add("ladder:" + Num(h), Fmt(T("k.ladder", "Ladder {0} m"), Num(h)), "furniture", "array");
+        add("mailbox", T("k.mailbox", "Mailbox"), "furniture", "model");
+        add("lamppost", T("k.lamppost", "Lamp post"), "furniture", "bulb");
+        add("streetlamp", T("k.streetlamp", "Street lamp"), "furniture", "bulb");
+        add("campfire", T("k.campfire", "Campfire"), "furniture", "sun");
+
+        foreach (var c in new[] { "red", "blue", "yellow", "green" }) add("car:" + c, Fmt(T("k.car", "Car, {0}"), T("hue." + c, c)), "vehicles", "car");
+        foreach (var c in new[] { "red", "blue" }) add("truck:" + c, Fmt(T("k.truck", "Truck, {0}"), T("hue." + c, c)), "vehicles", "car");
+        add("kart", T("k.kart", "Kart"), "vehicles", "car");
+        add("boat", T("k.boat", "Boat"), "vehicles", "car");
+        add("bus", T("k.bus", "Bus"), "vehicles", "car");
+        add("plane", T("k.plane", "Plane"), "vehicles", "car");
+        add("rocket", T("k.rocket", "Rocket"), "vehicles", "spot");
+
+        foreach (var c in new[] { "warm", "white", "cold", "red", "green", "blue", "purple", "pink" }) add("light:" + c, Fmt(T("k.light", "Light, {0}"), T("tone." + c, c)), "lights", "bulb");
+        foreach (var c in new[] { "white", "warm", "purple" }) add("spot:" + c, Fmt(T("k.spot", "Spotlight, {0}"), T("tone." + c, c)), "lights", "spot");
+        foreach (var c in new[] { "warm", "white" }) add("bulb:" + c, Fmt(T("k.bulb", "Light bulb, {0}"), T("tone." + c, c)), "lights", "bulb");
+        add("torch", T("k.torch", "Torch"), "lights", "sun");
+        foreach (var c in new[] { "pink", "blue", "green" }) add("neon:" + c, Fmt(T("k.neon", "Neon bar, {0}"), T("tone." + c, c)), "lights", "bulb");
+
+        add("coin", T("k.coin", "Coin"), "game", "sphere");
+        add("gem", T("k.gem", "Gem"), "game", "spot");
+        add("checkpoint", T("k.checkpoint", "Checkpoint ring"), "game", "sphere");
+        add("jumppad", T("k.jumppad", "Jump pad"), "game", "physics");
+        add("spawn", T("k.spawn", "Spawn point"), "game", "focus");
+        add("flag", T("k.flag", "Finish flag"), "game", "play");
+        add("spikes", T("k.spikes", "Spikes"), "game", "spot");
+        add("target", T("k.target", "Target"), "game", "focus");
+        add("button", T("k.button", "Floor button"), "game", "cylinder");
+        add("portal", T("k.portal", "Portal"), "game", "sphere");
+        add("laser", T("k.laser", "Laser beam"), "game", "spot");
+        add("arrow", T("k.arrow", "Arrow sign"), "game", "move");
+
+        // 23.6: текст, эффекты частицами, земля (вода, холмы, дороги, гора).
+        add("text", T("k.text", "3D text"), "text", "quad");
+        add("textBig", T("k.textBig", "Big 3D text"), "text", "quad");
+        add("textGlow", T("k.textGlow", "Glowing 3D text"), "text", "sun");
+        foreach (var fx in new[] { "fire", "smoke", "sparks", "magic", "fireflies", "confetti", "bubbles", "snow", "rain", "mist", "jet" })
+            add("fx:" + fx, T("fx." + fx, fx), "effects", fx == "fire" || fx == "sparks" ? "sun" : fx == "rain" || fx == "jet" ? "fog" : "sphere");
+        foreach (var s in new[] { 10f, 30f, 100f }) add("water:" + Num(s), Fmt(T("k.water", "Water {0}×{0} m"), Num(s)), "terrain", "fog");
+        foreach (var s in new[] { 10f, 20f, 40f }) add("hill:" + Num(s), Fmt(T("k.hill", "Hill {0} m"), Num(s)), "terrain", "plane");
+        foreach (var l in new[] { 4f, 8f, 16f }) add("road:" + Num(l), Fmt(T("k.road", "Road {0} m"), Num(l)), "terrain", "array");
+        add("crossroad", T("k.crossroad", "Crossroads"), "terrain", "plus");
+        add("mountain", T("k.mountain", "Mountain"), "terrain", "spot");
+        _kits = k;
+        return k;
+    }
+
+    // ------------------------------------------------------------------ сборка детали
+
+    readonly Dictionary<string, Material> _colorMats = new Dictionary<string, Material>();
+
+    Material ColorMat(Color c)
+    {
+        var key = C(c);
+        Material m;
+        if (_colorMats.TryGetValue(key, out m) && m != null) return m;
+        var basis = BaseMaterial();
+        if (basis == null) return null;
+        m = new Material(basis) { name = "ModScript Studio " + key };
+        if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", c);
+        if (m.HasProperty("_Color")) m.color = c;
+        _colorMats[key] = m;
+        return m;
+    }
+
+    GameObject Prim(Transform root, PrimitiveType type, Vector3 pos, Vector3 scale, Color c, Quaternion rot)
+    {
+        var go = GameObject.CreatePrimitive(type);
+        go.name = type.ToString();
+        go.transform.SetParent(root, false);
+        go.transform.localPosition = pos;
+        go.transform.localRotation = rot;
+        go.transform.localScale = scale;
+        var m = ColorMat(c);
+        if (m != null) go.GetComponent<Renderer>().sharedMaterial = m;
+        return go;
+    }
+
+    GameObject Box(Transform root, Vector3 center, Vector3 size, Color c) { return Prim(root, PrimitiveType.Cube, center, size, c, Quaternion.identity); }
+    GameObject Box(Transform root, Vector3 center, Vector3 size, Color c, Quaternion rot) { return Prim(root, PrimitiveType.Cube, center, size, c, rot); }
+    GameObject Cyl(Transform root, Vector3 bottom, float r, float h, Color c) { return Prim(root, PrimitiveType.Cylinder, bottom + Vector3.up * h / 2, new Vector3(r * 2, h / 2, r * 2), c, Quaternion.identity); }
+    GameObject Ball(Transform root, Vector3 center, float r, Color c) { return Prim(root, PrimitiveType.Sphere, center, Vector3.one * r * 2, c, Quaternion.identity); }
+
+    GameObject MeshPart(Transform root, Mesh mesh, Vector3 pos, Color c, Quaternion rot)
+    {
+        var go = new GameObject("part");
+        go.transform.SetParent(root, false);
+        go.transform.localPosition = pos;
+        go.transform.localRotation = rot;
+        go.AddComponent<MeshFilter>().sharedMesh = mesh;
+        var r = go.AddComponent<MeshRenderer>();
+        var m = ColorMat(c);
+        if (m != null) r.sharedMaterial = m;
+        var mc = go.AddComponent<MeshCollider>();
+        mc.sharedMesh = mesh;
+        mc.convex = true;
+        return go;
+    }
+
+    /// <summary>Построитель сетки с плоскими гранями: каждый треугольник смотрит наружу от «центра» фигуры.</summary>
+    class MeshMaker
+    {
+        readonly List<Vector3> _v = new List<Vector3>();
+        readonly List<int> _t = new List<int>();
+        readonly List<Vector2> _uv = new List<Vector2>();
+        public Vector3 Center;
+
+        public void Tri(Vector3 a, Vector3 b, Vector3 c)
+        {
+            var n = Vector3.Cross(b - a, c - a);
+            if (Vector3.Dot(n, (a + b + c) / 3f - Center) < 0) { var x = b; b = c; c = x; }
+            foreach (var p in new[] { a, b, c }) { _t.Add(_v.Count); _v.Add(p); _uv.Add(new Vector2(p.x + p.z, p.y)); }
+        }
+
+        public void Quad(Vector3 a, Vector3 b, Vector3 c, Vector3 d) { Tri(a, b, c); Tri(a, c, d); }
+
+        public Mesh Build()
+        {
+            var m = new Mesh { name = "ModScript Studio kit" };
+            m.vertices = _v.ToArray();
+            m.triangles = _t.ToArray();
+            m.uv = _uv.ToArray();
+            m.RecalculateNormals();
+            m.RecalculateBounds();
+            return m;
+        }
+    }
+
+    /// <summary>Выпуклый профиль в плоскости Z–Y, вытянутый по X на ширину w (клин, призма, шестигранник).</summary>
+    static Mesh Extrude(Vector2[] profile, float w)
+    {
+        var mm = new MeshMaker();
+        var c = Vector2.zero;
+        foreach (var p in profile) c += p;
+        c /= profile.Length;
+        mm.Center = new Vector3(0, c.y, c.x);
+        Func<Vector2, float, Vector3> P = (p, x) => new Vector3(x, p.y, p.x);
+        for (var i = 1; i + 1 < profile.Length; i++)
+        {
+            mm.Tri(P(profile[0], -w / 2), P(profile[i], -w / 2), P(profile[i + 1], -w / 2));
+            mm.Tri(P(profile[0], w / 2), P(profile[i], w / 2), P(profile[i + 1], w / 2));
+        }
+        for (var i = 0; i < profile.Length; i++)
+        {
+            var a = profile[i]; var b = profile[(i + 1) % profile.Length];
+            mm.Quad(P(a, -w / 2), P(b, -w / 2), P(b, w / 2), P(a, w / 2));
+        }
+        return mm.Build();
+    }
+
+    static Mesh Cone(float r, float h, int segs, bool square)
+    {
+        var mm = new MeshMaker { Center = new Vector3(0, h / 4, 0) };
+        var n = square ? 4 : segs;
+        var apex = new Vector3(0, h, 0);
+        for (var i = 0; i < n; i++)
+        {
+            var a0 = (i + (square ? 0.5f : 0)) * Mathf.PI * 2 / n;
+            var a1 = (i + 1 + (square ? 0.5f : 0)) * Mathf.PI * 2 / n;
+            var p0 = new Vector3(Mathf.Cos(a0) * r, 0, Mathf.Sin(a0) * r);
+            var p1 = new Vector3(Mathf.Cos(a1) * r, 0, Mathf.Sin(a1) * r);
+            mm.Tri(p0, apex, p1);
+            mm.Tri(p0, Vector3.zero, p1);
+        }
+        return mm.Build();
+    }
+
+    /// <summary>Прямая призма с n гранями (шестигранная колонна и т. п.).</summary>
+    static Mesh Column(float r, float h, int n)
+    {
+        var mm = new MeshMaker { Center = new Vector3(0, h / 2, 0) };
+        for (var i = 0; i < n; i++)
+        {
+            var a0 = i * Mathf.PI * 2 / n; var a1 = (i + 1) * Mathf.PI * 2 / n;
+            var p0 = new Vector3(Mathf.Cos(a0) * r, 0, Mathf.Sin(a0) * r); var p1 = new Vector3(Mathf.Cos(a1) * r, 0, Mathf.Sin(a1) * r);
+            mm.Quad(p0, p1, p1 + Vector3.up * h, p0 + Vector3.up * h);
+            mm.Tri(Vector3.zero, p0, p1);
+            mm.Tri(Vector3.up * h, p0 + Vector3.up * h, p1 + Vector3.up * h);
+        }
+        return mm.Build();
+    }
+
+    static Mesh Dome(float r, int segs)
+    {
+        var mm = new MeshMaker { Center = new Vector3(0, r * 0.3f, 0) };
+        const int rings = 6;
+        for (var j = 0; j < rings; j++)
+        {
+            var t0 = j * Mathf.PI / 2 / rings; var t1 = (j + 1) * Mathf.PI / 2 / rings;
+            for (var i = 0; i < segs; i++)
+            {
+                var a0 = i * Mathf.PI * 2 / segs; var a1 = (i + 1) * Mathf.PI * 2 / segs;
+                Func<float, float, Vector3> S = (t, a) => new Vector3(Mathf.Cos(t) * Mathf.Cos(a) * r, Mathf.Sin(t) * r, Mathf.Cos(t) * Mathf.Sin(a) * r);
+                if (j == rings - 1) mm.Tri(S(t0, a0), S(t0, a1), new Vector3(0, r, 0));
+                else mm.Quad(S(t0, a0), S(t0, a1), S(t1, a1), S(t1, a0));
+                if (j == 0) mm.Tri(S(0, a0), S(0, a1), Vector3.zero);
+            }
+        }
+        return mm.Build();
+    }
+
+    static Mesh Torus(float R, float r, int segs, int sides)
+    {
+        var v = new List<Vector3>();
+        var t = new List<int>();
+        for (var i = 0; i < segs; i++)
+            for (var j = 0; j < sides; j++)
+            {
+                Func<int, int, Vector3> P = (a, b) =>
+                {
+                    var u = a * Mathf.PI * 2 / segs; var w = b * Mathf.PI * 2 / sides;
+                    return new Vector3((R + r * Mathf.Cos(w)) * Mathf.Cos(u), r * Mathf.Sin(w), (R + r * Mathf.Cos(w)) * Mathf.Sin(u));
+                };
+                var p00 = P(i, j); var p10 = P(i + 1, j); var p11 = P(i + 1, j + 1); var p01 = P(i, j + 1);
+                var c = new Vector3(Mathf.Cos((i + 0.5f) * Mathf.PI * 2 / segs) * R, 0, Mathf.Sin((i + 0.5f) * Mathf.PI * 2 / segs) * R);
+                foreach (var tri in new[] { new[] { p00, p10, p11 }, new[] { p00, p11, p01 } })
+                {
+                    var a = tri[0]; var b = tri[1]; var d = tri[2];
+                    if (Vector3.Dot(Vector3.Cross(b - a, d - a), (a + b + d) / 3f - c) < 0) { var x = b; b = d; d = x; }
+                    t.Add(v.Count); v.Add(a); t.Add(v.Count); v.Add(b); t.Add(v.Count); v.Add(d);
+                }
+            }
+        var m = new Mesh { name = "ModScript Studio torus" };
+        m.vertices = v.ToArray();
+        m.triangles = t.ToArray();
+        m.RecalculateNormals();
+        m.RecalculateBounds();
+        return m;
+    }
+
+    /// <summary>Камень: многогранник со смещёнными вершинами (форма зависит от seed, а значит одинакова при каждой загрузке).</summary>
+    static Mesh RockMesh(float s, int seed)
+    {
+        var mm = new MeshMaker { Center = new Vector3(0, s * 0.35f, 0) };
+        const int lat = 5, lon = 8;
+        var rnd = new System.Random(seed * 7919 + 13);
+        var pts = new Vector3[lat + 1, lon];
+        for (var j = 0; j <= lat; j++)
+            for (var i = 0; i < lon; i++)
+            {
+                var t = -Mathf.PI / 2 + j * Mathf.PI / lat;
+                var a = i * Mathf.PI * 2 / lon;
+                var k = 0.75f + (float)rnd.NextDouble() * 0.45f;
+                var y = (Mathf.Sin(t) * 0.5f + 0.5f) * 0.7f * s;
+                pts[j, i] = new Vector3(Mathf.Cos(t) * Mathf.Cos(a) * s * 0.5f * k, y, Mathf.Cos(t) * Mathf.Sin(a) * s * 0.5f * k);
+            }
+        for (var j = 0; j < lat; j++)
+            for (var i = 0; i < lon; i++)
+                mm.Quad(pts[j, i], pts[j, (i + 1) % lon], pts[j + 1, (i + 1) % lon], pts[j + 1, i]);
+        return mm.Build();
+    }
+
+    void Glow(GameObject part, Color c)
+    {
+        foreach (var r in part.GetComponentsInChildren<Renderer>())
+            foreach (var m in r.materials)
+                if (m.HasProperty("_EmissionColor")) { m.EnableKeyword("_EMISSION"); m.SetColor("_EmissionColor", c * 2.5f); }
+    }
+
+    static Light AddLight(Transform root, Vector3 pos, Color c, float range, float intensity, LightType type)
+    {
+        var go = new GameObject("Light");
+        go.transform.SetParent(root, false);
+        go.transform.localPosition = pos;
+        var l = go.AddComponent<Light>();
+        l.type = type;
+        l.color = c;
+        l.range = range;
+        l.intensity = intensity;
+        if (type == LightType.Spot) { l.spotAngle = 55; go.transform.localRotation = Quaternion.Euler(90, 0, 0); }
+        return l;
+    }
+
+    static Color Tone(string name)
+    {
+        switch (name)
+        {
+            case "warm": return new Color(1f, 0.78f, 0.5f);
+            case "cold": return new Color(0.65f, 0.8f, 1f);
+            case "red": return new Color(1f, 0.25f, 0.2f);
+            case "green": return new Color(0.3f, 1f, 0.4f);
+            case "blue": return new Color(0.3f, 0.5f, 1f);
+            case "purple": return new Color(0.7f, 0.35f, 1f);
+            case "pink": return new Color(1f, 0.4f, 0.75f);
+            case "yellow": return new Color(1f, 0.85f, 0.2f);
+            default: return Color.white;
+        }
+    }
+
+    static ModScriptBehaviour Beh(GameObject go, string code)
+    {
+        var b = go.GetComponent<ModScriptBehaviour>();
+        if (b == null) b = go.AddComponent<ModScriptBehaviour>();
+        b.Parse(code);
+        b.Rebase();
+        return b;
+    }
+
+    /// <summary>Собрать деталь по её строке. Основание детали — на нуле (стоит на поверхности).</summary>
+    GameObject Kit(string id)
+    {
+        var a = id.Split(':');
+        Func<int, float> P = i => a.Length > i ? float.Parse(a[i], Inv) : 1f;
+        var root = new GameObject(a[0]).transform;
+        var up = Vector3.up;
+        switch (a[0])
+        {
+            case "wall": { var w = P(1); var h = P(2); Box(root, up * h / 2, new Vector3(w, h, 0.2f), Concrete); break; }
+            case "floor": { var s = P(1); Box(root, up * 0.05f, new Vector3(s, 0.1f, s), Stone); break; }
+            case "platform": { var s = P(1); var h = P(2); Box(root, up * h / 2, new Vector3(s, h, s), Concrete); break; }
+            case "beam": { var l = P(1); var t = P(2); Box(root, up * t / 2, new Vector3(l, t, t), Wood); break; }
+            case "pillar": { var h = P(1); var r = P(2); Cyl(root, Vector3.zero, r * 1.3f, 0.2f, Stone); Cyl(root, up * 0.2f, r, h - 0.4f, Paper); Cyl(root, up * (h - 0.2f), r * 1.3f, 0.2f, Stone); break; }
+            case "ramp": { var l = P(1); var h = P(2); MeshPart(root, Extrude(new[] { new Vector2(-l / 2, 0), new Vector2(l / 2, 0), new Vector2(l / 2, h) }, 2f), Vector3.zero, Concrete, Quaternion.identity); break; }
+            case "stairs":
+                {
+                    var n = (int)P(1); var w = P(2); const float sh = 0.2f, sd = 0.3f;
+                    for (var i = 0; i < n; i++) Box(root, new Vector3(0, sh * (i + 0.5f), sd * i - n * sd / 2 + sd / 2), new Vector3(w, sh * (i + 1), sd), Stone).transform.localPosition = new Vector3(0, sh * (i + 1) / 2, sd * i - n * sd / 2 + sd / 2);
+                    break;
+                }
+            case "spiral":
+                {
+                    var n = (int)P(1);
+                    Cyl(root, Vector3.zero, 0.15f, n * 0.2f + 0.3f, Metal);
+                    for (var i = 0; i < n; i++)
+                    {
+                        var ang = i * 30f;
+                        var dir = Quaternion.Euler(0, ang, 0);
+                        Box(root, up * (i * 0.2f + 0.1f) + dir * Vector3.forward * 0.75f, new Vector3(0.5f, 0.08f, 1.3f), Wood, dir);
+                    }
+                    break;
+                }
+            case "arch":
+                {
+                    var w = P(1); var h = P(2); var r = w / 2; const float t = 0.4f;
+                    var ph = h - r;
+                    Box(root, new Vector3(-r - t / 2, ph / 2, 0), new Vector3(t, ph, t * 1.5f), Stone);
+                    Box(root, new Vector3(r + t / 2, ph / 2, 0), new Vector3(t, ph, t * 1.5f), Stone);
+                    const int segs = 9;
+                    for (var i = 0; i < segs; i++)
+                    {
+                        var ang = (i + 0.5f) * Mathf.PI / segs;
+                        var pos = new Vector3(Mathf.Cos(ang) * (r + t / 2), ph + Mathf.Sin(ang) * (r + t / 2), 0);
+                        Box(root, pos, new Vector3(t, (r + t) * Mathf.PI / segs * 1.05f, t * 1.5f), Stone, Quaternion.Euler(0, 0, ang * Mathf.Rad2Deg));
+                    }
+                    break;
+                }
+            case "door": { var w = P(1); const float h = 2.2f, t = 0.15f; Box(root, new Vector3(-w / 2, h / 2, 0), new Vector3(t, h, t), Wood); Box(root, new Vector3(w / 2, h / 2, 0), new Vector3(t, h, t), Wood); Box(root, new Vector3(0, h, 0), new Vector3(w + t, t, t), Wood); break; }
+            case "window":
+                {
+                    var w = P(1); const float t = 0.1f; var h = w; var y0 = 1f;
+                    Box(root, new Vector3(0, y0, 0), new Vector3(w + t, t, t), Paper); Box(root, new Vector3(0, y0 + h, 0), new Vector3(w + t, t, t), Paper);
+                    Box(root, new Vector3(-w / 2, y0 + h / 2, 0), new Vector3(t, h, t), Paper); Box(root, new Vector3(w / 2, y0 + h / 2, 0), new Vector3(t, h, t), Paper);
+                    Box(root, new Vector3(0, y0 + h / 2, 0), new Vector3(w, h, 0.02f), Glass);
+                    break;
+                }
+            case "fence":
+            case "railing":
+                {
+                    var l = P(1); var rail = a[0] == "railing"; var h = rail ? 1f : 1.2f;
+                    var posts = Mathf.Max(2, Mathf.RoundToInt(l / (rail ? 1f : 0.5f)) + 1);
+                    for (var i = 0; i < posts; i++) Box(root, new Vector3(-l / 2 + l * i / (posts - 1), h / 2, 0), new Vector3(rail ? 0.06f : 0.1f, h, rail ? 0.06f : 0.04f), rail ? Metal : Wood);
+                    Box(root, new Vector3(0, h * 0.85f, 0), new Vector3(l, 0.08f, 0.08f), rail ? Metal : Wood);
+                    if (!rail) Box(root, new Vector3(0, h * 0.35f, 0), new Vector3(l, 0.08f, 0.08f), Wood);
+                    break;
+                }
+            case "house":
+                {
+                    const float w = 5, d = 4, h = 2.8f;
+                    Box(root, new Vector3(0, h / 2, -d / 2), new Vector3(w, h, 0.2f), Paper); Box(root, new Vector3(0, h / 2, d / 2), new Vector3(w, h, 0.2f), Paper);
+                    Box(root, new Vector3(-w / 2, h / 2, 0), new Vector3(0.2f, h, d), Paper); Box(root, new Vector3(w / 2, h / 2, 0), new Vector3(0.2f, h, d), Paper);
+                    Box(root, up * 0.05f, new Vector3(w, 0.1f, d), Wood);
+                    MeshPart(root, Extrude(new[] { new Vector2(-d / 2 - 0.3f, 0), new Vector2(d / 2 + 0.3f, 0), new Vector2(0, 1.6f) }, w + 0.6f), up * h, Roof, Quaternion.identity);
+                    Box(root, new Vector3(0, 1.05f, -d / 2 - 0.02f), new Vector3(0.9f, 2.1f, 0.06f), DarkWood);
+                    Box(root, new Vector3(1.5f, 1.5f, -d / 2 - 0.02f), new Vector3(0.9f, 0.8f, 0.06f), Glass);
+                    break;
+                }
+            case "hut":
+                {
+                    Cyl(root, Vector3.zero, 1.6f, 2f, Wood);
+                    MeshPart(root, Cone(2f, 1.8f, 16, false), up * 2f, Roof, Quaternion.identity);
+                    Box(root, new Vector3(0, 0.9f, -1.6f), new Vector3(0.8f, 1.8f, 0.1f), DarkWood);
+                    break;
+                }
+            case "tower":
+                {
+                    var h = P(1);
+                    Cyl(root, Vector3.zero, 1.5f, h, Stone);
+                    for (var i = 0; i < 8; i++) { var q = Quaternion.Euler(0, i * 45, 0); Box(root, up * (h + 0.3f) + q * Vector3.forward * 1.35f, new Vector3(0.5f, 0.6f, 0.3f), Stone, q); }
+                    MeshPart(root, Cone(1.7f, 2.2f, 16, false), up * (h + 0.6f), Roof, Quaternion.identity);
+                    break;
+                }
+            case "bridge":
+                {
+                    var l = P(1);
+                    Box(root, up * 0.6f, new Vector3(2.4f, 0.2f, l), Wood);
+                    foreach (var x in new[] { -1.15f, 1.15f }) { Box(root, new Vector3(x, 1.25f, 0), new Vector3(0.08f, 0.08f, l), Wood); for (var z = -l / 2; z <= l / 2 + 0.01f; z += 1.5f) Box(root, new Vector3(x, 0.95f, z), new Vector3(0.1f, 0.7f, 0.1f), Wood); }
+                    foreach (var z in new[] { -l / 2 + 0.3f, l / 2 - 0.3f }) foreach (var x in new[] { -1f, 1f }) Box(root, new Vector3(x, 0.25f, z), new Vector3(0.3f, 0.5f, 0.3f), DarkWood);
+                    break;
+                }
+            case "gate":
+                {
+                    Box(root, new Vector3(-2, 1.5f, 0), new Vector3(0.6f, 3, 0.6f), Stone); Box(root, new Vector3(2, 1.5f, 0), new Vector3(0.6f, 3, 0.6f), Stone);
+                    Box(root, new Vector3(0, 3.2f, 0), new Vector3(4.8f, 0.5f, 0.7f), Stone);
+                    for (var i = 0; i < 6; i++) Box(root, new Vector3(-1.5f + i * 0.6f, 1.4f, 0), new Vector3(0.08f, 2.8f, 0.08f), Metal);
+                    break;
+                }
+            case "castle":
+                {
+                    var l = P(1);
+                    Box(root, up * 1.5f, new Vector3(l, 3, 1), Stone);
+                    for (var x = -l / 2 + 0.35f; x <= l / 2 - 0.3f; x += 1f) Box(root, new Vector3(x, 3.3f, 0), new Vector3(0.6f, 0.6f, 1), Stone);
+                    break;
+                }
+            case "prim":
+                {
+                    var type = (PrimitiveType)Enum.Parse(typeof(PrimitiveType), a[1]); var s = P(2);
+                    var yScale = type == PrimitiveType.Cylinder || type == PrimitiveType.Capsule ? s / 2 : s;
+                    Prim(root, type, up * s / 2, new Vector3(s, yScale, s), Paper, Quaternion.identity);
+                    break;
+                }
+            case "cone": { var s = P(1); MeshPart(root, Cone(s / 2, s, 24, false), Vector3.zero, Paper, Quaternion.identity); break; }
+            case "pyramid": { var s = P(1); MeshPart(root, Cone(s * 0.7071f, s * 0.8f, 4, true), Vector3.zero, Paper, Quaternion.identity); break; }
+            case "prism": { var s = P(1); MeshPart(root, Extrude(new[] { new Vector2(-s / 2, 0), new Vector2(s / 2, 0), new Vector2(0, s * 0.87f) }, s), Vector3.zero, Paper, Quaternion.identity); break; }
+            case "wedge": { var s = P(1); MeshPart(root, Extrude(new[] { new Vector2(-s / 2, 0), new Vector2(s / 2, 0), new Vector2(s / 2, s) }, s), Vector3.zero, Paper, Quaternion.identity); break; }
+            case "torus": { var s = P(1); MeshPart(root, Torus(s * 0.35f, s * 0.15f, 24, 10), up * s * 0.15f, Paper, Quaternion.identity); break; }
+            case "ring": { var s = P(1); MeshPart(root, Torus(s * 0.45f, s * 0.05f, 32, 8), up * s * 0.5f, Gold, Quaternion.Euler(90, 0, 0)); break; }
+            case "tube": { var s = P(1); for (var i = 0; i < 12; i++) { var q = Quaternion.Euler(0, i * 30, 0); Box(root, up * s / 2 + q * Vector3.forward * s * 0.42f, new Vector3(s * 0.24f, s, s * 0.08f), Metal, q); } break; }
+            case "dome": { var s = P(1); MeshPart(root, Dome(s / 2, 20), Vector3.zero, Paper, Quaternion.identity); break; }
+case "hex": { var s = P(1); MeshPart(root, Column(s * 0.5f, s * 2, 6), Vector3.zero, Stone, Quaternion.identity); break; }
+            case "tree": { var s = P(1); Cyl(root, Vector3.zero, 0.18f * s, 1.8f * s, Trunk); Ball(root, up * 2.4f * s, 1.1f * s, Leaf); Ball(root, up * 2.0f * s + Vector3.right * 0.6f * s, 0.7f * s, Leaf); break; }
+            case "pine": { var s = P(1); Cyl(root, Vector3.zero, 0.14f * s, 1.2f * s, Trunk); for (var i = 0; i < 3; i++) MeshPart(root, Cone((1.2f - i * 0.3f) * s, 1.4f * s, 10, false), up * (0.9f + i * 0.8f) * s, Pine, Quaternion.identity); break; }
+            case "bush": { var s = P(1); Ball(root, up * 0.5f * s, 0.6f * s, Leaf); Ball(root, new Vector3(0.45f, 0.4f, 0.2f) * s, 0.45f * s, Leaf); Ball(root, new Vector3(-0.4f, 0.35f, -0.2f) * s, 0.4f * s, Leaf); break; }
+            case "rock": { var s = P(1); MeshPart(root, RockMesh(s, (int)P(2)), Vector3.zero, Rock, Quaternion.identity); break; }
+            case "boulders": { MeshPart(root, RockMesh(2f, 3), Vector3.zero, Rock, Quaternion.identity); MeshPart(root, RockMesh(1.2f, 4), new Vector3(1.4f, 0, 0.5f), Rock, Quaternion.identity); MeshPart(root, RockMesh(0.8f, 5), new Vector3(-1.1f, 0, 0.8f), Rock, Quaternion.identity); break; }
+            case "log": { var l = P(1); Prim(root, PrimitiveType.Cylinder, up * 0.25f, new Vector3(0.5f, l / 2, 0.5f), Trunk, Quaternion.Euler(0, 0, 90)); break; }
+            case "stump": { Cyl(root, Vector3.zero, 0.35f, 0.5f, Trunk); break; }
+            case "flowers":
+                {
+                    var rnd = new System.Random(7);
+                    Box(root, up * 0.05f, new Vector3(2, 0.1f, 1), Grass);
+                    var colors = new[] { Tone("red"), Tone("yellow"), Tone("pink"), Tone("purple"), Color.white };
+                    for (var i = 0; i < 14; i++)
+                    {
+                        var p = new Vector3((float)rnd.NextDouble() * 1.8f - 0.9f, 0.1f, (float)rnd.NextDouble() * 0.8f - 0.4f);
+                        Cyl(root, p, 0.015f, 0.3f, Leaf);
+                        Ball(root, p + up * 0.33f, 0.07f, colors[i % colors.Length]);
+                    }
+                    break;
+                }
+            case "cactus": { Cyl(root, Vector3.zero, 0.25f, 2f, Pine); Cyl(root, new Vector3(0.45f, 0.9f, 0), 0.15f, 0.6f, Pine); Box(root, new Vector3(0.3f, 0.9f, 0), new Vector3(0.35f, 0.2f, 0.2f), Pine); Ball(root, up * 2f, 0.25f, Pine); break; }
+            case "mushroom": { Cyl(root, Vector3.zero, 0.12f, 0.5f, Paper); MeshPart(root, Dome(0.4f, 14), up * 0.48f, Tone("red"), Quaternion.identity); break; }
+            case "table": { var s = P(1); Box(root, up * 0.75f, new Vector3(s, 0.06f, s * 0.6f), Wood); foreach (var x in new[] { -1, 1 }) foreach (var z in new[] { -1, 1 }) Box(root, new Vector3(x * (s / 2 - 0.06f), 0.36f, z * (s * 0.3f - 0.06f)), new Vector3(0.06f, 0.72f, 0.06f), DarkWood); break; }
+            case "chair": { Box(root, up * 0.45f, new Vector3(0.45f, 0.05f, 0.45f), Wood); Box(root, new Vector3(0, 0.75f, 0.2f), new Vector3(0.45f, 0.6f, 0.05f), Wood); foreach (var x in new[] { -1, 1 }) foreach (var z in new[] { -1, 1 }) Box(root, new Vector3(x * 0.19f, 0.22f, z * 0.19f), new Vector3(0.05f, 0.44f, 0.05f), DarkWood); break; }
+            case "bench": { Box(root, up * 0.45f, new Vector3(1.8f, 0.06f, 0.45f), Wood); Box(root, new Vector3(0, 0.8f, 0.2f), new Vector3(1.8f, 0.35f, 0.05f), Wood); foreach (var x in new[] { -0.8f, 0.8f }) Box(root, new Vector3(x, 0.22f, 0), new Vector3(0.08f, 0.44f, 0.4f), Metal); break; }
+            case "stool": { Cyl(root, up * 0.6f, 0.2f, 0.06f, Wood); Cyl(root, Vector3.zero, 0.04f, 0.6f, Metal); Cyl(root, Vector3.zero, 0.18f, 0.03f, Metal); break; }
+            case "shelf": { for (var i = 0; i < 4; i++) Box(root, up * (0.1f + i * 0.5f), new Vector3(1.2f, 0.04f, 0.35f), Wood); foreach (var x in new[] { -0.6f, 0.6f }) Box(root, new Vector3(x, 0.85f, 0), new Vector3(0.04f, 1.7f, 0.35f), DarkWood); break; }
+            case "bed": { Box(root, up * 0.25f, new Vector3(1.4f, 0.3f, 2.1f), Wood); Box(root, up * 0.45f, new Vector3(1.3f, 0.15f, 2f), Paper); Box(root, new Vector3(0, 0.6f, 0.8f), new Vector3(0.9f, 0.12f, 0.35f), Color.white); Box(root, new Vector3(0, 0.6f, 1.02f), new Vector3(1.4f, 0.9f, 0.06f), DarkWood); break; }
+            case "sofa": { var c = Tone("blue") * 0.7f; c.a = 1; Box(root, up * 0.25f, new Vector3(2f, 0.5f, 0.85f), c); Box(root, new Vector3(0, 0.65f, 0.35f), new Vector3(2f, 0.7f, 0.2f), c); foreach (var x in new[] { -0.95f, 0.95f }) Box(root, new Vector3(x, 0.45f, 0), new Vector3(0.15f, 0.5f, 0.85f), c); break; }
+            case "crate": { var s = P(1); Box(root, up * s / 2, Vector3.one * s, Wood); Box(root, up * s / 2, new Vector3(s * 1.02f, s * 0.15f, s * 1.02f), DarkWood); break; }
+            case "barrel": { Cyl(root, Vector3.zero, 0.35f, 1f, Wood); Cyl(root, up * 0.2f, 0.36f, 0.06f, Metal); Cyl(root, up * 0.75f, 0.36f, 0.06f, Metal); break; }
+            case "bin": { Cyl(root, Vector3.zero, 0.3f, 0.9f, Tone("green") * 0.55f + Color.black * 0.45f); Cyl(root, up * 0.9f, 0.32f, 0.05f, Metal); break; }
+            case "sign": { Box(root, up * 0.8f, new Vector3(0.08f, 1.6f, 0.08f), Wood); Box(root, up * 1.6f, new Vector3(1.2f, 0.6f, 0.06f), Paper); break; }
+            case "chest": { Box(root, up * 0.25f, new Vector3(0.9f, 0.5f, 0.55f), Wood); MeshPart(root, Extrude(new[] { new Vector2(-0.275f, 0), new Vector2(0.275f, 0), new Vector2(0.2f, 0.15f), new Vector2(-0.2f, 0.15f) }, 0.9f), up * 0.5f, DarkWood, Quaternion.identity); Box(root, new Vector3(0, 0.45f, -0.28f), new Vector3(0.15f, 0.15f, 0.03f), Gold); break; }
+            case "fountain": { Cyl(root, Vector3.zero, 1.6f, 0.5f, Stone); Cyl(root, up * 0.5f, 1.3f, 0.05f, Glass); Cyl(root, up * 0.5f, 0.25f, 1.2f, Stone); Cyl(root, up * 1.7f, 0.6f, 0.15f, Stone); break; }
+            case "well": { Cyl(root, Vector3.zero, 0.9f, 0.8f, Stone); foreach (var x in new[] { -0.8f, 0.8f }) Box(root, new Vector3(x, 1.3f, 0), new Vector3(0.12f, 1.8f, 0.12f), Wood); MeshPart(root, Extrude(new[] { new Vector2(-0.9f, 0), new Vector2(0.9f, 0), new Vector2(0, 0.7f) }, 2f), up * 2.1f, Roof, Quaternion.Euler(0, 90, 0)); break; }
+            case "ladder": { var h = P(1); foreach (var x in new[] { -0.25f, 0.25f }) Box(root, new Vector3(x, h / 2, 0), new Vector3(0.06f, h, 0.06f), Wood); for (var y = 0.3f; y < h; y += 0.35f) Box(root, new Vector3(0, y, 0), new Vector3(0.5f, 0.05f, 0.05f), Wood); break; }
+            case "mailbox": { Box(root, up * 0.6f, new Vector3(0.08f, 1.2f, 0.08f), Wood); Box(root, up * 1.3f, new Vector3(0.3f, 0.3f, 0.5f), Tone("blue") * 0.8f); break; }
+            case "lamppost": { Cyl(root, Vector3.zero, 0.08f, 3f, Ink0); Ball(root, up * 3.1f, 0.22f, Paper); Glow(root.GetChild(root.childCount - 1).gameObject, Tone("warm")); AddLight(root, up * 3.1f, Tone("warm"), 10, 1.6f, LightType.Point); break; }
+            case "streetlamp": { Cyl(root, Vector3.zero, 0.1f, 4.5f, Metal); Box(root, new Vector3(0, 4.5f, 0.6f), new Vector3(0.12f, 0.12f, 1.3f), Metal); Box(root, new Vector3(0, 4.4f, 1.2f), new Vector3(0.4f, 0.1f, 0.5f), Paper); Glow(root.GetChild(root.childCount - 1).gameObject, Color.white); AddLight(root, new Vector3(0, 4.3f, 1.2f), new Color(1, 0.95f, 0.85f), 14, 2f, LightType.Spot); break; }
+            case "campfire": { for (var i = 0; i < 5; i++) Prim(root, PrimitiveType.Cylinder, up * 0.1f, new Vector3(0.12f, 0.45f, 0.12f), Trunk, Quaternion.Euler(70, i * 72, 0)); MeshPart(root, Cone(0.3f, 0.7f, 8, false), Vector3.zero, Tone("yellow"), Quaternion.identity); Glow(root.GetChild(root.childCount - 1).gameObject, new Color(1, 0.5f, 0.1f)); AddLight(root, up * 0.6f, new Color(1, 0.6f, 0.25f), 8, 2f, LightType.Point); Beh(root.gameObject, "flicker"); break; }
+            case "car":
+            case "truck":
+            case "bus":
+            case "kart":
+                {
+                    var paint = a[0] == "bus" ? Tone("yellow") : a[0] == "kart" ? Tone("red") : Tone(a.Length > 1 ? a[1] : "red") * 0.85f; paint.a = 1;
+                    var len = a[0] == "bus" ? 8f : a[0] == "truck" ? 6f : a[0] == "kart" ? 1.6f : 4f;
+                    var wid = a[0] == "kart" ? 1f : 1.8f;
+                    var wr = a[0] == "kart" ? 0.2f : a[0] == "bus" ? 0.5f : 0.38f;
+                    Box(root, up * (wr + 0.3f), new Vector3(wid, 0.6f, len), paint);
+                    if (a[0] == "car") Box(root, new Vector3(0, wr + 0.85f, -0.2f), new Vector3(wid * 0.9f, 0.55f, len * 0.5f), Glass);
+                    if (a[0] == "truck") { Box(root, new Vector3(0, wr + 1.2f, len / 2 - 1f), new Vector3(wid, 1.2f, 1.8f), paint); Box(root, new Vector3(0, wr + 1.4f, -0.9f), new Vector3(wid, 1.6f, 3.8f), Paper); }
+                    if (a[0] == "bus") { Box(root, up * (wr + 1.5f), new Vector3(wid, 1.8f, len), paint); Box(root, new Vector3(wid / 2 + 0.01f, wr + 1.7f, 0), new Vector3(0.02f, 0.7f, len * 0.85f), Glass); }
+                    if (a[0] == "kart") { Box(root, new Vector3(0, wr + 0.65f, -0.2f), new Vector3(0.4f, 0.5f, 0.1f), Ink0); }
+                    foreach (var x in new[] { -wid / 2, wid / 2 }) foreach (var z in new[] { -len / 2 + wr + 0.3f, len / 2 - wr - 0.3f })
+                            Prim(root, PrimitiveType.Cylinder, new Vector3(x, wr, z), new Vector3(wr * 2, 0.12f, wr * 2), Ink0, Quaternion.Euler(0, 0, 90));
+                    break;
+                }
+            case "boat": { MeshPart(root, Extrude(new[] { new Vector2(-2f, 0.6f), new Vector2(-1.6f, 0), new Vector2(1.6f, 0), new Vector2(2.2f, 0.7f) }, 1.6f), Vector3.zero, Paper, Quaternion.Euler(0, 0, 0)); Box(root, new Vector3(0, 0.75f, -0.5f), new Vector3(1.2f, 0.6f, 1.4f), Wood); break; }
+            case "plane": { Prim(root, PrimitiveType.Capsule, up * 1.2f, new Vector3(1.2f, 3f, 1.2f), Paper, Quaternion.Euler(90, 0, 0)); Box(root, up * 1.2f, new Vector3(9, 0.15f, 1.4f), Paper); Box(root, new Vector3(0, 1.9f, -2.6f), new Vector3(0.12f, 1.4f, 0.9f), Tone("red")); Box(root, new Vector3(0, 1.3f, -2.6f), new Vector3(3, 0.1f, 0.7f), Paper); break; }
+            case "rocket": { Cyl(root, up * 0.6f, 0.5f, 4f, Paper); MeshPart(root, Cone(0.5f, 1.4f, 16, false), up * 4.6f, Tone("red"), Quaternion.identity); for (var i = 0; i < 3; i++) Box(root, Quaternion.Euler(0, i * 120, 0) * Vector3.forward * 0.6f + up * 1f, new Vector3(0.08f, 1.2f, 0.7f), Tone("red"), Quaternion.Euler(0, i * 120, 0)); break; }
+            case "light": { var c = Tone(a[1]); var b = Ball(root, up * 1f, 0.12f, c); Glow(b, c); AddLight(root, up * 1f, c, 12, 2.2f, LightType.Point); break; }
+            case "spot": { var c = Tone(a[1]); MeshPart(root, Cone(0.18f, 0.3f, 12, false), up * 2.7f, Ink0, Quaternion.Euler(180, 0, 0)); AddLight(root, up * 2.6f, c, 16, 3f, LightType.Spot); break; }
+            case "bulb": { var c = Tone(a[1]); Box(root, up * 2.2f, new Vector3(0.02f, 0.6f, 0.02f), Ink0); var b = Ball(root, up * 1.85f, 0.1f, Color.white); Glow(b, c); AddLight(root, up * 1.8f, c, 8, 1.5f, LightType.Point); break; }
+            case "torch": { Cyl(root, Vector3.zero, 0.04f, 1.2f, Wood); var f = MeshPart(root, Cone(0.1f, 0.3f, 8, false), up * 1.2f, Tone("yellow"), Quaternion.identity); Glow(f, new Color(1, 0.5f, 0.1f)); AddLight(root, up * 1.4f, new Color(1, 0.6f, 0.3f), 7, 1.8f, LightType.Point); Beh(root.gameObject, "flicker"); break; }
+            case "neon": { var c = Tone(a[1]); var bar = Box(root, up * 1.5f, new Vector3(1.6f, 0.08f, 0.08f), c); Glow(bar, c); AddLight(root, up * 1.5f, c, 6, 1.6f, LightType.Point); break; }
+            case "coin": { var c = MeshPart(root, Torus(0.25f, 0.08f, 20, 8), up * 0.8f, Gold, Quaternion.Euler(90, 0, 0)); Glow(c, Gold * 0.4f); Beh(root.gameObject, "spin=120,1;bob=0.15,1"); break; }
+            case "gem": { var g = MeshPart(root, Cone(0.25f, 0.35f, 6, false), up * 0.9f, Tone("blue"), Quaternion.identity); MeshPart(root, Cone(0.25f, 0.35f, 6, false), up * 0.9f, Tone("blue"), Quaternion.Euler(180, 0, 0)); Glow(g, Tone("blue") * 0.5f); Beh(root.gameObject, "spin=90,1;bob=0.12,1.2"); break; }
+            case "checkpoint": { var r = MeshPart(root, Torus(1.5f, 0.12f, 32, 8), up * 1.7f, Tone("yellow"), Quaternion.Euler(90, 0, 0)); Glow(r, Tone("yellow") * 0.6f); break; }
+            case "jumppad": { Cyl(root, Vector3.zero, 0.8f, 0.12f, Ink0); var p = Cyl(root, up * 0.12f, 0.65f, 0.04f, Tone("green")); Glow(p, Tone("green")); break; }
+            case "spawn": { Cyl(root, Vector3.zero, 0.7f, 0.05f, Tone("blue")); MeshPart(root, Cone(0.3f, 0.6f, 4, true), up * 0.1f + Vector3.forward * 0.4f, Tone("blue"), Quaternion.Euler(90, 0, 0)); break; }
+            case "flag": { Cyl(root, Vector3.zero, 0.05f, 3f, Metal); for (var i = 0; i < 4; i++) for (var j = 0; j < 3; j++) Box(root, new Vector3(0, 2.7f - j * 0.2f, 0.15f + i * 0.2f), new Vector3(0.02f, 0.2f, 0.2f), (i + j) % 2 == 0 ? Ink0 : Color.white); break; }
+            case "spikes": { for (var i = 0; i < 5; i++) MeshPart(root, Cone(0.15f, 0.5f, 6, false), new Vector3(-0.8f + i * 0.4f, 0, 0), Metal, Quaternion.identity); Box(root, up * 0.02f, new Vector3(2, 0.04f, 0.4f), Ink0); break; }
+            case "target": { for (var i = 0; i < 4; i++) Prim(root, PrimitiveType.Cylinder, new Vector3(0, 1.2f, -i * 0.01f), new Vector3(1.6f - i * 0.38f, 0.02f, 1.6f - i * 0.38f), i % 2 == 0 ? Tone("red") : Color.white, Quaternion.Euler(90, 0, 0)); Box(root, up * 0.4f, new Vector3(0.08f, 0.8f, 0.08f), Wood); break; }
+            case "button": { Cyl(root, Vector3.zero, 0.5f, 0.08f, Metal); var b = Cyl(root, up * 0.08f, 0.35f, 0.08f, Tone("red")); Glow(b, Tone("red") * 0.5f); break; }
+            case "portal": { var r = MeshPart(root, Torus(1.2f, 0.15f, 32, 8), up * 1.4f, Tone("purple"), Quaternion.Euler(90, 0, 0)); Glow(r, Tone("purple")); AddLight(root, up * 1.4f, Tone("purple"), 6, 2f, LightType.Point); Beh(root.gameObject, "pulse=0.05"); break; }
+            case "laser": { Box(root, up * 0.15f, new Vector3(0.3f, 0.3f, 0.3f), Ink0); var beam = Box(root, up * 0.15f + Vector3.forward * 2.65f, new Vector3(0.04f, 0.04f, 5f), Tone("red")); Glow(beam, Tone("red")); foreach (var c in beam.GetComponents<Collider>()) c.isTrigger = true; break; }
+            case "arrow": { Box(root, up * 0.6f, new Vector3(0.08f, 1.2f, 0.08f), Wood); Box(root, new Vector3(0, 1.3f, 0.1f), new Vector3(0.06f, 0.3f, 0.8f), Tone("yellow")); MeshPart(root, Extrude(new[] { new Vector2(0.4f, -0.3f), new Vector2(0.75f, 0), new Vector2(0.4f, 0.3f) }, 0.06f), up * 1.3f + Vector3.forward * 0.1f, Tone("yellow"), Quaternion.identity); break; }
+            case "text":
+            case "textBig":
+            case "textGlow":
+                {
+                    var tm = root.gameObject.AddComponent<TextMesh>();
+                    tm.text = "ModScript";
+                    tm.font = KitFont();
+                    tm.fontSize = 64;
+                    tm.characterSize = a[0] == "textBig" ? 0.12f : 0.04f;
+                    tm.anchor = TextAnchor.LowerCenter;
+                    tm.alignment = TextAlignment.Center;
+                    tm.color = a[0] == "textGlow" ? Tone("pink") : Color.white;
+                    var r = root.GetComponent<MeshRenderer>();
+                    if (tm.font != null) r.sharedMaterial = tm.font.material;
+                    if (a[0] == "textGlow") AddLight(root, up * 0.6f, Tone("pink"), 5, 1.2f, LightType.Point);
+                    var col = root.gameObject.AddComponent<BoxCollider>();
+                    col.size = new Vector3(a[0] == "textBig" ? 6f : 2f, a[0] == "textBig" ? 1.2f : 0.4f, 0.1f);
+                    col.center = up * col.size.y / 2;
+                    break;
+                }
+            case "fx": Effect(root, a[1]); break;
+            case "water": { var s = P(1); Box(root, up * 0.05f, new Vector3(s, 0.1f, s), new Color(0.16f, 0.45f, 0.62f)).GetComponent<Renderer>().sharedMaterial = SmoothMat(new Color(0.16f, 0.45f, 0.62f), 0.95f); break; }
+            case "hill": { var s = P(1); MeshPart(root, HillMesh(s, s * 0.22f, 24, 5), Vector3.zero, Grass, Quaternion.identity).GetComponent<MeshCollider>().convex = false; break; }
+            case "mountain": { var m = MeshPart(root, RockMesh(30f, 9), Vector3.zero, Rock, Quaternion.identity); m.transform.localScale = new Vector3(1, 1.6f, 1); MeshPart(root, Cone(5f, 4f, 10, false), up * 31f, Color.white, Quaternion.identity); break; }
+            case "road":
+            case "crossroad":
+                {
+                    var asphalt = new Color(0.2f, 0.21f, 0.23f);
+                    var paint = new Color(0.95f, 0.92f, 0.8f);
+                    if (a[0] == "road")
+                    {
+                        var l = P(1);
+                        Box(root, up * 0.03f, new Vector3(4f, 0.06f, l), asphalt);
+                        for (var z = -l / 2 + 0.5f; z < l / 2; z += 2f) Box(root, new Vector3(0, 0.065f, z + 0.5f), new Vector3(0.15f, 0.01f, 1f), paint);
+                        foreach (var x in new[] { -2.15f, 2.15f }) Box(root, new Vector3(x, 0.08f, 0), new Vector3(0.3f, 0.16f, l), Concrete);
+                    }
+                    else
+                    {
+                        Box(root, up * 0.03f, new Vector3(4f, 0.06f, 12f), asphalt);
+                        Box(root, up * 0.031f, new Vector3(12f, 0.06f, 4f), asphalt);
+                        for (var i = 0; i < 5; i++) { Box(root, new Vector3(-1.6f + i * 0.8f, 0.065f, 2.6f), new Vector3(0.4f, 0.01f, 1f), paint); Box(root, new Vector3(-1.6f + i * 0.8f, 0.065f, -2.6f), new Vector3(0.4f, 0.01f, 1f), paint); }
+                    }
+                    break;
+                }
+            default: Destroy(root.gameObject); return null;
+        }
+        return root.gameObject;
+    }
+}

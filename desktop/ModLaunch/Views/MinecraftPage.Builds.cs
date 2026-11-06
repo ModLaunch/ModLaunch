@@ -20,6 +20,8 @@ public sealed partial class MinecraftPage
         col.Children.Add(Ui.Row(10,
             Ui.Button(I18n.T("mine.build.new"), CreateDialog, "primary", Icons.Plus),
             Ui.Button(I18n.T("mine.import.mrpack"), () => ImportMrpack(), "", Icons.FilePlus),
+            // 24.0: сборка друга по коду — новая сборка с теми же модами.
+            Ui.Button(I18n.T("v24.share.enter"), () => ShareUi.Enter(Mc.State), "", Icons.Download),
             Ui.Button(I18n.T("mine.tab.catalog") + " · " + I18n.T("mine.kind.modpack.many"), () => { _type = "modpack"; _category = ""; Go("catalog"); }, "ghost", Icons.Bag)));
 
         var builds = Mc.Instances();
@@ -96,6 +98,7 @@ public sealed partial class MinecraftPage
         var more = Ui.Button("", () => { }, "icon ghost", Icons.More, I18n.T("tab.more"));
         more.Click += (_, _) => { var m = BuildMenu(i); m.Placement = PlacementMode.BottomEdgeAlignedRight; m.ShowAt(more); };
         var buttons = Ui.Row(8, play, pick);
+        if (i.Modded && mods > 0) buttons.Children.Add(Ui.Button("", () => ShareUi.Share(i), "icon ghost", Icons.Users, I18n.T("v24.share.go")));
         var foot = new DockPanel();
         DockPanel.SetDock(more, Dock.Right);
         foot.Children.Add(more);
@@ -121,6 +124,7 @@ public sealed partial class MinecraftPage
         Ctx.Item(I18n.T("mine.build.rename"), Icons.Edit, () => RenameDialog(i)),
         Ctx.Item(I18n.T("mc94.icon.change"), Icons.Image, () => IconDialog(i)),
         Ctx.Item(I18n.T("mine.build.duplicate"), Icons.Copy, () => DuplicateDialog(i)),
+        Ctx.Item(I18n.T("v24.share.go"), Icons.Users, () => ShareUi.Share(i)),
         Ctx.Item(I18n.T("mc94.export.title"), Icons.Upload, () => ExportDialog(i)),
         McModrinth.PackUpdate(i) is { } pv ? Ctx.Item(I18n.T("mc94.pack.go") + " · " + pv.Number, Icons.ArrowUp, () => UpdatePack(i, pv)) : null,
         Ctx.Folder(I18n.T("games.openFolder"), i.Dir),

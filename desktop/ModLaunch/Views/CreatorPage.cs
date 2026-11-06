@@ -55,11 +55,11 @@ public sealed partial class CreatorPage : Page
             "market" or "studio" or "mine" or "projects" or "available" => "home",
             "inject" or "lang" or "mxdev" or "x" or "ide" => "home",
             "create" => "form",
-            "modscript" or "docs" or "commands" or "console" or "functions" => "x",
+            "modscript" or "docs" or "commands" or "console" or "functions" or "guide" => "x",
             "injects" or "library" => "scripts",
             _ => tab,
         };
-        _ms = tab switch { "docs" or "commands" => "commands", "functions" => "functions", "console" => "console", _ => _ms };
+        _ms = tab switch { "docs" or "commands" => "commands", "functions" => "functions", "console" => "console", "guide" => "scripts", _ => _ms };
         if (tab == "published") { _tab = "home"; _minePart = "published"; }
         if (project is not null) { _tab = "mine"; Open(Projects.Get(project)); }
         _code.TextChanged += () =>
@@ -182,9 +182,9 @@ public sealed partial class CreatorPage : Page
             // 18.0: Creator Hub › Мои проекты › Создать / Доступные (› проект); остальные разделы — Creator Hub › раздел.
             Action projects = () => MainWindow.Current?.Navigate(() => new CreatorPage());
             var market = projects;
-            if (_tab is "home" or "mine" && _open is not null) return [("Creator Hub", market), ("ModScript X", projects), (_open.Name, null)];
-            if (_tab is "home" or "mine" or "scripts") return [("Creator Hub", market), ("ModScript X", projects), (I18n.T("v20.hub.projects"), null)];
-            if (_tab is "form" or "examples" or "x") return [("Creator Hub", market), ("ModScript X", projects), (TabTitle(_tab), null)];
+            if (_tab is "home" or "mine" && _open is not null) return [("Creator Hub", market), (I18n.T("v22.hub.mods"), projects), (_open.Name, null)];
+            if (_tab is "home" or "mine" or "scripts") return [("Creator Hub", market), (I18n.T("v22.hub.mods"), null)];
+            if (_tab is "form" or "examples" or "x") return [("Creator Hub", market), (HubTitle(), null)];
             return [("Creator Hub", market), (TabTitle(_tab), null)];
         }
     }
@@ -223,6 +223,7 @@ public sealed partial class CreatorPage : Page
             "models" => Shelf("models"),
             "hub" => HubView(),
             "form" => CreateView(),
+            "ingame" => DevGamesView(),
             _ => editing ? Editor() : Available(),
         };
         // Своё пространство Hub: «Мои проекты» и разделы слева, шапка с одной главной кнопкой, сетка чертежа.
@@ -236,18 +237,19 @@ public sealed partial class CreatorPage : Page
     /// <summary>Строка под названием раздела — там, где без неё непонятно, что делать.</summary>
     string? Lead() => _tab switch
     {
-        "form" => I18n.T("v18.create.lead"),
+        "form" => null,
         "scripts" => I18n.T("v18.lib.lead"),
-        "x" => I18n.T("v13.ms.lead", ("n", ModScriptCommands.All.Length), ("new", ModScriptCommands.NewCount)),
+        "x" => I18n.T("v22.guide.lead"),
         _ => null,
     };
 
     /// <summary>Название раздела в шапке Hub — так же, как пункт боковой панели.</summary>
     string HubTitle() => _tab switch
     {
-        "home" or "mine" or "scripts" => I18n.T("v20.hub.projects"),
-        "x" => I18n.T("v20.x.tools"),
-        "form" => I18n.T("v18.hub.create"),
+        "home" or "mine" or "scripts" => I18n.T("v22.hub.mods"),
+        "x" => I18n.T("v22.hub.guide"),
+        "form" => I18n.T("v22.hub.new"),
+        "ingame" => I18n.T("v23.dg.title"),
         _ => TabTitle(_tab),
     };
 
@@ -255,7 +257,7 @@ public sealed partial class CreatorPage : Page
     bool Rail(string rail)
     {
         var tab = HubNav.CreatorTab(rail);
-        if (tab is not ("home" or "form" or "scripts" or "team" or "x")) return false;
+        if (tab is not ("home" or "form" or "scripts" or "team" or "x" or "ingame")) return false;
         if (tab == "home") _minePart = "projects";
         if (_dirty) Save(quiet: true);
         // «Мои проекты» из редактора — к списку (как «Назад»).

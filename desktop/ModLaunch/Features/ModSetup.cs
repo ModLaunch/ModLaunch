@@ -83,6 +83,18 @@ public static class ModSetup
     }
 
     /// <summary>Куда в игре ляжет файл из архива настроек (или null, если путь странный).</summary>
+    static readonly string[] ConfigExtensions = [".cfg", ".json", ".txt", ".yml", ".yaml", ".xml", ".ini", ".toml"];
+
+    /// <summary>Файл настроек, а не код: config.json мода SMAPI, текстовые настройки BepInEx, *.GlobalSettings.json Hollow Knight.</summary>
+    public static bool IsConfigFile(string entry)
+    {
+        entry = entry.Replace('\\', '/');
+        var name = Path.GetFileName(entry);
+        if (entry.StartsWith("Mods/", StringComparison.OrdinalIgnoreCase)) return name.Equals("config.json", StringComparison.OrdinalIgnoreCase);
+        if (entry.StartsWith("settings/", StringComparison.OrdinalIgnoreCase)) return name.EndsWith(".GlobalSettings.json", StringComparison.OrdinalIgnoreCase);
+        return ConfigExtensions.Contains(Path.GetExtension(name).ToLowerInvariant());
+    }
+
     static string? Target(ModRegistry registry, string entry)
     {
         entry = entry.Replace('\\', '/').TrimStart('/');
@@ -103,13 +115,17 @@ public static class ModSetup
     /// Разложить настройки из zip (или из потока архива кода сборки). Прежние файлы, которые
     /// заменяются, сначала копируются в ModHub/config-backup. Возвращает, сколько файлов записано.
     /// </summary>
-    public static int RestoreConfig(ModRegistry registry, ZipArchive zip)
+    public static int RestoreConfig(ModRegistry registry, ZipArchive zip, bool fromCode = false)
     {
         var backup = Path.Combine(registry.GamePath, "ModHub", "config-backup", DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss"));
         var written = 0;
+        long total = 0;
         foreach (var entry in zip.Entries)
         {
             if (entry.FullName.EndsWith('/') || Target(registry, entry.FullName) is not { } target) continue;
+            // 24.0: настройки из чужого кода сборки — только сами файлы настроек (config.json у SMAPI,
+            // .cfg/.json/… у BepInEx — никаких .dll), не больше 4 МБ на файл и 20 МБ всего.
+            if (fromCode && (!IsConfigFile(entry.FullName) || entry.Length > 4 * 1024 * 1024 || (total += entry.Length) > 20 * 1024 * 1024)) continue;
             try
             {
                 if (File.Exists(target))

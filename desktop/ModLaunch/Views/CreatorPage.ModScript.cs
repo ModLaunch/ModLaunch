@@ -21,7 +21,7 @@ namespace ModLaunch.Views;
 public sealed partial class CreatorPage
 {
     /// <summary>Вкладка консоли и справки ModScript (20.0): console, commands, functions.</summary>
-    string _ms = "console";
+    string _ms = "scripts";
     string _msGroup = "";
     bool _msNewOnly;
     static string? _msText;
@@ -47,7 +47,7 @@ public sealed partial class CreatorPage
     List<Control> MsTabs()
     {
         var tabs = new List<Control>();
-        foreach (var (id, key) in new[] { ("console", "v13.ms.tab.console"), ("commands", "v13.ms.tab.commands"), ("functions", "v13.ms.tab.functions") })
+        foreach (var (id, key) in new[] { ("scripts", "v22.guide.scripts"), ("commands", "v22.guide.files"), ("functions", "v13.ms.tab.functions"), ("console", "v13.ms.tab.console") })
         {
             var tab = id;
             var b = Ui.Button(I18n.T(key), () => { if (_ms == tab) return; _ms = tab; Build(); }, "hub-tab");
@@ -225,7 +225,7 @@ public sealed partial class CreatorPage
                 if (_msGroup == g) chip.Classes.Add("active");
                 chips.Children.Add(chip);
             }
-            var fresh = Ui.Button(I18n.T("v13.ms.newOnly", ("n", ModScriptCommands.NewCount)), () => { _msNewOnly = !_msNewOnly; Chips(); Fill(); }, "chip", Icons.Sparkles);
+            var fresh = Ui.Button(I18n.T("v23.ms.newOnly", ("n", ModScriptCommands.NewCount)), () => { _msNewOnly = !_msNewOnly; Chips(); Fill(); }, "chip", Icons.Sparkles);
             fresh.Margin = new Thickness(10, 0, 6, 6);
             if (_msNewOnly) fresh.Classes.Add("active");
             chips.Children.Add(fresh);

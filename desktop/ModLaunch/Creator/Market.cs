@@ -504,7 +504,7 @@ public static class Market
         var got = Convert.ToHexString(SHA256.HashData(ms.ToArray())).ToLowerInvariant();
         if (l.Sha256 != "" && got != l.Sha256) throw new ServiceError("BAD_HASH");
         var dir = Directory.CreateDirectory(Path.Combine(Paths.DownloadsTemp, "market")).FullName;
-        var file = Path.Combine(dir, Regex.Replace(l.FileName is { Length: > 0 } f ? f : $"{Projects.PackageName(l.Title)}.zip", @"[^\w.\-]+", "_"));
+        var file = Path.Combine(dir, Regex.Replace(l.FileName is { Length: > 0 } f ? f : $"{Projects.PackageName(l.Title)}.zip", @"[^\w.\-]+", "_").TrimStart('.'));
         await File.WriteAllBytesAsync(file, ms.ToArray());
         return file;
     }

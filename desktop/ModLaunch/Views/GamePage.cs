@@ -187,6 +187,8 @@ public sealed partial class GamePage : Page
         if (_g.Status == Detect.Found)
         {
             buttons.Children.Add(Ui.Button(I18n.T("games.openFolder"), () => Actions.OpenFolder(_g.Path), vitrina ? "hero-ghost" : "", Icons.Folder));
+            // 24.0: «Поделиться сборкой» — на виду: играть вместе можно только с одинаковыми модами.
+            if (_g.ModCount > 0) buttons.Children.Add(Ui.Button(I18n.T("v24.share.go"), () => ShareUi.Share(_g), vitrina ? "hero-ghost" : "", Icons.Users));
             if (_g.LoaderInstalled)
             {
                 if (Features.Launcher.IsRunning(_g.Def.Id))

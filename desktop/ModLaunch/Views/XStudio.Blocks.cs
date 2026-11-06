@@ -114,7 +114,7 @@ public sealed partial class XStudio
     static Control PaletteCaption(string text, string hue) => new Border
     {
         Padding = new Thickness(4, 12, 4, 4),
-        Child = Ui.Row(7, Ui.Dot(new SolidColorBrush(Avalonia.Media.Color.Parse(hue)), 8), HubLook.MonoText(text.ToUpper(I18n.Culture), 10, Ui.Res("Muted"))),
+        Child = Ui.Row(7, Ui.Dot(new SolidColorBrush(Avalonia.Media.Color.Parse(hue)), 8), HubLook.MonoText(text, 10, Ui.Res("Muted"))),
     };
 
     /// <summary>Кирпичик палитры: нажатие — в холст к курсору, перетаскивание — куда угодно.</summary>
@@ -126,17 +126,17 @@ public sealed partial class XStudio
         var box = new Border
         {
             CornerRadius = new CornerRadius(kind == "hook" ? 10 : 8), Padding = new Thickness(12, 7, 10, 7), Cursor = new Cursor(StandardCursorType.Hand),
-            Background = kind == "hook" ? new SolidColorBrush(Look.Mix(c, Colors.Black, 0.25)) : new SolidColorBrush(Avalonia.Media.Color.FromArgb(Look.IsLight ? (byte)0x22 : (byte)0x26, c.R, c.G, c.B)),
-            BorderBrush = new SolidColorBrush(Avalonia.Media.Color.FromArgb(0x70, c.R, c.G, c.B)), BorderThickness = new Thickness(1), Opacity = enabled ? 1 : 0.45,
-            Child = Ui.Row(8, Ui.Icon(BlockCanvas.IconOf(kind), 14, kind == "hook" ? Brushes.White : new SolidColorBrush(Look.IsLight ? Look.Mix(c, Colors.Black, 0.45) : c)),
-                new TextBlock { Text = label, FontSize = 12.5, FontWeight = FontWeight.SemiBold, Foreground = kind == "hook" ? Brushes.White : Ui.Res("Text"), TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center }),
+            // 23.0: строка палитры на поверхности темы; род — цветным значком и тонкой полосой, события — янтарным значком.
+            Background = HubLook.Raised, BorderBrush = HubLook.Edge, BorderThickness = new Thickness(1), Opacity = enabled ? 1 : 0.45,
+            Child = Ui.Row(8, Ui.Icon(BlockCanvas.IconOf(kind), 14, kind == "hook" ? HubLook.Violet : new SolidColorBrush(Look.IsLight ? Look.Mix(c, Colors.Black, 0.45) : c)),
+                new TextBlock { Text = label, FontSize = 12.5, FontWeight = kind == "hook" ? FontWeight.SemiBold : FontWeight.Normal, Foreground = Ui.Res("Text"), TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center }),
         };
-        var bar = new Border { Width = 4, CornerRadius = new CornerRadius(8, 0, 0, 8), Background = new SolidColorBrush(c), HorizontalAlignment = HorizontalAlignment.Left, IsHitTestVisible = false, IsVisible = kind != "hook" };
+        var bar = new Border { Width = 3, CornerRadius = new CornerRadius(8, 0, 0, 8), Background = new SolidColorBrush(Avalonia.Media.Color.FromArgb(0xC0, c.R, c.G, c.B)), HorizontalAlignment = HorizontalAlignment.Left, IsHitTestVisible = false, IsVisible = kind != "hook" };
         var item = new Panel { Children = { box, bar } };
         ToolTip.SetTip(item, enabled ? I18n.T("v21.p." + (id.StartsWith("hook:") ? "hook" : id) + ".tip") : I18n.T("v16.event.missing", ("engine", t.Title)));
         if (!enabled) return item;
-        item.PointerEntered += (_, _) => box.BorderBrush = new SolidColorBrush(c);
-        item.PointerExited += (_, _) => box.BorderBrush = new SolidColorBrush(Avalonia.Media.Color.FromArgb(0x70, c.R, c.G, c.B));
+        item.PointerEntered += (_, _) => box.BorderBrush = HubLook.EdgeHi;
+        item.PointerExited += (_, _) => box.BorderBrush = HubLook.Edge;
         item.Tapped += (_, _) => PlaceBlock(id);
         BlockCanvas.StartDrag(item, () => BlockCanvas.DragTemplate = id);
         return item;
@@ -150,31 +150,25 @@ public sealed partial class XStudio
         var tile = new Border
         {
             Width = 28, Height = 28, CornerRadius = new CornerRadius(7),
-            Background = new LinearGradientBrush
-            {
-                StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
-                GradientStops = { new GradientStop(c, 0), new GradientStop(Look.Mix(c, Colors.Black, 0.45), 1) },
-            },
-            Child = Ui.Icon(p.Icon, 14, Brushes.White),
+            Background = new SolidColorBrush(Avalonia.Media.Color.FromArgb(0x30, c.R, c.G, c.B)),
+            Child = Ui.Icon(p.Icon, 14, new SolidColorBrush(c)),
         };
         var used = _s.Active is { } d && Pieces.Used(d.Editor.Text ?? "", p.Name);
         var sub = used ? I18n.T("v21.piece.inProject") : p.Free ? I18n.T("v21.piece.free") : I18n.T("v21.piece.bought", ("seller", p.Seller));
         var text = Ui.Col(1, new TextBlock { Text = p.Title, FontSize = 12.5, FontWeight = FontWeight.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis },
             Ui.Text(sub, "small", color: used ? Ui.Res("Good") : Ui.Res("Muted")));
         text.VerticalAlignment = VerticalAlignment.Center;
-        var gold = Avalonia.Media.Color.Parse("#F5B94A");
         var box = new Border
         {
             CornerRadius = new CornerRadius(9), Padding = new Thickness(8, 6), Cursor = new Cursor(StandardCursorType.Hand),
-            Background = new SolidColorBrush(Avalonia.Media.Color.FromArgb(Look.IsLight ? (byte)0x26 : (byte)0x1C, gold.R, gold.G, gold.B)),
-            BorderBrush = new SolidColorBrush(Avalonia.Media.Color.FromArgb(0x66, gold.R, gold.G, gold.B)), BorderThickness = new Thickness(1),
+            Background = HubLook.Raised, BorderBrush = HubLook.Edge, BorderThickness = new Thickness(1),
             Child = Ui.Row(10, tile, text),
         };
         var missing = p.Events.Where(e => !t.Events.Contains(e)).ToList();
         ToolTip.SetTip(box, (p.About == "" ? "" : p.About + "\n") + I18n.T("v21.piece.tip", ("line", Pieces.Line(p.Title)))
             + (missing.Count > 0 ? "\n" + I18n.T("v16.event.missing", ("engine", t.Title)) : ""));
-        box.PointerEntered += (_, _) => box.BorderBrush = new SolidColorBrush(gold);
-        box.PointerExited += (_, _) => box.BorderBrush = new SolidColorBrush(Avalonia.Media.Color.FromArgb(0x66, gold.R, gold.G, gold.B));
+        box.PointerEntered += (_, _) => box.BorderBrush = HubLook.EdgeHi;
+        box.PointerExited += (_, _) => box.BorderBrush = HubLook.Edge;
         box.Tapped += (_, _) => PlaceBlock(id);
         BlockCanvas.StartDrag(box, () => BlockCanvas.DragTemplate = id);
         return box;

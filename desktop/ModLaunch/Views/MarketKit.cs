@@ -78,38 +78,24 @@ public static class MarketTiles
 
     public static void Open(Listing l) => MainWindow.Current?.Navigate(() => new ListingPage(l));
 
-    /// <summary>Картинка лота: первое изображение, иначе арт игры, иначе градиент с значком типа.</summary>
+    /// <summary>
+    /// Картинка лота: первое изображение, иначе арт его игры. 23.0: без значка вида посреди картинки — вид уже
+    /// написан ярлыком; у лотов без игры — спокойная плашка со значком.
+    /// </summary>
     public static Control Art(Listing l, int decode = 768, bool hero = true)
     {
         if (l.Images.Count > 0) return StoreKit.UrlImage(l.Images[0], decode);
         var game = GameCatalog.ById(l.Game);
-        // В маленькой картинке (строки списков) — значок поменьше, чтобы не закрывал её.
-        var small = decode <= 384;
-        var icon = new Border
-        {
-            Width = small ? 32 : 64, Height = small ? 32 : 64, CornerRadius = new CornerRadius(small ? 8 : 16), Background = new SolidColorBrush(Color.FromArgb(small ? (byte)110 : (byte)70, 0, 0, 0)),
-            BorderBrush = new SolidColorBrush(Color.FromArgb(60, 255, 255, 255)), BorderThickness = new Thickness(1),
-            HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
-            Child = Ui.Icon(KindIcon(l.Kind), small ? 15 : 28, Brushes.White),
-        };
-        if (game is null) return new Panel { Children = { Gx.Gradient(null), Gx.Scanlines(), icon } };
-        return new Panel { Children = { Ui.GameImage(game, decode, art: hero ? Images.Art.Hero : Images.Art.Header), new Border { Background = new SolidColorBrush(Color.FromArgb(95, 6, 6, 10)) }, icon } };
+        if (game is null) return new Border { Background = HubLook.Raised, Child = Ui.Icon(KindIcon(l.Kind), decode <= 384 ? 18 : 30, Ui.Res("Muted")) };
+        return Ui.GameImage(game, decode, art: hero ? Images.Art.Hero : Images.Art.Header);
     }
 
     public static Control Art(HubMod h, int decode = 768)
     {
         if (h.Images.Count > 0) return StoreKit.UrlImage(h.Images[0], decode);
         var game = GameCatalog.ById(h.Game);
-        var small = decode <= 384;
-        var icon = new Border
-        {
-            Width = small ? 32 : 60, Height = small ? 32 : 60, CornerRadius = new CornerRadius(small ? 8 : 15), Background = new SolidColorBrush(Color.FromArgb(small ? (byte)110 : (byte)70, 0, 0, 0)),
-            BorderBrush = new SolidColorBrush(Color.FromArgb(60, 255, 255, 255)), BorderThickness = new Thickness(1),
-            HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
-            Child = Ui.Icon(h.IsPackage ? Icons.Package : Icons.Code, small ? 15 : 26, Brushes.White),
-        };
-        if (game is null) return new Panel { Children = { Gx.Gradient("#2BB673"), Gx.Scanlines(), icon } };
-        return new Panel { Children = { Ui.GameImage(game, decode, art: Images.Art.Hero), new Border { Background = new SolidColorBrush(Color.FromArgb(95, 6, 6, 10)) }, icon } };
+        if (game is null) return new Border { Background = HubLook.Raised, Child = Ui.Icon(h.IsPackage ? Icons.Package : Icons.Code, decode <= 384 ? 18 : 30, Ui.Res("Muted")) };
+        return Ui.GameImage(game, decode, art: Images.Art.Hero);
     }
 
     public static string GameName(string id) => GameCatalog.ById(id)?.ShortName ?? (id == "" ? I18n.T("mk.anyGame") : id);
@@ -141,7 +127,7 @@ public static class MarketTiles
 
     static Control PriceOrOwned(Listing l) => Owned(l)
         ? Gx.Tag(I18n.T("v93.mk.owned"), new SolidColorBrush(Color.FromArgb(220, 30, 34, 44)), Brushes.White, 12)
-        : Gx.Price(MarketViews.PriceText(l), l.Free);
+        : l.Free ? Gx.Price(MarketViews.PriceText(l), true) : Gx.Tag(MarketViews.PriceText(l), new SolidColorBrush(Color.FromArgb(230, 16, 17, 22)), Brushes.White, 12.5);
 
     /// <summary>
     /// Лот: size 0 — строка списка, 1 — карточка (картинка сверху), 2 — широкий баннер.
@@ -159,7 +145,7 @@ public static class MarketTiles
         if (size == 2)
         {
             var words = Ui.Col(10,
-                Gx.Eyebrow(I18n.T("v93.mk.eyebrow"), Ui.Hex("#E6E7EE")),
+                HubLook.Label(I18n.T("v93.mk.eyebrow"), Ui.Hex("#E6E7EE")),
                 Gx.Title(l.Title, 26, Brushes.White),
                 new TextBlock { Text = l.Summary, FontSize = 13.5, Foreground = Ui.Hex("#D0D3DC"), TextWrapping = TextWrapping.Wrap, MaxLines = 2, TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = 520, HorizontalAlignment = HorizontalAlignment.Left },
                 Ui.Row(8, StoreKit.Pill(I18n.T("mk.kind." + l.Kind)), StoreKit.Pill(GameName(l.Game)), StoreKit.Pill(I18n.T("mod.by", ("author", l.Author)))),
@@ -263,7 +249,7 @@ public static class MarketTiles
         if (size == 2)
         {
             var words = Ui.Col(10,
-                Gx.Eyebrow(I18n.T("v93.mk.workshop.eyebrow"), Ui.Hex("#E6E7EE")),
+                HubLook.Label(I18n.T("v93.mk.workshop.eyebrow"), Ui.Hex("#E6E7EE")),
                 Gx.Title(h.Name, 26, Brushes.White),
                 new TextBlock { Text = h.Summary, FontSize = 13.5, Foreground = Ui.Hex("#D0D3DC"), TextWrapping = TextWrapping.Wrap, MaxLines = 2, TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = 520, HorizontalAlignment = HorizontalAlignment.Left },
                 Ui.Row(8, StoreKit.Pill(GameName(h.Game)), StoreKit.Pill(I18n.T("mod.by", ("author", h.Author))), StoreKit.Pill(counters)),

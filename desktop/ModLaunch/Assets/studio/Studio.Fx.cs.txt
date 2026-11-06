@@ -1,0 +1,533 @@
+
+// ===================================================================== Studio.Fx — эффекты, погода, день и ночь, превью деталей, кисть
+// Эффекты — частицы со своей мягкой точкой (работают на любом конвейере), погода следует за камерой игрока, смена дня
+// и ночи крутит солнце, превью — каждая деталь снимается своей камерой в маленькую картинку для библиотеки.
+
+/// <summary>Держится у камеры: погода идёт вокруг игрока (или вокруг камеры редактора, пока он открыт).</summary>
+public class ModScriptFollow : MonoBehaviour
+{
+    public static Transform Target;
+
+    void LateUpdate()
+    {
+        var t = Target != null ? Target : (Camera.main != null ? Camera.main.transform : null);
+        if (t != null) transform.position = t.position;
+    }
+}
+
+/// <summary>Смена дня и ночи: сутки за Minutes минут игры.</summary>
+public class ModScriptDayCycle : MonoBehaviour
+{
+    public float Minutes = 5, Hour = 12;
+    public Light Sun;
+
+    void Update()
+    {
+        if (Sun == null || Minutes <= 0) return;
+        Hour = Mathf.Repeat(Hour + Time.deltaTime / (Minutes * 60f) * 24f, 24f);
+        float pitch, intensity;
+        Color color;
+        ModScriptStudio.SunAt(Hour, out pitch, out intensity, out color);
+        Sun.transform.rotation = Quaternion.Euler(pitch, Sun.transform.eulerAngles.y, 0);
+        Sun.intensity = intensity;
+        Sun.color = color;
+    }
+}
+
+public partial class ModScriptStudio
+{
+    // ------------------------------------------------------------------ солнце по времени суток
+
+    /// <summary>Солнце в час h: днём поднимается и белеет, утром и вечером тёплое и низкое, ночью — слабый лунный свет.</summary>
+    public static void SunAt(float h, out float pitch, out float intensity, out Color color)
+    {
+        if (h >= 6 && h <= 18)
+        {
+            var k = Mathf.Sin((h - 6) / 12f * Mathf.PI);
+            pitch = 4 + k * 76;
+            intensity = Mathf.Lerp(0.55f, 1.35f, k);
+            color = Color.Lerp(new Color(1f, 0.62f, 0.38f), new Color(1f, 0.97f, 0.92f), Mathf.Sqrt(k));
+        }
+        else
+        {
+            pitch = 35;
+            intensity = 0.12f;
+            color = new Color(0.55f, 0.65f, 1f);
+        }
+    }
+
+    // ------------------------------------------------------------------ материалы и шрифт для деталей
+
+    static Font _kitFont;
+
+    static Font KitFont()
+    {
+        if (_kitFont != null) return _kitFont;
+        try { _kitFont = Font.CreateDynamicFontFromOSFont(new[] { "Segoe UI", "Arial" }, 64); } catch { }
+        return _kitFont;
+    }
+
+    readonly Dictionary<string, Material> _smoothMats = new Dictionary<string, Material>();
+
+    Material SmoothMat(Color c, float smooth)
+    {
+        var key = C(c) + "/" + Num(smooth);
+        Material m;
+        if (_smoothMats.TryGetValue(key, out m) && m != null) return m;
+        var basis = ColorMat(c);
+        if (basis == null) return null;
+        m = new Material(basis);
+        if (m.HasProperty("_Smoothness")) m.SetFloat("_Smoothness", smooth);
+        if (m.HasProperty("_Glossiness")) m.SetFloat("_Glossiness", smooth);
+        _smoothMats[key] = m;
+        return m;
+    }
+
+    static Texture2D _dot;
+    static Material _fxMat;
+
+    /// <summary>Мягкая круглая точка (своя текстура) и простой шейдер спрайтов — частицы выглядят одинаково на любом конвейере.</summary>
+    static Material FxMat()
+    {
+        if (_fxMat != null) return _fxMat;
+        if (_dot == null)
+        {
+            const int s = 64;
+            _dot = new Texture2D(s, s, TextureFormat.RGBA32, false) { hideFlags = HideFlags.HideAndDontSave, wrapMode = TextureWrapMode.Clamp };
+            for (var y = 0; y < s; y++)
+                for (var x = 0; x < s; x++)
+                {
+                    var d = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), new Vector2(s / 2f, s / 2f)) / (s / 2f);
+                    var a = Mathf.Clamp01(1 - d);
+                    _dot.SetPixel(x, y, new Color(1, 1, 1, a * a));
+                }
+            _dot.Apply();
+        }
+        Shader sh = null;
+        foreach (var name in new[] { "Sprites/Default", "Universal Render Pipeline/Particles/Unlit", "Legacy Shaders/Particles/Alpha Blended", "Particles/Alpha Blended", "Unlit/Transparent" })
+            if ((sh = Shader.Find(name)) != null) break;
+        if (sh == null) return null;
+        _fxMat = new Material(sh) { name = "ModScript Studio particles", hideFlags = HideFlags.HideAndDontSave, mainTexture = _dot };
+        return _fxMat;
+    }
+
+    /// <summary>Система частиц: цвета, размер, жизнь, скорость, частота, гравитация, форма (cone, sphere, box) и её размер.</summary>
+    static ParticleSystem Particles(Transform root, Vector3 pos, Quaternion rot, Color c0, Color c1, float size, float life, float speed, float rate, float gravity, string shape, Vector3 extent, bool stretch)
+    {
+        var go = new GameObject("fx");
+        go.transform.SetParent(root, false);
+        go.transform.localPosition = pos;
+        go.transform.localRotation = rot;
+        var ps = go.AddComponent<ParticleSystem>();
+        ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        var main = ps.main;
+        main.startColor = new ParticleSystem.MinMaxGradient(c0, c1);
+        main.startSize = new ParticleSystem.MinMaxCurve(size * 0.6f, size);
+        main.startLifetime = new ParticleSystem.MinMaxCurve(life * 0.7f, life);
+        main.startSpeed = new ParticleSystem.MinMaxCurve(speed * 0.7f, speed);
+        main.gravityModifier = gravity;
+        main.maxParticles = 3000;
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+        main.useUnscaledTime = true;
+        var em = ps.emission;
+        em.rateOverTime = rate;
+        var sh = ps.shape;
+        sh.shapeType = shape == "sphere" ? ParticleSystemShapeType.Sphere : shape == "box" ? ParticleSystemShapeType.Box : ParticleSystemShapeType.Cone;
+        sh.radius = extent.x;
+        if (shape == "cone") sh.angle = extent.y;
+        if (shape == "box") sh.scale = extent;
+        var col = ps.colorOverLifetime;
+        col.enabled = true;
+        var g = new Gradient();
+        g.SetKeys(new[] { new GradientColorKey(Color.white, 0), new GradientColorKey(Color.white, 1) }, new[] { new GradientAlphaKey(0, 0), new GradientAlphaKey(1, 0.15f), new GradientAlphaKey(1, 0.6f), new GradientAlphaKey(0, 1) });
+        col.color = g;
+        var r = go.GetComponent<ParticleSystemRenderer>();
+        var mat = FxMat();
+        if (mat != null) r.sharedMaterial = mat;
+        if (stretch) { r.renderMode = ParticleSystemRenderMode.Stretch; r.lengthScale = 6; }
+        ps.Play();
+        return ps;
+    }
+
+    /// <summary>Готовые эффекты: огонь, дым, искры, магия, светлячки, конфетти, пузыри, снег, дождь, туман, струя воды.</summary>
+    void Effect(Transform root, string kind)
+    {
+        var up = Quaternion.Euler(-90, 0, 0);
+        var down = Quaternion.Euler(90, 0, 0);
+        switch (kind)
+        {
+            case "fire":
+                Particles(root, Vector3.up * 0.1f, up, new Color(1f, 0.85f, 0.3f), new Color(1f, 0.35f, 0.1f), 0.55f, 0.9f, 1.6f, 45, -0.15f, "cone", new Vector3(0.25f, 12, 0), false);
+                AddLight(root, Vector3.up * 0.6f, new Color(1, 0.6f, 0.25f), 8, 2f, LightType.Point);
+                Beh(root.gameObject, "flicker");
+                break;
+            case "smoke": Particles(root, Vector3.up * 0.2f, up, new Color(0.55f, 0.55f, 0.57f, 0.6f), new Color(0.3f, 0.3f, 0.32f, 0.5f), 1.4f, 4.5f, 0.9f, 9, -0.05f, "cone", new Vector3(0.3f, 15, 0), false); break;
+            case "sparks": Particles(root, Vector3.up * 0.3f, up, new Color(1f, 0.95f, 0.6f), new Color(1f, 0.5f, 0.1f), 0.07f, 0.8f, 4.5f, 35, 1f, "cone", new Vector3(0.1f, 35, 0), false); break;
+            case "magic": Particles(root, Vector3.up * 1f, up, new Color(0.7f, 0.4f, 1f), new Color(0.3f, 0.9f, 1f), 0.16f, 1.6f, 0.5f, 35, -0.15f, "sphere", new Vector3(0.6f, 0, 0), false); break;
+            case "fireflies": Particles(root, Vector3.up * 1.2f, up, new Color(0.85f, 1f, 0.4f), new Color(1f, 0.9f, 0.3f), 0.09f, 4.5f, 0.25f, 10, -0.02f, "box", new Vector3(6, 2, 6), false); break;
+            case "confetti": Particles(root, Vector3.up * 0.2f, up, new Color(1f, 0.3f, 0.4f), new Color(0.3f, 0.6f, 1f), 0.14f, 3f, 6.5f, 45, 0.7f, "cone", new Vector3(0.2f, 25, 0), false); break;
+            case "bubbles": Particles(root, Vector3.up * 0.2f, up, new Color(0.75f, 0.9f, 1f, 0.7f), new Color(0.9f, 1f, 1f, 0.6f), 0.22f, 3.5f, 0.6f, 14, -0.25f, "box", new Vector3(1.5f, 1.5f, 0.2f), false); break;
+            case "snow": Particles(root, Vector3.up * 10f, down, Color.white, new Color(0.9f, 0.95f, 1f), 0.12f, 9f, 1.2f, 160, 0.03f, "box", new Vector3(12, 12, 0.5f), false); break;
+            case "rain": Particles(root, Vector3.up * 12f, down, new Color(0.7f, 0.82f, 1f, 0.6f), new Color(0.8f, 0.9f, 1f, 0.5f), 0.05f, 1.4f, 16f, 500, 1f, "box", new Vector3(12, 12, 0.5f), true); break;
+            case "mist": Particles(root, Vector3.up * 0.5f, up, new Color(1, 1, 1, 0.25f), new Color(0.9f, 0.95f, 1f, 0.2f), 2.5f, 6f, 0.2f, 10, -0.01f, "box", new Vector3(4, 4, 0.5f), false); break;
+            case "jet": Particles(root, Vector3.up * 0.1f, up, new Color(0.7f, 0.85f, 1f, 0.8f), new Color(1, 1, 1, 0.7f), 0.16f, 1.6f, 7.5f, 90, 1.2f, "cone", new Vector3(0.08f, 6, 0), false); break;
+        }
+        // Невидимый коллайдер — чтобы эффект можно было выбрать щелчком и сдвинуть стрелками.
+        var box = root.gameObject.AddComponent<BoxCollider>();
+        box.isTrigger = true;
+        box.size = kind == "snow" || kind == "rain" ? new Vector3(12, 1, 12) : new Vector3(1, 1, 1);
+        box.center = Vector3.up * 0.5f;
+    }
+
+    /// <summary>Холм: сетка с плавными буграми (шум Перлина), края опущены к земле.</summary>
+    static Mesh HillMesh(float size, float height, int n, int seed)
+    {
+        var v = new List<Vector3>();
+        var t = new List<int>();
+        for (var j = 0; j <= n; j++)
+            for (var i = 0; i <= n; i++)
+            {
+                var x = (i / (float)n - 0.5f) * size;
+                var z = (j / (float)n - 0.5f) * size;
+                var edge = Mathf.Clamp01(1 - new Vector2(x, z).magnitude / (size * 0.5f));
+                var y = (Mathf.PerlinNoise(i * 0.18f + seed, j * 0.18f + seed) * 0.6f + 0.4f) * height * Mathf.SmoothStep(0, 1, edge);
+                v.Add(new Vector3(x, y, z));
+            }
+        for (var j = 0; j < n; j++)
+            for (var i = 0; i < n; i++)
+            {
+                var a = j * (n + 1) + i;
+                t.Add(a); t.Add(a + n + 1); t.Add(a + 1);
+                t.Add(a + 1); t.Add(a + n + 1); t.Add(a + n + 2);
+            }
+        var m = new Mesh { name = "ModScript Studio hill" };
+        m.vertices = v.ToArray();
+        m.triangles = t.ToArray();
+        m.RecalculateNormals();
+        m.RecalculateBounds();
+        return m;
+    }
+
+    // ------------------------------------------------------------------ погода и смена дня и ночи (сохраняются с картой)
+
+    GameObject _weatherGo;
+    ModScriptDayCycle _cycle;
+
+    void ApplyWeather()
+    {
+        if (_weatherGo != null) Destroy(_weatherGo);
+        _weatherGo = null;
+        var kind = _world.Weather ?? "";
+        if (kind != "")
+        {
+            _weatherGo = new GameObject("ModScript Studio Weather");
+            _weatherGo.AddComponent<ModScriptFollow>();
+            var root = _weatherGo.transform;
+            var down = Quaternion.Euler(90, 0, 0);
+            var up = Quaternion.Euler(-90, 0, 0);
+            switch (kind)
+            {
+                case "rain": Particles(root, Vector3.up * 14f, down, new Color(0.7f, 0.82f, 1f, 0.5f), new Color(0.8f, 0.9f, 1f, 0.45f), 0.045f, 1.4f, 18f, 900, 1f, "box", new Vector3(40, 40, 1), true); break;
+                case "storm": Particles(root, Vector3.up * 14f, down * Quaternion.Euler(0, 15, 0), new Color(0.6f, 0.7f, 0.9f, 0.6f), new Color(0.7f, 0.8f, 1f, 0.5f), 0.05f, 1.2f, 24f, 2200, 1f, "box", new Vector3(40, 40, 1), true); break;
+                case "snow": Particles(root, Vector3.up * 12f, down, Color.white, new Color(0.9f, 0.95f, 1f), 0.13f, 10f, 1.3f, 700, 0.03f, "box", new Vector3(40, 40, 1), false); break;
+                case "dust": Particles(root, Vector3.zero, up, new Color(0.85f, 0.75f, 0.55f, 0.45f), new Color(0.75f, 0.65f, 0.5f, 0.35f), 0.07f, 6f, 0.4f, 160, 0f, "sphere", new Vector3(15, 0, 0), false); break;
+                case "petals": Particles(root, Vector3.up * 10f, down, new Color(1f, 0.7f, 0.82f), new Color(1f, 0.85f, 0.9f), 0.13f, 9f, 1f, 180, 0.05f, "box", new Vector3(30, 30, 1), false); break;
+                case "embers": Particles(root, Vector3.down * 2f, up, new Color(1f, 0.6f, 0.2f), new Color(1f, 0.35f, 0.1f), 0.07f, 4f, 1.2f, 140, -0.1f, "box", new Vector3(30, 30, 1), false); break;
+            }
+            // Погода сразу в полную силу (иначе первые секунды капли ещё над головой).
+            foreach (var ps in _weatherGo.GetComponentsInChildren<ParticleSystem>()) { ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear); var pm = ps.main; pm.prewarm = true; ps.Play(); }
+        }
+        var sun = Sun();
+        if (_cycle != null) Destroy(_cycle);
+        _cycle = null;
+        if (_world.Cycle > 0 && sun != null)
+        {
+            _cycle = sun.gameObject.AddComponent<ModScriptDayCycle>();
+            _cycle.Sun = sun;
+            _cycle.Minutes = _world.Cycle;
+            _cycle.Hour = 9;
+        }
+    }
+
+    // ------------------------------------------------------------------ пипетка и кисть
+
+    Style0 _styleClip;
+
+    void PickStyle()
+    {
+        var p = _sel != null ? PlacedOf(_sel) : null;
+        if (p == null) { Status(T("onlyYours", "Works on objects you placed")); return; }
+        _styleClip = StyleOf(p);
+        Status(T("paint.picked", "Look taken — now apply it with the brush"));
+    }
+
+    void PaintOn(GameObject go)
+    {
+        if (_styleClip == null) { Status(T("paint.empty", "Take a look with the eyedropper first")); return; }
+        var clip = _styleClip;
+        var was = _selection.ToList();
+        _selection.Clear();
+        _selection.Add(go);
+        ForPlaced(T("paint.mode", "Brush"), p => { p.Mat = clip.Mat; p.Look = clip.Look; p.Tint = clip.Tint; p.Tinted = clip.Tinted; ApplyStyle(p); });
+        _selection.Clear();
+        _selection.AddRange(was.Where(g => g != null));
+    }
+
+    // ------------------------------------------------------------------ превью деталей для библиотеки
+
+    readonly Dictionary<string, RenderTexture> _previews = new Dictionary<string, RenderTexture>();
+    readonly List<string> _previewQueue = new List<string>();
+    Camera _previewCam;
+
+    Texture Preview(string id)
+    {
+        RenderTexture rt;
+        if (_previews.TryGetValue(id, out rt) && rt != null && rt.IsCreated()) return rt;
+        if (!_previewQueue.Contains(id)) _previewQueue.Add(id);
+        return null;
+    }
+
+    /// <summary>Снять по две детали за кадр: собрать далеко внизу, показать своей камерой с подсветкой, убрать.</summary>
+    void RenderPreviews()
+    {
+        if (_previewQueue.Count == 0) return;
+        if (_previewCam == null)
+        {
+            var cg = new GameObject("ModScript Studio Preview");
+            DontDestroyOnLoad(cg);
+            _previewCam = cg.AddComponent<Camera>();
+            _previewCam.enabled = false;
+            _previewCam.clearFlags = CameraClearFlags.SolidColor;
+            _previewCam.backgroundColor = new Color(0.13f, 0.14f, 0.165f, 1f);
+            _previewCam.fieldOfView = 28;
+            _previewCam.nearClipPlane = 0.05f;
+            _previewCam.farClipPlane = 400;
+        }
+        for (var n = 0; n < 2 && _previewQueue.Count > 0; n++)
+        {
+            var id = _previewQueue[0];
+            _previewQueue.RemoveAt(0);
+            GameObject go = null;
+            GameObject lightGo = null;
+            var fog = RenderSettings.fog;
+            try
+            {
+                go = Kit(id);
+                if (go == null) continue;
+                go.transform.position = new Vector3(0, -6000, 0);
+                foreach (var b in go.GetComponentsInChildren<ModScriptBehaviour>()) b.enabled = false;
+                var bounds = BoundsOf(go);
+                var size = Mathf.Max(0.4f, bounds.size.magnitude);
+                var dir = Quaternion.Euler(24, -38, 0);
+                _previewCam.transform.rotation = dir;
+                _previewCam.transform.position = bounds.center - dir * Vector3.forward * size * 2.1f;
+                lightGo = new GameObject("ModScript Studio Preview Light");
+                var l = lightGo.AddComponent<Light>();
+                l.type = LightType.Directional;
+                l.intensity = 1.15f;
+                l.shadows = LightShadows.None;
+                lightGo.transform.rotation = Quaternion.Euler(45, -20, 0);
+                var rt = new RenderTexture(176, 132, 16, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB) { name = "ModScript Studio preview", hideFlags = HideFlags.HideAndDontSave };
+                rt.Create();
+                _previewCam.targetTexture = rt;
+                RenderSettings.fog = false;
+                _previewCam.Render();
+                _previews[id] = rt;
+            }
+            catch (Exception e) { Logger.LogWarning("preview " + id + ": " + e.Message); }
+            finally
+            {
+                RenderSettings.fog = fog;
+                if (_previewCam != null) _previewCam.targetTexture = null;
+                if (lightGo != null) DestroyImmediate(lightGo);
+                if (go != null) DestroyImmediate(go);
+            }
+        }
+    }
+}
+
+// ===================================================================== 23.7: меню под игру и облегчённая панель
+// ModLaunch кладёт рядом profile.txt: имя игры, набор (horror, racing, survival…), цвет обложки, разделы библиотеки по
+// порядку и быстрые действия. Без файла — обычный набор «конструктор».
+
+public partial class ModScriptStudio
+{
+    class QuickItem { public string Id, Name, Icon; }
+
+    string _gameName = "", _preset = "builder";
+    bool _accentUser;
+    string[] _profCats = new string[0], _profQuick = new string[0];
+    List<QuickItem> _quick;
+    bool _allCats, _dockMore;
+    Rect _moreRect;
+
+    static readonly string[] DefaultCats = { "build", "shapes", "nature", "furniture", "lights", "effects" };
+
+    void LoadProfile()
+    {
+        try
+        {
+            var file = Path.Combine(_root, "profile.txt");
+            if (!File.Exists(file)) return;
+            foreach (var line in File.ReadAllLines(file))
+            {
+                var at = line.IndexOf('|');
+                if (at <= 0) continue;
+                var k = line.Substring(0, at);
+                var v = line.Substring(at + 1).Trim();
+                if (k == "name") _gameName = v;
+                else if (k == "preset") _preset = v;
+                else if (k == "accent" && v.Length == 6)
+                {
+                    Color c;
+                    if (ColorUtility.TryParseHtmlString("#" + v, out c)) SetAccent(c);
+                }
+                else if (k == "cats") _profCats = v.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries).Where(c => Array.IndexOf(AddCats, c) >= 0).ToArray();
+                else if (k == "quick") _profQuick = v.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+            }
+            _quick = null;
+            if (_profCats.Length > 0) _addCat = _profCats[0];
+            Logger.LogInfo("profile: " + _gameName + ", " + _preset + ", " + _profCats.Length + " sections, " + _profQuick.Length + " quick actions");
+        }
+        catch (Exception e) { Logger.LogWarning("profile: " + e.Message); }
+    }
+
+    /// <summary>Разделы библиотеки: сначала нужные этой игре (6), остальные — по «Ещё».</summary>
+    string[] VisibleCats()
+    {
+        if (_allCats) return AddCats;
+        var list = (_profCats.Length > 0 ? _profCats : DefaultCats).ToList();
+        if (Array.IndexOf(AddCats, _addCat) >= 0 && !list.Contains(_addCat)) list.Add(_addCat);
+        return list.ToArray();
+    }
+
+    /// <summary>Быстрые действия этой игры: команды (как в палитре) и детали kit: — то, чего нет, пропускается.</summary>
+    List<QuickItem> QuickList()
+    {
+        if (_quick != null) return _quick;
+        _quick = new List<QuickItem>();
+        foreach (var q in _profQuick)
+        {
+            if (q.StartsWith("kit:"))
+            {
+                var id = q.Substring(4);
+                var k = Kits().FirstOrDefault(x => x.Id == id);
+                if (k != null) _quick.Add(new QuickItem { Id = q, Name = k.Name, Icon = k.Icon });
+            }
+            else
+            {
+                var a = FindAct(q);
+                if (a != null) _quick.Add(new QuickItem { Id = q, Name = a.Name, Icon = a.Icon });
+            }
+        }
+        return _quick;
+    }
+
+    void RunQuick(QuickItem q)
+    {
+        if (q.Id.StartsWith("kit:")) BeginPlace(q.Id, q.Name);
+        else { var a = FindAct(q.Id); if (a != null) RunAct(a); }
+    }
+
+    /// <summary>Быстрые действия — плашками в одну-две строки над разделами библиотеки.</summary>
+    void QuickRow(float width)
+    {
+        var quick = QuickList();
+        if (_search != "" || quick.Count == 0) return;
+        GUILayout.Label(Fmt(T("forGame", "For {0}"), _gameName != "" ? _gameName : T("thisGame", "this game")), Text(Muted, 12, FontStyle.Bold, TextAnchor.MiddleLeft));
+        var x = 0f;
+        var label = Text(Ink, 12, FontStyle.Normal, TextAnchor.MiddleLeft);
+        GUILayout.BeginHorizontal();
+        foreach (var q in quick)
+        {
+            var name = q.Name.Length > 42 ? q.Name.Substring(0, 41) + "…" : q.Name;
+            var cw = Mathf.Min(label.CalcSize(new GUIContent(name)).x + 36, width);
+            if (x + cw > width) { GUILayout.EndHorizontal(); GUILayout.BeginHorizontal(); x = 0; }
+            x += cw + 4;
+            var r = GUILayoutUtility.GetRect(cw, 30, GUILayout.Width(cw), GUILayout.Height(30));
+            if (Event.current.type == EventType.Repaint)
+            {
+                GUI.Box(r, GUIContent.none, _chip);
+                if (r.Contains(Event.current.mousePosition)) Fill(r, new Color(1, 1, 1, 0.05f));
+                DrawIcon(new Rect(r.x + 8, r.y + 7, 16, 16), q.Icon, Amber);
+                GUI.Label(new Rect(r.x + 28, r.y, r.width - 30, r.height), name, label);
+            }
+            if (GUI.Button(r, new GUIContent("", q.Name), GUIStyle.none)) { var qq = q; Later(() => RunQuick(qq)); }
+        }
+        GUILayout.EndHorizontal();
+        GUILayout.Space(8);
+    }
+
+    /// <summary>«Ещё» у дока: редкие инструменты — списком над доком, чтобы сам док остался коротким.</summary>
+    void DockMore()
+    {
+        if (!_dockMore) return;
+        if (Event.current.type == EventType.MouseDown && !_moreRect.Contains(Event.current.mousePosition) && !_dockRect.Contains(Event.current.mousePosition)) { _dockMore = false; return; }
+        var rows = new[] { "brush", "physics", "scene", "props", "keys" };
+        const float rh = 38;
+        _moreRect = new Rect(_dockRect.xMax - 250, _dockRect.y - rows.Length * rh - 22, 250, rows.Length * rh + 14);
+        Island(_moreRect);
+        var label = Text(Ink, 13, FontStyle.Normal, TextAnchor.MiddleLeft);
+        for (var i = 0; i < rows.Length; i++)
+        {
+            var r = new Rect(_moreRect.x + 7, _moreRect.y + 7 + i * rh, _moreRect.width - 14, rh);
+            string icon, name, keys;
+            bool on;
+            switch (rows[i])
+            {
+                case "brush": icon = "palette"; name = T("paint.mode", "Brush"); keys = ""; on = _mode == "paint"; break;
+                case "physics": icon = "physics"; name = T("simulate", "Simulate"); keys = "Alt+S"; on = _simulate; break;
+                case "scene": icon = "model"; name = T("explorer.title", "Scene"); keys = ""; on = _rightOpen && _rightTab == "scene"; break;
+                case "props": icon = "gear"; name = T("properties", "Properties"); keys = "I"; on = _rightOpen && _rightTab == "props"; break;
+                default: icon = "search"; name = T("keysTitle", "Keys"); keys = "F1"; on = false; break;
+            }
+            if (Event.current.type == EventType.Repaint)
+            {
+                if (on) Fill(r, AmberSoft);
+                else if (r.Contains(Event.current.mousePosition)) Fill(r, new Color(1, 1, 1, 0.05f));
+                DrawIcon(new Rect(r.x + 10, r.y + 10, 18, 18), icon, on ? Amber : Ink);
+                GUI.Label(new Rect(r.x + 38, r.y, r.width - 90, r.height), name, label);
+                if (keys != "") GUI.Label(new Rect(r.xMax - 60, r.y, 52, r.height), keys, _cap);
+            }
+            if (GUI.Button(r, GUIContent.none, GUIStyle.none))
+            {
+                var what = rows[i];
+                Later(() =>
+                {
+                    _dockMore = false;
+                    if (what == "brush") { if (_mode == "paint") _mode = "move"; else { var a = FindAct("paint.mode"); if (a != null) RunAct(a); } }
+                    else if (what == "physics") ToggleSimulate();
+                    else if (what == "scene") OpenRight("scene");
+                    else if (what == "props") OpenRight("props");
+                    else _showHelp = true;
+                });
+            }
+        }
+    }
+}
+
+// ===================================================================== 23.8: самотест доходит до конца
+// Некоторые игры закрываются сами (PEAK — когда сервер считает версию старой). Пока идёт самотест, выход откладывается
+// через Application.wantsToQuit (Unity 2018.1+, через отражение — конструктор собирается и под Unity 2017); в обычной игре не трогаем.
+
+public partial class ModScriptStudio
+{
+    bool _testDone;
+
+    void HoldQuit()
+    {
+        try
+        {
+            var ev = typeof(Application).GetEvent("wantsToQuit");
+            if (ev == null) return;
+            Func<bool> hold = () =>
+            {
+                if (_testDone || !_autotest) return true;
+                Logger.LogInfo("self-test: the game asked to quit — held until the test ends");
+                return false;
+            };
+            ev.AddEventHandler(null, hold);
+        }
+        catch (Exception e) { Logger.LogWarning("hold quit: " + e.Message); }
+    }
+}

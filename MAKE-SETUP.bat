@@ -1,7 +1,9 @@
 @echo off
 chcp 65001 >nul
 cd /d "%~dp0"
-set VER=9.7.0
+rem Версия — из desktop\ModLaunch\ModLaunch.csproj (раньше была вписана руками и отставала: 9.7.0 при 23.x).
+for /f "usebackq delims=" %%v in (`powershell -NoProfile -Command "([xml](Get-Content 'desktop\ModLaunch\ModLaunch.csproj')).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1"`) do set VER=%%v
+if "%VER%"=="" (echo  Не нашёл версию в ModLaunch.csproj. & pause & exit /b 1)
 title ModLaunch %VER% - установщик
 echo.
 echo  ==== ModLaunch %VER%: собираю установщик ====

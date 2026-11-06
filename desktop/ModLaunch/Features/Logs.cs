@@ -21,9 +21,6 @@ public static partial class Logs
     };
 
     [GeneratedRegex(@"\[(Error|Fatal)\s*:\s*([^\]]+)\]\s*(.+)", RegexOptions.IgnoreCase)] private static partial Regex BepInExLine();
-    [GeneratedRegex(@"Skipped mods\s*[\s\S]*?(?=\n\[|\n\n\n|$)", RegexOptions.IgnoreCase)] private static partial Regex SmapiSkipped();
-    [GeneratedRegex(@"^\s*-\s+(.+?)\s+because\s+(.+)$", RegexOptions.IgnoreCase)] private static partial Regex SmapiBecause();
-    [GeneratedRegex(@"\[\s*ERROR\s+([^\]]+)\]\s*(.+)")] private static partial Regex SmapiError();
     [GeneratedRegex(@"\[ERROR\]:?\s*\[([^\]]+)\]\s*-?\s*(.+)")] private static partial Regex HkError();
     /// <summary>Minecraft: «[12:00:01] [main/ERROR] (Fabric Loader) …» или «[Render thread/ERROR]: …».</summary>
     [GeneratedRegex(@"\[([^\]/]+)/(?:ERROR|FATAL)\]:?\s*(?:\(([^)]+)\))?:?\s*(.+)")] private static partial Regex McError();
@@ -39,11 +36,10 @@ public static partial class Logs
         switch (game.Loader)
         {
             case LoaderKind.Smapi:
-                if (SmapiSkipped().Match(text) is { Success: true } skipped)
-                    foreach (var line in skipped.Value.Split('\n'))
-                        if (SmapiBecause().Match(line) is { Success: true } m) Add(m.Groups[1].Value, m.Groups[2].Value);
-                foreach (Match m in SmapiError().Matches(text))
-                    if (!m.Groups[1].Value.Trim().Equals("SMAPI", StringComparison.OrdinalIgnoreCase)) Add(m.Groups[1].Value, m.Groups[2].Value);
+                // 24.0: строки настоящего SMAPI-latest.txt начинаются с метки времени «[19:59:49 ERROR SMAPI]» —
+                // прежний разбор их не видел. Теперь — тот же разбор, что у «Почему игра упала».
+                foreach (var c in CrashDoctor.Scan(LoaderKind.Smapi, text).Where(c => c.Mod != ""))
+                    Add(c.Mod, c.Detail ?? c.Kind);
                 break;
             case LoaderKind.HkApi:
                 foreach (Match m in HkError().Matches(text)) Add(m.Groups[1].Value, m.Groups[2].Value);

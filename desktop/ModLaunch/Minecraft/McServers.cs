@@ -145,8 +145,8 @@ public static partial class McServers
     public static McServerStatus FromJson(string json, int ms)
     {
         var j = JsonNode.Parse(json);
-        return new McServerStatus(true, (int)j?["players"].Long("online"), (int)j?["players"].Long("max"),
-            Plain(j?["description"]), Strip(j?["version"].Str("name") ?? ""), ms, j.Str("favicon"));
+        return new McServerStatus(true, (int)(j?["players"].Long("online") ?? 0), (int)(j?["players"].Long("max") ?? 0),
+            Plain(j?["description"]), Strip(j?["version"].Str("name") ?? ""), ms, j?.Str("favicon"));
     }
 
     /// <summary>Описание сервера — строка или «чат-компонент» с text/extra; цветовые коды §x убираем.</summary>

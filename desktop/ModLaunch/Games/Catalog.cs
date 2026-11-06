@@ -381,7 +381,79 @@ public static class GameCatalog
             Executables = ["Outward Definitive Edition.exe", "Outward.exe"],
             ModMarker = "dll",
         },
+        // 23.2: Cyberpunk 2077 (REDengine 4) — моды с Nexus; режим разработчика — Cyber Engine Tweaks и Entity Spawner
+        // (Features/DevBackends.cs). Узнаётся по bin/x64/Cyberpunk2077.exe в любой папке (Steam, GOG, Epic, свои папки).
+        new()
+        {
+            Id = "cyberpunk-2077", Name = "Cyberpunk 2077", ShortName = "Cyberpunk 2077", SteamAppId = 1091500,
+            FolderNames = ["Cyberpunk 2077", "Cyberpunk2077"], Accent = "#F3E600", ArtUrl = GameDef.SteamArt(1091500),
+            Engine = "redengine", ModsFolder = Path.Combine("archive", "pc", "mod"),
+            Loader = LoaderKind.None, LoaderName = "Cyber Engine Tweaks", LoaderSite = "https://github.com/maximegmd/CyberEngineTweaks",
+            Catalog = CatalogKind.Nexus, BrowseUrl = "https://www.nexusmods.com/cyberpunk2077/mods",
+            NexusDomain = "cyberpunk2077", NexusGameId = 3333,
+            Sections = Section.Pick("all", "best"),
+            SignatureDirs = [Path.Combine("bin", "x64", "Cyberpunk2077.exe")], SignatureExes = ["Cyberpunk2077.exe"], SignatureWith = "REDprelauncher.exe",
+            GogId = "1423049311",
+            Executables = [Path.Combine("bin", "x64", "Cyberpunk2077.exe")],
+            SavesDir = _ => Path.Combine(Home, "Saved Games", "CD Projekt Red", "Cyberpunk 2077"),
+            ModMarker = "any",
+        },
+
+        // 23.3: большие игры (AAA). Моды — с Nexus (номера игр сверены с Nexus и Steam). Узнаются по exe в любой папке.
+        // Режим разработчика — по движку (Features/DevEngines.cs): Unreal → UE4SS, RE Engine → REFramework,
+        // Creation Engine (Bethesda) → своя консоль игры. У игр с античитом он не включается.
+        Aaa("elden-ring", "Elden Ring", "Elden Ring", 1245620, ["ELDEN RING"], "#C9A44C", "fromsoft", P("Game", "eldenring.exe"), P("Game", "mods"), "eldenring", 4333, Roaming("EldenRing")),
+        Aaa("witcher-3", "The Witcher 3: Wild Hunt", "Witcher 3", 292030, ["The Witcher 3", "The Witcher 3 Wild Hunt", "The Witcher 3 Wild Hunt GOTY"], "#B32D2D", "redengine", P("bin", "x64", "witcher3.exe"), "Mods", "witcher3", 952, Docs("The Witcher 3", "gamesaves")),
+        Aaa("skyrim-se", "The Elder Scrolls V: Skyrim Special Edition", "Skyrim SE", 489830, ["Skyrim Special Edition"], "#8FA3B5", "creation", "SkyrimSE.exe", "Data", "skyrimspecialedition", 1704, Docs("My Games", "Skyrim Special Edition", "Saves")),
+        Aaa("fallout-4", "Fallout 4", "Fallout 4", 377160, ["Fallout 4"], "#4FA34A", "creation", "Fallout4.exe", "Data", "fallout4", 1151, Docs("My Games", "Fallout4", "Saves")),
+        Aaa("starfield", "Starfield", "Starfield", 1716740, ["Starfield"], "#D9DCE3", "creation", "Starfield.exe", "Data", "starfield", 4187, Docs("My Games", "Starfield", "Saves")),
+        Aaa("oblivion-remastered", "The Elder Scrolls IV: Oblivion Remastered", "Oblivion Remastered", 2623190, ["Oblivion Remastered"], "#B59A5B", "unreal", P("OblivionRemastered", "Binaries", "Win64", "OblivionRemastered-Win64-Shipping.exe"), P("OblivionRemastered", "Content", "Paks", "~mods"), "oblivionremastered", 7587),
+        Aaa("baldurs-gate-3", "Baldur's Gate 3", "Baldur's Gate 3", 1086940, ["Baldurs Gate 3", "Baldur's Gate 3"], "#C0392B", "larian", P("bin", "bg3.exe"), "Data", "baldursgate3", 3474, Local("Larian Studios", "Baldur's Gate 3", "PlayerProfiles")),
+        Aaa("resident-evil-4", "Resident Evil 4", "Resident Evil 4", 2050650, ["RESIDENT EVIL 4  BIOHAZARD RE4", "RESIDENT EVIL 4 BIOHAZARD RE4", "Resident Evil 4"], "#7A1F1F", "re", "re4.exe", "natives", "residentevil42023", 5195),
+        Aaa("resident-evil-village", "Resident Evil Village", "RE Village", 1196590, ["Resident Evil Village BIOHAZARD VILLAGE", "Resident Evil Village"], "#5E6B73", "re", "re8.exe", "natives", "residentevilvillage", 3669),
+        Aaa("resident-evil-2", "Resident Evil 2", "Resident Evil 2", 883710, ["RESIDENT EVIL 2  BIOHAZARD RE2", "RESIDENT EVIL 2 BIOHAZARD RE2", "Resident Evil 2"], "#8E2A2A", "re", "re2.exe", "natives", "residentevil22019", 2702),
+        Aaa("resident-evil-3", "Resident Evil 3", "Resident Evil 3", 952060, ["RE3", "Resident Evil 3"], "#9C3A2E", "re", "re3.exe", "natives", "residentevil32020", 3191),
+        Aaa("devil-may-cry-5", "Devil May Cry 5", "Devil May Cry 5", 601150, ["Devil May Cry 5"], "#B0263C", "re", "DevilMayCry5.exe", "natives", "devilmaycry5", 2751),
+        Aaa("monster-hunter-wilds", "Monster Hunter Wilds", "MH Wilds", 2246340, ["MonsterHunterWilds", "Monster Hunter Wilds"], "#C47F2C", "re", "MonsterHunterWilds.exe", "natives", "monsterhunterwilds", 6993),
+        Aaa("monster-hunter-rise", "Monster Hunter Rise", "MH Rise", 1446780, ["MonsterHunterRise", "Monster Hunter Rise"], "#D1A33A", "re", "MonsterHunterRise.exe", "natives", "monsterhunterrise", 4095),
+        Aaa("dragons-dogma-2", "Dragon's Dogma 2", "Dragon's Dogma 2", 2054970, ["Dragons Dogma 2", "Dragon's Dogma 2"], "#8C6A3F", "re", "DD2.exe", "natives", "dragonsdogma2", 6234),
+        Aaa("hogwarts-legacy", "Hogwarts Legacy", "Hogwarts Legacy", 990080, ["Hogwarts Legacy"], "#C9A44C", "unreal", P("Phoenix", "Binaries", "Win64", "HogwartsLegacy.exe"), P("Phoenix", "Content", "Paks", "~mods"), "hogwartslegacy", 5113, Local("Hogwarts Legacy", "Saved", "SaveGames")),
+        Aaa("palworld", "Palworld", "Palworld", 1623730, ["Palworld"], "#3FA7D6", "unreal", P("Pal", "Binaries", "Win64", "Palworld-Win64-Shipping.exe"), P("Pal", "Content", "Paks", "~mods"), "palworld", 6063, Local("Pal", "Saved", "SaveGames")),
+        Aaa("black-myth-wukong", "Black Myth: Wukong", "Black Myth: Wukong", 2358720, ["BlackMythWukong", "Black Myth Wukong"], "#B8862E", "unreal", P("b1", "Binaries", "Win64", "b1-Win64-Shipping.exe"), P("b1", "Content", "Paks", "~mods"), "blackmythwukong", 6713),
+        Aaa("stalker-2", "S.T.A.L.K.E.R. 2: Heart of Chornobyl", "S.T.A.L.K.E.R. 2", 1643320, ["S.T.A.L.K.E.R. 2 Heart of Chornobyl", "STALKER 2"], "#6B7F3A", "unreal", P("Stalker2", "Binaries", "Win64", "Stalker2-Win64-Shipping.exe"), P("Stalker2", "Content", "Paks", "~mods"), "stalker2heartofchornobyl", 6944),
+        Aaa("silent-hill-2", "Silent Hill 2", "Silent Hill 2", 2124490, ["SILENT HILL 2", "Silent Hill 2"], "#7D8B8F", "unreal", P("SHProto", "Binaries", "Win64", "SHProto-Win64-Shipping.exe"), P("SHProto", "Content", "Paks", "~mods"), "silenthill2", 6880),
+        Aaa("final-fantasy-7-remake", "Final Fantasy VII Remake Intergrade", "FF VII Remake", 1462040, ["FINAL FANTASY VII REMAKE", "FINAL FANTASY VII REMAKE INTERGRADE"], "#3D7FB8", "unreal", P("End", "Binaries", "Win64", "ff7remake_.exe"), P("End", "Content", "Paks", "~mods"), "finalfantasy7remake", 4202),
+        Aaa("satisfactory", "Satisfactory", "Satisfactory", 526870, ["Satisfactory"], "#F2A33A", "unreal", P("FactoryGame", "Binaries", "Win64", "FactoryGameSteam-Win64-Shipping.exe"), P("FactoryGame", "Mods"), "satisfactory", 2904, Local("FactoryGame", "Saved", "SaveGames")),
+        Aaa("deep-rock-galactic", "Deep Rock Galactic", "Deep Rock Galactic", 548430, ["Deep Rock Galactic"], "#E0A82E", "unreal", P("FSD", "Binaries", "Win64", "FSD-Win64-Shipping.exe"), P("FSD", "Content", "Paks"), "deeprockgalactic", 3671),
+        Aaa("ready-or-not", "Ready or Not", "Ready or Not", 1144200, ["Ready Or Not", "Ready or Not"], "#4E6A8A", "unreal", P("ReadyOrNot", "Binaries", "Win64", "ReadyOrNot-Win64-Shipping.exe"), P("ReadyOrNot", "Content", "Paks", "~mods"), "readyornot", 4205),
+        Aaa("red-dead-redemption-2", "Red Dead Redemption 2", "RDR2", 1174180, ["Red Dead Redemption 2"], "#A8321E", "rage", "RDR2.exe", "lml", "reddeadredemption2", 3024),
+        Aaa("kingdom-come-deliverance-2", "Kingdom Come: Deliverance II", "KCD II", 1771300, ["KingdomComeDeliverance2", "Kingdom Come Deliverance II"], "#9B7B45", "cryengine", P("Bin", "Win64MasterMasterSteamPGO", "KingdomCome.exe"), "Mods", "kingdomcomedeliverance2", 7286),
+        Aaa("sekiro", "Sekiro: Shadows Die Twice", "Sekiro", 814380, ["Sekiro"], "#A83A2A", "fromsoft", "sekiro.exe", "mods", "sekiro", 2763, Roaming("Sekiro")),
+        Aaa("dark-souls-3", "Dark Souls III", "Dark Souls III", 374320, ["DARK SOULS III", "Dark Souls III"], "#8A7A5A", "fromsoft", P("Game", "DarkSoulsIII.exe"), P("Game", "mods"), "darksouls3", 1392, Roaming("DarkSoulsIII")),
+        Aaa("bannerlord", "Mount & Blade II: Bannerlord", "Bannerlord", 261550, ["Mount & Blade II Bannerlord"], "#A6822F", "taleworlds", P("bin", "Win64_Shipping_Client", "Bannerlord.exe"), "Modules", "mountandblade2bannerlord", 3174),
+        Aaa("mass-effect-le", "Mass Effect Legendary Edition", "Mass Effect LE", 1328670, ["Mass Effect Legendary Edition"], "#4A78B0", "unreal3", P("Game", "Launcher", "MassEffectLauncher.exe"), "Game", "masseffectlegendaryedition", 3712),
+        Aaa("hitman-3", "HITMAN World of Assassination", "Hitman WoA", 1659040, ["HITMAN 3", "HITMAN World of Assassination"], "#C8102E", "glacier", P("Retail", "HITMAN3.exe"), "Runtime", "hitman3", 3617),
+        Aaa("no-mans-sky", "No Man's Sky", "No Man's Sky", 275850, ["No Man's Sky"], "#E35D3A", "nms", P("Binaries", "NMS.exe"), P("GAMEDATA", "MODS"), "nomanssky", 1634, Roaming("HelloGames", "NMS")),
     ];
+
+    static string P(params string[] parts) => Path.Combine(parts);
+    static Func<string, string> Docs(params string[] parts) => _ => Path.Combine([Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), .. parts]);
+    static Func<string, string> Roaming(params string[] parts) => _ => Path.Combine([Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), .. parts]);
+    static Func<string, string> Local(params string[] parts) => _ => Path.Combine([Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), .. parts]);
+
+    /// <summary>Большая игра с модами на Nexus: узнаётся по своему exe (путь от папки игры), моды кладутся в mods.</summary>
+    static GameDef Aaa(string id, string name, string shortName, int steam, string[] folders, string accent, string engine, string exe, string mods,
+        string nexus, int nexusId, Func<string, string>? saves = null) => new()
+    {
+        Id = id, Name = name, ShortName = shortName, SteamAppId = steam, FolderNames = folders, Accent = accent, ArtUrl = GameDef.SteamArt(steam),
+        Engine = engine, ModsFolder = mods,
+        Loader = LoaderKind.None, LoaderName = engine switch { "unreal" => "UE4SS", "re" => "REFramework", "creation" => "Script Extender", _ => "—" },
+        LoaderSite = $"https://www.nexusmods.com/{nexus}",
+        Catalog = CatalogKind.Nexus, BrowseUrl = $"https://www.nexusmods.com/{nexus}/mods", NexusDomain = nexus, NexusGameId = nexusId,
+        Sections = Section.Pick("all", "best"),
+        SignatureDirs = [exe], SignatureExes = [Path.GetFileName(exe)], SignatureWith = exe,
+        Executables = [exe], SavesDir = saves, ModMarker = "any",
+    };
 
     /// <summary>Все игры: встроенные и свои (свои живут в AppState.Games). Массив общий — не менять.</summary>
     public static GameDef[] All => Current.Defs;

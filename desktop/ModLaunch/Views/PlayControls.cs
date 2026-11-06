@@ -57,7 +57,9 @@ public static class PlayControls
 
         var profiles = g.Registry is null ? [] : Profiles.List(g.Def.Id);
         var vanilla = g.Path is not null && Vanilla.Supported(g.Def, g.Path);
-        if (profiles.Count > 0 || vanilla)
+        // 23.0: «Играть как разработчик» — игра с конструктором ModScript Studio внутри (Unity с BepInEx).
+        var dev = g.Path is not null && DevMode.Unsupported(g.Path) is null;
+        if (profiles.Count > 0 || vanilla || dev)
         {
             play.CornerRadius = new CornerRadius(12, 0, 0, 12);
             var chevron = new Button
@@ -68,6 +70,13 @@ public static class PlayControls
             };
             ToolTip.SetTip(chevron, I18n.T(profiles.Count > 0 ? "profile.play" : "vanilla.menu"));
             var menu = new MenuFlyout();
+            if (dev)
+            {
+                var asDev = new MenuItem { Header = I18n.T("v23.dev.play"), Icon = Ui.Icon(Icons.Creator, 14) };
+                asDev.Click += (_, _) => Guard.Later(() => DevLaunch.Start(g));
+                menu.Items.Add(asDev);
+                if (profiles.Count > 0 || vanilla) menu.Items.Add(new Separator());
+            }
             foreach (var p in profiles)
             {
                 var name = p.Name;

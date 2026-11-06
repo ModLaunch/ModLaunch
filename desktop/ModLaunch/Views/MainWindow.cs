@@ -250,6 +250,7 @@ public sealed partial class MainWindow : Window
         // 15.0: все игры Steam (100 тыс.+) читаются в фоне; как прочитались — перерисовать страницу (счётчики, поиск).
         Games.SteamCatalog.Loaded += () => Avalonia.Threading.Dispatcher.UIThread.Post(() => _current?.Build());
         _ = Games.SteamCatalog.EnsureLoaded();
+        try { Settings.MigrateSecrets(); } catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Security.Cryptography.CryptographicException) { }
         // 9.4: официальные картинки Minecraft — в фоне; как скачаются, перерисовать рамку и страницу.
         OfficialArt.Refresh(() => Avalonia.Threading.Dispatcher.UIThread.Post(() => { RenderRail(); _current?.Build(); }));
         Navigate(StartPage());
@@ -484,7 +485,7 @@ public sealed partial class MainWindow : Window
     /// <summary>Игры на боковой панели: без скрытых, по желанию — только найденные, свой порядок.</summary>
     /// <summary>
     /// Игры на боковой панели — как недавние сборки в Modrinth App: только те,
-    /// что есть на компьютере, недавно запущенные сверху, не больше восьми.
+    /// что есть на компьютере, недавно запущенные сверху. Все: лента прокручивается (23.2).
     /// Остальные — в «Библиотеке».
     /// </summary>
     public static IEnumerable<GameState> RailGames()
@@ -492,8 +493,7 @@ public sealed partial class MainWindow : Window
         var hidden = Settings.Data.Arr("hiddenGames").Select(x => x?.ToString()).ToHashSet();
         return OrderedGames()
             .Where(g => !hidden.Contains(g.Def.Id) && g.Status == Detect.Found)
-            .OrderByDescending(g => Features.NewGames.Recent(g))
-            .Take(Look.Store ? 5 : 8);
+            .OrderByDescending(g => Features.NewGames.Recent(g));
     }
 
     /// <summary>Все игры в порядке, заданном в настройках (остальные — как в программе).</summary>
@@ -1005,9 +1005,14 @@ public sealed partial class MainWindow : Window
         if (Settings.Data.Str("afterLaunch") == "minimize" && Settings.Data.Bool("restoreAfterGame", true) && WindowState == WindowState.Minimized)
             WindowState = WindowState.Normal;
         if (counted) Toast(I18n.T("time.session", ("game", game.Def.Name), ("time", Features.PlayTime.Format(ms))));
+        // 23.0: режим разработчика заканчивается вместе с игрой — сделанное в конструкторе остаётся модом.
+        Features.DevMode.Leave(game.Path);
+        // 23.0: защита прогресса — оставить новый прогресс или вернуть сохранения как было.
+        AskProgress(game);
         AppState.Notify();
-        // Закрылась сама и быстро — возможно, вылет: смотрим лог.
-        if (Features.Launcher.LastExit(gameId) is { ByUser: false } exit && exit.Ms < 90_000 && Settings.Data.Bool("crashHelper", true))
+        // Закрылась сама — возможно, вылет: смотрим логи. 24.0: и после долгой игры (вылет через час — тоже вылет);
+        // окно появится, только если это правда вылет (код ошибки, файл о вылете или серьёзная причина в логе).
+        if (Features.Launcher.LastExit(gameId) is { ByUser: false } exit && Settings.Data.Bool("crashHelper", true))
             _ = CheckCrash(game, exit);
     }
 
@@ -1017,6 +1022,8 @@ public sealed partial class MainWindow : Window
         if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
         Activate();
         if (line.StartsWith("nxm://", StringComparison.OrdinalIgnoreCase)) Actions.InstallNxm(line);
+        // 24.0: modlaunch://pack/ABCD-EFGH — сборка друга по ссылке.
+        else if (line.StartsWith("modlaunch://pack/", StringComparison.OrdinalIgnoreCase)) ShareUi.Enter(prefill: line);
         else if (Features.ModLink.IsAppLink(line)) OpenLink(line);
     }
 

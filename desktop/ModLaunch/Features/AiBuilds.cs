@@ -24,7 +24,7 @@ public static class AiBuilds
     const int Max = 40;
     static readonly JsonFile File = new(Path.Combine(Paths.DataDir, "ai-builds.json"), () => new JsonObject { ["items"] = new JsonArray() });
 
-    public static string? Key => Settings.Data.Str("aiKey") is { Length: > 10 } k ? k : null;
+    public static string? Key => Settings.Secret("aiKey") is { Length: > 10 } k ? k : null;
     public static bool HasClaude => Key is not null;
 
     /// <summary>Стили-заготовки: id и слова, которые они добавляют к поиску.</summary>

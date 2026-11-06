@@ -23,7 +23,7 @@ public static class Engines
     /// <summary>16.0: движок по мосту (Bridge.Scan, двадцать движков по отпечаткам); старые правила — если мост не нашёл кода.</summary>
     public static Target? Detect(string gameDir)
     {
-        try { if (Bridge.TargetOf(Bridge.Scan(gameDir)) is { } bridged) return bridged; }
+        try { if (Bridge.TargetOf(Bridge.Scan(gameDir)) is { } bridged) return CustomTarget.Bind(bridged, gameDir); }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
         return DetectOld(gameDir);
     }

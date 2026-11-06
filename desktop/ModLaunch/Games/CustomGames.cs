@@ -529,13 +529,13 @@ public static partial class CustomGames
     /// <summary>Пробный справочник: номер Steam, имя без номера, папка без номера, встроенная игра под чужим номером.</summary>
     static readonly DirGame[] ProbeDir =
     [
-        new("probe-steam", "Deep Rock Galactic", 548430, "deep-rock-galactic", null, "bepinex", "BepInEx-BepInExPack", "Deep Rock Galactic", ["FSD.exe"], null, 1400),
+        new("probe-steam", "Steam Probe Game", 990100, "steam-probe-game", null, "bepinex", "BepInEx-BepInExPack", "Steam Probe Game", ["SPG.exe"], null, 1400),
         new("probe-name", "Schedule I", 0, "schedule-i", null, "melonloader", null, null, ["Schedule I.exe"], null, 2100),
         new("probe-folder", "Inscryption", 0, "inscryption", null, "bepinex", "BepInEx-BepInExPack_Inscryption", "InscryptionGame", [], null, 900),
         new("probe-builtin", "R.E.P.O.", 0, "repo", "repo", "bepinex", "BepInEx-BepInExPack", "REPO", ["REPO.exe"], null, 9000),
         new("probe-other-id", "Same Name Game", 777001, null, "samename", null, null, null, [], null, 10),
-        new("probe-affix", "Skyrim Special Edition", 0, null, "skyrimspecialedition", null, null, null, [], null, 140000, 1704),
-        new("probe-short", "Skyrim", 0, null, "skyrim", null, null, null, [], null, 70000, 110),
+        new("probe-affix", "Civilization VI", 0, null, "civilisationvi", null, null, null, [], null, 14000, 1704),
+        new("probe-short", "Civilization", 0, null, "civilization", null, null, null, [], null, 7000, 110),
         new("probe-series", "Dark Souls", 0, null, "darksouls", null, null, null, [], null, 3000, 160),
         new("probe-roman", "Dark Souls 2", 0, null, "darksouls2", null, null, null, [], null, 2000, 161),
     ];
@@ -561,7 +561,7 @@ public static partial class CustomGames
                 Directory.CreateDirectory(dir);
                 File.WriteAllText(Path.Combine(dir, exe), "MZ");
             }
-            Game(548430, "Deep Rock Galactic", "Deep Rock Galactic", "FSD.exe");      // номер Steam
+            Game(990100, "Steam Probe Game", "Steam Probe Game", "SPG.exe");      // номер Steam
             Game(990001, "SCHEDULE I", "Schedule I", "Schedule I.exe");               // имя (регистр и пробелы не важны)
             Game(990002, "Inscryption Kaycee Build", "InscryptionGame", "Inscryption.exe"); // папка установки
             Game(990003, "R.E.P.O.", "REPO copy", "REPO.exe");                         // встроенная — не предлагаем
@@ -569,7 +569,7 @@ public static partial class CustomGames
             Game(990005, "Totally Unknown", "Unknown", "Unknown.exe");                 // не из справочника
             Game(990006, "Gone Game", "Gone", "Gone.exe", manifestOnly: true);         // манифест без папки
             Game(892970, "Valheim", "Valheim", "valheim.exe");                         // встроенная по номеру
-            Game(489830, "The Elder Scrolls V: Skyrim Special Edition", "Skyrim Special Edition", "SkyrimSE.exe"); // имя в конце
+            Game(289070, "Sid Meier's Civilization VI", "Sid Meier's Civilization VI", "CivilizationVI.exe"); // имя в конце
             Game(374320, "DARK SOULS™ III", "DARK SOULS III", "DarkSoulsIII.exe");     // другая часть серии — не Dark Souls
             Game(335300, "DARK SOULS™ II: Scholar of the First Sin", "Dark Souls II Scholar", "DarkSoulsII.exe"); // римская цифра = арабская
 
@@ -577,14 +577,14 @@ public static partial class CustomGames
             if (steam.Count != 11) throw new Exception($"{steam.Count} manifests read");
             var found = Collect(steam, [], new DirMatcher(ProbeDir));
             string? Key(string name) => found.FirstOrDefault(f => f.Name == name)?.Dir?.Key;
-            if (Key("Deep Rock Galactic") != "probe-steam") throw new Exception("steam id: " + Key("Deep Rock Galactic"));
+            if (Key("Steam Probe Game") != "probe-steam") throw new Exception("steam id: " + Key("Steam Probe Game"));
             if (Key("SCHEDULE I") != "probe-name") throw new Exception("name: " + Key("SCHEDULE I"));
             if (Key("Inscryption Kaycee Build") != "probe-folder") throw new Exception("folder: " + Key("Inscryption Kaycee Build"));
             if (found.Any(f => f.Name is "R.E.P.O." or "Valheim" or "Gone Game")) throw new Exception("builtin or missing game offered: " + string.Join(", ", found.Select(f => f.Name)));
             if (found.FirstOrDefault(f => f.Name == "Same Name Game") is not { Dir: null }) throw new Exception("name matched across different steam ids");
             if (found.FirstOrDefault(f => f.Name == "Totally Unknown") is not { Dir: null }) throw new Exception("unknown game lost or matched");
-            if (found.First(f => f.Name == "Deep Rock Galactic").Exe != "FSD.exe") throw new Exception("exe not taken from directory");
-            if (Key("The Elder Scrolls V: Skyrim Special Edition") != "probe-affix") throw new Exception("suffix: " + Key("The Elder Scrolls V: Skyrim Special Edition"));
+            if (found.First(f => f.Name == "Steam Probe Game").Exe != "SPG.exe") throw new Exception("exe not taken from directory");
+            if (Key("Sid Meier's Civilization VI") != "probe-affix") throw new Exception("suffix: " + Key("Sid Meier's Civilization VI"));
             if (Key("DARK SOULS™ III") is not null) throw new Exception("sequel matched the first game: " + Key("DARK SOULS™ III"));
             if (Key("DARK SOULS™ II: Scholar of the First Sin") != "probe-roman") throw new Exception("roman numeral: " + Key("DARK SOULS™ II: Scholar of the First Sin"));
             return $"{steam.Count} manifests in one pass: steam id, name and folder matched; builtin and missing skipped; {found.Count} offered";

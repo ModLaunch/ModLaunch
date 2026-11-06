@@ -27,6 +27,7 @@ public static class Bridge
 
     static readonly Engine[] Engines =
     [
+        new("custom", "Custom engine (modscript.engine.json)", "custom", EngineProfile.FileName, "code"),
         new("unity-mono", "Unity (Mono)", "unity", "BepInEx 5", "code"),
         new("unity-il2cpp", "Unity (IL2CPP)", "unity", "BepInEx 6 IL2CPP", "code"),
         new("unreal", "Unreal Engine", "unreal", "UE4SS", "code"),
@@ -98,6 +99,9 @@ public static class Bridge
         var c = new List<(string, int, string)>();
         void Add(bool hit, string engine, int weight, string what) { if (hit) c.Add((engine, weight, what)); }
 
+        // 22.0: автор игры сам описал движок — это главнее любых отпечатков.
+        Add(t.File(EngineProfile.FileName), "custom", 1000, EngineProfile.FileName);
+
         // Unity
         var managed = t.EndsWith("_Data/Managed/Assembly-CSharp.dll");
         Add(managed, "unity-mono", 70, "*_Data/Managed/Assembly-CSharp.dll");
@@ -168,7 +172,7 @@ public static class Bridge
         "unreal" => t.Files.Any(f => f.EndsWith("/UE4SS.dll", StringComparison.OrdinalIgnoreCase) || f.EndsWith("/ue4ss/UE4SS.dll", StringComparison.OrdinalIgnoreCase)),
         "reengine" => t.Dir("reframework") && t.File("dinput8.dll"),
         "godot" => t.Dir("mods") || t.File("override.cfg"),
-        "renpy" or "rpgmaker" or "html5" or "love" or "lua" => true,
+        "renpy" or "rpgmaker" or "html5" or "love" or "lua" or "custom" => true,
         _ => false,
     };
 
@@ -184,7 +188,8 @@ public static class Bridge
         ("creation", _) => "Bethesda games: plugins (.esp) and Papyrus need the Creation Kit; ModScript manages Data files and ini",
         ("source" or "source2", _) => "Source games: ModScript manages addons/custom files, cfg and launch options",
         ("gamemaker", _) => "GameMaker: data.win patches need UndertaleModTool; ModScript manages files and options.ini",
-        ("generic", _) => "no known engine: ModScript works through files — configs, ini and replaced assets",
+        ("generic", _) => $"no known engine: ModScript works through files — configs, ini and replaced assets. If the game runs Lua, Python, JavaScript, C# or GDScript scripts, describe it in {EngineProfile.FileName} (modscript profile <gameDir>) and code mods work too",
+        ("rpgmaker-ruby" or "java" or "xna" or "cryengine" or "frostbite" or "idtech", _) => $"ModScript works through files here; if the game has its own script folder, describe it in {EngineProfile.FileName} (modscript profile <gameDir>)",
         _ => null,
     };
 

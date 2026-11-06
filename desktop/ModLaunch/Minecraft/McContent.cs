@@ -188,6 +188,8 @@ public static partial class McContent
         var from = Path.Combine(dir, item.File);
         var to = Path.Combine(dir, enabled ? item.Key : item.Key + ".disabled");
         if (File.Exists(from)) File.Move(from, to, true);
+        // 24.0: выключенный мод не обновляется — иначе «Обновить всё» включил бы его обратно.
+        if (!enabled) ForgetUpdate(i, item);
     }
 
     public static void Delete(McInstance i, McItem item)
@@ -196,6 +198,8 @@ public static partial class McContent
         if (File.Exists(path)) File.Delete(path);
         lock (Gate) FilesOf(i).Remove(RecordKey(item.Kind, item.Key));
         Save(i);
+        // Удалённый мод — и обновлять нечего (раньше «Обновить всё» ставил его обратно).
+        ForgetUpdate(i, item);
     }
 
     /// <summary>Запомнить, откуда файл: проект и версия Modrinth.</summary>

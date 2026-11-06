@@ -1,4 +1,4 @@
-﻿using Avalonia;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
@@ -13,52 +13,110 @@ namespace ModLaunch.Views;
 
 public sealed partial class CreatorPage
 {
-    // ---------------------------------------------------------------- «Мои проекты → Доступные»
+    // ---------------------------------------------------------------- «Мои моды»
 
     /// <summary>
-    /// 18.0: «Доступные» — всё, что уже есть: проекты ModScript X, классические проекты ModScript и приобретённые
-    /// решения (купленные и импортированные скрипты, под защитой). Никаких постоянных кнопок на плитках: при наведении
-    /// проявляются «Запуск» и «Настройка». Создание нового — пункт «Создать» слева (раньше то же делали
-    /// баннер, кнопка в шапке и пунктирная плитка). «Опубликованные» — вкладкой в шапке.
+    /// 22.0: «Мои моды» — одна полка для всего, что написано на ModScript: и скрипты (.modx), и правки файлов
+    /// (.mls, раньше «классические проекты»), от последнего изменённого. Ниже — купленные и импортированные
+    /// скрипты (под защитой). Плитка — обложка игры с ярлыком мода цвета проекта, как подписанный картридж;
+    /// при наведении — «Открыть» и «Настройка».
     /// </summary>
     Control Available()
     {
-        var col = new StackPanel { Spacing = 16 };
+        var col = new StackPanel { Spacing = 18 };
         if (_minePart == "published") { col.Children.Add(PublishedView()); return col; }
 
         // Проверка в игре закончится, пока смотрим список, — точка статуса обновится сама.
         HookTest();
         bool Match(string name) => _filter == "" || name.Contains(_filter, StringComparison.OrdinalIgnoreCase);
         var xs = XProjects.List().Where(p => Match(p.Name)).ToList();
-        var projects = Projects.List().Where(p => Match(p.Name)).OrderByDescending(p => p.Updated).ToList();
+        var entries = xs.Select(p => (p.Game, p.Name, When: p.Updated, Make: (Func<Control>)(() => XCard(p))))
+            .Concat(Projects.List().Where(p => Match(p.Name) && xs.All(x => !string.Equals(x.Dir, p.Dir, StringComparison.OrdinalIgnoreCase)))
+                .Select(p => (p.Game, p.Name, When: p.Updated, Make: (Func<Control>)(() => ProjectCard(p)))))
+            .ToList();
         var owned = Features.Inject.All().Where(i => i.Sealed && Match(i.Title)).ToList();
 
-        if (xs.Count + projects.Count + owned.Count == 0)
+        // 23.0: над полкой — игры (с числом модов), порядок и «Новый мод».
+        if (entries.Count > 0)
         {
-            var empty = Ui.Col(12,
-                Ui.Text(_filter == "" ? I18n.T("cr.empty") : I18n.T("cr.lib.none"), "h3"),
-                Ui.Text(I18n.T("v18.av.empty"), "muted", wrap: true));
-            if (_filter == "") empty.Children.Add(Ui.Row(10, Ui.Button(I18n.T("v18.hub.create"), () => Go("form"), "primary", Icons.Plus)));
-            col.Children.Add(HubLook.Frame(empty, new Thickness(24, 20)));
+            var chips = new WrapPanel { VerticalAlignment = VerticalAlignment.Center };
+            void Chip(string text, bool on, Action pick)
+            {
+                var b = Ui.Button(text, () => { pick(); Build(); }, on ? "chip active" : "chip");
+                b.Margin = new Thickness(0, 0, 6, 6);
+                chips.Children.Add(b);
+            }
+            var games = entries.Where(e => e.Game != "").GroupBy(e => e.Game).OrderByDescending(g => g.Count()).ToList();
+            if (_mineGame is not null && games.All(g => g.Key != _mineGame)) _mineGame = null;
+            if (games.Count > 1)
+            {
+                Chip($"{I18n.T("hub.allGames")}  {entries.Count}", _mineGame is null, () => _mineGame = null);
+                foreach (var g in games)
+                {
+                    var id = g.Key;
+                    Chip($"{GameCatalog.ById(id)?.ShortName ?? id}  {g.Count()}", _mineGame == id, () => _mineGame = _mineGame == id ? null : id);
+                }
+            }
+            var sorts = new[] { "recent", "name", "game" };
+            var sort = new ComboBox { Width = 190, ItemsSource = sorts.Select(s => I18n.T("v23.mine.sort." + s)).ToList(), SelectedIndex = Math.Max(0, Array.IndexOf(sorts, _mineSort)), VerticalAlignment = VerticalAlignment.Center };
+            sort.SelectionChanged += (_, _) => { var v = sorts[Math.Max(0, sort.SelectedIndex)]; if (v != _mineSort) { _mineSort = v; Build(); } };
+            var tools = Ui.Row(10, sort, Ui.Button(I18n.T("v22.hub.new"), () => Go("form"), "primary", Icons.Plus));
+            tools.VerticalAlignment = VerticalAlignment.Top;
+            var bar = new DockPanel();
+            DockPanel.SetDock(tools, Dock.Right);
+            bar.Children.Add(tools);
+            bar.Children.Add(chips);
+            col.Children.Add(bar);
+        }
+        var shown = entries.Where(e => _mineGame is null || e.Game == _mineGame);
+        shown = _mineSort switch
+        {
+            "name" => shown.OrderBy(e => e.Name, StringComparer.CurrentCultureIgnoreCase),
+            "game" => shown.OrderBy(e => GameCatalog.ById(e.Game)?.Name ?? "~", StringComparer.CurrentCultureIgnoreCase).ThenByDescending(e => e.When),
+            _ => shown.OrderByDescending(e => e.When),
+        };
+        var mods = shown.Select(e => e.Make()).ToList();
+
+        if (mods.Count + owned.Count == 0)
+        {
+            var empty = Ui.Col(10,
+                Ui.Text(_filter == "" ? I18n.T("v22.mods.empty") : I18n.T("cr.lib.none"), "h3"),
+                Ui.Text(_filter == "" ? I18n.T("v22.mods.empty.text") : I18n.T("v18.av.empty"), "muted", wrap: true));
+            if (_filter == "") empty.Children.Add(Ui.Row(10, Ui.Button(I18n.T("v22.hub.new"), () => Go("form"), "primary", Icons.Plus)));
+            empty.MaxWidth = 560;
+            empty.HorizontalAlignment = HorizontalAlignment.Left;
+            col.Children.Add(empty);
             return col;
         }
-        if (xs.Count > 0)
-        {
-            col.Children.Add(Section(I18n.T("v16.mine.x", ("n", xs.Count))));
-            col.Children.Add(Tiles(xs.Select(XCard)));
-        }
-        if (projects.Count > 0)
-        {
-            col.Children.Add(Section(I18n.T("v16.mine.classic", ("n", projects.Count))));
-            col.Children.Add(Tiles(projects.Select(ProjectCard)));
-        }
+        if (mods.Count > 0) col.Children.Add(Tiles(mods));
         if (owned.Count > 0)
         {
             var all = Ui.Button(I18n.T("v18.av.owned.all"), () => Go("scripts"), "ghost", Icons.Shield);
-            col.Children.Add(Section(I18n.T("v18.av.owned", ("n", owned.Count)), all));
+            col.Children.Add(Section(I18n.T("v22.mods.owned", ("n", owned.Count)), all));
             col.Children.Add(Tiles(owned.Select(OwnedCard)));
         }
+        // 23.0: карты, сделанные конструктором прямо в игре (режим разработчика).
+        var worlds = AppState.Games.Where(g => g.Status == Detect.Found && g.Path is not null && (_mineGame is null || g.Def.Id == _mineGame))
+            .SelectMany(g => DevMode.Worlds(g.Path).Where(w => Match(w.Level)).Select(w => (Game: g, w.Level, w.Objects, w.At))).ToList();
+        if (worlds.Count > 0)
+        {
+            col.Children.Add(Section(I18n.T("v23.dev.worlds", ("n", worlds.Count))));
+            col.Children.Add(Tiles(worlds.Select(w => WorldCard(w.Game, w.Level, w.Objects, w.At))));
+        }
         return col;
+    }
+
+    /// <summary>Карта из конструктора в игре: обложка игры, ярлык с уровнем, сколько изменений; «Открыть» — снова в игру разработчиком.</summary>
+    Control WorldCard(GameState g, string level, int objects, DateTime at)
+    {
+        var state = Ui.Row(6, Ui.Icon(Icons.Cube, 12, HubLook.Violet), Ui.Text(I18n.T("v23.dev.changes", ("n", objects)), "small"));
+        var card = Tile(Ui.GameImage(g.Def, 400), [Tag(I18n.T("v23.dev.map"), null, HorizontalAlignment.Right)],
+            level, g.Def.Name, state, Ui.Text(Ui.Ago(at), "small muted"),
+            () => DevLaunch.Start(g), () => Actions.OpenFolder(DevMode.ConfigDir(g.Path!)), Ui.Hex("#2F7D6B"), launchText: I18n.T("v23.dev.open"));
+        Ctx.Attach(card, () => Ctx.Menu(
+            Ctx.Item(I18n.T("v23.dev.open"), Icons.Play, () => DevLaunch.Start(g)),
+            Ctx.Folder(I18n.T("games.openFolder"), DevMode.ConfigDir(g.Path!))));
+        return card;
     }
 
     static UniformGrid Tiles(IEnumerable<Control> cards)
@@ -70,71 +128,101 @@ public sealed partial class CreatorPage
 
     static Control Section(string title, Control? right = null)
     {
-        var bar = new DockPanel { Margin = new Thickness(0, 6, 0, -4) };
+        var bar = new DockPanel { Margin = new Thickness(0, 8, 0, -2) };
         if (right is not null) { DockPanel.SetDock(right, Dock.Right); bar.Children.Add(right); }
-        bar.Children.Add(HubLook.Eyebrow(title, HubLook.Violet));
+        bar.Children.Add(HubLook.Eyebrow(title));
         return bar;
     }
 
+    /// <summary>Светлый ли цвет ярлыка: на светлом — тёмный текст, на тёмном — белый.</summary>
+    static bool IsLightColor(Color c) => 0.299 * c.R + 0.587 * c.G + 0.114 * c.B > 160;
+
     /// <summary>
-    /// Плитка «Доступных»: полоса цвета сверху (если есть), картинка с ярлыками, название, подпись и строка внизу.
-    /// Над картинкой при наведении — «Запуск» и «Настройка»; клик по плитке — то же, что главное действие.
+    /// Плитка мода — «картридж»: обложка игры, на ней ярлык с названием мода цвета проекта (label), в углу —
+    /// версия или пометка (tags); под обложкой — игра и строка состояния. При наведении — «Открыть» и «Настройка»;
+    /// клик по плитке — главное действие.
     /// </summary>
     static Button Tile(Control art, Control[] tags, string title, string sub, Control footLeft, Control footRight, Action launch, Action configure,
-        IBrush? stripe = null, string? launchText = null, Action? click = null)
+        IBrush? label = null, string? launchText = null, Action? click = null)
     {
+        var plateColor = (label as ISolidColorBrush)?.Color ?? HubLook.AmberColor;
+        var plateText = new TextBlock
+        {
+            Text = title, FontSize = 15, FontWeight = FontWeight.Bold, TextTrimming = TextTrimming.CharacterEllipsis,
+            Foreground = IsLightColor(plateColor) ? HubLook.OnAmber : Brushes.White,
+        };
+        var plate = new Border
+        {
+            Background = new SolidColorBrush(plateColor), CornerRadius = new CornerRadius(4), Padding = new Thickness(9, 5),
+            Margin = new Thickness(10), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Bottom,
+            BoxShadow = new BoxShadows(new BoxShadow { OffsetY = 2, Blur = 6, Color = Color.FromArgb(110, 0, 0, 0) }), Child = plateText,
+        };
         var top = new Panel { Children = { art } };
+        // Затемнение к низу обложки: ярлык читается на любой картинке.
+        top.Children.Add(new Border
+        {
+            IsHitTestVisible = false,
+            Background = new LinearGradientBrush
+            {
+                StartPoint = new RelativePoint(0, 0.45, RelativeUnit.Relative), EndPoint = new RelativePoint(0, 1, RelativeUnit.Relative),
+                GradientStops = { new GradientStop(Color.FromArgb(0, 0, 0, 0), 0), new GradientStop(Color.FromArgb(150, 0, 0, 0), 1) },
+            },
+        });
         foreach (var t in tags) top.Children.Add(t);
+        top.Children.Add(plate);
         var card = new Button
         {
-            Classes = { "tile" }, Margin = new Thickness(0, 0, 14, 14), Padding = new Thickness(0),
+            Classes = { "tile" }, Margin = new Thickness(0, 0, 16, 16), Padding = new Thickness(0),
             HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch,
         };
         top.Children.Add(HoverActions.OnArt(card, launch, configure, launchText));
-        var name = Ui.Text(title, "h3");
-        name.TextTrimming = TextTrimming.CharacterEllipsis;
         var subText = Ui.Text(sub, "small muted");
         subText.TextTrimming = TextTrimming.CharacterEllipsis;
         footLeft.Margin = new Thickness(0, 0, 8, 0);
-        var foot = new DockPanel { Margin = new Thickness(0, 8, 0, 0) };
+        var foot = new DockPanel { Margin = new Thickness(0, 6, 0, 0) };
         DockPanel.SetDock(footRight, Dock.Right);
         foot.Children.Add(footRight);
         foot.Children.Add(footLeft);
-        var body = Ui.Col(2, name, subText, new Border { Height = 1, Background = HubLook.Edge, Margin = new Thickness(0, 8, 0, 0) }, foot);
-        body.Margin = new Thickness(14, 12, 14, 12);
-        var content = new StackPanel();
-        if (stripe is not null) content.Children.Add(new Border { Height = 3, Background = stripe });
-        content.Children.Add(new Border { Height = 96, ClipToBounds = true, CornerRadius = stripe is null ? new CornerRadius(4, 4, 0, 0) : new CornerRadius(0), Child = top });
-        content.Children.Add(body);
+        var body = Ui.Col(0, subText, foot);
+        body.Margin = new Thickness(14, 10, 14, 12);
+        var content = new StackPanel
+        {
+            Children = { new Border { Height = 150, ClipToBounds = true, CornerRadius = new CornerRadius(10, 10, 0, 0), Child = top }, body },
+        };
         card.Content = content;
+        ToolTip.SetTip(card, title);
         card.Click += (_, _) => (click ?? launch)();
         return card;
     }
 
-    /// <summary>Ярлык в углу картинки: тёмный (версия) или цветной (вид проекта).</summary>
+    /// <summary>Пометка в правом верхнем углу обложки: версия, «Куплен», «Импорт».</summary>
     static Border Tag(string text, IBrush? background, HorizontalAlignment h) => new()
     {
-        Background = background ?? new SolidColorBrush(Color.FromArgb(215, 10, 12, 18)), CornerRadius = new CornerRadius(3), Padding = new Thickness(6, 2),
-        Margin = new Thickness(8), HorizontalAlignment = h, VerticalAlignment = VerticalAlignment.Top, Child = HubLook.MonoText(text, 9.5, Brushes.White),
+        Background = background ?? new SolidColorBrush(Color.FromArgb(200, 0, 0, 0)), CornerRadius = new CornerRadius(4), Padding = new Thickness(6, 2),
+        Margin = new Thickness(8), HorizontalAlignment = h, VerticalAlignment = VerticalAlignment.Top,
+        Child = new TextBlock { Text = text, FontSize = 11, FontWeight = FontWeight.SemiBold, Foreground = Brushes.White },
     };
 
     static Control NoArt(string icon) => new Border { Background = HubLook.Raised, Child = Ui.Icon(icon, 30, Ui.Res("Faint")) };
 
     /// <summary>
-    /// Плитка проекта ModScript X: полоса цвета проекта, игра, путь моста (движок → язык), когда изменён.
-    /// «Запуск» — среда ModScript X, «Настройка» — её панель настроек проекта (название, игра, движок, цвет).
+    /// Плитка скрипта ModScript (.modx): ярлык цвета проекта, игра, куда переводится мод (движок и язык), когда изменён.
+    /// «Открыть» — среда ModScript, «Настройка» — её панель настроек проекта (название, игра, движок, цвет).
     /// </summary>
     Control XCard(XProject p)
     {
         var game = p.Game == "" ? null : GameCatalog.ById(p.Game);
         var target = p.Target is { } t ? MX.Target.Find(t) : null;
-        var route = HubLook.MonoText(target is null ? I18n.T("v16.sum.files") : $"{target.Title} → {XStudio.Lang(target.Language)}", 10.5, HubLook.Cyan);
-        route.TextTrimming = TextTrimming.CharacterEllipsis;
+        // 23.0: под обложкой — стоит ли мод в игре сейчас (и не изменён ли после установки); путь кода — в подсказке.
+        var (st, brush) = XState(p);
+        var state = Ui.Row(6, Ui.Dot(brush, 8), Ui.Text(I18n.T("v23.mine.st." + st), "small"));
+        ToolTip.SetTip(state, target is null ? I18n.T("v16.sum.files") : I18n.T("v22.mods.route", ("engine", target.Title)));
         var hex = XProjects.Hex(p.Color);
         var sub = game?.Name ?? (p.GamePath is { } gp ? Path.GetFileName(gp.TrimEnd('\\', '/')) : I18n.T("v16.sum.noGame"));
+        var when = Ui.Text(Ui.Ago(p.Updated), "small muted");
         var card = Tile(game is not null ? Ui.GameImage(game, 400) : NoArt(Icons.Code),
-            [Tag("MODSCRIPT X", Ui.Hex(hex), HorizontalAlignment.Left), Tag("v" + p.Version, null, HorizontalAlignment.Right)],
-            p.Name, sub, route, HubLook.MonoText(Ui.Ago(p.Updated), 10.5),
+            [Tag("v" + p.Version, null, HorizontalAlignment.Right)],
+            p.Name, sub, state, when,
             () => MainWindow.Current?.Navigate(() => new XStudio(p.Id)), () => MainWindow.Current?.Navigate(() => new XStudio(p.Id, "settings")), Ui.Hex(hex));
         Ctx.Attach(card, () => Ctx.Menu(
             Ctx.Item(I18n.T("v18.hover.launch"), Icons.Play, () => MainWindow.Current?.Navigate(() => new XStudio(p.Id))),
@@ -158,9 +246,9 @@ public sealed partial class CreatorPage
         var state = Ui.Row(6, Ui.Dot(StatusBrush(status), 8), Ui.Text(I18n.T($"v12.pj.st.{status}.short"), "small"));
         ToolTip.SetTip(state, I18n.T($"v12.pj.st.{status}"));
         var card = Tile(game is not null ? Ui.GameImage(game, 400) : NoArt(Icons.Creator),
-            [Tag("MODSCRIPT", null, HorizontalAlignment.Left), Tag(p.Version == "" ? "v—" : "v" + p.Version, null, HorizontalAlignment.Right)],
+            [Tag(p.Version == "" ? "v—" : "v" + p.Version, null, HorizontalAlignment.Right)],
             p.Name, game?.Name ?? p.Game, state, HubLook.MonoText(Ui.Ago(p.Updated), 10.5),
-            () => OpenProject(p), () => OpenProject(p, "overview"));
+            () => OpenInStudio(p), () => OpenInStudio(p, "settings"));
         Ctx.Attach(card, () => ProjectMenu(p));
         return card;
     }
@@ -172,12 +260,13 @@ public sealed partial class CreatorPage
     Control OwnedCard(InjectItem i)
     {
         var game = i.Game == "" ? null : GameCatalog.ById(i.Game);
-        var shield = Ui.Row(6, Ui.Icon(Icons.Lock, 12, HubLook.Cyan), HubLook.MonoText(GuardLine(i), 10.5, HubLook.Cyan));
-        var sub = (i.Source == "market" ? I18n.T("v18.lib.from", ("seller", i.Seller)) : I18n.T("v18.lib.imported")) + (game is null ? "" : " · " + game.Name);
+        var shield = Ui.Row(6, Ui.Icon(Icons.Lock, 12, HubLook.Cyan), HubLook.MonoText(I18n.T("v18.lib.sealed"), 10.5));
+        ToolTip.SetTip(shield, GuardLine(i));
+        var sub = game?.Name ?? (i.Source == "market" ? I18n.T("v18.lib.from", ("seller", i.Seller)) : I18n.T("v18.lib.imported"));
         var card = Tile(game is not null ? Ui.GameImage(game, 400) : NoArt(Icons.Lock),
-            [Tag(I18n.T("v18.lib.sealed").ToUpper(I18n.Culture), HubLook.Signature(), HorizontalAlignment.Left), Tag(I18n.T(i.Source == "market" ? "v18.lib.bought" : "v18.lib.import").ToUpper(I18n.Culture), null, HorizontalAlignment.Right)],
+            [Tag(I18n.T(i.Source == "market" ? "v18.lib.bought" : "v18.lib.import"), null, HorizontalAlignment.Right)],
             i.Title, sub, shield, HubLook.MonoText(Ui.Ago(i.Added), 10.5),
-            () => LaunchScript(i), () => ScriptSettings(i), launchText: I18n.T("v18.hover.play"), click: () => ScriptSettings(i));
+            () => LaunchScript(i), () => ScriptSettings(i), Ui.Hex("#3B4252"), launchText: I18n.T("v18.hover.play"), click: () => ScriptSettings(i));
         if (!i.Enabled) card.Opacity = 0.6;
         return card;
     }
@@ -215,7 +304,7 @@ public sealed partial class CreatorPage
 
     /// <summary>Меню проекта (плитка «Моих проектов» и строка «Верстака»).</summary>
     MenuFlyout ProjectMenu(Project p) => Ctx.Menu(
-        Ctx.Item(I18n.T("ctx.open"), Icons.Edit, () => OpenProject(p)),
+        Ctx.Item(I18n.T("ctx.open"), Icons.Edit, () => OpenInStudio(p)),
         Ctx.Item(I18n.T("v12.pj.pane.overview"), Icons.Chart, () => OpenProject(p, "overview")),
         Ctx.Item(I18n.T("v12.pj.run"), Icons.Play, () => { OpenProject(p); BuildAndTest(); }, gesture: "F5"),
         Ctx.Item(I18n.T("ctx.duplicate"), Icons.Layers, () => { Projects.Create(p.Name + " (2)", File.ReadAllText(p.Script)); Build(); }),
@@ -242,5 +331,41 @@ public sealed partial class CreatorPage
         w.Dialog(I18n.T("ctx.delete"), Ui.Text(I18n.T("cr.deleteProject", ("name", p.Name)), "muted", wrap: true),
             Ui.Button(I18n.T("common.cancel"), w.CloseDialog),
             Ui.Button(I18n.T("ctx.delete"), () => { w.CloseDialog(); Projects.Delete(p); if (_open?.Id == p.Id) _open = null; Build(); }, "primary", Icons.Trash));
+    }
+}
+public sealed partial class CreatorPage
+{
+    /// <summary>
+    /// 22.0: проект правок файлов (main.mls) открывается в той же среде ModScript, что и скрипты: проверка на лету,
+    /// F5 — что изменит мод, F6 — собрать и поставить в игру. Папка проекта остаётся на месте.
+    /// </summary>
+    internal static void OpenInStudio(Project p, string? side = null)
+    {
+        XProject x;
+        try { x = XProjects.Adopt(p); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { MainWindow.Current?.Toast(e.Message, bad: true); return; }
+        MainWindow.Current?.Navigate(() => new XStudio(x.Id, side));
+    }
+}
+public sealed partial class CreatorPage
+{
+    /// <summary>«Мои моды»: выбранная игра (null — все) и порядок (recent, name, game) — на сеанс.</summary>
+    static string? _mineGame;
+    static string _mineSort = "recent";
+
+    /// <summary>
+    /// 23.0: состояние скрипта ModScript для плитки: draft — без игры, notyet — ещё не ставили, ingame — стоит и
+    /// не менялся после установки, changed — код новее установленного (поставить заново, F6).
+    /// </summary>
+    static (string Key, IBrush Brush) XState(XProject p)
+    {
+        var path = p.GamePath ?? (p.Game != "" ? AppState.Games.FirstOrDefault(g => g.Def.Id == p.Game && g.Status == Detect.Found)?.Path : null);
+        if (path is null) return ("draft", Ui.Res("Faint"));
+        if (!p.Main.EndsWith(".modx", StringComparison.OrdinalIgnoreCase)) return ("notyet", Ui.Res("Faint"));
+        DateTime? at;
+        try { at = MX.Injector.InstalledAt(MX.ModxDoc.Parse(File.ReadAllText(p.Main)).Id, path); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException) { at = null; }
+        if (at is null) return ("notyet", Ui.Res("Faint"));
+        return at.Value >= p.Updated.AddSeconds(-2) ? ("ingame", Ui.Res("Good")) : ("changed", Ui.Res("Warn"));
     }
 }

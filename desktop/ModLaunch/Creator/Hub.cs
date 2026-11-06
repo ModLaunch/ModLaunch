@@ -348,7 +348,7 @@ public static partial class Hub
         var got = Convert.ToHexString(SHA256.HashData(ms.ToArray())).ToLowerInvariant();
         if (sha != "" && got != sha) throw new ServiceError("BAD_HASH");
         var dir = Directory.CreateDirectory(Path.Combine(Paths.DownloadsTemp, "hub")).FullName;
-        var file = Path.Combine(dir, Regex.Replace(mod.FileName is { Length: > 0 } f ? f : $"{Projects.PackageName(mod.Name)}-{ver}.zip", @"[^\w.\-]+", "_"));
+        var file = Path.Combine(dir, Regex.Replace(mod.FileName is { Length: > 0 } f ? f : $"{Projects.PackageName(mod.Name)}-{ver}.zip", @"[^\w.\-]+", "_").TrimStart('.'));
         await File.WriteAllBytesAsync(file, ms.ToArray(), ct);
         _ = CountDownload(mod.Id);
         return file;

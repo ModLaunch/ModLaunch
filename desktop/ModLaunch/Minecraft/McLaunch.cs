@@ -13,8 +13,17 @@ public static class McLaunch
     /// <summary>Started — лаунчер открыт; AlreadyOpen — он уже был открыт и мог не заметить новую установку.</summary>
     public enum Result { Started, NoLauncher, AlreadyOpen }
 
+    /// <summary>
+    /// 24.0: какая сборка запущена последней — её и разбирает «Почему игра упала» (с главной и из друзей
+    /// запускают сборку, не делая её выбранной).
+    /// </summary>
+    public static string? LaunchedId { get; private set; }
+
+    public static McInstance? Launched => (LaunchedId is { } id ? Mc.Get(id) : null) ?? Mc.Active;
+
     public static async Task<Result> Play(McInstance i, IProgress<InstallStep>? progress = null, CancellationToken ct = default)
     {
+        LaunchedId = i.Id;
         await McInstall.EnsureVersion(i, progress, ct);
         // Открытый лаунчер читает установки при старте — новую он может не увидеть, пока его не перезапустят.
         var wasOpen = !Program.Demo && LauncherRunning();
@@ -49,6 +58,13 @@ public static class McLaunch
                 while (!cts.IsCancellationRequested && DateTime.Now - since < TimeSpan.FromMinutes(10))
                 {
                     await Task.Delay(3000, cts.Token);
+                    // 24.0: игра упала ещё до окна (нет Fabric API, не та Java, моды несовместимы) — окна «Minecraft»
+                    // не будет, но «Почему игра упала» должно открыться и тут.
+                    if (FindGame(since) is null && EarlyCrash(i, since))
+                    {
+                        Features.Launcher.ReportCrash(Mc.Def!, since.ToUniversalTime(), (long)(DateTime.Now - since).TotalMilliseconds);
+                        return;
+                    }
                     if (FindGame(since) is { } game)
                     {
                         var jars = 0;
@@ -73,6 +89,28 @@ public static class McLaunch
             }
             catch { }
         }, cts.Token);
+    }
+
+    /// <summary>Что пишут загрузчики, когда игра не запустилась.</summary>
+    static readonly string[] EarlyMarkers =
+    [
+        "Mod resolution encountered", "Incompatible mods found", "UnsupportedClassVersionError", "Missing or unsupported mandatory dependencies",
+        "MixinApplyError", "Mixin apply failed", "java.lang.OutOfMemoryError", "Mod loading has failed", "Failed to load mods",
+    ];
+
+    /// <summary>Вылет до окна игры: свежий отчёт о вылете или свежий latest.log с ошибкой загрузки модов.</summary>
+    internal static bool EarlyCrash(McInstance i, DateTime since)
+    {
+        try
+        {
+            var reports = Path.Combine(i.Dir, "crash-reports");
+            if (Directory.Exists(reports) && new DirectoryInfo(reports).EnumerateFiles("crash-*.txt").Any(f => f.LastWriteTime > since)) return true;
+            var log = Path.Combine(i.Dir, "logs", "latest.log");
+            if (!File.Exists(log) || File.GetLastWriteTime(log) <= since) return false;
+            var text = string.Join('\n', Features.Logs.Tail(log, 600));
+            return EarlyMarkers.Any(m => text.Contains(m, StringComparison.Ordinal));
+        }
+        catch { return false; }
     }
 
     /// <summary>Процесс игры: javaw/java с окном «Minecraft …», запущенный после нажатия «Играть».</summary>

@@ -72,7 +72,7 @@ public sealed class ListingPage : Page
         // Заголовок: название крупно, рядом — тип, игра и автор.
         var title = Gx.Title(l.Title, 32, Ui.Res("Text"));
         var meta = Ui.Row(8, StoreKit.Pill(I18n.T("mk.kind." + l.Kind), onArt: false), StoreKit.Pill(MarketTiles.GameName(l.Game), onArt: false), StoreKit.Pill(I18n.T("mk.license." + l.License), onArt: false));
-        col.Children.Add(Ui.Col(10, Gx.Eyebrow("Creator Hub · " + I18n.T("mk.kind." + l.Kind), Ui.Res("Brand2")), title, meta));
+        col.Children.Add(Ui.Col(10, HubLook.Label("Creator Hub · " + I18n.T("mk.kind." + l.Kind), Ui.Res("Brand2")), title, meta));
 
         // Медиа слева, сведения справа.
         var top = new Grid { ColumnDefinitions = new ColumnDefinitions("2*,*"), ColumnSpacing = 18 };
@@ -106,7 +106,7 @@ public sealed class ListingPage : Page
         Content = new ScrollViewer { Content = col, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
     }
 
-    static Control Section(string title) => Ui.Col(6, Gx.Eyebrow(title, Ui.Res("Text"), 12), new Border { Height = 1, Background = Ui.Res("Line") });
+    static Control Section(string title) => Ui.Col(6, HubLook.Label(title, Ui.Res("Text"), 12), new Border { Height = 1, Background = Ui.Res("Line") });
 
     static readonly FontFamily Mono = new("Cascadia Mono, Consolas, JetBrains Mono, DejaVu Sans Mono, monospace");
 
@@ -261,7 +261,7 @@ public sealed class ListingPage : Page
             d.Children.Add(Ui.Row(8, Ui.Icon(icon, 14, Ui.Res("Muted")), Ui.Text(label, "small muted")));
             return d;
         }
-        var col = Ui.Col(10, Gx.Eyebrow(I18n.T("v93.mk.contents"), Ui.Res("Text"), 11),
+        var col = Ui.Col(10, HubLook.Label(I18n.T("v93.mk.contents"), Ui.Res("Text"), 11),
             Row(Icons.Package, I18n.T("v93.mk.file"), l.FileName == "" ? "—" : l.FileName),
             Row(Icons.Save, I18n.T("v93.mk.size"), l.Size > 0 ? GamePage.Size(l.Size) : "—"),
             Row(Icons.Info, I18n.T("hub.f.version"), l.Version),
@@ -278,7 +278,7 @@ public sealed class ListingPage : Page
         var who = Ui.Row(12, Ui.Thumb(null, a.Name, 48, 24, person: true), Ui.Col(2, Ui.Text(a.Name, "h3"), Ui.Text(I18n.T("v93.mk.author.stats", ("n", a.Items), ("sales", I18n.Compact(a.Sales))), "small muted")));
         var link = new Border { Background = Brushes.Transparent, Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand), Child = who };
         StoreKit.OnClick(link, () => MainWindow.Current?.Navigate(() => new AuthorPage(a.Uid, a.Name)));
-        return new Border { Classes = { "card" }, Padding = new Thickness(16), Child = Ui.Col(12, Gx.Eyebrow(I18n.T("v93.mk.author"), Ui.Res("Text"), 11), link, MarketPage.FollowButton(a.Uid, a.Name)) };
+        return new Border { Classes = { "card" }, Padding = new Thickness(16), Child = Ui.Col(12, HubLook.Label(I18n.T("v93.mk.author"), Ui.Res("Text"), 11), link, MarketPage.FollowButton(a.Uid, a.Name)) };
     }
 
     static Control Similar(Listing l)
@@ -289,7 +289,7 @@ public sealed class ListingPage : Page
         if (list.Count == 0) return new Border();
         var rows = Ui.Col(4);
         foreach (var x in list) rows.Children.Add(MarketTiles.Row(x));
-        return Ui.Col(10, Gx.Eyebrow(I18n.T("v93.mk.similar"), Ui.Res("Text"), 11), rows);
+        return Ui.Col(10, HubLook.Label(I18n.T("v93.mk.similar"), Ui.Res("Text"), 11), rows);
     }
 
     /// <summary>Отзывы: сводка как в Steam (полоса по звёздам), список и форма для купивших.</summary>
@@ -410,10 +410,10 @@ public sealed class AuthorPage : Page
         var since = a.Since is DateTime d ? I18n.T("v93.mk.author.since", ("date", d.ToLocalTime().ToString("MMMM yyyy", I18n.Culture))) : I18n.T("v93.mk.author");
         var who = Ui.Col(4, Gx.Title(_name, 30, Ui.Res("Text"), 1), Ui.Text(since, "muted"));
         var stats = Ui.Row(34,
-            Gx.Stat(a.Items.ToString(), I18n.T("v93.mk.items.short")),
-            Gx.Stat(I18n.Compact(a.Sales), I18n.T("st.sales")),
-            Gx.Stat(a.Workshop.ToString(), I18n.T("v93.mk.workshop")),
-            Gx.Stat(I18n.Compact(a.Downloads), I18n.T("hub.stat.downloads")));
+            HubLook.Stat(a.Items.ToString(), I18n.T("v93.mk.items.short")),
+            HubLook.Stat(I18n.Compact(a.Sales), I18n.T("st.sales")),
+            HubLook.Stat(a.Workshop.ToString(), I18n.T("v93.mk.workshop")),
+            HubLook.Stat(I18n.Compact(a.Downloads), I18n.T("hub.stat.downloads")));
         var follow = MarketPage.FollowButton(_uid, _name);
         follow.VerticalAlignment = VerticalAlignment.Center;
         var right = Ui.Row(30, stats, follow);

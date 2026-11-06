@@ -37,6 +37,16 @@ public static class Http
         return await response.Content.ReadAsStringAsync(cts.Token);
     }
 
+    /// <summary>23.7: небольшой файл целиком (обложка для цвета меню игры).</summary>
+    public static async Task<byte[]> GetBytes(string url, CancellationToken ct = default, int timeoutSec = 30)
+    {
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(TimeSpan.FromSeconds(timeoutSec));
+        using var response = await Client.GetAsync(url, cts.Token);
+        if (!response.IsSuccessStatusCode) throw new HttpRequestException($"{(int)response.StatusCode} {response.ReasonPhrase} — {url}");
+        return await response.Content.ReadAsByteArrayAsync(cts.Token);
+    }
+
     public static async Task<JsonNode?> GetJson(string url, CancellationToken ct = default, int timeoutSec = 30, string? accept = null)
     {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);

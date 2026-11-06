@@ -1,0 +1,904 @@
+
+// ===================================================================== Studio.Commands — 500+ команд одной строкой поиска
+// Каждая возможность редактора — команда: имя на языке ModLaunch, группа, значок, клавиши. Все команды ищутся в палитре
+// (Space или Ctrl+K), частые — всплывают над выбранным объектом. Команды, меняющие карту, отменяются (Ctrl+Z).
+public partial class ModScriptStudio
+{
+    class Act { public string Id, Group, Name, Icon, Keys, Search; public Action Run; public bool Sel; }
+
+    List<Act> _acts;
+    readonly List<string> _recent = new List<string>();
+
+    static readonly string[] ActGroups = { "add", "transform", "arrange", "edit", "color", "look", "behaviour", "physics", "world", "camera", "select", "view", "file", "info" };
+
+    string GroupName(string g) { return T("g." + g, g); }
+
+    void A(string id, string group, string icon, string name, bool sel, Action run, string keys)
+    {
+        _acts.Add(new Act { Id = id, Group = group, Icon = icon, Name = name, Sel = sel, Run = run, Keys = keys ?? "", Search = (name + " " + GroupName(group) + " " + id).ToLowerInvariant() });
+    }
+
+    void A(string id, string group, string icon, string name, bool sel, Action run) { A(id, group, icon, name, sel, run, ""); }
+
+    void RunAct(Act a)
+    {
+        if (a.Sel && TopSelection().Count == 0) { Status(T("needSel", "Select an object first")); return; }
+        try { a.Run(); }
+        catch (Exception e) { Status(a.Name + ": " + e.Message); Logger.LogWarning("command " + a.Id + ": " + e); }
+        _recent.Remove(a.Id);
+        _recent.Insert(0, a.Id);
+        if (_recent.Count > 8) _recent.RemoveAt(8);
+    }
+
+    Act FindAct(string id) { return Acts().FirstOrDefault(x => x.Id == id); }
+
+    // ------------------------------------------------------------------ общие помощники команд
+
+    /// <summary>Правка положения выбранного (с отменой).</summary>
+    void ForSel(string name, Action<GameObject> f)
+    {
+        var tops = TopSelection();
+        if (tops.Count == 0) { Status(T("needSel", "Select an object first")); return; }
+        var before = SnapOf(tops);
+        foreach (var g in tops) f(g);
+        foreach (var g in tops) Touch(g);
+        PushSnap(name, before, SnapOf(tops));
+        Dirty();
+    }
+
+    class Style0 { public Placed P; public string Mat, Look, Beh, PhysMat; public Color Tint; public bool Tinted, Physics; }
+
+    Style0 StyleOf(Placed p) { return new Style0 { P = p, Mat = p.Mat, Look = p.Look, Beh = BehOf(p), PhysMat = p.PhysMat, Tint = p.Tint, Tinted = p.Tinted, Physics = p.Physics }; }
+
+    static string BehOf(Placed p)
+    {
+        var b = p.Go != null ? p.Go.GetComponent<ModScriptBehaviour>() : null;
+        return b != null ? b.Code() : "";
+    }
+
+    void PutStyle(Style0 s)
+    {
+        var p = s.P;
+        if (p.Go == null) return;
+        p.Mat = s.Mat; p.Look = s.Look; p.PhysMat = s.PhysMat; p.Tint = s.Tint; p.Tinted = s.Tinted; p.Physics = s.Physics;
+        ApplyStyle(p);
+        ApplyPhysMat(p.Go, p.PhysMat);
+        SetPhysics(p.Go, _simulate && p.Physics);
+        SetBeh(p, s.Beh);
+    }
+
+    void SetBeh(Placed p, string code)
+    {
+        var b = p.Go.GetComponent<ModScriptBehaviour>();
+        if (b == null && code == "") return;
+        if (b == null) b = p.Go.AddComponent<ModScriptBehaviour>();
+        b.Paused = false;
+        b.Pause();
+        b.Parse(code);
+        p.Beh = code;
+        b.Rebase();
+        if (_simulate) b.Paused = false; else { b.Paused = false; b.Pause(); }
+    }
+
+    /// <summary>Правка вида поставленных объектов (цвет, материал, поведение, физика) — с отменой.</summary>
+    void ForPlaced(string name, Action<Placed> f)
+    {
+        var ps = TopSelection().Select(PlacedOf).Where(p => p != null).Distinct().ToList();
+        if (ps.Count == 0) { Status(TopSelection().Count == 0 ? T("needSel", "Select an object first") : T("onlyYours", "Works on objects you placed")); return; }
+        var before = ps.Select(StyleOf).ToList();
+        foreach (var p in ps) f(p);
+        var after = ps.Select(StyleOf).ToList();
+        Push(name, () => { foreach (var s in before) PutStyle(s); }, () => { foreach (var s in after) PutStyle(s); });
+        Dirty();
+    }
+
+    Bounds AllBounds(List<GameObject> gos)
+    {
+        var b = BoundsOf(gos[0]);
+        foreach (var g in gos) b.Encapsulate(BoundsOf(g));
+        return b;
+    }
+
+    Vector3 FocusPoint()
+    {
+        if (_sel != null) return BoundsOf(_sel).center;
+        return _cam.transform.position + _cam.transform.forward * 10f;
+    }
+
+    /// <summary>Снимок мира (солнце, окружение, туман) для отмены.</summary>
+    class WorldSnap
+    {
+        public World W; public Quaternion SunRot; public float SunI, SunShadow; public Color SunC, Amb, FogC; public float AmbI, FogD; public bool Fog; public UnityEngine.Rendering.AmbientMode Mode;
+    }
+
+    WorldSnap SnapWorld()
+    {
+        var sun = Sun();
+        return new WorldSnap
+        {
+            W = new World { SunIntensity = _world.SunIntensity, SunPitch = _world.SunPitch, SunYaw = _world.SunYaw, Ambient = _world.Ambient, FogDensity = _world.FogDensity, Fog = _world.Fog, SunColor = _world.SunColor, AmbientColor = _world.AmbientColor, FogColor = _world.FogColor, Shadow = _world.Shadow, Weather = _world.Weather, Cycle = _world.Cycle },
+            SunRot = sun != null ? sun.transform.rotation : Quaternion.identity, SunI = sun != null ? sun.intensity : 0, SunC = sun != null ? sun.color : Color.white, SunShadow = sun != null ? sun.shadowStrength : 1,
+            Amb = RenderSettings.ambientLight, AmbI = RenderSettings.ambientIntensity, Mode = RenderSettings.ambientMode, FogC = RenderSettings.fogColor, FogD = RenderSettings.fogDensity, Fog = RenderSettings.fog,
+        };
+    }
+
+    void PutWorld(WorldSnap s)
+    {
+        _world = s.W;
+        var sun = Sun();
+        if (sun != null) { sun.transform.rotation = s.SunRot; sun.intensity = s.SunI; sun.color = s.SunC; sun.shadowStrength = s.SunShadow; }
+        RenderSettings.ambientMode = s.Mode; RenderSettings.ambientLight = s.Amb; RenderSettings.ambientIntensity = s.AmbI;
+        RenderSettings.fogColor = s.FogC; RenderSettings.fogDensity = s.FogD; RenderSettings.fog = s.Fog;
+        ApplyWeather();
+    }
+
+    void ForWorld(string name, Action f)
+    {
+        var before = SnapWorld();
+        f();
+        ApplyWorld();
+        var after = SnapWorld();
+        Push(name, () => PutWorld(before), () => PutWorld(after));
+        Dirty();
+    }
+
+void TimeOfDay(int h)    {        var sun = Sun();        if (sun == null) { Status(T("world.noSun", "This level has no sun.")); return; }        float pitch, intensity;        Color color;        SunAt(h, out pitch, out intensity, out color);        _world.SunPitch = pitch; _world.SunIntensity = intensity; _world.SunColor = color; _world.SunYaw = sun.transform.eulerAngles.y;        _world.Cycle = -1;    }
+
+    static readonly string[] Hues = { "red", "orange", "amber", "yellow", "lime", "green", "teal", "cyan", "blue", "indigo", "purple", "pink" };
+    static readonly float[] HueH = { 0f, 0.07f, 0.11f, 0.15f, 0.22f, 0.33f, 0.47f, 0.52f, 0.6f, 0.68f, 0.77f, 0.9f };
+
+    static Color HueColor(int i, int shade)
+    {
+        var c = Color.HSVToRGB(HueH[i], 0.78f, 0.92f);
+        switch (shade)
+        {
+            case 0: return Color.Lerp(c, Color.white, 0.45f);
+            case 2: return c * 0.6f + new Color(0, 0, 0, 0.4f);
+            case 3: return c * 0.35f + new Color(0, 0, 0, 0.65f);
+            default: return c;
+        }
+    }
+
+    static readonly string[] Neutrals = { "white", "silver", "gray", "graphite", "black", "cream", "sand", "brown" };
+    static readonly Color[] NeutralC = { new Color(0.96f, 0.96f, 0.96f), new Color(0.75f, 0.76f, 0.78f), new Color(0.5f, 0.51f, 0.53f), new Color(0.24f, 0.25f, 0.27f), new Color(0.07f, 0.07f, 0.08f), new Color(0.96f, 0.92f, 0.82f), new Color(0.86f, 0.75f, 0.55f), new Color(0.45f, 0.3f, 0.18f) };
+
+    // ------------------------------------------------------------------ все команды
+
+    List<Act> Acts()
+    {
+        if (_acts != null) return _acts;
+        _acts = new List<Act>();
+        var axisName = new[] { "X", "Y", "Z" };
+
+        // Добавить: каждая готовая деталь — команда.
+        foreach (var k in Kits())
+        {
+            var kit = k;
+            A("add." + kit.Id, "add", kit.Icon, Fmt(T("c.add", "Add: {0}"), kit.Name), false, () => BeginPlace("kit:" + kit.Id, kit.Name));
+        }
+        A("add.light", "add", "bulb", Fmt(T("c.add", "Add: {0}"), T("shape.Light", "Light")), false, () => BeginPlace("prim:Light", T("shape.Light", "Light")));
+        A("add.empty", "add", "empty", Fmt(T("c.add", "Add: {0}"), T("shape.Empty", "Empty")), false, () => BeginPlace("prim:Empty", T("shape.Empty", "Empty")));
+
+        // Положение, поворот, размер.
+        foreach (var step in new[] { 0.1f, 0.5f, 1f, 5f })
+            for (var ax = 0; ax < 3; ax++)
+                foreach (var sign in new[] { 1, -1 })
+                {
+                    var s = step; var a = ax; var g = sign;
+                    A("nudge." + axisName[a] + (g > 0 ? "+" : "-") + Num(s), "transform", "move", Fmt(T("c.nudge", "Move along {0} by {1} m"), (g > 0 ? "+" : "−") + axisName[a], Num(s)), true,
+                        () => ForSel(T("move", "Move"), o => o.transform.position += AxisOf(a) * s * g));
+                }
+        foreach (var deg in new[] { 15f, -15f, 45f, -45f, 90f, -90f, 180f })
+            for (var ax = 0; ax < 3; ax++)
+            {
+                var d = deg; var a = ax;
+                A("rot." + axisName[a] + Num(d), "transform", "rotate", Fmt(T("c.rot", "Rotate around {0} by {1}°"), axisName[a], (d > 0 ? "+" : "") + Num(d)), true,
+                    () => ForSel(T("rotate", "Rotate"), o => o.transform.Rotate(Axes[a], d, _local ? Space.Self : Space.World)));
+            }
+        foreach (var k in new[] { 0.25f, 0.5f, 0.75f, 0.9f, 1.1f, 1.25f, 1.5f, 2f, 3f, 4f })
+        {
+            var f = k;
+            A("scale." + Num(f), "transform", "scale", Fmt(T("c.scale", "Scale ×{0}"), Num(f)), true, () => ForSel(T("scale", "Scale"), o => o.transform.localScale *= f));
+        }
+        for (var ax = 0; ax < 3; ax++)
+            foreach (var k in new[] { 0.5f, 2f })
+            {
+                var a = ax; var f = k;
+                A("scaleAxis." + axisName[a] + Num(f), "transform", "scale", Fmt(T("c.scaleAxis", "Scale along {0} ×{1}"), axisName[a], Num(f)), true,
+                    () => ForSel(T("scale", "Scale"), o => { var s = o.transform.localScale; s[a] *= f; o.transform.localScale = s; }));
+            }
+        foreach (var m in new[] { 0.5f, 1f, 2f, 5f, 10f })
+        {
+            var size = m;
+            A("size." + Num(size), "transform", "scale", Fmt(T("c.size", "Make it {0} m big"), Num(size)), true,
+                () => ForSel(T("scale", "Scale"), o => { var b = BoundsOf(o).size; var big = Mathf.Max(b.x, Mathf.Max(b.y, b.z)); if (big > 0.001f) o.transform.localScale *= size / big; }));
+        }
+        A("reset.rot", "transform", "rotate", T("c.resetRot", "Reset rotation"), true, () => ForSel(T("rotate", "Rotate"), o => o.transform.rotation = Quaternion.identity));
+        A("reset.scale", "transform", "scale", T("c.resetScale", "Reset size"), true, () => ForSel(T("scale", "Scale"), o => o.transform.localScale = Vector3.one));
+        A("reset.all", "transform", "refresh", T("c.resetAll", "Reset rotation and size"), true, () => ForSel(T("move", "Move"), o => { o.transform.rotation = Quaternion.identity; o.transform.localScale = Vector3.one; }));
+        for (var ax = 0; ax < 3; ax++)
+        {
+            var a = ax;
+            A("mirror." + axisName[a], "transform", "scale", Fmt(T("c.mirror", "Mirror along {0}"), axisName[a]), true, () => ForSel(T("scale", "Scale"), o => { var s = o.transform.localScale; s[a] = -s[a]; o.transform.localScale = s; }));
+        }
+        A("rand.rotY", "transform", "rotate", T("c.randRotY", "Random turn"), true, () => ForSel(T("rotate", "Rotate"), o => o.transform.rotation = Quaternion.Euler(0, UnityEngine.Random.Range(0f, 360f), 0) * o.transform.rotation));
+        A("rand.rot", "transform", "rotate", T("c.randRot", "Random rotation (all axes)"), true, () => ForSel(T("rotate", "Rotate"), o => o.transform.rotation = UnityEngine.Random.rotation));
+        foreach (var pct in new[] { 10, 30 })
+        {
+            var p = pct;
+            A("rand.scale" + p, "transform", "scale", Fmt(T("c.randScale", "Random size ±{0}%"), p), true, () => ForSel(T("scale", "Scale"), o => o.transform.localScale *= 1 + UnityEngine.Random.Range(-p, p) / 100f));
+        }
+        foreach (var m in new[] { 0.5f, 2f })
+        {
+            var r = m;
+            A("rand.pos" + Num(r), "transform", "move", Fmt(T("c.jitter", "Shake position up to {0} m"), Num(r)), true, () => ForSel(T("move", "Move"), o => { var d = UnityEngine.Random.insideUnitSphere * r; d.y = 0; o.transform.position += d; }));
+        }
+        var wheres = new[] { "min", "center", "max" };
+        for (var ax = 0; ax < 3; ax++)
+            for (var w = 0; w < 3; w++)
+            {
+                var a = ax; var where = w;
+                A("align." + axisName[a] + wheres[w], "transform", "array", Fmt(T("c.align", "Align along {0}: {1}"), axisName[a], T("where." + wheres[w], wheres[w])), true, () => Align(a, where));
+            }
+        for (var ax = 0; ax < 3; ax++) { var a = ax; A("distribute." + axisName[a], "transform", "array", Fmt(T("c.distribute", "Spread evenly along {0}"), axisName[a]), true, () => Distribute(a)); }
+        A("snap.pos", "transform", "magnet", T("c.snapPos", "Snap position to grid"), true, () => ForSel(T("snap", "Snap"), o => { var p = o.transform.position; o.transform.position = new Vector3(Mathf.Round(p.x / _grid) * _grid, Mathf.Round(p.y / _grid) * _grid, Mathf.Round(p.z / _grid) * _grid); }));
+        foreach (var st in new[] { 15f, 90f })
+        {
+            var s = st;
+            A("snap.rot" + Num(s), "transform", "magnet", Fmt(T("c.snapRot", "Snap rotation to {0}°"), Num(s)), true, () => ForSel(T("rotate", "Rotate"), o => { var e = o.transform.eulerAngles; o.transform.eulerAngles = new Vector3(Mathf.Round(e.x / s) * s, Mathf.Round(e.y / s) * s, Mathf.Round(e.z / s) * s); }));
+        }
+        A("ground", "transform", "ground", T("ground", "Put on the ground"), true, DropToGround, "End");
+        A("stackOn", "transform", "ground", T("c.stackOn", "Put on top of the last selected"), true, StackOnTop);
+        A("toCamera", "transform", "camera", T("c.toCamera", "Bring in front of the camera"), true, () => ForSel(T("move", "Move"), o => o.transform.position = _cam.transform.position + _cam.transform.forward * 4f));
+        A("faceCamera", "transform", "rotate", T("c.faceCamera", "Turn to face the camera"), true, () => ForSel(T("rotate", "Rotate"), o => { var d = _cam.transform.position - o.transform.position; d.y = 0; if (d.sqrMagnitude > 0.01f) o.transform.rotation = Quaternion.LookRotation(d); }));
+        A("lookAtLast", "transform", "focus", T("c.lookAt", "Turn towards the last selected"), true, () => { var t = _sel; ForSel(T("rotate", "Rotate"), o => { if (o != t) { var d = t.transform.position - o.transform.position; d.y = 0; if (d.sqrMagnitude > 0.01f) o.transform.rotation = Quaternion.LookRotation(d); } }); });
+        A("alignNormal", "transform", "ground", T("c.alignNormal", "Lean along the surface below"), true, AlignToSurface);
+        A("copyT", "transform", "copy", T("c.copyT", "Copy position, rotation and size"), true, () => { _tPos = _sel.transform.position; _tRot = _sel.transform.rotation; _tScale = _sel.transform.localScale; _tHas = true; Status(T("copied", "Copied")); });
+        A("pasteP", "transform", "paste", T("c.pasteP", "Paste position"), true, () => { if (_tHas) ForSel(T("move", "Move"), o => o.transform.position = _tPos); });
+        A("pasteR", "transform", "paste", T("c.pasteR", "Paste rotation"), true, () => { if (_tHas) ForSel(T("rotate", "Rotate"), o => o.transform.rotation = _tRot); });
+        A("pasteS", "transform", "paste", T("c.pasteS", "Paste size"), true, () => { if (_tHas) ForSel(T("scale", "Scale"), o => o.transform.localScale = _tScale); });
+
+        // Расстановка копий.
+        for (var ax = 0; ax < 3; ax++)
+            foreach (var n in new[] { 3, 5, 10 })
+            {
+                var a = ax; var c = n;
+                A("array." + axisName[a] + c, "arrange", "array", Fmt(T("c.array", "Row of {0} along {1}"), c, axisName[a]), true, () => MakeArray(c - 1, a));
+            }
+        foreach (var n in new[] { 4, 6, 8, 12, 16 }) { var c = n; A("circle." + c, "arrange", "rotate", Fmt(T("c.circle", "Circle of {0}"), c), true, () => Circle(c)); }
+        foreach (var n in new[] { 3, 5, 10 }) { var c = n; A("gridArr." + c, "arrange", "grid", Fmt(T("c.gridArr", "Grid {0}×{0}"), c), true, () => GridArray(c)); }
+        foreach (var n in new[] { 5, 10, 25, 50 })
+            foreach (var r in new[] { 5f, 15f })
+            {
+                var c = n; var rad = r;
+                A("scatter." + c + "." + Num(rad), "arrange", "tree", Fmt(T("c.scatter", "Scatter {0} copies within {1} m"), c, Num(rad)), true, () => Scatter(c, rad));
+            }
+        foreach (var n in new[] { 3, 5, 10 }) { var c = n; A("stack." + c, "arrange", "ground", Fmt(T("c.stack", "Stack of {0}"), c), true, () => Stack(c)); }
+        foreach (var n in new[] { 8, 16 }) { var c = n; A("spiralArr." + c, "arrange", "rotate", Fmt(T("c.spiral", "Spiral of {0}"), c), true, () => Spiral(c)); }
+
+        // Правка.
+        A("duplicate", "edit", "duplicate", T("duplicate", "Duplicate"), true, Duplicate, "Ctrl+D");
+        A("duplicateHere", "edit", "duplicate", T("c.dupHere", "Duplicate in place"), true, () => DuplicateBy(Vector3.zero));
+        foreach (var d in new[] { "+X", "-X", "+Z", "-Z" })
+        {
+            var dir = d;
+            A("duplicate" + dir, "edit", "duplicate", Fmt(T("c.dupTo", "Duplicate to {0}"), dir.Replace("-", "−")), true, () =>
+            {
+                var tops = TopSelection(); var b = AllBounds(tops);
+                var v = dir[1] == 'X' ? Vector3.right * b.size.x : Vector3.forward * b.size.z;
+                DuplicateBy(dir[0] == '-' ? -v : v);
+            });
+        }
+        A("copy", "edit", "copy", T("copy", "Copy"), true, Copy, "Ctrl+C");
+        A("paste", "edit", "paste", T("paste", "Paste"), false, Paste, "Ctrl+V");
+        A("pasteHere", "edit", "paste", T("c.pasteHere", "Paste in the same place"), false, PasteInPlace);
+        A("delete", "edit", "trash", T("delete", "Delete"), true, Delete, "Del");
+        A("group", "edit", "group", T("group", "Group"), true, Group, "Ctrl+G");
+        A("ungroup", "edit", "group", T("ungroup", "Ungroup"), true, Ungroup, "Ctrl+Shift+G");
+        A("hide", "edit", "eyeOff", T("c.hide", "Hide while editing"), true, () => { foreach (var g in TopSelection()) ToggleEye(g); }, "H");
+        A("showAll", "edit", "eye", T("c.showAll", "Show everything hidden"), false, ShowAll, "Alt+H");
+        A("isolate", "edit", "eye", T("c.isolate", "Show only the selected"), true, () => { var keep = TopSelection(); foreach (var p in _placed) if (p.Go != null && TopPlaced(p.Go) == p && !keep.Contains(p.Go) && !_eyeHidden.ContainsKey(p.Go)) ToggleEye(p.Go); });
+        A("restoreLevel", "edit", "refresh", T("c.restoreLevel", "Bring back everything removed from the level"), false, RestoreLevel);
+        A("clearAll", "edit", "trash", T("c.clearAll", "Remove everything you placed"), false, () => { _selection.Clear(); foreach (var p in _placed) if (p.Go != null && TopPlaced(p.Go) == p) _selection.Add(p.Go); Delete(); });
+
+        // Цвет.
+        for (var i = 0; i < Hues.Length; i++)
+            for (var shade = 0; shade < 4; shade++)
+            {
+                var c = HueColor(i, shade);
+                var hue = T("hue." + Hues[i], Hues[i]);
+                var name = Fmt(T("c.color", "Colour: {0}"), shade == 1 ? hue : Fmt(T("shade." + shade, "{0}"), hue));
+                A("color." + Hues[i] + shade, "color", "palette", name, true, () => ForPlaced(T("tint", "Colour"), p => { p.Tint = c; p.Tinted = true; ApplyStyle(p); }));
+            }
+        for (var i = 0; i < Neutrals.Length; i++)
+        {
+            var c = NeutralC[i];
+            A("color." + Neutrals[i], "color", "palette", Fmt(T("c.color", "Colour: {0}"), T("hue." + Neutrals[i], Neutrals[i])), true, () => ForPlaced(T("tint", "Colour"), p => { p.Tint = c; p.Tinted = true; ApplyStyle(p); }));
+        }
+        A("color.none", "color", "palette", T("c.colorNone", "Original colour"), true, () => ForPlaced(T("tint", "Colour"), p => { p.Tinted = false; ApplyStyle(p); }));
+
+        // Вид материала.
+        var looks = new[] { "matte", "satin", "glossy", "mirror", "metal", "brushed", "chrome", "gold", "copper", "silver", "rubber" };
+        var lookSpec = new[] { "m=0;s=0", "m=0;s=0.45", "m=0;s=0.85", "m=0.2;s=1", "m=1;s=0.6", "m=1;s=0.35", "m=1;s=0.95", "m=1;s=0.8", "m=1;s=0.65", "m=1;s=0.8", "m=0;s=0.1" };
+        var lookTint = new[] { Color.clear, Color.clear, Color.clear, Color.clear, Color.clear, Color.clear, Color.clear, new Color(1f, 0.78f, 0.3f), new Color(0.85f, 0.5f, 0.32f), new Color(0.82f, 0.83f, 0.86f), new Color(0.14f, 0.14f, 0.15f) };
+        for (var i = 0; i < looks.Length; i++)
+        {
+            var spec = lookSpec[i]; var tint = lookTint[i];
+            A("look." + looks[i], "look", "texture", Fmt(T("c.look", "Material: {0}"), T("look." + looks[i], looks[i])), true, () => ForPlaced(T("section.look", "Look"), p =>
+            {
+                p.Look = spec;
+                if (tint.a > 0) { p.Tint = tint; p.Tinted = true; }
+                ApplyStyle(p);
+            }));
+        }
+        var glows = new[] { "white", "warm", "red", "green", "blue", "cyan", "purple", "pink" };
+        foreach (var gname in glows)
+        {
+            var c = gname == "cyan" ? new Color(0.3f, 1f, 1f) : Tone(gname);
+            A("glow." + gname, "look", "sun", Fmt(T("c.glow", "Glow: {0}"), T("tone." + gname, gname)), true, () => ForPlaced(T("section.look", "Look"), p =>
+            {
+                var parts = (p.Look ?? "").Split(';').Where(x => x != "" && !x.StartsWith("e=")).ToList();
+                parts.Add("e=" + Num(c.r) + "," + Num(c.g) + "," + Num(c.b));
+                p.Look = string.Join(";", parts.ToArray());
+                ApplyStyle(p);
+            }));
+        }
+        A("look.plain", "look", "texture", T("c.lookPlain", "Plain material (no shine or glow)"), true, () => ForPlaced(T("section.look", "Look"), p => { p.Look = ""; ApplyStyle(p); }));
+
+        // Поведение.
+        foreach (var sp in new[] { 15f, 45f, 90f, 180f, 360f })
+            for (var ax = 0; ax < 3; ax++)
+            {
+                var v = sp; var a = ax;
+                A("beh.spin" + axisName[a] + Num(v), "behaviour", "rotate", Fmt(T("c.spin", "Spin around {0}, {1}°/s"), axisName[a], Num(v)), true, () => ForPlaced(T("section.behaviour", "Behaviour"), p => EditBeh(p, b => { b.Spin = v; b.SpinAxis = a; })));
+            }
+        foreach (var h in new[] { 0.25f, 0.5f, 1f, 2f }) { var v = h; A("beh.bob" + Num(v), "behaviour", "ground", Fmt(T("c.bob", "Float up and down {0} m"), Num(v)), true, () => ForPlaced(T("section.behaviour", "Behaviour"), p => EditBeh(p, b => { b.Bob = v; b.BobSpeed = 1.2f; }))); }
+        foreach (var k in new[] { 0.05f, 0.15f, 0.3f }) { var v = k; A("beh.pulse" + Num(v), "behaviour", "scale", Fmt(T("c.pulse", "Pulse {0}%"), Mathf.RoundToInt(v * 100)), true, () => ForPlaced(T("section.behaviour", "Behaviour"), p => EditBeh(p, b => b.Pulse = v))); }
+        foreach (var d in new[] { 15f, 45f }) { var v = d; A("beh.swing" + Num(v), "behaviour", "rotate", Fmt(T("c.swing", "Swing like a pendulum ±{0}°"), Num(v)), true, () => ForPlaced(T("section.behaviour", "Behaviour"), p => EditBeh(p, b => b.Swing = v))); }
+        foreach (var r in new[] { 1f, 3f, 6f }) { var v = r; A("beh.orbit" + Num(v), "behaviour", "globe", Fmt(T("c.orbit", "Circle around, radius {0} m"), Num(v)), true, () => ForPlaced(T("section.behaviour", "Behaviour"), p => EditBeh(p, b => b.Orbit = v))); }
+        foreach (var t in new[] { 0.5f, 1f, 2f }) { var v = t; A("beh.blink" + Num(v), "behaviour", "bulb", Fmt(T("c.blink", "Blink every {0} s"), Num(v)), true, () => ForPlaced(T("section.behaviour", "Behaviour"), p => EditBeh(p, b => b.Blink = v))); }
+        A("beh.rainbowSlow", "behaviour", "palette", T("c.rainbowSlow", "Rainbow colours, slow"), true, () => ForPlaced(T("section.behaviour", "Behaviour"), p => EditBeh(p, b => b.Rainbow = 0.5f)));
+        A("beh.rainbowFast", "behaviour", "palette", T("c.rainbowFast", "Rainbow colours, fast"), true, () => ForPlaced(T("section.behaviour", "Behaviour"), p => EditBeh(p, b => b.Rainbow = 2f)));
+        A("beh.flicker", "behaviour", "sun", T("c.flicker", "Flicker like fire (lights)"), true, () => ForPlaced(T("section.behaviour", "Behaviour"), p => EditBeh(p, b => b.Flicker = true)));
+        A("beh.wobble", "behaviour", "rotate", T("c.wobble", "Wobble"), true, () => ForPlaced(T("section.behaviour", "Behaviour"), p => EditBeh(p, b => b.Wobble = true)));
+        A("beh.billboard", "behaviour", "camera", T("c.billboard", "Always face the player's camera"), true, () => ForPlaced(T("section.behaviour", "Behaviour"), p => EditBeh(p, b => b.Billboard = true)));
+        A("beh.drift", "behaviour", "move", T("c.drift", "Wander around slowly"), true, () => ForPlaced(T("section.behaviour", "Behaviour"), p => EditBeh(p, b => b.Drift = true)));
+        A("beh.none", "behaviour", "close", T("c.behNone", "Stop all behaviours"), true, () => ForPlaced(T("section.behaviour", "Behaviour"), p => SetBeh(p, "")));
+
+        // Физика.
+        A("phys.on", "physics", "physics", T("c.physOn", "Physics on: falls and can be pushed"), true, () => ForPlaced(T("physics", "Physics"), p => { p.Physics = true; SetPhysics(p.Go, _simulate); }));
+        A("phys.off", "physics", "physics", T("c.physOff", "Physics off: stays in place"), true, () => ForPlaced(T("physics", "Physics"), p => { p.Physics = false; SetPhysics(p.Go, false); }));
+        foreach (var m in new[] { 0.5f, 1f, 5f, 20f, 100f }) { var v = m; A("phys.mass" + Num(v), "physics", "physics", Fmt(T("c.mass", "Weight {0} kg"), Num(v)), true, () => RigidProp("mass", Num(v))); }
+        A("phys.gravityOff", "physics", "physics", T("c.gravityOff", "No gravity (floats)"), true, () => RigidProp("useGravity", "false"));
+        A("phys.gravityOn", "physics", "physics", T("c.gravityOn", "Normal gravity"), true, () => RigidProp("useGravity", "true"));
+        A("phys.freezeRot", "physics", "physics", T("c.freezeRot", "Don't tip over"), true, () => RigidProp("freezeRotation", "true"));
+        foreach (var b in new[] { 0f, 0.5f, 0.9f }) { var v = b; A("phys.bounce" + Num(v), "physics", "physics", Fmt(T("c.bounce", "Bounciness {0}%"), Mathf.RoundToInt(v * 100)), true, () => ForPlaced(T("physics", "Physics"), p => { p.PhysMat = SetSpec(p.PhysMat, "b", v); ApplyPhysMat(p.Go, p.PhysMat); })); }
+        foreach (var f in new[] { 0.02f, 0.6f, 1f }) { var v = f; A("phys.friction" + Num(v), "physics", "physics", Fmt(T("c.friction", "Friction: {0}"), T(v < 0.1f ? "fr.ice" : v < 0.9f ? "fr.normal" : "fr.grip", "")), true, () => ForPlaced(T("physics", "Physics"), p => { p.PhysMat = SetSpec(p.PhysMat, "f", v); ApplyPhysMat(p.Go, p.PhysMat); })); }
+        A("phys.trigger", "physics", "physics", T("c.trigger", "Pass-through (trigger zone)"), true, () => ColliderProp("isTrigger", "true"));
+        A("phys.solid", "physics", "physics", T("c.solid", "Solid again"), true, () => ColliderProp("isTrigger", "false"));
+        A("phys.addBox", "physics", "cube", T("c.addBox", "Add a box collider"), true, () => { foreach (var g in TopSelection()) if (g.GetComponent<Collider>() == null) g.AddComponent<BoxCollider>(); Status(T("done", "Done")); });
+        A("phys.kick", "physics", "physics", T("c.kick", "Kick up (simulation)"), true, () => Kick(Vector3.up * 6f));
+        A("phys.kickBig", "physics", "physics", T("c.kickBig", "Launch high (simulation)"), true, () => Kick(Vector3.up * 16f));
+        A("phys.push", "physics", "physics", T("c.push", "Push away from the camera (simulation)"), true, () => Kick(_cam.transform.forward * 8f));
+        A("phys.explode", "physics", "physics", T("c.explode", "Blast apart (simulation)"), true, Explode);
+
+        // Мир.
+        for (var h = 0; h < 24; h++) { var hour = h; A("time." + h, "world", "sun", Fmt(T("c.time", "Time of day {0}:00"), hour.ToString("00")), false, () => ForWorld(T("lighting", "Lighting"), () => TimeOfDay(hour))); }
+        foreach (var v in new[] { 0.2f, 0.5f, 1f, 1.5f, 2f, 3f }) { var i = v; A("sun.i" + Num(i), "world", "sun", Fmt(T("c.sunI", "Sun brightness {0}"), Num(i)), false, () => ForWorld(T("lighting", "Lighting"), () => _world.SunIntensity = i)); }
+        foreach (var t in new[] { "warm", "white", "cold", "red", "purple", "green" }) { var c = Tone(t); A("sun.c" + t, "world", "sun", Fmt(T("c.sunC", "Sunlight: {0}"), T("tone." + t, t)), false, () => ForWorld(T("lighting", "Lighting"), () => _world.SunColor = c)); }
+        foreach (var v in new[] { 0f, 0.5f, 1f, 1.5f, 2f }) { var i = v; A("amb.i" + Num(i), "world", "palette", Fmt(T("c.ambI", "Ambient light {0}"), Num(i)), false, () => ForWorld(T("lighting", "Lighting"), () => _world.Ambient = i)); }
+        var ambs = new[] { "day", "night", "sunset", "toxic", "neutral" };
+        var ambC = new[] { new Color(0.55f, 0.62f, 0.72f), new Color(0.08f, 0.1f, 0.2f), new Color(0.6f, 0.38f, 0.3f), new Color(0.25f, 0.5f, 0.2f), new Color(0.45f, 0.45f, 0.45f) };
+        for (var i = 0; i < ambs.Length; i++) { var c = ambC[i]; A("amb.c" + ambs[i], "world", "palette", Fmt(T("c.ambC", "Ambient: {0}"), T("amb." + ambs[i], ambs[i])), false, () => ForWorld(T("lighting", "Lighting"), () => _world.AmbientColor = c)); }
+        A("fog.off", "world", "fog", T("c.fogOff", "No fog"), false, () => ForWorld(T("world.fog", "Fog"), () => _world.Fog = 0));
+        foreach (var d in new[] { 0.005f, 0.02f, 0.06f }) { var v = d; A("fog.d" + Num(v), "world", "fog", Fmt(T("c.fog", "Fog: {0}"), T(v < 0.01f ? "fog.light" : v < 0.05f ? "fog.medium" : "fog.thick", "")), false, () => ForWorld(T("world.fog", "Fog"), () => { _world.Fog = 1; _world.FogDensity = v; RenderSettings.fogMode = FogMode.ExponentialSquared; })); }
+        foreach (var t in new[] { "white", "cold", "warm", "green", "purple", "black" }) { var c = t == "black" ? new Color(0.05f, 0.05f, 0.06f) : Tone(t); A("fog.c" + t, "world", "fog", Fmt(T("c.fogC", "Fog colour: {0}"), T("tone." + t, t)), false, () => ForWorld(T("world.fog", "Fog"), () => { _world.Fog = 1; _world.FogColor = c; if (_world.FogDensity < 0) _world.FogDensity = 0.02f; })); }
+        foreach (var s in new[] { 0f, 0.5f, 1f }) { var v = s; A("shadow." + Num(v), "world", "sun", Fmt(T("c.shadow", "Shadows {0}%"), Mathf.RoundToInt(v * 100)), false, () => ForWorld(T("lighting", "Lighting"), () => _world.Shadow = v)); }
+        A("world.reset", "world", "refresh", T("c.worldReset", "Forget world changes (after reload)"), false, () => ForWorld(T("lighting", "Lighting"), () => _world = new World()));
+        // 23.6: погода, смена дня и ночи, пипетка и кисть.
+        foreach (var wk in new[] { "rain", "storm", "snow", "dust", "petals", "embers" })
+        {
+            var kind = wk;
+            A("weather." + kind, "world", kind == "snow" || kind == "petals" ? "sun" : "fog", Fmt(T("c.weather", "Weather: {0}"), T("weather." + kind, kind)), false, () => ForWorld(T("g.world", "World"), () => _world.Weather = kind));
+        }
+        A("weather.off", "world", "sun", T("c.weatherOff", "Clear weather"), false, () => ForWorld(T("g.world", "World"), () => _world.Weather = ""));
+        foreach (var m in new[] { 2f, 5f, 10f, 20f })
+        {
+            var minutes = m;
+            A("cycle." + Num(minutes), "world", "sun", Fmt(T("c.cycle", "Day and night: a day lasts {0} min"), Num(minutes)), false, () => ForWorld(T("g.world", "World"), () => _world.Cycle = minutes));
+        }
+        A("cycle.off", "world", "sun", T("c.cycleOff", "Stop day and night"), false, () => ForWorld(T("g.world", "World"), () => _world.Cycle = -1));
+        A("paint.pick", "look", "palette", T("c.pick", "Eyedropper: take the look of the selected"), true, PickStyle);
+        A("paint.apply", "look", "palette", T("c.applyPick", "Apply the taken look to the selected"), true, () => { foreach (var g in TopSelection()) PaintOn(g); });
+        A("paint.mode", "look", "palette", T("c.paintMode", "Brush: click objects to paint them (Q — stop)"), false, () => { if (_styleClip == null) PickStyle(); if (_styleClip != null) { _mode = "paint"; Status(T("paint.on", "Brush on: click objects · Q — stop")); } });
+
+        // Камера.
+        foreach (var s in new[] { 0.25f, 0.5f, 1f, 2f, 4f, 8f }) { var v = s; A("cam.speed" + Num(v), "camera", "camera", Fmt(T("c.camSpeed", "Camera speed ×{0}"), Num(v)), false, () => _speed = v); }
+        foreach (var f in new[] { 30f, 45f, 60f, 75f, 90f, 110f }) { var v = f; A("cam.fov" + Num(v), "camera", "camera", Fmt(T("c.fov", "Field of view {0}°"), Num(v)), false, () => _cam.fieldOfView = v); }
+        var views = new[] { "top", "bottom", "front", "back", "left", "right", "iso" };
+        var viewE = new[] { new Vector3(89, 0, 0), new Vector3(-89, 0, 0), new Vector3(0, 0, 0), new Vector3(0, 180, 0), new Vector3(0, 90, 0), new Vector3(0, -90, 0), new Vector3(30, 45, 0) };
+        for (var i = 0; i < views.Length; i++) { var e = viewE[i]; A("view." + views[i], "camera", "camera", Fmt(T("c.view", "View: {0}"), T("view." + views[i], views[i])), false, () => ViewFrom(e)); }
+        for (var i = 1; i <= 9; i++)
+        {
+            var n = i;
+            A("bm.save" + n, "camera", "focus", Fmt(T("c.bmSave", "Remember camera spot {0}"), n), false, () => { _bookmarks[n] = new KeyValuePair<Vector3, Quaternion>(_cam.transform.position, _cam.transform.rotation); Dirty(); Status(Fmt(T("c.bmSaved", "Camera spot {0} remembered"), n)); }, "Ctrl+Shift+" + n);
+            A("bm.go" + n, "camera", "focus", Fmt(T("c.bmGo", "Go to camera spot {0}"), n), false, () => GoBookmark(n), "Shift+" + n);
+        }
+        A("cam.focus", "camera", "focus", T("focus", "Look at it"), true, () => FocusOn(_sel), "F");
+        A("cam.frameAll", "camera", "focus", T("c.frameAll", "Show everything you placed"), false, FrameAll);
+        A("cam.ortho", "camera", "grid", T("c.ortho", "Flat view on / off (orthographic)"), false, () => { _cam.orthographic = !_cam.orthographic; _cam.orthographicSize = Mathf.Max(3, Vector3.Distance(_cam.transform.position, FocusPoint()) * 0.5f); });
+        A("cam.game", "camera", "camera", T("c.camGame", "Back to the game camera view"), false, () => { var g = Camera.main; if (g != null && g != _cam) { _cam.transform.position = g.transform.position; _cam.transform.rotation = g.transform.rotation; _yaw = g.transform.eulerAngles.y; _pitch = g.transform.eulerAngles.x > 180 ? g.transform.eulerAngles.x - 360 : g.transform.eulerAngles.x; } });
+
+        // Выбрать.
+        A("sel.all", "select", "select", T("c.selAll", "Select everything you placed"), false, () => SelectWhere(p => true), "Ctrl+A");
+        A("sel.none", "select", "select", T("c.selNone", "Select nothing"), false, () => Select(null, false), "Esc");
+        A("sel.invert", "select", "select", T("c.selInvert", "Invert selection"), false, () => { var was = new HashSet<GameObject>(_selection); _selection.Clear(); foreach (var p in TopPlaceds()) if (!was.Contains(p.Go)) _selection.Add(p.Go); });
+        A("sel.lights", "select", "bulb", T("c.selLights", "Select all lights"), false, () => SelectWhere(p => p.Go.GetComponentInChildren<Light>() != null));
+        A("sel.shapes", "select", "cube", T("c.selShapes", "Select all shapes"), false, () => SelectWhere(p => p.Source.StartsWith("prim:") || p.Source.StartsWith("kit:prim")));
+        A("sel.kits", "select", "house", T("c.selKits", "Select all ready-made parts"), false, () => SelectWhere(p => p.Source.StartsWith("kit:")));
+        A("sel.models", "select", "model", T("c.selModels", "Select all 3D models"), false, () => SelectWhere(p => p.Source.StartsWith("obj:")));
+        A("sel.groups", "select", "group", T("c.selGroups", "Select all groups"), false, () => SelectWhere(p => p.Source == "prim:Empty"));
+        A("sel.physics", "select", "physics", T("c.selPhysics", "Select everything with physics"), false, () => SelectWhere(p => p.Physics));
+        A("sel.behaviour", "select", "gear", T("c.selBeh", "Select everything with a behaviour"), false, () => SelectWhere(p => BehOf(p) != ""));
+        A("sel.game", "select", "layers", T("c.selGame", "Select everything taken from the game"), false, () => SelectWhere(p => p.Source.StartsWith("asset:") || p.Source.StartsWith("clone:")));
+        A("sel.sameSource", "select", "select", T("c.selSame", "Select the same kind"), true, () => { var p0 = PlacedOf(_sel); if (p0 != null) SelectWhere(p => p.Source == p0.Source); });
+        A("sel.sameColor", "select", "palette", T("c.selColor", "Select the same colour"), true, () => { var p0 = PlacedOf(_sel); if (p0 != null) SelectWhere(p => p.Tinted == p0.Tinted && (!p.Tinted || p.Tint == p0.Tint)); });
+        A("sel.sameLook", "select", "texture", T("c.selLook", "Select the same material"), true, () => { var p0 = PlacedOf(_sel); if (p0 != null) SelectWhere(p => p.Look == p0.Look && p.Mat == p0.Mat); });
+        A("sel.children", "select", "group", T("c.selChildren", "Select parts of the group"), true, () => { var g = _sel; _selection.Clear(); foreach (Transform c in g.transform) _selection.Add(c.gameObject); });
+        A("sel.parent", "select", "group", T("parent", "Select parent"), true, () => { if (_sel.transform.parent != null) Select(_sel.transform.parent.gameObject, false); });
+        A("sel.siblings", "select", "group", T("c.selSiblings", "Select neighbours in the group"), true, () => { var par = _sel.transform.parent; if (par == null) return; _selection.Clear(); foreach (Transform c in par) _selection.Add(c.gameObject); });
+        A("sel.nearest", "select", "focus", T("c.selNearest", "Select the nearest to the camera"), false, () => { var best = TopPlaceds().OrderBy(p => Vector3.Distance(p.Go.transform.position, _cam.transform.position)).FirstOrDefault(); if (best != null) Select(best.Go, false); });
+        foreach (var r in new[] { 5f, 10f, 25f }) { var rad = r; A("sel.near" + Num(rad), "select", "focus", Fmt(T("c.selNear", "Select everything within {0} m"), Num(rad)), true, () => { var c = _sel.transform.position; SelectWhere(p => Vector3.Distance(p.Go.transform.position, c) <= rad); }); }
+        A("sel.visible", "select", "eye", T("c.selVisible", "Select everything on screen"), false, () => SelectWhere(p => { var s = _cam.WorldToViewportPoint(p.Go.transform.position); return s.z > 0 && s.x > 0 && s.x < 1 && s.y > 0 && s.y < 1; }));
+
+        // Вид.
+        A("view.grid", "view", "grid", T("c.gridToggle", "Grid on the ground on / off"), false, () => _showGrid = !_showGrid);
+        foreach (var g in new[] { 0.25f, 0.5f, 1f, 2f, 5f }) { var v = g; A("view.gridSize" + Num(v), "view", "grid", Fmt(T("c.gridSize", "Snap step {0} m"), Num(v)), false, () => { _grid = v; _snap = true; }); }
+        A("view.snap", "view", "magnet", T("c.snapToggle", "Snapping on / off"), false, () => _snap = !_snap, "G");
+        A("view.local", "view", "globe", T("c.localToggle", "Arrows: world / object axes"), false, () => _local = !_local);
+        A("view.labels", "view", "layers", T("c.labels", "Names above objects on / off"), false, () => _showLabels = !_showLabels);
+        A("view.stats", "view", "output", T("c.stats", "Scene statistics on / off"), false, () => _showStats = !_showStats);
+        A("view.add", "view", "plus", T("c.panelAdd", "Panel “Add”"), false, () => _showToolbox = !_showToolbox, "Tab");
+        A("view.scene", "view", "model", T("c.panelScene", "Panel “Scene”"), false, () => { OpenRight("scene"); });
+        A("view.props", "view", "gear", T("c.panelProps", "Panel “Properties”"), false, () => { OpenRight("props"); }, "I");
+        A("view.output", "view", "output", T("c.panelOutput", "Panel “Output”"), false, () => _showOutput = !_showOutput);
+        A("view.ui", "view", "eye", T("c.hideUi", "Hide the editor interface (clean view)"), false, () => _clean = !_clean, "F10");
+        var accents = new[] { "amber", "sky", "mint", "rose", "violet" };
+        var accentC = new[] { new Color(0.94f, 0.71f, 0.16f), new Color(0.36f, 0.68f, 1f), new Color(0.35f, 0.85f, 0.62f), new Color(1f, 0.45f, 0.55f), new Color(0.66f, 0.52f, 1f) };
+        for (var i = 0; i < accents.Length; i++) { var c = accentC[i]; var n = accents[i]; A("accent." + n, "view", "palette", Fmt(T("c.accent", "Editor colour: {0}"), T("accent." + n, n)), false, () => { _accentUser = true; SetAccent(c); SavePrefs(); }); }
+        foreach (var s in new[] { 0.9f, 1f, 1.15f, 1.3f }) { var v = s; A("uiScale." + Num(v), "view", "scale", Fmt(T("c.uiScale", "Interface size {0}%"), Mathf.RoundToInt(v * 100)), false, () => { _uiUser = v; _txt = null; SavePrefs(); }); }
+        A("view.help", "view", "output", T("c.help", "Keyboard shortcuts"), false, () => _showHelp = !_showHelp, "F1");
+
+        // Файл.
+        A("file.save", "file", "save", T("save", "Save"), false, Save, "Ctrl+S");
+        A("file.revert", "file", "refresh", T("c.revert", "Go back to the last save"), false, Revert);
+        A("file.backup", "file", "save", T("c.backup", "Save a backup copy of this map"), false, Backup);
+        A("file.export", "file", "group", T("c.export", "Save the selected as a set (to reuse)"), true, ExportSet);
+        foreach (var f in SetFiles()) { var file = f; A("set." + Path.GetFileNameWithoutExtension(file), "file", "model", Fmt(T("c.insertSet", "Insert set: {0}"), Path.GetFileNameWithoutExtension(file)), false, () => InsertSet(file)); }
+        foreach (var k in new[] { 1, 2, 4 }) { var s = k; A("shot.x" + s, "file", "camera", Fmt(T("c.shot", "Screenshot ×{0}"), s), false, () => { var name = "shot-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".png"; ShotSize(name, s); Status(T("shotSaved", "Screenshot saved") + ": " + name); }); }
+        A("file.models", "file", "folder", T("openModels", "Open the models folder…"), false, () => Application.OpenURL("file:///" + Path.Combine(_root, "models").Replace('\\', '/')));
+        A("file.textures", "file", "folder", T("openTextures", "Open the textures folder…"), false, () => Application.OpenURL("file:///" + Path.Combine(_root, "textures").Replace('\\', '/')));
+        A("file.folder", "file", "folder", T("c.openMaps", "Open the folder with maps…"), false, () => Application.OpenURL("file:///" + _root.Replace('\\', '/')));
+
+        // Сведения.
+        A("info.distance", "info", "array", T("c.distance", "Distance between the two selected"), true, () => { if (_selection.Count < 2) { Status(T("needTwo", "Select two objects")); return; } Status(Fmt(T("c.distanceIs", "Distance: {0} m"), Num(Vector3.Distance(_selection[0].transform.position, _selection[1].transform.position)))); });
+        A("info.size", "info", "scale", T("c.sizeInfo", "Size of the selected"), true, () => { var b = AllBounds(TopSelection()).size; Status(Fmt(T("c.sizeIs", "Size: {0} × {1} × {2} m"), Num(b.x), Num(b.y), Num(b.z))); });
+        A("info.scene", "info", "layers", T("c.sceneInfo", "What is on this map"), false, () => Status(Fmt(T("c.sceneIs", "Placed: {0} · groups: {1} · lights: {2} · removed from the level: {3}"), _placed.Count, _placed.Count(p => p.Source == "prim:Empty"), _placed.Count(p => p.Go != null && p.Go.GetComponentInChildren<Light>() != null), _touched.Count(t => t.Hidden))));
+        return _acts;
+    }
+
+    // ------------------------------------------------------------------ реализации команд
+
+    Vector3 _tPos, _tScale;
+    Quaternion _tRot;
+    bool _tHas, _showLabels, _showStats, _showHelp, _clean;
+
+    IEnumerable<Placed> TopPlaceds() { return _placed.Where(p => p.Go != null && p.Go.activeInHierarchy && TopPlaced(p.Go) == p).ToList(); }
+
+    void SelectWhere(Func<Placed, bool> f)
+    {
+        _lighting = false;
+        _selection.Clear();
+        foreach (var p in TopPlaceds()) if (f(p)) _selection.Add(p.Go);
+        Status(T("selected", "Selected") + ": " + _selection.Count);
+    }
+
+    void EditBeh(Placed p, Action<ModScriptBehaviour> f)
+    {
+        var b = p.Go.GetComponent<ModScriptBehaviour>();
+        if (b == null) { b = p.Go.AddComponent<ModScriptBehaviour>(); b.Rebase(); b.Paused = true; }
+        var t = new GameObject("tmp").AddComponent<ModScriptBehaviour>();
+        t.Parse(b.Code());
+        f(t);
+        var code = t.Code();
+        Destroy(t.gameObject);
+        SetBeh(p, code);
+    }
+
+    static string SetSpec(string spec, string key, float v)
+    {
+        var parts = (spec ?? "").Split(';').Where(x => x != "" && !x.StartsWith(key + "=")).ToList();
+        parts.Add(key + "=" + Num(v));
+        return string.Join(";", parts.ToArray());
+    }
+
+    void RigidProp(string member, string value)
+    {
+        ForPlaced(T("physics", "Physics"), p => { p.Physics = true; SetPhysics(p.Go, _simulate); });
+        foreach (var g in TopSelection())
+        {
+            var rb = g.GetComponent<Rigidbody>();
+            if (rb == null) { rb = g.AddComponent<Rigidbody>(); rb.isKinematic = !_simulate; }
+            EditProp(rb, member, value);
+        }
+    }
+
+    void ColliderProp(string member, string value)
+    {
+        foreach (var g in TopSelection()) foreach (var c in g.GetComponentsInChildren<Collider>()) EditProp(c, member, value);
+    }
+
+    void Kick(Vector3 v)
+    {
+        if (!_simulate) ToggleSimulate();
+        foreach (var g in TopSelection())
+        {
+            var p = PlacedOf(g);
+            if (p != null && !p.Physics) { p.Physics = true; SetPhysics(g, true); }
+            var rb = g.GetComponent<Rigidbody>();
+            if (rb != null) { rb.isKinematic = false; rb.AddForce(v, ForceMode.VelocityChange); }
+        }
+    }
+
+    void Explode()
+    {
+        if (!_simulate) ToggleSimulate();
+        var tops = TopSelection();
+        var c = AllBounds(tops).center - Vector3.up * 0.5f;
+        foreach (var g in tops)
+        {
+            var p = PlacedOf(g);
+            if (p != null && !p.Physics) { p.Physics = true; SetPhysics(g, true); }
+            var rb = g.GetComponent<Rigidbody>();
+            if (rb != null) { rb.isKinematic = false; rb.AddExplosionForce(900f, c, 20f, 1.5f); }
+        }
+    }
+
+    void Align(int axis, int where)
+    {
+        var tops = TopSelection();
+        if (tops.Count < 2) { Status(T("needTwo", "Select two objects")); return; }
+        var all = AllBounds(tops);
+        var target = where == 0 ? all.min[axis] : where == 2 ? all.max[axis] : all.center[axis];
+        ForSel(T("move", "Move"), o =>
+        {
+            var b = BoundsOf(o);
+            var cur = where == 0 ? b.min[axis] : where == 2 ? b.max[axis] : b.center[axis];
+            var p = o.transform.position; p[axis] += target - cur; o.transform.position = p;
+        });
+    }
+
+    void Distribute(int axis)
+    {
+        var tops = TopSelection().OrderBy(g => BoundsOf(g).center[axis]).ToList();
+        if (tops.Count < 3) { Status(T("needThree", "Select three or more objects")); return; }
+        var a = BoundsOf(tops[0]).center[axis];
+        var z = BoundsOf(tops[tops.Count - 1]).center[axis];
+        var before = SnapOf(tops);
+        for (var i = 1; i < tops.Count - 1; i++)
+        {
+            var t = a + (z - a) * i / (tops.Count - 1);
+            var p = tops[i].transform.position; p[axis] += t - BoundsOf(tops[i]).center[axis]; tops[i].transform.position = p;
+            Touch(tops[i]);
+        }
+        PushSnap(T("move", "Move"), before, SnapOf(tops));
+        Dirty();
+    }
+
+    void StackOnTop()
+    {
+        var tops = TopSelection();
+        if (tops.Count < 2) { Status(T("needTwo", "Select two objects")); return; }
+        var basis = _sel;
+        ForSel(T("move", "Move"), o =>
+        {
+            if (o == basis) return;
+            var top = BoundsOf(basis).max.y;
+            var b = BoundsOf(o);
+            o.transform.position += new Vector3(basis.transform.position.x - o.transform.position.x, top - b.min.y, basis.transform.position.z - o.transform.position.z);
+        });
+    }
+
+    void AlignToSurface()
+    {
+        ForSel(T("rotate", "Rotate"), o =>
+        {
+            var b = BoundsOf(o);
+            var cols = o.GetComponentsInChildren<Collider>().Where(c => c.enabled).ToList();
+            foreach (var c in cols) c.enabled = false;
+            RaycastHit hit;
+            var found = Physics.Raycast(new Vector3(b.center.x, b.max.y + 0.5f, b.center.z), Vector3.down, out hit, 2000f, ~0, QueryTriggerInteraction.Ignore);
+            foreach (var c in cols) c.enabled = true;
+            if (found) o.transform.rotation = Quaternion.FromToRotation(Vector3.up, hit.normal) * Quaternion.Euler(0, o.transform.eulerAngles.y, 0);
+        });
+    }
+
+    void DuplicateBy(Vector3 offset)
+    {
+        var tops = TopSelection();
+        if (tops.Count == 0) return;
+        var made = new List<Placed>();
+        var news = new List<GameObject>();
+        foreach (var g in tops) { var c = Clone(g, made); if (c != null) { c.transform.position += offset; news.Add(c); } }
+        _selection.Clear();
+        _selection.AddRange(news);
+        PushMade(T("duplicate", "Duplicate"), made);
+    }
+
+    void PasteInPlace()
+    {
+        var src = _clipboard.Where(g => g != null).ToList();
+        if (src.Count == 0) return;
+        var made = new List<Placed>();
+        var news = new List<GameObject>();
+        foreach (var g in src) { var c = Clone(g, made); if (c != null) news.Add(c); }
+        _selection.Clear();
+        _selection.AddRange(news);
+        PushMade(T("paste", "Paste"), made);
+    }
+
+    /// <summary>Копии одного объекта по готовым точкам (круг, сетка, разброс, стопка, спираль) — одной отменой.</summary>
+    void CopiesAt(string name, IEnumerable<KeyValuePair<Vector3, Quaternion>> spots)
+    {
+        if (_sel == null) return;
+        var from = _sel;
+        var made = new List<Placed>();
+        var news = new List<GameObject> { from };
+        foreach (var s in spots)
+        {
+            var c = Clone(from, made);
+            if (c == null) continue;
+            c.transform.position = s.Key;
+            c.transform.rotation = s.Value;
+            news.Add(c);
+        }
+        _selection.Clear();
+        _selection.AddRange(news);
+        PushMade(name, made);
+    }
+
+    void Circle(int n)
+    {
+        var b = BoundsOf(_sel);
+        var r = Mathf.Max(1f, Mathf.Max(b.size.x, b.size.z) * n / (2 * Mathf.PI) * 1.3f);
+        var c = _sel.transform.position - Vector3.forward * r;
+        var list = new List<KeyValuePair<Vector3, Quaternion>>();
+        for (var i = 1; i < n; i++)
+        {
+            var ang = i * 360f / n;
+            var q = Quaternion.Euler(0, ang, 0);
+            list.Add(new KeyValuePair<Vector3, Quaternion>(c + q * Vector3.forward * r, q * _sel.transform.rotation));
+        }
+        CopiesAt(T("arrange", "Arrange"), list);
+    }
+
+    void GridArray(int n)
+    {
+        var b = BoundsOf(_sel);
+        var dx = Mathf.Max(0.2f, b.size.x * 1.15f); var dz = Mathf.Max(0.2f, b.size.z * 1.15f);
+        var o = _sel.transform.position;
+        var list = new List<KeyValuePair<Vector3, Quaternion>>();
+        for (var i = 0; i < n; i++) for (var j = 0; j < n; j++) if (i + j > 0) list.Add(new KeyValuePair<Vector3, Quaternion>(o + new Vector3(i * dx, 0, j * dz), _sel.transform.rotation));
+        CopiesAt(T("arrange", "Arrange"), list);
+    }
+
+    void Scatter(int n, float radius)
+    {
+        var o = _sel.transform.position;
+        var lift = _sel.transform.position.y - BoundsOf(_sel).min.y;
+        var list = new List<KeyValuePair<Vector3, Quaternion>>();
+        for (var i = 0; i < n; i++)
+        {
+            var d = UnityEngine.Random.insideUnitCircle * radius;
+            var p = o + new Vector3(d.x, 0, d.y);
+            RaycastHit hit;
+            if (Physics.Raycast(p + Vector3.up * 60f, Vector3.down, out hit, 200f, ~0, QueryTriggerInteraction.Ignore)) p.y = hit.point.y + lift;
+            list.Add(new KeyValuePair<Vector3, Quaternion>(p, Quaternion.Euler(0, UnityEngine.Random.Range(0f, 360f), 0) * _sel.transform.rotation));
+        }
+        CopiesAt(T("arrange", "Arrange"), list);
+    }
+
+    void Stack(int n)
+    {
+        var h = Mathf.Max(0.1f, BoundsOf(_sel).size.y);
+        var list = new List<KeyValuePair<Vector3, Quaternion>>();
+        for (var i = 1; i < n; i++) list.Add(new KeyValuePair<Vector3, Quaternion>(_sel.transform.position + Vector3.up * h * i, _sel.transform.rotation));
+        CopiesAt(T("arrange", "Arrange"), list);
+    }
+
+    void Spiral(int n)
+    {
+        var b = BoundsOf(_sel);
+        var r = Mathf.Max(1f, Mathf.Max(b.size.x, b.size.z) * 1.6f);
+        var c = _sel.transform.position - Vector3.forward * r;
+        var list = new List<KeyValuePair<Vector3, Quaternion>>();
+        for (var i = 1; i < n; i++)
+        {
+            var q = Quaternion.Euler(0, i * 30f, 0);
+            list.Add(new KeyValuePair<Vector3, Quaternion>(c + q * Vector3.forward * r + Vector3.up * b.size.y * i * 0.5f, q * _sel.transform.rotation));
+        }
+        CopiesAt(T("arrange", "Arrange"), list);
+    }
+
+    void RestoreLevel()
+    {
+        var hidden = _touched.Where(t => t.Hidden).ToList();
+        if (hidden.Count == 0) { Status(T("nothing", "Nothing found")); return; }
+        foreach (var t in hidden) { t.Hidden = false; if (t.Go != null) t.Go.SetActive(true); }
+        Push(T("c.restoreLevel", "Bring back"), () => { foreach (var t in hidden) { t.Hidden = true; if (t.Go != null) t.Go.SetActive(false); } }, () => { foreach (var t in hidden) { t.Hidden = false; if (t.Go != null) t.Go.SetActive(true); } });
+        Dirty();
+    }
+
+    void ViewFrom(Vector3 euler)
+    {
+        var f = FocusPoint();
+        var d = Mathf.Max(6f, Vector3.Distance(_cam.transform.position, f));
+        var q = Quaternion.Euler(euler);
+        _cam.transform.rotation = q;
+        _cam.transform.position = f - q * Vector3.forward * d;
+        _yaw = euler.y;
+        _pitch = euler.x;
+        _orbit = f;
+    }
+
+    void GoBookmark(int n)
+    {
+        KeyValuePair<Vector3, Quaternion> b;
+        if (!_bookmarks.TryGetValue(n, out b)) { Status(Fmt(T("c.bmNone", "Camera spot {0} is not remembered yet"), n)); return; }
+        _cam.transform.position = b.Key;
+        _cam.transform.rotation = b.Value;
+        var e = b.Value.eulerAngles;
+        _yaw = e.y;
+        _pitch = e.x > 180 ? e.x - 360 : e.x;
+    }
+
+    void FrameAll()
+    {
+        var gos = TopPlaceds().Select(p => p.Go).ToList();
+        if (gos.Count == 0) return;
+        var b = AllBounds(gos);
+        _cam.transform.position = b.center - _cam.transform.forward * Mathf.Max(5, b.size.magnitude * 1.2f);
+        _orbit = b.center;
+    }
+
+    void Revert()
+    {
+        foreach (var p in _placed.ToArray()) if (p.Go != null) Destroy(p.Go);
+        _placed.Clear(); _touched.Clear(); _props.Clear(); _selection.Clear(); _undo.Clear(); _redo.Clear();
+        _world = new World();
+        Load();
+        foreach (var b in FindObjectsOfType<ModScriptBehaviour>()) { b.Paused = false; b.Rebase(); b.Pause(); }
+        Status(T("c.reverted", "Back to the last save"));
+    }
+
+    void Backup()
+    {
+        Save();
+        var file = LayoutFile(_scene);
+        if (!File.Exists(file)) return;
+        var copy = file + "." + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".bak";
+        File.Copy(file, copy, true);
+        Status(T("c.backupDone", "Backup saved") + ": " + Path.GetFileName(copy));
+    }
+
+    string SetDir() { return Path.Combine(_root, "sets"); }
+
+    IEnumerable<string> SetFiles()
+    {
+        try { return Directory.Exists(SetDir()) ? Directory.GetFiles(SetDir(), "*.set").OrderBy(f => f).ToArray() : new string[0]; }
+        catch { return new string[0]; }
+    }
+
+    /// <summary>Набор: выбранные поставленные объекты (с группами) строками карты, положение — от центра набора.</summary>
+    void ExportSet()
+    {
+        var tops = TopSelection().Where(g => PlacedOf(g) != null).ToList();
+        if (tops.Count == 0) { Status(T("onlyYours", "Works on objects you placed")); return; }
+        var center = AllBounds(tops).center;
+        center.y = AllBounds(tops).min.y;
+        var lines = new List<string>();
+        foreach (var top in tops)
+            foreach (var p in _placed.Where(x => x.Go != null && x.Go.transform.IsChildOf(top.transform)))
+            {
+                Capture(p);
+                var pos = p.Parent == "" ? p.Pos - center : p.Pos;
+                lines.Add("place|" + p.Id + "|" + Esc(p.Source) + "|" + Esc(p.Name) + "|" + V(pos) + "|" + Q(p.Rot) + "|" + V(p.Scale) + "|" + Esc(p.Mat) + "|" + (p.Tinted ? C(p.Tint) : "") + "|" + (p.Physics ? "phys" : "") + "|" + Esc(p.Beh) + "|" + (tops.Contains(p.Go) ? "" : p.Parent) + "|" + Esc(p.Look) + "|" + Esc(p.PhysMat));
+            }
+        Directory.CreateDirectory(SetDir());
+        var name = (PlacedOf(tops[0]).Name + "-" + DateTime.Now.ToString("HHmmss")).Replace(' ', '_');
+        foreach (var ch in Path.GetInvalidFileNameChars()) name = name.Replace(ch, '_');
+        File.WriteAllLines(Path.Combine(SetDir(), name + ".set"), lines.ToArray(), Encoding.UTF8);
+        _acts = null;
+        Status(T("c.exported", "Set saved — insert it from the command list") + ": " + name);
+    }
+
+    void InsertSet(string file)
+    {
+        var aim = Aim();
+        var map = new Dictionary<string, Placed>();
+        var made = new List<Placed>();
+        foreach (var line in File.ReadAllLines(file, Encoding.UTF8))
+        {
+            var f = line.Split('|');
+            if (f.Length < 14 || f[0] != "place") continue;
+            var pos = F(f[4]); var rot = F(f[5]); var sc = F(f[6]);
+            var p = new Placed { Id = NewId(), Source = f[2], Name = f[3], Mat = f[7], Physics = f[9] == "phys", Beh = f[10], Parent = f[11], Look = f[12], PhysMat = f[13] };
+            if (f[8] != "") { var c = F(f[8]); p.Tint = new Color(c[0], c[1], c[2], c[3]); p.Tinted = true; }
+            p.Pos = new Vector3(pos[0], pos[1], pos[2]); p.Rot = new Quaternion(rot[0], rot[1], rot[2], rot[3]); p.Scale = new Vector3(sc[0], sc[1], sc[2]);
+            p.Go = Make(p.Source, p.Parent == "" ? aim + p.Pos : p.Pos, p.Rot);
+            if (p.Go == null) continue;
+            map[f[1]] = p;
+            Dress(p);
+            SetPhysics(p.Go, false);
+            var b = p.Go.GetComponent<ModScriptBehaviour>();
+            if (b != null) b.Pause();
+            _placed.Add(p);
+            made.Add(p);
+        }
+        foreach (var p in made)
+        {
+            Placed parent;
+            if (p.Parent == "" || !map.TryGetValue(p.Parent, out parent)) { p.Parent = ""; continue; }
+            p.Parent = parent.Id;
+            p.Go.transform.SetParent(parent.Go.transform, false);
+            p.Go.transform.localPosition = p.Pos; p.Go.transform.localRotation = p.Rot; p.Go.transform.localScale = p.Scale;
+        }
+        _selection.Clear();
+        foreach (var p in made) if (p.Parent == "") _selection.Add(p.Go);
+        PushMade(T("c.insertSetName", "Insert set"), made);
+    }
+
+    void ShotSize(string name, int size)
+    {
+        var path = Path.Combine(_root, name);
+        var sc = Type.GetType("UnityEngine.ScreenCapture, UnityEngine.ScreenCaptureModule") ?? Type.GetType("UnityEngine.ScreenCapture, UnityEngine");
+        var m = sc != null ? sc.GetMethod("CaptureScreenshot", new[] { typeof(string), typeof(int) }) : null;
+        if (m != null) m.Invoke(null, new object[] { path, size });
+        else Shot(name);
+    }
+
+    // ------------------------------------------------------------------ свои настройки редактора (цвет, размер)
+
+    float _uiUser = 1f;
+
+    string PrefsFile() { return Path.Combine(_root, "studio.cfg"); }
+
+    void LoadPrefs()
+    {
+        try
+        {
+            if (!File.Exists(PrefsFile())) return;
+            foreach (var line in File.ReadAllLines(PrefsFile()))
+            {
+                var kv = line.Split('=');
+                if (kv.Length != 2) continue;
+                // Свой цвет игрока важнее цвета игры; старые настройки с жёлтым по умолчанию цвет игры не перебивают.
+                if (kv[0] == "accent") { var c = F(kv[1]); var col = new Color(c[0], c[1], c[2], 1); if (_gameName == "" || Mathf.Abs(col.r - 0.94f) + Mathf.Abs(col.g - 0.71f) + Mathf.Abs(col.b - 0.16f) > 0.03f) { _accentUser = true; SetAccent(col); } }
+                if (kv[0] == "ui") _uiUser = Mathf.Clamp(float.Parse(kv[1], Inv), 0.7f, 1.6f);
+            }
+        }
+        catch { }
+    }
+
+    void SavePrefs()
+    {
+        try { File.WriteAllLines(PrefsFile(), _accentUser ? new[] { "accent=" + C(Amber), "ui=" + Num(_uiUser) } : new[] { "ui=" + Num(_uiUser) }); } catch { }
+    }
+
+    void SetAccent(Color c)
+    {
+        Amber = c;
+        AmberSoft = new Color(c.r, c.g, c.b, 0.16f);
+        _txt = null;
+    }
+}

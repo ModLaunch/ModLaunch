@@ -15,7 +15,8 @@ public static class Ctx
     public static MenuItem Item(string text, string icon, Action run, bool enabled = true, string? gesture = null)
     {
         var m = new MenuItem { Header = text, Icon = Ui.Icon(icon, 14), IsEnabled = enabled };
-        if (gesture is not null) m.InputGesture = KeyGesture.Parse(gesture);
+        // Подсказка клавиш — только если Avalonia её понимает: нераспознанная («Ctrl+`») раньше роняла всю страницу.
+        if (gesture is not null) try { m.InputGesture = KeyGesture.Parse(gesture); } catch (ArgumentException) { }
         // Действие — после закрытия меню и под страховкой (см. Guard.Later).
         m.Click += (_, _) => Guard.Later(run);
         return m;

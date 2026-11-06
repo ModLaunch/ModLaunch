@@ -12,6 +12,17 @@ public static class WhatsNew
 {
     static readonly (string Icon, string Key, Func<Page>? Open)[] Items =
     [
+        // 24.0: «Почему игра упала», сборка по коду для всех игр, «Обновить всё» одной кнопкой.
+        (Icons.Wand, "new.v24.crash", null),
+        (Icons.Users, "new.v24.share", () => new HomePage()),
+        (Icons.ArrowUp, "new.v24.updates", () => new HomePage()),
+        // 23.8: конструктор в играх, весь Steam, меню под игру, новые движки, рынок, безопасность.
+        (Icons.Cube, "new.v23.builder", () => new CreatorPage("ingame")),
+        (Icons.Gamepad, "new.v23.allgames", () => new CreatorPage("ingame")),
+        (Icons.Palette, "new.v23.menu", () => new CreatorPage("ingame")),
+        (Icons.Layers, "new.v23.engines", () => new CreatorPage("ingame")),
+        (Icons.Bag, "new.v23.market", () => new CreatorPage("shop")),
+        (Icons.Shield, "new.v23.safety", null),
         (Icons.Grid, "new.v21.blocks", XStudio.Entry),
         (Icons.Package, "new.v21.pieces", XStudio.Entry),
         (Icons.Sparkles, "new.v21.kids", () => CreatorPage.NewForm()),
@@ -61,7 +72,6 @@ public static class WhatsNew
         (Icons.Cube, "new.v101.mc", () => new MinecraftPage()),
         (Icons.Check, "new.v101.cases", () => new SettingsPage("configs")),
         (Icons.Home, "new.v10.home", () => new HomePage()),
-        (Icons.Sliders, "new.v10.configs", () => new SettingsPage("configs")),
         (Icons.Shield, "new.v10.autopilot", () => new AutopilotPage()),
         (Icons.Download, "new.v10.cloud", () => new SettingsPage("backups")),
         (Icons.Sparkles, "new.v10.clean", () => new SettingsPage("launch")),
@@ -104,6 +114,47 @@ public static class WhatsNew
         (Icons.Sidebar, "new.v85.rail", null),
     ];
 
+    /// <summary>
+    /// Заголовок и описание пункта. До 20.x — две строки (key и key.text), с 21.0 — одна «Заголовок: описание».
+    /// Раньше у таких пунктов вместо описания виден был сам ключ «new.v21.blocks.text».
+    /// </summary>
+    public static (string Title, string Text) Split(string key) => Split(key, k => I18n.T(k));
+
+    /// <summary>То же для любого языка (в самотесте — по всем восьми).</summary>
+    static (string Title, string Text) Split(string key, Func<string, string> t)
+    {
+        var title = t(key);
+        var text = t(key + ".text");
+        if (text != key + ".text") return (title, text);
+        // Двоеточие: «: », во французском « : », в китайском полноширинное «：».
+        var m = System.Text.RegularExpressions.Regex.Match(title, @"\s?[:：]\s*");
+        while (m.Success && m.Value.Trim() == ":" && !m.Value.EndsWith(' ')) m = m.NextMatch(); // «14:00», «Nexus:123» — не делитель
+        if (!m.Success || m.Index <= 0 || m.Index + m.Length >= title.Length) return (title, "");
+        var rest = title[(m.Index + m.Length)..];
+        return (title[..m.Index].TrimEnd(), char.ToUpper(rest[0], I18n.Culture) + rest[1..]);
+    }
+
+    [SelfTest]
+    static string WhatsNewHasNoRawKeys()
+    {
+        if (I18n.T("new.title") == "new.title") return "strings not loaded (headless)";
+        string[] langs = ["ru", "en", "uk", "es", "de", "fr", "pt-BR", "zh-CN"];
+        var missing = new List<string>();
+        foreach (var lang in langs)
+            foreach (var (_, key, _) in Items)
+            {
+                var (title, text) = Split(key, k => I18n.Raw(lang, k) ?? k);
+                if (title.StartsWith("new.", StringComparison.Ordinal) || text.StartsWith("new.", StringComparison.Ordinal) || text == "") missing.Add(lang + ":" + key);
+            }
+        // 23.8: все пункты переведены на все восемь языков — новый пункт без перевода тест не пропустит.
+        if (missing.FirstOrDefault() is { } bad) throw new Exception("raw or empty: " + bad + (missing.Count > 1 ? $" (+{missing.Count - 1})" : ""));
+        if (I18n.T("new.v24.subtitle") == "new.v24.subtitle") throw new Exception("no subtitle for 24");
+        var (fr, frText) = Split("new.v21.blocks", k => k == "new.v21.blocks" ? "Blocs dans ModScript : texte" : k);
+        var (zh, zhText) = Split("new.v21.blocks", k => k == "new.v21.blocks" ? "积木：文字" : k);
+        if (fr != "Blocs dans ModScript" || frText != "Texte" || zh != "积木" || zhText != "文字") throw new Exception("colon split: " + fr + "|" + zh);
+        return Items.Length + " items × 8 languages, " + missing.Count + " not translated yet";
+    }
+
     /// <summary>9.5: самые свежие пункты — для карточки «Что нового» на главной.</summary>
     public static IEnumerable<(string Icon, string Key, Func<Page>? Open)> Latest(int n) => Items.Take(n);
 
@@ -139,7 +190,8 @@ public static class WhatsNew
         var list = Ui.Col(10);
         foreach (var (icon, key, open) in Items)
         {
-            var words = Ui.Col(2, Ui.Text(I18n.T(key), "h3"), Ui.Text(I18n.T(key + ".text"), "small muted", wrap: true));
+            var (title, text) = Split(key);
+            var words = Ui.Col(2, Ui.Text(title, "h3"), Ui.Text(text, "small muted", wrap: true));
             words.VerticalAlignment = VerticalAlignment.Center;
             var row = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"), ColumnSpacing = 14 };
             var badge = new Border { Width = 40, Height = 40, CornerRadius = new CornerRadius(12), Background = Ui.Res("BrandSoft"), Child = Ui.Icon(icon, 19, Ui.Res("Brand2")), VerticalAlignment = VerticalAlignment.Center };
@@ -166,7 +218,7 @@ public static class WhatsNew
             },
             Child = Ui.Col(2,
                 new TextBlock { Text = $"ModLaunch {Http.Version}", FontSize = 24, FontWeight = FontWeight.Bold, Foreground = Brushes.White },
-                new TextBlock { Text = I18n.T("new.v21.subtitle"), Foreground = new SolidColorBrush(Color.FromArgb(220, 255, 255, 255)), TextWrapping = TextWrapping.Wrap }),
+                new TextBlock { Text = I18n.T("new.v24.subtitle"), Foreground = new SolidColorBrush(Color.FromArgb(220, 255, 255, 255)), TextWrapping = TextWrapping.Wrap }),
         };
         w.Dialog(I18n.T("new.title"), new ScrollViewer { MaxHeight = 560, Content = Ui.Col(12, hero, list) }, 620,
             Ui.Button(I18n.T("new.ok"), w.CloseDialog, "primary", Icons.Check));

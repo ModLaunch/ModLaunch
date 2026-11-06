@@ -12,7 +12,6 @@ public sealed partial class MinecraftPage
 {
     static string _kind = "mod";
     string _filter = "";
-    readonly HashSet<string> _updating = [];
 
     Control ContentView()
     {
@@ -100,7 +99,7 @@ public sealed partial class MinecraftPage
         var right = Ui.Row(6);
         if (update is not null)
         {
-            var busy = _updating.Contains(item.Key);
+            var busy = Actions.IsMcUpdating(a, item);
             var b = Ui.Button(busy ? I18n.T("upd.updating") : I18n.T("upd.to", ("version", update.Latest.Number)), () => RunUpdates(a, [update]), "primary", Icons.ArrowUp);
             b.IsEnabled = !busy;
             right.Children.Add(b);
@@ -200,8 +199,9 @@ public sealed partial class MinecraftPage
         var names = string.Join(", ", updates.Take(4).Select(u => u.Item.Name)) + (updates.Count > 4 ? "…" : "");
         var text = Ui.Col(3, Ui.Text(I18n.T("mine.updates.title", ("n", updates.Count)), "h3"), Ui.Text(names, "small muted"));
         text.VerticalAlignment = VerticalAlignment.Center;
-        var all = Ui.Button(I18n.T("mr.updateAll"), () => RunUpdates(a, updates), "primary", Icons.ArrowUp);
-        all.IsEnabled = _updating.Count == 0;
+        var busy = updates.Any(u => Actions.IsMcUpdating(a, u.Item));
+        var all = Ui.Button(busy ? I18n.T("upd.updating") : I18n.T("upd.all"), () => RunUpdates(a, updates), "primary", Icons.ArrowUp);
+        all.IsEnabled = !busy;
         all.VerticalAlignment = VerticalAlignment.Center;
         var dock = new DockPanel();
         DockPanel.SetDock(all, Dock.Right);
@@ -210,28 +210,12 @@ public sealed partial class MinecraftPage
         return new Border { Classes = { "card" }, Padding = new Thickness(16, 14), BorderBrush = Ui.Hex("#553FB950"), BorderThickness = new Thickness(1), Child = dock };
     }
 
+    /// <summary>24.0: одна задача на всё (Actions.UpdateMc) — так же обновляют главная и «Почему игра упала».</summary>
     void RunUpdates(McInstance a, List<McUpdate> updates)
     {
-        foreach (var u in updates) _updating.Add(u.Item.Key);
+        var running = Actions.UpdateMc(a, updates);
         Build();
-        Jobs.Run(updates.Count == 1 ? updates[0].Item.Name : I18n.T("mine.updates.job", ("n", updates.Count)), "Minecraft", async (_, progress, ct) =>
-        {
-            var failed = 0;
-            foreach (var u in updates)
-            {
-                try { await McModrinth.Update(a, u, progress, ct); }
-                catch (OperationCanceledException) { throw; }
-                catch (Exception e) { failed++; Guard.Log(e); }
-            }
-            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-            {
-                foreach (var u in updates) _updating.Remove(u.Item.Key);
-                W.Toast(failed == 0 ? I18n.T("mr.updated") : I18n.T("mine.updates.failed", ("n", failed)), bad: failed > 0);
-                Build();
-                Mc.Notify();
-            });
-            if (failed == updates.Count) throw new InvalidOperationException(I18n.T("mine.updates.failed", ("n", failed)));
-        });
+        _ = running.ContinueWith(_ => Avalonia.Threading.Dispatcher.UIThread.Post(Build), TaskScheduler.Default);
     }
 
     /// <summary>Подсказки под чипами: чистая игра без загрузчика, шейдеры без Iris.</summary>

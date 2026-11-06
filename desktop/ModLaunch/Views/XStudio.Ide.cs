@@ -106,7 +106,7 @@ public sealed partial class XStudio
         var files = new List<string>();
         try
         {
-            files = [.. Directory.EnumerateFiles(_p.Dir).Where(f => f.EndsWith(MX.ModxDoc.Extension, StringComparison.OrdinalIgnoreCase) || f.EndsWith(".md", StringComparison.OrdinalIgnoreCase))];
+            files = ProjectFiles();
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
         foreach (var d in _s.Docs) if (d.Path is not null && !files.Any(f => Same(f, d.Path))) files.Add(d.Path);
@@ -526,6 +526,18 @@ public sealed partial class XStudio
         yield return C(Icons.Alert, "v15.ms.key.next", "F8", NextProblem);
         yield return C(Icons.Save, "cr.save", "Ctrl+S", () => { if (_s.Active is { } d) Save(d); });
         yield return C(Icons.FilePlus, "v15.ms.new", "Ctrl+N", NewFile);
+        // 22.0: простой язык, любые файлы, консоль.
+        yield return C(Icons.Sparkles, "v22.cmd.newSimple", "Ctrl+Shift+N", NewSimpleFile);
+        yield return C(Icons.Plus, "v22.file.new", "", NewAnyFile);
+        yield return C(Icons.Code, "v22.cmd.show", "", ShowAsModx);
+        yield return C(Icons.Wand, "v22.cmd.convert", "", ConvertToModx);
+        yield return C(Icons.Keyboard, "v22.p.console", "Ctrl+`", () => { _s.Panel = "console"; RenderPanel(); });
+        if (_s.Active is { Path: { } file } && !Same(file, _p?.Main))
+        {
+            yield return C(Icons.Edit, "v22.file.rename", "", () => RenameFile(file));
+            yield return C(Icons.Trash, "ctx.delete", "", () => DeleteFile(file));
+        }
+        if (_s.Active is { Path: { } copy }) yield return C(Icons.Copy, "v22.file.copy", "", () => DuplicateFile(copy));
         yield return C(Icons.Folder, "v15.ms.open", "Ctrl+O", () => _ = OpenFile());
         yield return C(Icons.Close, "v15.ms.close", "Ctrl+W", () => { if (_s.Active is { } d) Close(d); });
         yield return C(Icons.Eye, "v15.ms.watch", "", () => { _s.Watch = !_s.Watch; RenderStatus(); RenderTop(); });

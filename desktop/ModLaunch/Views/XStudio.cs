@@ -36,6 +36,8 @@ public sealed partial class XStudio : Page
         public ScriptEditor Editor = null!;
         public List<Diag> Diags = [];
         public bool Modx => Path is null || Path.EndsWith(MX.ModxDoc.Extension, StringComparison.OrdinalIgnoreCase);
+        /// <summary>22.0: файл правок ModScript (.mls) — проверяется и ставится в игру той же средой.</summary>
+        public bool Mls => Path?.EndsWith(ModScript.Extension, StringComparison.OrdinalIgnoreCase) == true;
         public bool Dirty => Editor.Text != Saved;
         /// <summary>18.0: за сколько миллисекунд прошла последняя проверка на лету — в строке состояния.</summary>
         public double CheckMs;
@@ -112,7 +114,7 @@ public sealed partial class XStudio : Page
     public static Page Entry() =>
         Settings.Data.Str("xLast") is { } id && XProjects.Get(id) is not null ? new XStudio(id) : CreatorPage.NewForm();
 
-    public override string Title => _p?.Name ?? "ModScript X";
+    public override string Title => _p?.Name ?? "ModScript";
     public override bool Workspace => true;
     public override bool SameScreenAs(Page? previous) => HubNav.IsHub(previous);
     public override string? Accent => _p is null ? null : XProjects.Hex(_p.Color);
@@ -123,7 +125,7 @@ public sealed partial class XStudio : Page
     [
         ("Creator Hub", () => MainWindow.Current?.Navigate(() => new CreatorPage())),
         (I18n.T("v18.hub.projects"), () => MainWindow.Current?.Navigate(() => new CreatorPage())),
-        (_p?.Name ?? "ModScript X", null),
+        (_p?.Name ?? "ModScript", null),
     ];
 
     GameState? Game => _p is { Game: { Length: > 0 } id } ? AppState.Games.FirstOrDefault(g => g.Def.Id == id) : null;
@@ -244,11 +246,11 @@ public sealed partial class XStudio : Page
     {
         var p = _p!;
         // 18.0: среда живёт внутри «Моих проектов» — слева путь назад туда, знак X и проект (цвет проекта — точкой).
-        var back = Ui.Button(I18n.T("v18.hub.projects"), () => MainWindow.Current?.Navigate(() => new CreatorPage()), "ghost", Icons.Back, I18n.T("v18.x.back"));
+        var back = Ui.Button(I18n.T("v22.hub.mods"), () => MainWindow.Current?.Navigate(() => new CreatorPage()), "ghost", Icons.Back, I18n.T("v18.x.back"));
         var tile = CreatorPage.XMark(34);
         var name = Ui.Col(1,
             new TextBlock { Text = p.Name, FontSize = 15, FontWeight = FontWeight.Bold, TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = 260 },
-            Ui.Row(6, Ui.Dot(Color, 6), HubLook.MonoText($"v{p.Version}  ·  MODSCRIPT X", 10.5, HubLook.Violet)));
+            Ui.Row(6, Ui.Dot(Color, 6), HubLook.MonoText($"v{p.Version}", 10.5)));
         var t = TargetFor(ActiveDoc());
         var b = Bridge;
         Control art = Game?.Def is { } def
@@ -280,6 +282,11 @@ public sealed partial class XStudio : Page
             Ctx.Item(I18n.T("cr.save"), Icons.Save, () => { if (_s.Active is { } d) Save(d); }, gesture: "Ctrl+S"),
             "-",
             Ctx.Item(I18n.T("v15.ms.new"), Icons.FilePlus, NewFile, gesture: "Ctrl+N"),
+            Ctx.Item(I18n.T("v22.cmd.newSimple"), Icons.Sparkles, NewSimpleFile),
+            Ctx.Item(I18n.T("v22.file.new"), Icons.Plus, NewAnyFile),
+            Ctx.Item(I18n.T("v22.cmd.show"), Icons.Code, ShowAsModx, enabled: ActiveSimple),
+            Ctx.Item(I18n.T("v22.cmd.convert"), Icons.Wand, ConvertToModx, enabled: ActiveSimple),
+            Ctx.Item(I18n.T("v22.p.console"), Icons.Keyboard, () => { _s.Panel = "console"; RenderPanel(); }, gesture: "Ctrl+OemTilde"),
             Ctx.Item(I18n.T("v15.ms.open"), Icons.Folder, () => _ = OpenFile(), gesture: "Ctrl+O"),
             Ctx.Item(I18n.T("v15.ms.find"), Icons.Search, () => _s.Active?.Editor.Find(), gesture: "Ctrl+F"),
             Ctx.Item(I18n.T("v15.ms.replace"), Icons.Edit, () => _s.Active?.Editor.Find(true), gesture: "Ctrl+H"),
@@ -361,7 +368,7 @@ public sealed partial class XStudio : Page
         _side.Child = new DockPanel { Children = { Docked(head, Dock.Top), new ScrollViewer { Content = body, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled } } };
     }
 
-    static Control Caption(string text) => new Border { Padding = new Thickness(8, 14, 8, 6), Child = HubLook.MonoText(text.ToUpper(I18n.Culture), 10, Ui.Res("Faint")) };
+    static Control Caption(string text) => new Border { Padding = new Thickness(8, 14, 8, 6), Child = HubLook.MonoText(text, 10, Ui.Res("Faint")) };
 
     static Button Row(string icon, string text, bool active, Action open, IBrush? mark = null, string? right = null, IBrush? iconColor = null)
     {
@@ -394,16 +401,13 @@ public sealed partial class XStudio : Page
     {
         var p = _p!;
         var col = new StackPanel { Spacing = 1, Margin = new Thickness(8, 0, 8, 12) };
+        // 22.0: создать — обычный .modx, простым языком или любой другой файл (заметки, JSON, Lua…).
         var add = Ui.Button(I18n.T("v15.ms.new"), NewFile, "ghost", Icons.FilePlus);
-        add.HorizontalAlignment = HorizontalAlignment.Left;
-        List<string> files = [];
-        try
-        {
-            files = Directory.EnumerateFiles(p.Dir)
-                .Where(f => f.EndsWith(MX.ModxDoc.Extension, StringComparison.OrdinalIgnoreCase) || f.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
-                .OrderBy(f => System.IO.Path.GetFileName(f) == System.IO.Path.GetFileName(p.Main) ? 0 : f.EndsWith(".md", StringComparison.OrdinalIgnoreCase) ? 2 : 1).ThenBy(f => f).ToList();
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+        var adds = new WrapPanel { Margin = new Thickness(0, 4, 0, 0) };
+        adds.Children.Add(add);
+        adds.Children.Add(Ui.Button(I18n.T("v22.cmd.newSimple"), NewSimpleFile, "ghost", Icons.Sparkles));
+        adds.Children.Add(Ui.Button(I18n.T("v22.file.new"), NewAnyFile, "ghost", Icons.Plus));
+        var files = ProjectFiles();
         col.Children.Add(Caption(I18n.T("v16.x.files.project")));
         foreach (var f in files)
         {
@@ -411,10 +415,13 @@ public sealed partial class XStudio : Page
             var doc = _s.Docs.FirstOrDefault(d => Same(d.Path, f));
             var mark = doc is null ? null : doc.Dirty ? Ui.Res("Warn") : doc.Diags.Any(x => !x.Warning) ? Ui.Res("Bad") : null;
             var main = Same(f, p.Main);
-            col.Children.Add(Row(f.EndsWith(".md", StringComparison.OrdinalIgnoreCase) ? Icons.Book : Icons.Code, System.IO.Path.GetFileName(f), Same(_s.Active?.Path, f), () => Open(path), mark,
-                main ? I18n.T("v16.x.files.main") : null, main ? Color : null));
+            var row = Row(IconFor(f), System.IO.Path.GetRelativePath(p.Dir, f).Replace('\\', '/'), Same(_s.Active?.Path, f), () => Open(path), mark,
+                main ? I18n.T("v16.x.files.main") : null, main ? Color : null);
+            ToolTip.SetTip(row, I18n.T("v22.file.tip"));
+            Ctx.Attach(row, () => FileMenu(path));
+            col.Children.Add(row);
         }
-        col.Children.Add(add);
+        col.Children.Add(adds);
 
         if (_s.Active is { Modx: true } a)
         {
@@ -426,7 +433,7 @@ public sealed partial class XStudio : Page
                 {
                     var at = line;
                     var icon = kind switch { "hook" => Icons.Zap, "fn" => Icons.Code, "native" => Icons.Layers, _ => Icons.Package };
-                    col.Children.Add(Row(icon, (kind == "mod" ? "" : kind + " ") + name, false, () => a.Editor.GoToLine(at), right: at.ToString(),
+                    col.Children.Add(Row(icon, (kind == "mod" || MX.Simple.IsSimple(name) ? "" : kind + " ") + name, false, () => a.Editor.GoToLine(at), right: at.ToString(),
                         iconColor: kind == "hook" ? HubLook.Cyan : kind == "fn" ? HubLook.Violet : null));
                 }
             }
@@ -479,7 +486,7 @@ public sealed partial class XStudio : Page
         var t = TargetFor(ActiveDoc());
         if (b is not { Code: false })
         {
-            var where = Ui.Col(4, HubLook.MonoText(I18n.T("v16.x.bridge.files").ToUpper(I18n.Culture), 10, Ui.Res("Faint")));
+            var where = Ui.Col(4, HubLook.MonoText(I18n.T("v16.x.bridge.files"), 10, Ui.Res("Faint")));
             try
             {
                 if (ActiveDoc() is { Ok: true } doc)
@@ -502,13 +509,14 @@ public sealed partial class XStudio : Page
                 ToolTip.SetTip(tag, has ? I18n.T($"v16.event.{e}.tip") : I18n.T("v16.event.missing", ("engine", t.Title)));
                 events.Children.Add(tag);
             }
-            col.Children.Add(Ui.Col(6, HubLook.MonoText(I18n.T("v16.x.bridge.events", ("engine", t.Title)).ToUpper(I18n.Culture), 10, Ui.Res("Faint")), events));
+            col.Children.Add(Ui.Col(6, HubLook.MonoText(I18n.T("v16.x.bridge.events", ("engine", t.Title)), 10, Ui.Res("Faint")), events));
         }
         else
         {
             var classic = Ui.Button(I18n.T("v16.form.create.files"), () => CreatorPage.ShowNewProject(new CreatorPage.NewProjectState { Name = p.Name, Game = Game?.Def.Id }), "", Icons.FilePlus);
             col.Children.Add(classic);
         }
+        col.Children.Add(EngineProfileCard(path));
         if (path is not null)
             col.Children.Add(Ui.Button(I18n.T("v16.x.bridge.rescan"), () => { CreatorPage.Rescan(path); Build(); }, "ghost", Icons.Refresh));
         return col;
@@ -546,7 +554,7 @@ public sealed partial class XStudio : Page
         var col = new StackPanel { Spacing = 2, Margin = new Thickness(8, 0, 8, 14) };
         col.Children.Add(new Border { Padding = new Thickness(8, 0, 8, 4), Child = Ui.Text(I18n.T("v16.x.blocks.lead"), "small muted", wrap: true) });
         var t = TargetFor(ActiveDoc());
-        foreach (var (group, items) in Blocks())
+        foreach (var (group, items) in ActiveSimple ? SimpleBlocks() : Blocks())
         {
             col.Children.Add(Caption(I18n.T("v16.x.blocks." + group)));
             foreach (var (key, code, ev) in items)
@@ -571,7 +579,7 @@ public sealed partial class XStudio : Page
     [
         ("events", [
             ("v16.event.ready", "hook ready {\n    log \"mod loaded\"\n}\n", "ready"),
-            ("v16.event.start", "hook start {\n    say \"Hello from ModScript X\"\n}\n", "start"),
+            ("v16.event.start", "hook start {\n    say \"Hello from ModScript\"\n}\n", "start"),
             ("v16.event.load", "hook load {\n    log \"save loaded\"\n}\n", "load"),
             ("v16.event.tick", "hook tick {\n    add ticks 1\n}\n", "tick"),
         ]),
@@ -607,6 +615,14 @@ public sealed partial class XStudio : Page
     Control DocsSide()
     {
         var col = new StackPanel { Spacing = 10, Margin = new Thickness(14, 0, 14, 14) };
+        // 22.0: открыт файл простым языком — сначала его шпаргалка; иначе — приглашение попробовать.
+        if (ActiveSimple)
+        {
+            col.Children.Add(SimpleDocs());
+            col.Children.Add(Ui.Button(I18n.T("v22.cmd.show"), ShowAsModx, "ghost", Icons.Code));
+            col.Children.Add(new Border { Height = 1, Background = HubLook.Edge, Margin = new Thickness(0, 6) });
+        }
+        else col.Children.Add(Ui.Button(I18n.T("v22.cmd.newSimple"), NewSimpleFile, "", Icons.Sparkles));
         col.Children.Add(Ui.Text(I18n.T("v16.x.docs.lead"), "small muted", wrap: true));
         foreach (var (key, code) in new[]
         {
@@ -793,7 +809,7 @@ public sealed partial class XStudio : Page
     async Task OpenFile()
     {
         if (TopLevel.GetTopLevel(this) is not { } top) return;
-        var type = new FilePickerFileType("ModScript X (.modx)") { Patterns = ["*" + MX.ModxDoc.Extension] };
+        var type = new FilePickerFileType("ModScript (.modx)") { Patterns = ["*" + MX.ModxDoc.Extension] };
         var files = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions { AllowMultiple = true, FileTypeFilter = [type] });
         foreach (var f in files) if (f.TryGetLocalPath() is { } p) Open(p);
     }
@@ -814,6 +830,7 @@ public sealed partial class XStudio : Page
             MainWindow.Current?.Toast(e.Message, bad: true);
             return false;
         }
+        AfterSave(d);
         if (quiet || _live != this) return true;
         RenderSide();
         RenderTabs();
@@ -911,6 +928,15 @@ public sealed partial class XStudio : Page
     {
         var list = new List<(int, string, string)>();
         var lines = text.Split('\n');
+        // 22.0: простой язык — события и функции из раскладки переводчика, строкой так, как её написал автор.
+        if (MX.Simple.IsSimple(text))
+        {
+            for (var i = 0; i < lines.Length; i++)
+                if (Regex.Match(lines[i], @"^\s*(?:мод|название)\s+[""«]?([^""»]*)", RegexOptions.IgnoreCase) is { Success: true } mod) { list.Add((i + 1, "mod", mod.Groups[1].Value.Trim())); break; }
+            foreach (var (start, _, kind, title) in MX.Simple.ToModx(text).Blocks.Where(b => b.Kind is "hook" or "fn" or "native"))
+                list.Add((start, kind, title.TrimEnd(':')));
+            return [.. list.OrderBy(x => x.Item1)];
+        }
         for (var i = 0; i < lines.Length; i++)
         {
             var m = Regex.Match(lines[i], @"^\s*(hook|fn|native)\s+([\p{L}\w]+)(\s*\([^)]*\))?");
@@ -943,6 +969,18 @@ public sealed partial class XStudio : Page
 
     static void Analyze(Doc d)
     {
+        if (d.Mls)
+        {
+            // Правки файлов: тот же разбор, что у сборки (ModScript.Compile), — ошибки и предупреждения на своих строках.
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            var build = ModScript.Compile(d.Editor.Text ?? "");
+            d.CheckMs = watch.Elapsed.TotalMilliseconds;
+            d.Lints = [];
+            d.Diags = [.. build.Diags.OrderBy(x => x.Warning).ThenBy(x => x.Line)];
+            d.Editor.MarkErrors(d.Diags.Where(x => !x.Warning && x.Line > 0).Select(x => x.Line));
+            d.Editor.SetIssues(d.Diags.Where(x => x.Line > 0).Select(x => new ModxInsight.Issue(x.Line, 0, 0, CreatorPage.LxMsg(x), x.Warning)));
+            return;
+        }
         if (!d.Modx) { d.Diags = []; return; }
         var clock = System.Diagnostics.Stopwatch.StartNew();
         var doc = MX.ModxDoc.Parse(d.Editor.Text ?? "");
@@ -970,7 +1008,7 @@ public sealed partial class XStudio : Page
     static readonly (string Id, string Key, string Icon)[] PanelTabs =
     [
         ("problems", "v15.ms.p.problems", Icons.Alert), ("output", "v15.ms.p.output", Icons.Play), ("debug", "v19.p.debug", Icons.Bug), ("refs", "v19.p.refs", Icons.Link),
-        ("search", "v19.p.search", Icons.Search), ("code", "v15.ms.p.code", Icons.Code), ("inject", "v16.x.p.bridge", Icons.Layers),
+        ("search", "v19.p.search", Icons.Search), ("code", "v15.ms.p.code", Icons.Code), ("console", "v22.p.console", Icons.Keyboard), ("inject", "v16.x.p.bridge", Icons.Layers),
     ];
 
     void RenderPanelTabs()
@@ -1003,6 +1041,7 @@ public sealed partial class XStudio : Page
             "refs" => FoundPane(search: false),
             "search" => FoundPane(search: true),
             "code" => CodePane(),
+            "console" => ConsolePane(),
             "inject" => InjectPane(),
             _ => ProblemsPane(),
         };
@@ -1135,6 +1174,7 @@ public sealed partial class XStudio : Page
 
     void Run()
     {
+        if (_s.Active is { Mls: true } mls) { CheckMls(mls); return; }
         if (ActiveDoc() is not { } doc) return;
         _s.Panel = "output";
         if (!doc.Ok) { _s.Panel = "problems"; RenderPanel(); MainWindow.Current?.Toast(I18n.T("v11.lx.fix"), bad: true); return; }
@@ -1148,6 +1188,61 @@ public sealed partial class XStudio : Page
         if (Content is not null) { RenderPanel(); RenderStatus(); }
     }
 
+    /// <summary>
+    /// 22.0, F5 для файла правок (.mls): разобрать как при сборке и показать в журнале, что мод изменит —
+    /// без игры (правки файлов не исполняются, как скрипт, а раскладываются по игре при установке).
+    /// </summary>
+    void CheckMls(Doc d)
+    {
+        var b = ModScript.Compile(d.Editor.Text ?? "");
+        _s.Panel = b.Ok ? "inject" : "problems";
+        if (!b.Ok) { RenderPanel(); MainWindow.Current?.Toast(I18n.T("v11.lx.fix"), bad: true); return; }
+        Log(true, I18n.T("v22.mls.checked", ("mod", b.Name), ("game", GameCatalog.ById(b.Game)?.Name ?? b.Game)));
+        foreach (var (n, key) in new[] { (b.Changes.Count, "v22.mls.changes"), (b.Configs.Count + b.Inis.Count, "v22.mls.settings"), (b.Copies.Count + b.Writes.Count, "v22.mls.files") })
+            if (n > 0) Log(true, "  " + I18n.T(key, ("n", n)));
+        foreach (var line in b.Log.Take(20)) Log(true, "  " + line);
+        foreach (var w in b.Diags.Where(x => x.Warning)) Log(false, (w.Line > 0 ? I18n.T("v15.ms.line", ("n", w.Line)) + ": " : "") + CreatorPage.LxMsg(w));
+        RenderPanel();
+        RenderStatus();
+    }
+
+    /// <summary>22.0, F6 для файла правок (.mls): собрать мод (Projects.Pack) и поставить в игру проекта (Projects.Install).</summary>
+    async Task InstallMls(Doc d, bool quiet)
+    {
+        var w = MainWindow.Current;
+        if (_p is null) return;
+        if (d.Dirty && !Save(d, quiet: true)) return;
+        var b = ModScript.Compile(d.Editor.Text ?? "");
+        if (!b.Ok) { _s.Panel = "problems"; RenderPanel(); w?.Toast(I18n.T("cr.build.hasErrors"), bad: true); return; }
+        var g = AppState.Games.FirstOrDefault(x => x.Def.Id == (b.Game != "" ? b.Game : _p.Game));
+        if (g?.Path is null || g.Registry is null) { _s.Panel = "inject"; Log(false, I18n.T("cr.install.noGame")); RenderPanel(); w?.Toast(I18n.T("cr.install.noGame"), bad: true); return; }
+        if (!g.LoaderInstalled) { _s.Panel = "inject"; Log(false, I18n.T("games.loaderMissing", ("loader", g.Def.LoaderName))); RenderPanel(); return; }
+        _busy = true;
+        _s.Panel = "inject";
+        RenderTop();
+        RenderPanel();
+        try
+        {
+            var packed = await Projects.Pack(b, _p.Dir);
+            Projects.Install(g, b, packed);
+            AppState.Notify();
+            Log(true, I18n.T("v22.mls.installed", ("mod", b.Name), ("game", g.Def.Name)));
+            foreach (var warning in packed.Warnings) Log(false, "  " + warning);
+            if (Projects.MissingNeeds(g, b) is { Count: > 0 } missing) Log(false, I18n.T("cr.install.needs", ("mods", string.Join(", ", missing))));
+            if (!quiet) w?.Toast(I18n.T("v22.mls.installed", ("mod", b.Name), ("game", g.Def.Name)));
+        }
+        catch (Exception e)
+        {
+            Log(false, Jobs.Explain(e));
+            if (!quiet) w?.Toast(Jobs.Explain(e), bad: true);
+        }
+        finally
+        {
+            _busy = false;
+            if (_live == this) { RenderTop(); RenderPanel(); }
+        }
+    }
+
     void Log(bool ok, string text)
     {
         _s.Log.Add((DateTime.UtcNow, ok, text));
@@ -1157,6 +1252,7 @@ public sealed partial class XStudio : Page
     /// <summary>F6: перевести и поставить мод в папку игры сейчас (в фоне: сборка C# для Unity занимает секунды).</summary>
     async Task InjectNow(bool quiet = false)
     {
+        if (_s.Active is { Mls: true } mls && !_busy) { await InstallMls(mls, quiet); return; }
         if (_s.Active is not { Modx: true } d || _busy) return;
         var w = MainWindow.Current;
         if (GamePath is not { } path) { _s.Panel = "inject"; RenderPanel(); Side("bridge"); w?.Toast(I18n.T("v15.ms.inj.pick"), bad: true); return; }
@@ -1260,12 +1356,20 @@ public sealed partial class XStudio : Page
 
     void RenderStatus()
     {
-        var parts = new List<string> { "ModScript X" };
+        var parts = new List<string> { "ModScript" };
         if (_s.Active is { } d)
         {
+            if (d.Mls)
+            {
+                // 22.0: файл правок — что это и сколько проблем.
+                parts.Add(I18n.T("v22.status.mls"));
+                var errors = d.Diags.Count(x => !x.Warning);
+                parts.Add(errors == 0 ? I18n.T("v15.ms.noProblems") : I18n.T("v15.ms.errors", ("n", errors)));
+            }
             if (d.Modx)
             {
                 var t = TargetFor(ActiveDoc());
+                if (ActiveSimple) parts.Add(I18n.T("v22.status.simple"));
                 parts.Add($"{t.Title} → {Lang(t.Language)}");
                 var errors = d.Diags.Count(x => !x.Warning) + d.Lints.Count(x => !x.Warning);
                 var warnings = d.Diags.Count(x => x.Warning) + d.Lints.Count(x => x.Warning);
@@ -1277,15 +1381,19 @@ public sealed partial class XStudio : Page
         }
         if (_s.Watch) parts.Add(I18n.T("v15.ms.watching"));
         if (_s is { Debugging: true, Trace: { Frames.Count: > 0 } trace }) parts.Add(I18n.T("v19.status.debug", ("i", _s.Frame + 1), ("n", trace.Frames.Count)));
-        var line = new TextBlock { Text = string.Join("   ·   ", parts), FontSize = 11.5, Foreground = Brushes.White, FontFamily = Mono, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center };
-        var caret = new TextBlock { Text = I18n.T("v15.ms.caret", ("line", _s.Caret.Line), ("col", _s.Caret.Col)) + "   ·   F5 · F9 · F12 · Ctrl+P", FontSize = 11.5, Foreground = Brushes.White, FontFamily = Mono, VerticalAlignment = VerticalAlignment.Center };
+        // 22.0: тихая строка в тон панели (раньше — заливка цветом проекта и моноширинный белый текст).
+        var line = Ui.Row(18, parts.Select(p => (Control)new TextBlock { Text = p, FontSize = 12, Foreground = Ui.Res("Muted"), VerticalAlignment = VerticalAlignment.Center }).ToArray());
+        line.ClipToBounds = true;
+        var caret = new TextBlock { Text = I18n.T("v15.ms.caret", ("line", _s.Caret.Line), ("col", _s.Caret.Col)), FontSize = 12, Foreground = Ui.Res("Muted"), VerticalAlignment = VerticalAlignment.Center };
         var bar = new DockPanel();
         DockPanel.SetDock(caret, Dock.Right);
         bar.Children.Add(caret);
         bar.Children.Add(line);
         _status.Child = bar;
-        _status.Background = Color;
-        _status.Padding = new Thickness(14, 4);
+        _status.Background = HubLook.Panel;
+        _status.BorderBrush = HubLook.Edge;
+        _status.BorderThickness = new Thickness(0, 1, 0, 0);
+        _status.Padding = new Thickness(14, 5);
     }
 
     void OnKey(object? sender, KeyEventArgs e)
@@ -1299,7 +1407,9 @@ public sealed partial class XStudio : Page
             case Key.F6: _ = InjectNow(); break;
             case Key.F8: NextProblem(); break;
             case Key.S when ctrl: if (_s.Active is { } d) Save(d); break;
+            case Key.N when ctrl && shift: NewSimpleFile(); break;
             case Key.N when ctrl: NewFile(); break;
+            case Key.OemTilde when ctrl: _s.Panel = "console"; RenderPanel(); break;
             case Key.O when ctrl: _ = OpenFile(); break;
             case Key.W when ctrl: if (_s.Active is { } c) Close(c); break;
             case Key.F when ctrl: _s.Active?.Editor.Find(); break;
@@ -1314,6 +1424,9 @@ public sealed partial class XStudio : Page
     }
 
     // ---------------------------------------------------------------- снимки и самотест
+
+    /// <summary>Снимки экрана: нажать F5 в открытом файле (для правок файлов — проверка с журналом).</summary>
+    internal void DemoRun() => Run();
 
     /// <summary>Для снимков: проект «Arena Rewards» по анкете (игра с BepInEx), журнал моста.</summary>
     internal static string DemoProject()

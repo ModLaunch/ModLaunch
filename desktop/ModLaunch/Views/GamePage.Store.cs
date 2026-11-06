@@ -149,8 +149,15 @@ public sealed partial class GamePage
                 install.Padding = new Thickness(26, 13);
                 buttons.Children.Add(install);
             }
-            var folder = Ui.Button(I18n.T("games.openFolder"), () => Actions.OpenFolder(_g.Path), "", Icons.Folder);
-            folder.Padding = new Thickness(18, 13);
+            // 24.0: «Поделиться сборкой» на виду — играть вместе можно только с одинаковыми модами.
+            if (_g.ModCount > 0)
+            {
+                var share = Ui.Button(I18n.T("v24.share.go"), () => ShareUi.Share(_g), "", Icons.Users);
+                share.Padding = new Thickness(18, 13);
+                buttons.Children.Add(share);
+            }
+            var folder = Ui.Button("", () => Actions.OpenFolder(_g.Path), "icon", Icons.Folder, I18n.T("games.openFolder"));
+            folder.Width = folder.Height = 46;
             buttons.Children.Add(folder);
         }
         else

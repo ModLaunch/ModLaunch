@@ -52,6 +52,22 @@ public static class SelfCheck
             if (!nexus.HasMore) throw new Exception("nexus page 1 says no more");
             return $"thunderstore keys {keys}; page 2 has {second.Mods.Count} new; nexus {nexus.Total} total";
         });
+        await Check("mod covers", async () =>
+        {
+            // 23.0: обложки каталога — по-настоящему: первые моды Lethal Company (Thunderstore) и Subnautica (Nexus).
+            var lines = new List<string>();
+            foreach (var (gameId, mods) in new[]
+            {
+                ("lethal-company", (await Thunderstore.Search("lethal-company", new Query(), [])).Mods.Take(8).ToList()),
+                ("subnautica", (await Nexus.Browse("subnautica", new Query(), [], [])).Mods.Take(6).ToList()),
+            })
+            {
+                var game = GameCatalog.ById(gameId)!;
+                var picked = await Task.WhenAll(mods.Select(m => Covers.Pick(game, m)));
+                lines.Add($"{gameId}: {picked.Count(p => p is not null)}/{mods.Count} with a cover ({string.Join(", ", mods.Zip(picked).Where(x => x.Second is not null).Take(3).Select(x => x.First.Name))})");
+            }
+            return string.Join("; ", lines);
+        });
         await Check("thunderstore sections", async () =>
         {
             var page = await Catalog.Browse(GameCatalog.ById("valheim")!, new Query(SectionId: "buildings"));
@@ -295,7 +311,9 @@ public static class SelfCheck
             }
             // Hollow Knight, Below Zero, ROUNDS, Dyson Sphere Program, GTFO и Outward: на всех сайтах вместе меньше 1000 модов — больше просто нет.
             // ULTRAKILL и Content Warning — ровно около 1000, число гуляет на пару модов.
-            var unexpected = small.Where(id => id is not ("hollow-knight" or "subnautica-below-zero" or "rounds" or "dyson-sphere-program" or "gtfo" or "outward" or "ultrakill" or "content-warning")).ToList();
+            // 23.3: у части AAA на Nexus тоже меньше 1000 (Satisfactory и Deep Rock Galactic живут на ficsit.app и mod.io, Hitman — на своих сайтах).
+            var unexpected = small.Where(id => id is not ("hollow-knight" or "subnautica-below-zero" or "rounds" or "dyson-sphere-program" or "gtfo" or "outward" or "ultrakill" or "content-warning"
+                or "resident-evil-village" or "resident-evil-3" or "black-myth-wukong" or "silent-hill-2" or "satisfactory" or "deep-rock-galactic" or "hitman-3")).ToList();
             if (unexpected.Count > 0) throw new Exception("under 1000: " + string.Join(", ", unexpected) + " | " + string.Join("; ", lines));
             return string.Join("; ", lines);
         });

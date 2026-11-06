@@ -1,0 +1,2423 @@
+
+// ===================================================================== Studio.Ui — окно редактора внутри игры
+// Раскладка как у UE5 и Roblox Studio: сверху заголовок и лента инструментов, слева библиотека, справа «Проводник»
+// и «Свойства», снизу «Вывод» и строка состояния, а игра идёт в окне просмотра посередине (камера рисует только туда).
+// Значки нарисованы кодом — не зависят от шрифта игры.
+public partial class ModScriptStudio
+{
+    // ------------------------------------------------------------------ открыть и закрыть
+
+    bool _open;
+    float _timeScale = 1;
+    Camera _cam;
+    CursorLockMode _lock;
+    bool _cursor;
+    string _status = "";
+    float _statusAt;
+    readonly List<Canvas> _hiddenUi = new List<Canvas>();
+
+    void Status(string text)
+    {
+        _status = text;
+        _statusAt = Time.realtimeSinceStartup;
+        if (_dev && !string.IsNullOrEmpty(text)) AddLog("ModScript Studio: " + text, LogType.Log);
+    }
+
+    void Open()
+    {
+        if (_open) return;
+        if (_scene == "") { _scene = SceneManager.GetActiveScene().name; Load(); }
+        _open = true;
+        _timeScale = Time.timeScale;
+        Time.timeScale = 0;
+        _lock = Cursor.lockState;
+        _cursor = Cursor.visible;
+        var game = Camera.main;
+        if (game == null) foreach (var c in Camera.allCameras) if (c.enabled && (game == null || c.depth > game.depth)) game = c;
+        var go = new GameObject("ModScript Studio Camera");
+        DontDestroyOnLoad(go);
+        _cam = go.AddComponent<Camera>();
+        if (game != null)
+        {
+            _cam.CopyFrom(game);
+            go.transform.position = game.transform.position;
+            go.transform.rotation = game.transform.rotation;
+        }
+        else go.transform.position = new Vector3(0, 10, -10);
+        _cam.depth = 100;
+        _cam.targetTexture = null;
+        _yaw = go.transform.eulerAngles.y;
+        _pitch = go.transform.eulerAngles.x;
+        if (_pitch > 180) _pitch -= 360;
+        _orbit = go.transform.position + go.transform.forward * 10f;
+        ModScriptFollow.Target = go.transform;
+        Status(T("hint", "Right mouse + WASD — fly, Alt + left mouse — orbit, click — select"));
+        // Экранный интерфейс игры на время редактора прячем (свой холст UnityExplorer — нет).
+        _hiddenUi.Clear();
+        foreach (var c in FindObjectsOfType<Canvas>())
+            if (c.enabled && c.isRootCanvas && c.renderMode == RenderMode.ScreenSpaceOverlay && !ExplorerUi(c.gameObject)) { c.enabled = false; _hiddenUi.Add(c); }
+        foreach (var b in FindObjectsOfType<ModScriptBehaviour>()) b.Paused = true;
+    }
+
+    void Close()
+    {
+        if (!_open) return;
+        if (_simulate) ToggleSimulate();
+        CancelPlace();
+        if (_drag >= 0) EndDrag();
+        ShowAll();
+        _open = false;
+        Save();
+        Time.timeScale = _timeScale <= 0 ? 1 : _timeScale;
+        Cursor.lockState = _lock;
+        Cursor.visible = _cursor;
+        if (_cam != null) Destroy(_cam.gameObject);
+        _cam = null;
+        if (_gridGo != null) Destroy(_gridGo);
+        ModScriptFollow.Target = null;
+        ReleaseTarget();
+        _gridGo = null;
+        _selection.Clear();
+        _keys.Clear();
+        _rmb = _mmb = false;
+        foreach (var p in _placed) if (p.Go != null) SetPhysics(p.Go, p.Physics);
+        foreach (var c in _hiddenUi) if (c != null) c.enabled = true;
+        _hiddenUi.Clear();
+        foreach (var b in FindObjectsOfType<ModScriptBehaviour>()) { b.Rebase(); b.Paused = false; }
+    }
+
+    static bool ExplorerUi(GameObject go)
+    {
+        var n = go.transform.root.name;
+        return n.IndexOf("UniverseLib", StringComparison.OrdinalIgnoreCase) >= 0 || n.IndexOf("Explorer", StringComparison.OrdinalIgnoreCase) >= 0;
+    }
+
+    // ------------------------------------------------------------------ камера: как в UE5
+
+    readonly HashSet<KeyCode> _keys = new HashSet<KeyCode>();
+    float _yaw, _pitch, _speed = 1f, _fps = 60;
+    Vector3 _orbit;
+    bool _rmb, _mmb, _orbiting, _typing;
+
+    void Update()
+    {
+        if (_autotest) AutoTest();
+        if (_dirty && Time.realtimeSinceStartup - _dirtyAt > 0.8f) Save();
+        if (!_open || _cam == null) return;
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+        var dt = Mathf.Min(Time.unscaledDeltaTime, 0.1f);
+        if (dt > 0) _fps = Mathf.Lerp(_fps, 1f / dt, 0.05f);
+        UpdateGrid();
+        var step = Time.unscaledDeltaTime * 7f;
+        _leftAnim = Mathf.MoveTowards(_leftAnim, _showToolbox ? 1 : 0, step);
+        _rightAnim = Mathf.MoveTowards(_rightAnim, _rightOpen ? 1 : 0, step);
+        if (_showToolbox) RenderPreviews();
+        if (_typing) return;
+        var t = _cam.transform;
+        var move = Vector3.zero;
+        // Стрелки — всегда; WASD/QE — только с зажатой правой кнопкой (без неё Q/W/E/R — инструменты).
+        if (_keys.Contains(KeyCode.UpArrow)) move += t.forward;
+        if (_keys.Contains(KeyCode.DownArrow)) move -= t.forward;
+        if (_keys.Contains(KeyCode.RightArrow)) move += t.right;
+        if (_keys.Contains(KeyCode.LeftArrow)) move -= t.right;
+        if (_keys.Contains(KeyCode.PageUp)) move += Vector3.up;
+        if (_keys.Contains(KeyCode.PageDown)) move -= Vector3.up;
+        if (_rmb)
+        {
+            if (_keys.Contains(KeyCode.W)) move += _cam.orthographic ? Vector3.up : t.forward;
+            if (_keys.Contains(KeyCode.S)) move -= _cam.orthographic ? Vector3.up : t.forward;
+            if (_keys.Contains(KeyCode.D)) move += t.right;
+            if (_keys.Contains(KeyCode.A)) move -= t.right;
+            if (_keys.Contains(KeyCode.E)) move += Vector3.up;
+            if (_keys.Contains(KeyCode.Q)) move -= Vector3.up;
+        }
+        var fast = _keys.Contains(KeyCode.LeftShift) || _keys.Contains(KeyCode.RightShift) ? 4f : 1f;
+        t.position += move * 7f * _speed * fast * dt;
+    }
+
+    void LateUpdate()
+    {
+        if (!_open) return;
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+        if (!_simulate && Time.timeScale != 0) Time.timeScale = 0;
+    }
+
+    void Look(Vector2 delta)
+    {
+        if (_cam.orthographic) { _cam.transform.position -= new Vector3(delta.x, -delta.y, 0) * (_cam.orthographicSize * 2 / Screen.height) * _ui; return; }
+        _yaw += delta.x * 0.22f * _ui;
+        _pitch = Mathf.Clamp(_pitch + delta.y * 0.22f * _ui, -89, 89);
+        _cam.transform.rotation = Quaternion.Euler(_pitch, _yaw, 0);
+    }
+
+    void Orbit(Vector2 delta)
+    {
+        var dist = Vector3.Distance(_cam.transform.position, _orbit);
+        _yaw += delta.x * 0.3f * _ui;
+        _pitch = Mathf.Clamp(_pitch + delta.y * 0.3f * _ui, -89, 89);
+        var rot = Quaternion.Euler(_pitch, _yaw, 0);
+        _cam.transform.rotation = rot;
+        _cam.transform.position = _orbit - rot * Vector3.forward * dist;
+    }
+
+    // ------------------------------------------------------------------ симуляция (как Simulate в UE5, Alt+S)
+
+    bool _simulate;
+    List<Snap> _simSnap;
+
+    /// <summary>Время идёт, физика и поведения работают, камера — редактора; остановка — всё возвращается на место.</summary>
+    void ToggleSimulate()
+    {
+        if (!_simulate)
+        {
+            if (_drag >= 0) EndDrag();
+            CancelPlace();
+            var gos = _placed.Where(p => p.Go != null).Select(p => p.Go).Concat(FindObjectsOfType<Rigidbody>().Select(r => r.gameObject)).Distinct().ToList();
+            _simSnap = SnapOf(gos);
+            _simulate = true;
+            Time.timeScale = _timeScale <= 0 ? 1 : _timeScale;
+            foreach (var p in _placed) if (p.Go != null) SetPhysics(p.Go, p.Physics);
+            foreach (var b in FindObjectsOfType<ModScriptBehaviour>()) { b.Rebase(); b.Paused = false; }
+            Status(T("simulating", "Simulation: physics and behaviours run · Alt+S — stop"));
+        }
+        else
+        {
+            _simulate = false;
+            Time.timeScale = 0;
+            foreach (var p in _placed) if (p.Go != null) SetPhysics(p.Go, false);
+            foreach (var b in FindObjectsOfType<ModScriptBehaviour>()) b.Paused = true;
+            if (_simSnap != null) Restore(_simSnap);
+            _simSnap = null;
+            foreach (var rb in FindObjectsOfType<Rigidbody>()) if (!rb.isKinematic) { rb.velocity = Vector3.zero; rb.angularVelocity = Vector3.zero; }
+            Status(T("simStopped", "Simulation stopped — everything is back in place"));
+        }
+    }
+
+    // ------------------------------------------------------------------ самопроверка в игре
+
+    int _testStage;
+    float _testAt;
+    const int TestLast = 22;
+    float _simY;
+    readonly List<string> _testLog = new List<string>();
+    GameObject _testCube, _testSphere;
+
+    /// <summary>
+    /// ModLaunch --dev-prepare … --autotest: кнопка в игре, редактор со стрелками всех трёх видов, свойства объекта уровня,
+    /// освещение, установка под курсор, рамка выделения; проверка отмены/повтора, групп и свойств; отчёт и выход.
+    /// </summary>
+    void AutoTest()
+    {
+        if (_testStage == 0)
+        {
+            if (_testAt > 0 && Time.realtimeSinceStartup > _testAt) { _testStage = 1; _testAt = Time.realtimeSinceStartup; }
+            else if (_testAt <= 0 && Time.realtimeSinceStartup > 40f) { _testStage = 1; _testAt = Time.realtimeSinceStartup; }
+            return;
+        }
+        if (Time.realtimeSinceStartup < _testAt) return;
+        try { TestStep(_testStage); }
+        catch (Exception e) { Logger.LogError("self-test step " + _testStage + ": " + e); _testLog.Add("step" + _testStage + "=error " + e.Message); }
+        _testStage++;
+        _testAt = Time.realtimeSinceStartup + 1.6f;
+    }
+
+    void TestStep(int s)
+    {
+        switch (s)
+        {
+            case 1: Shot("autotest-1-button.png"); break;
+            case 2: Open(); break;
+            case 3: TestBuild(); break;
+            case 4: Shot("autotest-2-move.png"); break;
+            case 5: _mode = "rotate"; _local = true; break;
+            case 6: Shot("autotest-3-rotate.png"); break;
+            case 7: _mode = "move"; _local = false; OpenPalette(T("k.stairs", "Stairs").Split(' ')[0].Trim(':', ',')); break;
+            case 8: Shot("autotest-4-palette.png"); break;
+            case 9: _palette = false; _selection.Clear(); _showToolbox = true; _addCat = "nature"; RunAct(FindAct("weather.snow")); break;
+            case 10: Shot("autotest-5-add.png"); break;
+            case 11:
+                _showToolbox = false;
+                var level = Pick(new Vector2(ViewCenter.x, ViewCenter.y - _vpPx.height * 0.25f), true);
+                if (level == null || PlacedOf(level) != null || level.name.StartsWith("ModScript Studio"))
+                    level = FindObjectsOfType<MeshRenderer>().Where(r => r.isVisible && PlacedOf(r.gameObject) == null && !r.name.StartsWith("ModScript Studio")).Select(r => r.gameObject).FirstOrDefault();
+                Select(level, false);
+                if (level != null) foreach (var c in level.GetComponents<Component>()) if (c != null) _openComp.Add(c.GetType().Name);
+                _rightOpen = true; _rightTab = "props"; _dockMore = true;
+                _testLog.Add("levelObject=" + (level != null ? level.name : "none"));
+                break;
+            case 12: Shot("autotest-6-properties.png"); break;
+            case 13: _rightOpen = false; _dockMore = false; _selection.Clear(); _selection.Add(_testCube); _pop = "color"; break;
+            case 14: Shot("autotest-7-colors.png"); break;
+            case 15: _pop = ""; TestAllCommands(); break;
+            case 16: RunAct(FindAct("time.18")); RunAct(FindAct("fog.d0.02")); _selection.Clear(); _showStats = true; break;
+            case 17: Shot("autotest-8-sunset.png"); break;
+            case 18:
+                // Симуляция: шар с физикой падает, после остановки — на прежнем месте.
+                var ps = PlacedExact(_testSphere);
+                if (ps != null) ps.Physics = true;
+                _simY = _testSphere.transform.position.y;
+                ToggleSimulate();
+                break;
+            case 19:
+                var fell = _testSphere.transform.position.y < _simY - 0.05f;
+                ToggleSimulate();
+                _testLog.Add("simulate=" + (fell ? "ok" : "fail") + " restored=" + (Mathf.Abs(_testSphere.transform.position.y - _simY) < 0.01f ? "ok" : "fail"));
+                break;
+            case 20:
+                Report();
+                foreach (var p in _placed.ToArray()) { if (p.Go != null) Destroy(p.Go); _placed.Remove(p); }
+                _props.Clear();
+                _bookmarks.Clear();
+                _world = new World();
+                Close();
+                break;
+            case TestLast: _testDone = true; Application.Quit(); break;
+        }
+    }
+
+    /// <summary>Самопроверка: фигуры, модель OBJ, поведение; отмена и повтор, группа, свойство компонента; витрина деталей.</summary>
+    void TestBuild()
+    {
+        _testCube = Place("prim:Cube", T("shape.Cube", "Cube"));
+        var b = _testCube.AddComponent<ModScriptBehaviour>();
+        b.Spin = 45; b.Rebase(); b.Pause();
+        _testSphere = Place("prim:Sphere", T("shape.Sphere", "Sphere"));
+        _testSphere.transform.position = _testCube.transform.position + FlatRight() * 2.2f;
+        var obj = Path.Combine(Path.Combine(_root, "models"), "autotest-pyramid.obj");
+        File.WriteAllText(obj, "v -1 0 -1\nv 1 0 -1\nv 1 0 1\nv -1 0 1\nv 0 1.6 0\nf 1 2 5\nf 2 3 5\nf 3 4 5\nf 4 1 5\nf 1 4 3 2\n");
+        var model = Place("obj:autotest-pyramid.obj", "Pyramid");
+        if (model != null) model.transform.position = _testCube.transform.position - FlatRight() * 2.4f;
+        try { File.Delete(obj); } catch { }
+        Undo();
+        var undone = model != null && !model.activeSelf;
+        Redo();
+        _testLog.Add("undo=" + (undone && model.activeSelf ? "ok" : "fail"));
+        _selection.Clear(); _selection.Add(_testCube); _selection.Add(_testSphere);
+        Group();
+        var grouped = _testCube.transform.parent != null && _testCube.transform.parent == _testSphere.transform.parent;
+        Undo();
+        _testLog.Add("group=" + (grouped && _testCube.transform.parent == null ? "ok" : "fail"));
+        var col = _testCube.GetComponent<BoxCollider>();
+        EditProp(col, "isTrigger", "true");
+        _testLog.Add("props=" + (col.isTrigger && _props.Any(p => p.Member == "isTrigger") ? "ok" : "fail"));
+        Undo();
+        // Витрина: каждая готовая деталь собирается; дюжина — рядом в кадре.
+        var built = 0;
+        var broken = new List<string>();
+        foreach (var k in Kits())
+        {
+            GameObject go = null;
+            try { go = Kit(k.Id); } catch (Exception e) { broken.Add(k.Id + " " + e.Message); }
+            if (go == null) { if (broken.Count == 0 || !broken[broken.Count - 1].StartsWith(k.Id)) broken.Add(k.Id); continue; }
+            built++;
+            Destroy(go);
+        }
+        _testLog.Add("kits=" + built + "/" + Kits().Count + (broken.Count > 0 ? " broken: " + string.Join(", ", broken.Take(8).ToArray()) : ""));
+        var showcase = new[] { "house", "tree:1.5", "pine:1.5", "car:red", "stairs:5:1", "arch:2:3", "lamppost", "fountain", "rock:1:1", "coin", "bench", "portal" };
+        var basis = _testCube.transform.position - FlatRight() * 12f + Vector3.Cross(FlatRight(), Vector3.up) * -6f;
+        for (var i = 0; i < showcase.Length; i++)
+        {
+            var go = Make("kit:" + showcase[i], basis + FlatRight() * i * 3.2f, Quaternion.identity);
+            if (go == null) continue;
+            var shown = Kits().FirstOrDefault(k => k.Id == showcase[i]);
+            var p = Register(go, "kit:" + showcase[i], shown != null ? shown.Name : showcase[i]);
+            p.Go.transform.position = basis + FlatRight() * i * 3.2f;
+        }
+        _testLog.Add("handleHit=" + TestHandle());
+        _selection.Clear(); _selection.Add(_testSphere); _selection.Add(_testCube);
+        _mode = "move";
+        FocusOn(_testCube);
+        _cam.transform.position += Vector3.up * 2.5f - _cam.transform.forward * 9f;
+    }
+
+    string TestHandle()
+    {
+        _selection.Clear(); _selection.Add(_testCube);
+        _mode = "move";
+        var o = _testCube.transform.position;
+        var tip = Scr(o + Vector3.right * GizmoSize(o) * 0.6f);
+        var h = HandleAt(tip);
+        return h == 0 ? "ok" : "fail " + h;
+    }
+
+    /// <summary>Каждая команда — на свежем кубике; затем отменить всё. Считаем, сколько прошли без ошибок.</summary>
+    void TestAllCommands()
+    {
+        var skip = new HashSet<string> { "clearAll", "view.ui", "file.revert", "file.models", "file.textures", "file.folder", "sel.none", "file.backup", "file.export" };
+        var acts = Acts().Where(a => !skip.Contains(a.Id) && !a.Id.StartsWith("shot.") && !a.Id.StartsWith("set.") && !a.Id.StartsWith("phys.kick") && a.Id != "phys.push" && a.Id != "phys.explode" && !a.Id.StartsWith("accent.") && !a.Id.StartsWith("uiScale.")).ToList();
+        var failed = new List<string>();
+        var undoBefore = _undo.Count;
+        var cam = _cam.transform.position;
+        var camRot = _cam.transform.rotation;
+        var fov = _cam.fieldOfView;
+        foreach (var a in acts)
+        {
+            if (_testCube == null || !_testCube.activeInHierarchy) { _testCube = Place("prim:Cube", "Cube"); }
+            _selection.Clear();
+            _selection.Add(_testCube);
+            if (a.Id.StartsWith("info.distance") || a.Id.StartsWith("align") || a.Id.StartsWith("distribute") || a.Id == "stackOn" || a.Id == "lookAtLast") _selection.Insert(0, _testSphere);
+            try { a.Run(); }
+            catch (Exception e) { failed.Add(a.Id + ": " + e.GetType().Name); }
+            CancelPlace();
+            if (_simulate) ToggleSimulate();
+            _palette = false;
+        }
+        var undoErrors = 0;
+        while (_undo.Count > undoBefore)
+        {
+            var c = _undo[_undo.Count - 1];
+            _undo.RemoveAt(_undo.Count - 1);
+            try { c.Undo(); } catch { undoErrors++; }
+        }
+        _cam.transform.position = cam;
+        _cam.transform.rotation = camRot;
+        _cam.fieldOfView = fov;
+        _cam.orthographic = false;
+        _testLog.Add("commands=" + Acts().Count + " ran=" + acts.Count + " failed=" + failed.Count + (failed.Count > 0 ? " (" + string.Join("; ", failed.Take(10).ToArray()) + ")" : "") + " undoErrors=" + undoErrors);
+        _testLog.Add("placedAfterUndo=" + _placed.Count);
+    }
+
+    void Shot(string name)
+    {
+        var path = Path.Combine(_root, name);
+        var sc = Type.GetType("UnityEngine.ScreenCapture, UnityEngine.ScreenCaptureModule") ?? Type.GetType("UnityEngine.ScreenCapture, UnityEngine");
+        var m = sc != null ? sc.GetMethod("CaptureScreenshot", new[] { typeof(string) }) : null;
+        if (m != null) m.Invoke(null, new object[] { path });
+        else Logger.LogWarning("no ScreenCapture in this game");
+    }
+
+    void Report()
+    {
+        var pipeline = Type.GetType("UnityEngine.Rendering.GraphicsSettings, UnityEngine.CoreModule");
+        object rp = null;
+        try { var prop = pipeline != null ? pipeline.GetProperty("currentRenderPipeline") ?? pipeline.GetProperty("renderPipelineAsset") : null; rp = prop != null ? prop.GetValue(null, null) : null; } catch { }
+        var lines = new List<string>
+        {
+            "unity=" + Application.unityVersion,
+            "screen=" + Screen.width + "x" + Screen.height + " ui=" + _ui.ToString("0.00", Inv) + " viewport=" + _vpPx,
+            "font=" + (_font != null ? _font.name : "none") + " fontOk=" + _fontOk,
+            "pipeline=" + (rp != null ? rp.GetType().Name : "builtin"),
+            "scene=" + _scene,
+            "library=" + (_library != null ? _library.Count : -1) + " materials=" + (_materials != null ? _materials.Count : -1),
+            "placed=" + _placed.Count + " selected=" + _selection.Count,
+            "grid=" + (_gridGo != null && _gridGo.activeSelf) + " gridRendered=" + (_gridGo != null && _gridGo.GetComponent<MeshRenderer>().isVisible),
+            "base=" + (BaseMaterial() != null ? BaseMaterial().shader.name : "none"),
+            "log=" + _log.Count + " previews=" + _previews.Count + " weather=" + (_world.Weather ?? "") + " profile=" + _gameName + "/" + _preset + " quick=" + QuickList().Count + "/" + _profQuick.Length,
+        };
+        lines.AddRange(_testLog);
+        File.WriteAllLines(Path.Combine(_root, "autotest.txt"), lines.ToArray(), Encoding.UTF8);
+        Logger.LogInfo("ModScript Studio self-test: " + string.Join("; ", lines.ToArray()));
+    }
+
+    // ------------------------------------------------------------------ вывод (как Output в Roblox Studio)
+
+    class LogLine { public string Text; public LogType Type; }
+    readonly List<LogLine> _log = new List<LogLine>();
+    Vector2 _logScroll;
+    int _logSeen;
+    bool _showOutput;
+
+    void OnLog(string text, string stack, LogType type) { AddLog(text, type); }
+
+    void AddLog(string text, LogType type)
+    {
+        if (text == null) return;
+        if (text.Length > 400) text = text.Substring(0, 400) + "…";
+        _log.Add(new LogLine { Text = text.Replace("\n", "  "), Type = type });
+        if (_log.Count > 300) _log.RemoveAt(0);
+    }
+
+    // ------------------------------------------------------------------ облик: цвета, шрифт Windows, масштаб, значки
+
+    static readonly Color TitleBg = new Color(0.047f, 0.051f, 0.059f, 1f);
+    static readonly Color RibbonBg = new Color(0.071f, 0.075f, 0.086f, 1f);
+    static readonly Color PanelBg = new Color(0.086f, 0.092f, 0.106f, 1f);
+    static readonly Color HeaderBg = new Color(0.110f, 0.118f, 0.135f, 1f);
+    static readonly Color Raised = new Color(0.155f, 0.165f, 0.192f, 1f);
+    static readonly Color HoverC = new Color(0.20f, 0.21f, 0.245f, 1f);
+    static readonly Color LineC = new Color(1f, 1f, 1f, 0.07f);
+    static Color Amber = new Color(0.94f, 0.71f, 0.16f, 1f);
+    static Color AmberSoft = new Color(0.94f, 0.71f, 0.16f, 0.16f);
+    static readonly Color Ink = new Color(0.90f, 0.91f, 0.94f);
+    static readonly Color Muted = new Color(0.60f, 0.63f, 0.69f);
+    static readonly Color Faint = new Color(0.53f, 0.56f, 0.62f);
+
+    Font _font;
+    bool _fontOk;
+    float _ui = 1;
+    Texture2D _white, _knob, _thumb;
+    GUIStyle _statusText, _rbOn;
+    GUIStyle _txt, _muted, _small, _bold, _title, _hdr, _cap, _rbl, _rblOn, _btn, _ghostBtn, _primary, _field, _row, _chip, _chipOn, _tab, _tabOn, _tip, _propLabel,
+        _badge, _badgeText, _badgeKey, _mark, _swOn, _swOff, _tile, _logStyle;
+
+    /// <summary>Скруглённая плашка для 9-срезов (сглаженные углы, необязательная рамка).</summary>
+    static Texture2D Rounded(Color fill, int r, Color edge, float edgeWidth)
+    {
+        var size = r * 2 + 2;
+        var t = new Texture2D(size, size, TextureFormat.RGBA32, false) { hideFlags = HideFlags.HideAndDontSave, filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
+        for (var y = 0; y < size; y++)
+            for (var x = 0; x < size; x++)
+            {
+                var cx = Mathf.Clamp(x + 0.5f, r, size - r);
+                var cy = Mathf.Clamp(y + 0.5f, r, size - r);
+                var d = Mathf.Sqrt((x + 0.5f - cx) * (x + 0.5f - cx) + (y + 0.5f - cy) * (y + 0.5f - cy));
+                var inside = Mathf.Clamp01(r - d + 0.5f);
+                var border = edgeWidth > 0 ? Mathf.Clamp01(d - (r - edgeWidth) + 0.5f) : 0;
+                var c = Color.Lerp(fill, edge, border);
+                c.a *= inside;
+                t.SetPixel(x, y, c);
+            }
+        t.Apply();
+        return t;
+    }
+
+    GUIStyle Style(Texture2D bg, Texture2D hover, Color text, int size, int r)
+    {
+        var s = new GUIStyle();
+        s.font = _font;
+        s.fontSize = size;
+        s.normal.background = bg; s.normal.textColor = text;
+        s.hover.background = hover ?? bg; s.hover.textColor = hover != null ? Color.white : text;
+        s.active.background = hover ?? bg; s.active.textColor = hover != null ? Color.white : text;
+        s.focused.background = bg; s.focused.textColor = text;
+        s.border = new RectOffset(r, r, r, r);
+        s.richText = false;
+        s.clipping = TextClipping.Clip;
+        return s;
+    }
+
+    GUIStyle Text(Color c, int size, FontStyle fs, TextAnchor a)
+    {
+        var s = Style(null, null, c, size, 0);
+        s.fontStyle = fs;
+        s.alignment = a;
+        s.padding = new RectOffset(2, 2, 2, 2);
+        return s;
+    }
+
+    void Styles()
+    {
+        var ui = Mathf.Clamp(Screen.height / 1080f, 1f, 2.6f) * _uiUser;
+        if (_txt != null && Mathf.Abs(ui - _ui) < 0.01f) return;
+        _ui = ui;
+        if (_font == null)
+        {
+            // Шрифт из Windows: встроенного шрифта IMGUI в новых Unity может не быть (тогда видны пустые прямоугольники).
+            try { _font = Font.CreateDynamicFontFromOSFont(new[] { "Segoe UI", "Segoe UI Symbol", "Arial", "Tahoma" }, 16); } catch { }
+            _fontOk = _font != null;
+            if (_font == null) _font = GUI.skin.font;
+        }
+        _white = Rounded(Color.white, 1, Color.white, 0);
+        _knob = Rounded(Color.white, 8, Color.white, 0);
+        _thumb = Rounded(new Color(1, 1, 1, 0.16f), 3, new Color(1, 1, 1, 0.16f), 0);
+        var raised = Rounded(Raised, 5, Raised, 0);
+        var hover = Rounded(HoverC, 5, HoverC, 0);
+        var clear = Rounded(new Color(0, 0, 0, 0), 5, new Color(0, 0, 0, 0), 0);
+        var amber = Rounded(Amber, 5, Amber, 0);
+        var amberHover = Rounded(new Color(0.98f, 0.79f, 0.33f), 5, Amber, 0);
+        var on = Rounded(new Color(0.94f, 0.71f, 0.16f, 0.18f), 5, new Color(0.94f, 0.71f, 0.16f, 0.55f), 1);
+
+        _txt = Text(Ink, 13, FontStyle.Normal, TextAnchor.MiddleLeft);
+        _muted = Text(Muted, 12, FontStyle.Normal, TextAnchor.MiddleLeft);
+        _muted.wordWrap = true;
+        _small = Text(Faint, 11, FontStyle.Normal, TextAnchor.MiddleLeft);
+        _bold = Text(Ink, 13, FontStyle.Bold, TextAnchor.MiddleLeft);
+        _title = Text(Color.white, 15, FontStyle.Bold, TextAnchor.MiddleLeft);
+        _hdr = Text(Ink, 12, FontStyle.Bold, TextAnchor.MiddleLeft);
+        _cap = Text(new Color(0.58f, 0.61f, 0.67f), 11, FontStyle.Normal, TextAnchor.MiddleCenter);
+        _statusText = Text(Muted, 12, FontStyle.Normal, TextAnchor.MiddleLeft);
+        _rbOn = Style(Rounded(new Color(0.94f, 0.71f, 0.16f, 0.15f), 5, new Color(0.94f, 0.71f, 0.16f, 0.15f), 0), null, Amber, 12, 5);
+        _rbl = Text(Muted, 12, FontStyle.Normal, TextAnchor.UpperCenter);
+        _rblOn = Text(Amber, 12, FontStyle.Bold, TextAnchor.UpperCenter);
+        _propLabel = Text(Muted, 12, FontStyle.Normal, TextAnchor.MiddleLeft);
+        _logStyle = Text(Ink, 12, FontStyle.Normal, TextAnchor.MiddleLeft);
+        _logStyle.wordWrap = true;
+
+        _btn = Style(raised, hover, Ink, 13, 5);
+        _btn.alignment = TextAnchor.MiddleCenter;
+        _btn.padding = new RectOffset(8, 8, 4, 4);
+        _btn.margin = new RectOffset(2, 2, 2, 2);
+        _ghostBtn = Style(clear, hover, Muted, 12, 5);
+        _ghostBtn.alignment = TextAnchor.MiddleCenter;
+        _primary = Style(amber, amberHover, new Color(0.11f, 0.08f, 0.02f), 13, 5);
+        _primary.hover.textColor = new Color(0.11f, 0.08f, 0.02f);
+        _primary.active.textColor = new Color(0.11f, 0.08f, 0.02f);
+        _primary.fontStyle = FontStyle.Bold;
+        _primary.alignment = TextAnchor.MiddleCenter;
+        _field = Style(Rounded(new Color(0.045f, 0.049f, 0.057f), 4, new Color(1, 1, 1, 0.10f), 1), null, Ink, 13, 4);
+        _field.focused.background = Rounded(new Color(0.045f, 0.049f, 0.057f), 4, Amber, 1);
+        _field.focused.textColor = Color.white;
+        _field.hover.background = Rounded(new Color(0.045f, 0.049f, 0.057f), 4, new Color(1, 1, 1, 0.22f), 1);
+        _field.padding = new RectOffset(7, 7, 4, 4);
+        _field.margin = new RectOffset(2, 2, 2, 2);
+        _field.alignment = TextAnchor.MiddleLeft;
+        _row = Style(clear, hover, Ink, 13, 5);
+        _row.alignment = TextAnchor.MiddleLeft;
+        _row.padding = new RectOffset(30, 8, 4, 4);
+        _row.margin = new RectOffset(0, 0, 0, 1);
+        _chip = Style(raised, hover, Muted, 12, 5);
+        _chip.alignment = TextAnchor.MiddleCenter;
+        _chip.padding = new RectOffset(6, 6, 4, 4);
+        _chip.margin = new RectOffset(2, 2, 2, 2);
+        _chipOn = Style(on, null, Amber, 12, 5);
+        _chipOn.alignment = TextAnchor.MiddleCenter;
+        _chipOn.padding = _chip.padding;
+        _chipOn.margin = _chip.margin;
+        _tab = Text(Muted, 13, FontStyle.Normal, TextAnchor.MiddleCenter);
+        _tabOn = Text(Color.white, 13, FontStyle.Bold, TextAnchor.MiddleCenter);
+        _tip = Style(Rounded(new Color(0.02f, 0.022f, 0.026f, 0.96f), 5, new Color(1, 1, 1, 0.14f), 1), null, Ink, 12, 5);
+        _tip.padding = new RectOffset(8, 8, 5, 5);
+        _tile = Style(raised, hover, Ink, 12, 6);
+        _tile.alignment = TextAnchor.LowerCenter;
+        _tile.padding = new RectOffset(4, 4, 4, 8);
+        _tile.margin = new RectOffset(3, 3, 3, 3);
+        _swOn = Style(Rounded(Amber, 9, Amber, 0), null, Ink, 12, 9);
+        _swOff = Style(Rounded(new Color(0.24f, 0.25f, 0.29f), 9, new Color(1, 1, 1, 0.12f), 1), null, Ink, 12, 9);
+
+        // Кнопка в игре: тёмная капсула с янтарным знаком { }, надписью и клавишей.
+        _badge = Style(Rounded(new Color(0.06f, 0.065f, 0.08f, 0.88f), 20, new Color(0.94f, 0.71f, 0.16f, 0.55f), 1.5f), Rounded(new Color(0.10f, 0.105f, 0.12f, 0.95f), 20, Amber, 1.5f), Ink, 15, 20);
+        _badgeText = Text(Color.white, 15, FontStyle.Bold, TextAnchor.MiddleLeft);
+        _badgeKey = Style(Rounded(new Color(1, 1, 1, 0.12f), 5, new Color(1, 1, 1, 0.22f), 1), null, new Color(0.85f, 0.87f, 0.9f), 12, 5);
+        _badgeKey.alignment = TextAnchor.MiddleCenter;
+        _mark = Style(Rounded(Amber, 6, Amber, 0), null, new Color(0.11f, 0.08f, 0.02f), 14, 6);
+        _mark.fontStyle = FontStyle.Bold;
+        _mark.alignment = TextAnchor.MiddleCenter;
+
+        // Острова: тёмное стекло со скруглением 14, док, строки палитры, клавиши.
+        _island = Style(Rounded(new Color(0.067f, 0.072f, 0.085f, 0.94f), 14, new Color(1, 1, 1, 0.08f), 1), null, Ink, 13, 14);
+        _pill = Style(Rounded(new Color(0.13f, 0.14f, 0.165f, 0.97f), 10, new Color(1, 1, 1, 0.09f), 1), null, Ink, 13, 10);
+        _dockOn = Style(Rounded(Amber, 10, Amber, 0), null, Ink, 13, 10);
+        _palRow = Style(Rounded(new Color(0.13f, 0.14f, 0.165f, 1f), 7, new Color(0.13f, 0.14f, 0.165f, 1f), 0), Rounded(HoverC, 7, HoverC, 0), Ink, 13, 7);
+        _palRow.alignment = TextAnchor.MiddleLeft;
+        _palRow.padding = new RectOffset(12, 8, 4, 4);
+        _palRow.margin = new RectOffset(3, 3, 3, 3);
+        _palRowOn = Style(Rounded(new Color(Amber.r, Amber.g, Amber.b, 0.16f), 8, new Color(Amber.r, Amber.g, Amber.b, 0.5f), 1), null, Ink, 13, 8);
+        _keyChip = Style(Rounded(new Color(1, 1, 1, 0.08f), 4, new Color(1, 1, 1, 0.14f), 1), null, Muted, 11, 4);
+        _keyChip.alignment = TextAnchor.MiddleCenter;
+        _tileText = Text(Ink, 11, FontStyle.Normal, TextAnchor.UpperCenter);
+        _tileText.wordWrap = true;
+        _tile = Style(Rounded(new Color(0.12f, 0.13f, 0.155f, 1f), 10, new Color(1, 1, 1, 0.06f), 1), null, Ink, 12, 10);
+        _chipOn = Style(Rounded(new Color(Amber.r, Amber.g, Amber.b, 0.18f), 7, new Color(Amber.r, Amber.g, Amber.b, 0.6f), 1), null, Amber, 12, 7);
+        _chipOn.alignment = TextAnchor.MiddleCenter;
+        _chipOn.padding = _chip.padding;
+        _chipOn.margin = _chip.margin;
+    }
+
+    static void FillRect(Rect r, Color c, Texture2D white)
+    {
+        var old = GUI.color;
+        GUI.color = c;
+        GUI.DrawTexture(r, white);
+        GUI.color = old;
+    }
+
+    void Fill(Rect r, Color c) { FillRect(r, c, _white); }
+
+    void DrawIcon(Rect r, string name, Color c)
+    {
+        var old = GUI.color;
+        GUI.color = c;
+        GUI.DrawTexture(r, Icon(name));
+        GUI.color = old;
+    }
+
+    // ------------------------------------------------------------------ значки: нарисованы кодом (сетка 24×24, текстура 48×48)
+
+    readonly Dictionary<string, Texture2D> _icons = new Dictionary<string, Texture2D>();
+
+    Texture2D Icon(string name)
+    {
+        Texture2D t;
+        if (_icons.TryGetValue(name, out t) && t != null) return t;
+        var ops = IconOps(name);
+        const int S = 48;
+        const float k = 2f;
+        t = new Texture2D(S, S, TextureFormat.RGBA32, false) { hideFlags = HideFlags.HideAndDontSave, filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
+        var px = new Color[S * S];
+        for (var y = 0; y < S; y++)
+            for (var x = 0; x < S; x++)
+            {
+                var p = new Vector2((x + 0.5f) / k, (S - y - 0.5f) / k);
+                var cov = 0f;
+                foreach (var op in ops) cov = Mathf.Max(cov, Coverage(op, p, k));
+                px[y * S + x] = new Color(1, 1, 1, cov);
+            }
+        t.SetPixels(px);
+        t.Apply();
+        _icons[name] = t;
+        return t;
+    }
+
+    static float SegDist(Vector2 p, Vector2 a, Vector2 b)
+    {
+        var ab = b - a;
+        var t = ab.sqrMagnitude < 1e-6f ? 0 : Mathf.Clamp01(Vector2.Dot(p - a, ab) / ab.sqrMagnitude);
+        return Vector2.Distance(p, a + ab * t);
+    }
+
+    static float Cross2(Vector2 a, Vector2 b) { return a.x * b.y - a.y * b.x; }
+
+    static float Coverage(float[] o, Vector2 p, float k)
+    {
+        float d;
+        switch ((int)o[0])
+        {
+            case 0: d = SegDist(p, new Vector2(o[1], o[2]), new Vector2(o[3], o[4])) - o[5] * 0.5f; break;
+            case 1: d = Mathf.Abs(Vector2.Distance(p, new Vector2(o[1], o[2])) - o[3]) - o[4] * 0.5f; break;
+            case 2:
+                {
+                    var c = new Vector2(o[1], o[2]);
+                    var ang = Mathf.Atan2(p.y - c.y, p.x - c.x) * Mathf.Rad2Deg;
+                    var rel = Mathf.Repeat(ang - o[4], 360f);
+                    if (rel <= o[5] - o[4]) d = Mathf.Abs(Vector2.Distance(p, c) - o[3]) - o[6] * 0.5f;
+                    else
+                    {
+                        var a0 = o[4] * Mathf.Deg2Rad; var a1 = o[5] * Mathf.Deg2Rad;
+                        var e0 = c + new Vector2(Mathf.Cos(a0), Mathf.Sin(a0)) * o[3];
+                        var e1 = c + new Vector2(Mathf.Cos(a1), Mathf.Sin(a1)) * o[3];
+                        d = Mathf.Min(Vector2.Distance(p, e0), Vector2.Distance(p, e1)) - o[6] * 0.5f;
+                    }
+                    break;
+                }
+            case 3: d = Vector2.Distance(p, new Vector2(o[1], o[2])) - o[3]; break;
+            case 4:
+            case 5:
+                {
+                    var half = new Vector2(o[3], o[4]) * 0.5f;
+                    var c = new Vector2(o[1], o[2]) + half;
+                    var q = new Vector2(Mathf.Abs(p.x - c.x), Mathf.Abs(p.y - c.y)) - half + new Vector2(o[5], o[5]);
+                    var sd = new Vector2(Mathf.Max(q.x, 0), Mathf.Max(q.y, 0)).magnitude + Mathf.Min(Mathf.Max(q.x, q.y), 0) - o[5];
+                    d = (int)o[0] == 4 ? sd : Mathf.Abs(sd) - o[6] * 0.5f;
+                    break;
+                }
+            default:
+                {
+                    var a = new Vector2(o[1], o[2]); var b = new Vector2(o[3], o[4]); var c = new Vector2(o[5], o[6]);
+                    var dist = Mathf.Min(SegDist(p, a, b), Mathf.Min(SegDist(p, b, c), SegDist(p, c, a)));
+                    var s1 = Cross2(b - a, p - a); var s2 = Cross2(c - b, p - b); var s3 = Cross2(a - c, p - c);
+                    var inside = (s1 >= 0 && s2 >= 0 && s3 >= 0) || (s1 <= 0 && s2 <= 0 && s3 <= 0);
+                    d = inside ? -dist : dist;
+                    break;
+                }
+        }
+        return Mathf.Clamp01(0.5f - d * k);
+    }
+
+    static float[] IL(float a, float b, float c, float d, float w) { return new[] { 0f, a, b, c, d, w }; }
+    static float[] IC(float x, float y, float r, float w) { return new[] { 1f, x, y, r, w }; }
+    static float[] IA(float x, float y, float r, float a0, float a1, float w) { return new[] { 2f, x, y, r, a0, a1, w }; }
+    static float[] ID(float x, float y, float r) { return new[] { 3f, x, y, r }; }
+    static float[] IR(float x, float y, float w, float h, float rad) { return new[] { 4f, x, y, w, h, rad }; }
+    static float[] IO(float x, float y, float w, float h, float rad, float lw) { return new[] { 5f, x, y, w, h, rad, lw }; }
+    static float[] IT(float a, float b, float c, float d, float e, float f) { return new[] { 6f, a, b, c, d, e, f }; }
+
+    static float[] IH(float x, float y, float deg, float s)
+    {
+        var a = deg * Mathf.Deg2Rad;
+        var d = new Vector2(Mathf.Cos(a), Mathf.Sin(a));
+        var n = new Vector2(-d.y, d.x);
+        var b = new Vector2(x, y) - d * s;
+        var p1 = b + n * s * 0.62f;
+        var p2 = b - n * s * 0.62f;
+        return IT(x, y, p1.x, p1.y, p2.x, p2.y);
+    }
+
+    static float[] IArcHead(float cx, float cy, float r, float deg, float s)
+    {
+        var a = deg * Mathf.Deg2Rad;
+        var end = new Vector2(cx + r * Mathf.Cos(a), cy + r * Mathf.Sin(a));
+        var t = new Vector2(-Mathf.Sin(a), Mathf.Cos(a));
+        var tip = end + t * s * 0.75f;
+        return IH(tip.x, tip.y, Mathf.Atan2(t.y, t.x) * Mathf.Rad2Deg, s);
+    }
+
+    static List<float[]> IconOps(string name)
+    {
+        var o = new List<float[]>();
+        switch (name)
+        {
+            case "select": o.Add(IT(5, 3, 5, 18.5f, 16.5f, 13.5f)); o.Add(IL(10, 14.5f, 13.5f, 21, 2.6f)); break;
+            case "move":
+                o.Add(IL(12, 5, 12, 19, 1.8f)); o.Add(IL(5, 12, 19, 12, 1.8f));
+                o.Add(IH(12, 1.8f, -90, 4.4f)); o.Add(IH(12, 22.2f, 90, 4.4f)); o.Add(IH(1.8f, 12, 180, 4.4f)); o.Add(IH(22.2f, 12, 0, 4.4f));
+                break;
+            case "rotate": o.Add(IA(12, 12, 7.5f, -30, 250, 2f)); o.Add(IArcHead(12, 12, 7.5f, 250, 5f)); break;
+            case "refresh": o.Add(IA(12, 12, 7, -60, 240, 1.8f)); o.Add(IArcHead(12, 12, 7, 240, 4.5f)); break;
+            case "scale": o.Add(IO(3, 9, 12, 12, 1.5f, 1.8f)); o.Add(IL(11, 13, 19.2f, 4.8f, 1.8f)); o.Add(IH(21, 3, -45, 4.6f)); break;
+            case "magnet":
+                // Подкова магнита: дуга и плечи, концы — отдельными плашками (полюса).
+                o.Add(IL(6.5f, 7.5f, 6.5f, 13, 3.4f)); o.Add(IL(17.5f, 7.5f, 17.5f, 13, 3.4f)); o.Add(IA(12, 13, 5.5f, 0, 180, 3.4f));
+                o.Add(IR(4.6f, 2.5f, 3.8f, 3.4f, 0.6f)); o.Add(IR(15.6f, 2.5f, 3.8f, 3.4f, 0.6f));
+                break;
+            case "globe":
+                o.Add(IC(12, 12, 8.5f, 1.7f)); o.Add(IL(3.5f, 12, 20.5f, 12, 1.3f)); o.Add(IL(12, 3.5f, 12, 20.5f, 1.3f));
+                o.Add(IA(20.5f, 12, 10.5f, 145, 215, 1.3f)); o.Add(IA(3.5f, 12, 10.5f, -35, 35, 1.3f));
+                break;
+            case "cube":
+                o.Add(IL(12, 3, 20, 7.5f, 1.7f)); o.Add(IL(20, 7.5f, 20, 16.5f, 1.7f)); o.Add(IL(20, 16.5f, 12, 21, 1.7f)); o.Add(IL(12, 21, 4, 16.5f, 1.7f));
+                o.Add(IL(4, 16.5f, 4, 7.5f, 1.7f)); o.Add(IL(4, 7.5f, 12, 3, 1.7f)); o.Add(IL(4, 7.5f, 12, 12, 1.7f)); o.Add(IL(20, 7.5f, 12, 12, 1.7f)); o.Add(IL(12, 12, 12, 21, 1.7f));
+                break;
+            case "undo": o.Add(IA(12, 14, 6.5f, 180, 360, 2f)); o.Add(IH(5.5f, 19.5f, 90, 4.4f)); break;
+            case "redo": o.Add(IA(12, 14, 6.5f, 180, 360, 2f)); o.Add(IH(18.5f, 19.5f, 90, 4.4f)); break;
+            case "copy": o.Add(IO(8, 8, 12, 13, 2, 1.7f)); o.Add(IO(4, 3, 12, 13, 2, 1.7f)); break;
+            case "paste": o.Add(IO(5, 5, 14, 16, 2, 1.7f)); o.Add(IR(9, 3, 6, 4, 1.2f)); o.Add(IL(8.5f, 12, 15.5f, 12, 1.4f)); o.Add(IL(8.5f, 16, 13.5f, 16, 1.4f)); break;
+            case "duplicate": o.Add(IR(3, 3, 11, 11, 2)); o.Add(IO(10, 10, 11, 11, 2, 1.7f)); break;
+            case "group":
+                o.Add(IL(4, 4, 4, 20, 1.8f)); o.Add(IL(4, 4, 7.5f, 4, 1.8f)); o.Add(IL(4, 20, 7.5f, 20, 1.8f));
+                o.Add(IL(20, 4, 20, 20, 1.8f)); o.Add(IL(16.5f, 4, 20, 4, 1.8f)); o.Add(IL(16.5f, 20, 20, 20, 1.8f)); o.Add(IR(8, 8, 8, 8, 1.5f));
+                break;
+            case "trash":
+                o.Add(IO(6.5f, 7.5f, 11, 13, 1.5f, 1.7f)); o.Add(IL(4, 6, 20, 6, 1.8f)); o.Add(IL(10, 3.5f, 14, 3.5f, 1.8f));
+                o.Add(IL(10, 10.5f, 10, 17.5f, 1.4f)); o.Add(IL(14, 10.5f, 14, 17.5f, 1.4f));
+                break;
+            case "play": o.Add(IT(7.5f, 4.5f, 7.5f, 19.5f, 19.5f, 12)); break;
+            case "camera": o.Add(IO(3, 7, 18, 13, 2.5f, 1.7f)); o.Add(IC(12, 13.5f, 3.6f, 1.7f)); o.Add(IR(8.5f, 4.5f, 7, 3, 1)); break;
+            case "save": o.Add(IO(4, 4, 16, 16, 2, 1.7f)); o.Add(IR(8, 4, 8, 5.5f, 0.6f)); o.Add(IO(7.5f, 13, 9, 7, 1, 1.4f)); break;
+            case "eye": o.Add(IA(12, 19, 9, -140, -40, 1.6f)); o.Add(IA(12, 5, 9, 40, 140, 1.6f)); o.Add(ID(12, 12, 2.6f)); break;
+            case "eyeOff": o.Add(IA(12, 19, 9, -140, -40, 1.6f)); o.Add(IA(12, 5, 9, 40, 140, 1.6f)); o.Add(ID(12, 12, 2.6f)); o.Add(IL(4, 20, 20, 4, 1.8f)); break;
+            case "sphere": o.Add(IC(12, 12, 8, 1.7f)); o.Add(IA(12, 6, 10, 53, 127, 1.3f)); o.Add(ID(9, 8.5f, 1.4f)); break;
+            case "cylinder":
+                o.Add(IO(6, 3, 12, 5, 2.5f, 1.5f)); o.Add(IL(6, 5.5f, 6, 18.5f, 1.7f)); o.Add(IL(18, 5.5f, 18, 18.5f, 1.7f)); o.Add(IA(12, 16, 6, 0, 180, 1.7f));
+                break;
+            case "plane": o.Add(IL(3, 16, 8, 8, 1.7f)); o.Add(IL(8, 8, 21, 8, 1.7f)); o.Add(IL(21, 8, 16, 16, 1.7f)); o.Add(IL(16, 16, 3, 16, 1.7f)); break;
+            case "capsule": o.Add(IO(7.5f, 3, 9, 18, 4.5f, 1.7f)); break;
+            case "quad": o.Add(IO(4, 4, 16, 16, 0.5f, 1.7f)); break;
+            case "sun":
+                o.Add(ID(12, 12, 3.8f));
+                for (var i = 0; i < 8; i++) { var a = i * Mathf.PI / 4; o.Add(IL(12 + Mathf.Cos(a) * 6.5f, 12 + Mathf.Sin(a) * 6.5f, 12 + Mathf.Cos(a) * 9.5f, 12 + Mathf.Sin(a) * 9.5f, 1.7f)); }
+                break;
+            case "spot": o.Add(ID(12, 4.5f, 2.4f)); o.Add(IL(12, 4.5f, 5.5f, 18, 1.7f)); o.Add(IL(12, 4.5f, 18.5f, 18, 1.7f)); o.Add(IL(5.5f, 18, 18.5f, 18, 1.7f)); o.Add(IL(9, 21, 15, 21, 1.4f)); break;
+            case "empty": o.Add(IO(4, 4, 16, 16, 2, 1.4f)); o.Add(IL(12, 8, 12, 16, 1.4f)); o.Add(IL(8, 12, 16, 12, 1.4f)); break;
+            case "model":
+                o.Add(IL(12, 3, 19.8f, 7.5f, 1.6f)); o.Add(IL(19.8f, 7.5f, 19.8f, 16.5f, 1.6f)); o.Add(IL(19.8f, 16.5f, 12, 21, 1.6f));
+                o.Add(IL(12, 21, 4.2f, 16.5f, 1.6f)); o.Add(IL(4.2f, 16.5f, 4.2f, 7.5f, 1.6f)); o.Add(IL(4.2f, 7.5f, 12, 3, 1.6f));
+                o.Add(IR(9, 9, 6, 6, 1));
+                break;
+            case "folder": o.Add(IO(3, 7, 18, 13, 2, 1.7f)); o.Add(IR(3, 5, 8, 3.5f, 1)); break;
+            case "search": o.Add(IC(10, 10, 6, 1.8f)); o.Add(IL(14.5f, 14.5f, 20, 20, 2.4f)); break;
+            case "chevR": o.Add(IL(9.5f, 6.5f, 15, 12, 1.8f)); o.Add(IL(15, 12, 9.5f, 17.5f, 1.8f)); break;
+            case "chevD": o.Add(IL(6.5f, 9.5f, 12, 15, 1.8f)); o.Add(IL(12, 15, 17.5f, 9.5f, 1.8f)); break;
+            case "output": o.Add(IO(3, 4, 18, 16, 2, 1.7f)); o.Add(IL(7, 9.5f, 10, 12, 1.6f)); o.Add(IL(10, 12, 7, 14.5f, 1.6f)); o.Add(IL(12, 15, 17, 15, 1.6f)); break;
+            case "grid":
+                o.Add(IO(3, 3, 18, 18, 1.5f, 1.5f)); o.Add(IL(9, 3, 9, 21, 1.2f)); o.Add(IL(15, 3, 15, 21, 1.2f)); o.Add(IL(3, 9, 21, 9, 1.2f)); o.Add(IL(3, 15, 21, 15, 1.2f));
+                break;
+            case "focus":
+                o.Add(IC(12, 12, 6.5f, 1.6f)); o.Add(ID(12, 12, 2)); o.Add(IL(12, 2, 12, 6, 1.6f)); o.Add(IL(12, 18, 12, 22, 1.6f)); o.Add(IL(2, 12, 6, 12, 1.6f)); o.Add(IL(18, 12, 22, 12, 1.6f));
+                break;
+            case "ground": o.Add(IL(4, 20.5f, 20, 20.5f, 2)); o.Add(IL(12, 3.5f, 12, 13, 1.8f)); o.Add(IH(12, 17.5f, 90, 4.4f)); break;
+            case "array": o.Add(IR(2, 9, 6, 6, 1)); o.Add(IR(9, 9, 6, 6, 1)); o.Add(IR(16, 9, 6, 6, 1)); break;
+            case "physics": o.Add(ID(12, 9, 4.5f)); o.Add(IL(4, 19.5f, 20, 19.5f, 2)); o.Add(IL(9.5f, 15.5f, 14.5f, 15.5f, 1.3f)); break;
+            case "gear":
+                o.Add(IC(12, 12, 5, 2)); o.Add(ID(12, 12, 1.6f));
+                for (var i = 0; i < 6; i++) { var a = i * Mathf.PI / 3; o.Add(IL(12 + Mathf.Cos(a) * 6.5f, 12 + Mathf.Sin(a) * 6.5f, 12 + Mathf.Cos(a) * 9.5f, 12 + Mathf.Sin(a) * 9.5f, 2.8f)); }
+                break;
+            case "plus": o.Add(IL(12, 5, 12, 19, 2)); o.Add(IL(5, 12, 19, 12, 2)); break;
+            case "minus": o.Add(IL(5, 12, 19, 12, 2)); break;
+            case "more": o.Add(ID(5.5f, 12, 2.1f)); o.Add(ID(12, 12, 2.1f)); o.Add(ID(18.5f, 12, 2.1f)); break;
+            case "close": o.Add(IL(6.5f, 6.5f, 17.5f, 17.5f, 1.8f)); o.Add(IL(17.5f, 6.5f, 6.5f, 17.5f, 1.8f)); break;
+            case "tree": o.Add(IT(12, 3, 4.5f, 15, 19.5f, 15)); o.Add(IL(12, 15, 12, 21, 2.4f)); break;
+            case "car": o.Add(IR(3, 10, 18, 6.5f, 2)); o.Add(IO(7, 5.5f, 10, 6, 1.5f, 1.5f)); o.Add(ID(7.5f, 17.5f, 2.3f)); o.Add(ID(16.5f, 17.5f, 2.3f)); break;
+            case "house": o.Add(IT(12, 3, 2.5f, 11.5f, 21.5f, 11.5f)); o.Add(IO(5, 11, 14, 10, 0.5f, 1.7f)); o.Add(IR(10.5f, 15, 3, 6, 0.3f)); break;
+            case "bulb": o.Add(IC(12, 10, 5.5f, 1.7f)); o.Add(IL(9.5f, 17.5f, 14.5f, 17.5f, 1.6f)); o.Add(IL(10.2f, 20.5f, 13.8f, 20.5f, 1.6f)); break;
+            case "layers":
+                o.Add(IL(4, 9, 12, 5, 1.6f)); o.Add(IL(12, 5, 20, 9, 1.6f)); o.Add(IL(20, 9, 12, 13, 1.6f)); o.Add(IL(12, 13, 4, 9, 1.6f));
+                o.Add(IL(4, 14, 12, 18, 1.6f)); o.Add(IL(12, 18, 20, 14, 1.6f));
+                break;
+            case "texture": o.Add(IO(3, 3, 18, 18, 2, 1.7f)); o.Add(IT(5.5f, 18.5f, 10.5f, 11, 15.5f, 18.5f)); o.Add(ID(16, 8, 2)); break;
+            case "fog": o.Add(IL(4, 8, 20, 8, 1.8f)); o.Add(IL(2, 12, 18, 12, 1.8f)); o.Add(IL(6, 16, 22, 16, 1.8f)); break;
+            case "palette": o.Add(IC(12, 12, 8.5f, 1.7f)); o.Add(ID(8, 10, 1.6f)); o.Add(ID(12, 7.5f, 1.6f)); o.Add(ID(16, 10, 1.6f)); o.Add(ID(14, 15.5f, 2)); break;
+            default: o.Add(IO(5, 5, 14, 14, 3, 1.7f)); break;
+        }
+        return o;
+    }
+
+    // ------------------------------------------------------------------ раскладка: окно просмотра на весь экран и «острова»
+
+    Rect _leftRect, _rightRect, _explorerRect, _propsRect, _outputRect, _vpRect, _dockRect, _ctxRect, _popRect, _palRect;
+    Rect _vpPx;
+    bool _showToolbox, _rightOpen, _compact, _palette;
+    float _leftAnim, _rightAnim;
+    string _rightTab = "props";
+    readonly List<Action> _later = new List<Action>();
+    readonly List<Rect> _uiNow = new List<Rect>();
+    List<Rect> _uiLast = new List<Rect>();
+
+    /// <summary>Сделать после этого прохода OnGUI: всё, что меняет содержимое панелей (иначе IMGUI путает элементы).</summary>
+    void Later(Action a) { _later.Add(a); }
+
+    /// <summary>Запомнить, что здесь интерфейс: мышь над ним не трогает сцену.</summary>
+    Rect Reg(Rect r) { _uiNow.Add(r); return r; }
+
+    bool OverUi(Vector2 m)
+    {
+        if (_palette) return true;
+        foreach (var r in _uiLast) if (r.Contains(m)) return true;
+        return false;
+    }
+
+    void OpenRight(string tab)
+    {
+        if (_rightOpen && _rightTab == tab) _rightOpen = false;
+        else { _rightOpen = true; _rightTab = tab; }
+    }
+
+    void LayoutRects(float w, float h)
+    {
+        _compact = w < 1500;
+        var dw = _compact ? 300f : 340f;
+        _vpRect = new Rect(0, 0, w, h);
+        // Панели выезжают плавно (сбавляя ход к концу).
+        var el = 1 - Mathf.Pow(1 - _leftAnim, 3); var er = 1 - Mathf.Pow(1 - _rightAnim, 3);
+        _leftRect = _leftAnim > 0.01f && !_clean ? new Rect(14 - (1 - el) * (dw + 40), 68, dw, h - 68 - 96) : new Rect();
+        _rightRect = _rightAnim > 0.01f && !_clean ? new Rect(w - 14 - dw - 20 + (1 - er) * (dw + 60), 68, dw + 20, h - 68 - 96) : new Rect();
+        _explorerRect = _propsRect = new Rect(_rightRect.x + 1, _rightRect.y + 46, _rightRect.width - 2, _rightRect.height - 50);
+        _outputRect = _showOutput && !_clean ? new Rect(w / 2 - Mathf.Min(430, w / 2 - 380), h - 96 - 210, Mathf.Min(860, w - 760), 200) : new Rect();
+        _vpPx = new Rect(0, 0, Screen.width, Screen.height);
+        EnsureTarget();
+    }
+
+    RenderTexture _rt;
+
+    /// <summary>
+    /// Камера редактора рисует в свою текстуру размером с окно просмотра, а окно выводит её между панелями. Так вид не
+    /// зависит от того, как конвейер игры (встроенный, URP, HDRP) обходится с частью экрана, и стрелки совпадают с объектами.
+    /// </summary>
+    void EnsureTarget()
+    {
+        if (_cam == null) return;
+        var w = Mathf.Max(64, (int)_vpPx.width);
+        var h = Mathf.Max(64, (int)_vpPx.height);
+        if (_rt != null && _rt.width == w && _rt.height == h && _cam.targetTexture == _rt) return;
+        ReleaseTarget();
+        _rt = new RenderTexture(w, h, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB) { name = "ModScript Studio View", hideFlags = HideFlags.HideAndDontSave };
+        _rt.Create();
+        _cam.rect = new Rect(0, 0, 1, 1);
+        _cam.targetTexture = _rt;
+        _cam.ResetAspect();
+    }
+
+    void ReleaseTarget()
+    {
+        if (_cam != null) _cam.targetTexture = null;
+        if (_rt == null) return;
+        _rt.Release();
+        Destroy(_rt);
+        _rt = null;
+    }
+
+    void OnGUI()
+    {
+        if (!_dev) return;
+        Styles();
+        var e = Event.current;
+        GUI.depth = -1000;
+        var prevSkinFont = GUI.skin.font;
+        var prev = GUI.matrix;
+        var thumb = GUI.skin.verticalScrollbarThumb.normal.background;
+        var bar = GUI.skin.verticalScrollbar.normal.background;
+        var barW = GUI.skin.verticalScrollbar.fixedWidth;
+        var thumbW = GUI.skin.verticalScrollbarThumb.fixedWidth;
+        GUI.skin.font = _font;
+        GUI.matrix = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, new Vector3(_ui, _ui, 1));
+        try
+        {
+            var w = Screen.width / _ui;
+            var h = Screen.height / _ui;
+            if (!_open) { Badge(w, e); return; }
+            // Тонкая полоса прокрутки в стиле редактора (только на время своих панелей).
+            GUI.skin.verticalScrollbarThumb.normal.background = _thumb;
+            GUI.skin.verticalScrollbar.normal.background = null;
+            GUI.skin.verticalScrollbar.fixedWidth = 8;
+            GUI.skin.verticalScrollbarThumb.fixedWidth = 6;
+            Editor(w, h, e);
+        }
+        finally
+        {
+            GUI.matrix = prev;
+            GUI.skin.font = prevSkinFont;
+            GUI.skin.verticalScrollbarThumb.normal.background = thumb;
+            GUI.skin.verticalScrollbar.normal.background = bar;
+            GUI.skin.verticalScrollbar.fixedWidth = barW;
+            GUI.skin.verticalScrollbarThumb.fixedWidth = thumbW;
+            if (_later.Count > 0)
+            {
+                var todo = _later.ToArray();
+                _later.Clear();
+                foreach (var a in todo) try { a(); } catch (Exception x) { Logger.LogWarning("studio: " + x.Message); }
+            }
+        }
+    }
+
+    /// <summary>Кнопка «Создать мод» в правом верхнем углу игры (или F8).</summary>
+    void Badge(float w, Event e)
+    {
+        var r = new Rect(w - 252, 16, 236, 44);
+        if (GUI.Button(r, GUIContent.none, _badge)) Open();
+        GUI.Label(new Rect(r.x + 8, r.y + 7, 30, 30), "{ }", _mark);
+        GUI.Label(new Rect(r.x + 48, r.y, 140, r.height), T("create", "Create mod"), _badgeText);
+        GUI.Label(new Rect(r.xMax - 46, r.y + 11, 34, 22), "F8", _badgeKey);
+        if (e.type == EventType.KeyDown && e.keyCode == KeyCode.F8) { Open(); e.Use(); }
+    }
+
+    void Editor(float w, float h, Event e)
+    {
+        LayoutRects(w, h);
+        _typing = GUIUtility.keyboardControl != 0;
+        if (!_typing) _edit.Clear();
+        if (e.type == EventType.Layout) { _uiLast = new List<Rect>(_uiNow); _uiNow.Clear(); }
+        var mouse = e.mousePosition;
+        var inView = _vpRect.Contains(mouse) && !OverUi(mouse);
+        // Точка мыши в окне просмотра — в точках его текстуры (снизу вверх), как у камеры редактора.
+        var screen = new Vector2(mouse.x * _ui - _vpPx.x, Screen.height - mouse.y * _ui - _vpPx.y);
+        // Клавиши палитры — до её поля ввода (иначе стрелки и Enter заберёт поле).
+        if (_palette && e.type == EventType.KeyDown) PaletteKeys(e);
+
+        if (e.type == EventType.Repaint)
+        {
+            // Наведённое: стрелка или объект — подсвечиваются; объект из библиотеки следует за курсором.
+            if (!_autotest)
+            {
+                _hover = inView && _drag < 0 && _ghost == null ? HandleAt(screen) : -1;
+                _hoverGo = null;
+                if (inView && _hover < 0 && _drag < 0 && !_marquee && _ghost == null)
+                {
+                    RaycastHit hit;
+                    if (!_cam.orthographic && Physics.Raycast(_cam.ScreenPointToRay(new Vector3(screen.x, screen.y, 0)), out hit, 5000f, ~0, QueryTriggerInteraction.Ignore))
+                    {
+                        var p = TopPlaced(hit.collider.gameObject);
+                        var r = hit.collider.GetComponentInParent<Renderer>();
+                        _hoverGo = p != null ? p.Go : (r != null ? r.gameObject : hit.collider.gameObject);
+                    }
+                }
+                if (inView && _ghost != null) MoveGhost(screen);
+            }
+            // Сначала стрелки и рамки — в текстуру вида, потом сама текстура — на весь экран.
+            DrawViewport();
+            if (_rt != null) GUI.DrawTexture(_vpRect, _rt, ScaleMode.StretchToFill, false);
+            ViewportOverlay();
+        }
+
+        if (_clean)
+        {
+            // Чистый вид: только кнопка вернуть интерфейс.
+            if (GUI.Button(Reg(new Rect(w - 200, 14, 186, 34)), T("showUi", "Show interface  F10"), _pill)) Later(() => _clean = false);
+        }
+        else
+        {
+            TopIslands(w);
+            if (_showStats) StatsIsland(w);
+            if (_leftRect.width > 0) AddDrawer();
+            if (_rightRect.width > 0) RightDrawer();
+            if (_showOutput) OutputPanel();
+            ContextBar(w, h);
+            Dock(w, h);
+            DockMore();
+            Toast(w, h);
+            if (_showHelp) HelpCard(w, h);
+            if (_palette) Palette(w, h);
+        }
+
+        // Мышь в окне просмотра — после интерфейса (его кнопки уже обработали свои щелчки).
+        if (e.type == EventType.MouseUp)
+        {
+            if (e.button == 1) _rmb = false;
+            if (e.button == 2) _mmb = false;
+        }
+        if (!_palette && (inView || _drag >= 0 || _marquee || _orbiting || _pressed || _rmb || _mmb)) ViewportMouse(e, screen, inView);
+        if (_palette && e.type == EventType.MouseDown && !_palRect.Contains(mouse)) { Later(() => _palette = false); e.Use(); }
+        Keyboard(e);
+        if (!string.IsNullOrEmpty(GUI.tooltip) && e.type == EventType.Repaint)
+        {
+            var c = new GUIContent(GUI.tooltip);
+            var size = _tip.CalcSize(c);
+            var r = new Rect(Mathf.Min(mouse.x + 14, w - size.x - 6), Mathf.Min(mouse.y + 20, h - size.y - 4), size.x, size.y);
+            GUI.Label(r, c, _tip);
+        }
+    }
+
+    // ------------------------------------------------------------------ мышь в окне просмотра
+
+    bool _pressed, _surface, _pressAdd, _clickInner;
+    Vector2 _press;
+    GameObject _pressGo;
+    readonly List<Collider> _surfaceCols = new List<Collider>();
+    float _surfaceLift;
+
+    void ViewportMouse(Event e, Vector2 screen, bool inView)
+    {
+        switch (e.type)
+        {
+            case EventType.MouseDown:
+                GUIUtility.keyboardControl = 0;
+                if (!inView) return;
+                if (e.button == 1)
+                {
+                    if (_ghost != null) { CancelPlace(); Status(T("cancelled", "Cancelled")); }
+                    else _rmb = true;
+                    e.Use();
+                    return;
+                }
+                if (e.button == 2) { _mmb = true; e.Use(); return; }
+                if (e.button != 0) return;
+                if (_ghost != null) { DropGhost(e.shift); e.Use(); return; }
+                if (_mode == "paint") { var pg = Pick(screen, false); if (pg != null) PaintOn(pg); e.Use(); return; }
+                if (e.alt)
+                {
+                    _orbiting = true;
+                    _orbit = _sel != null ? BoundsOf(_sel).center : _cam.transform.position + _cam.transform.forward * 10f;
+                    e.Use();
+                    return;
+                }
+                var h = HandleAt(screen);
+                if (h >= 0) { BeginDrag(h, screen); e.Use(); return; }
+                _pressed = true;
+                _press = screen;
+                _pressAdd = e.shift || e.control;
+                _clickInner = e.clickCount > 1;
+                _pressGo = Pick(screen, _clickInner);
+                if (_pressGo != null && (_pressAdd || !_selection.Contains(_pressGo))) Select(_pressGo, _pressAdd);
+                e.Use();
+                return;
+            case EventType.MouseDrag:
+                if (e.button == 1 && _rmb) { Look(e.delta); e.Use(); return; }
+                if (e.button == 2 && _mmb)
+                {
+                    var k = _cam.orthographic ? _cam.orthographicSize * 2 / Screen.height : 0.0025f * Mathf.Max(2f, Vector3.Distance(_cam.transform.position, _orbit));
+                    _cam.transform.position -= (_cam.transform.right * e.delta.x - _cam.transform.up * e.delta.y) * k * _ui;
+                    e.Use();
+                    return;
+                }
+                if (e.button != 0) return;
+                if (_orbiting) { Orbit(e.delta); e.Use(); return; }
+                if (_drag >= 0) { DragTo(screen); e.Use(); return; }
+                if (!_pressed) return;
+                if (_surface) { SurfaceDrag(screen); e.Use(); return; }
+                if (_marquee) { _marq1 = screen; e.Use(); return; }
+                if ((screen - _press).magnitude > 5f * _ui)
+                {
+                    if (_pressGo != null && _selection.Contains(_pressGo)) BeginSurface(screen);
+                    else { _marquee = true; _marq0 = _press; _marq1 = screen; }
+                }
+                e.Use();
+                return;
+            case EventType.MouseUp:
+                if (e.button != 0) return;
+                if (_orbiting) { _orbiting = false; e.Use(); return; }
+                if (_drag >= 0) { EndDrag(); e.Use(); return; }
+                if (!_pressed) return;
+                _pressed = false;
+                if (_surface) EndSurface();
+                else if (_marquee) { _marquee = false; FinishMarquee(_pressAdd); }
+                else if (_pressGo == null && !_pressAdd) Select(null, false);
+                else if (_pressGo != null && !_pressAdd && _selection.Count > 1) Select(_pressGo, false);
+                e.Use();
+                return;
+            case EventType.ScrollWheel:
+                if (!inView) return;
+                if (_rmb) { _speed = Mathf.Clamp(_speed * (e.delta.y > 0 ? 0.8f : 1.25f), 0.05f, 20f); Status(T("camSpeed", "Camera speed") + ": ×" + _speed.ToString("0.##", Inv)); }
+                else if (_cam.orthographic) _cam.orthographicSize = Mathf.Clamp(_cam.orthographicSize * (1 + e.delta.y * 0.05f), 0.5f, 500);
+                else
+                {
+                    var ray = _cam.ScreenPointToRay(new Vector3(screen.x, screen.y, 0));
+                    _cam.transform.position -= ray.direction * e.delta.y * 0.8f * _speed;
+                }
+                e.Use();
+                return;
+        }
+    }
+
+    /// <summary>Перетаскивание самого объекта (не стрелок): он едет по поверхностям под курсором, как в Roblox Studio.</summary>
+    void BeginSurface(Vector2 screen)
+    {
+        _surface = true;
+        _before = SnapOf(_selection);
+        _pos0 = _selection.Select(g => g.transform.position).ToArray();
+        _surfaceCols.Clear();
+        foreach (var g in _selection)
+            foreach (var c in g.GetComponentsInChildren<Collider>())
+                if (c.enabled) { c.enabled = false; _surfaceCols.Add(c); }
+        var b = BoundsOf(_pressGo);
+        _surfaceLift = _pressGo.transform.position.y - b.min.y;
+        SurfaceDrag(screen);
+    }
+
+    void SurfaceDrag(Vector2 screen)
+    {
+        var ray = _cam.ScreenPointToRay(new Vector3(screen.x, screen.y, 0));
+        RaycastHit h;
+        Vector3 p;
+        if (!_cam.orthographic && Physics.Raycast(ray, out h, 2000f, ~0, QueryTriggerInteraction.Ignore)) p = h.point;
+        else return;
+        if (_snap) { p.x = Mathf.Round(p.x / _grid) * _grid; p.z = Mathf.Round(p.z / _grid) * _grid; }
+        var i0 = _selection.IndexOf(_pressGo);
+        if (i0 < 0 || _pos0.Length != _selection.Count) return;
+        var delta = p + Vector3.up * _surfaceLift - _pos0[i0];
+        for (var i = 0; i < _selection.Count; i++) _selection[i].transform.position = _pos0[i] + delta;
+    }
+
+    void EndSurface()
+    {
+        _surface = false;
+        foreach (var c in _surfaceCols) if (c != null) c.enabled = true;
+        _surfaceCols.Clear();
+        foreach (var g in _selection) Touch(g);
+        PushSnap(T("move", "Move"), _before, SnapOf(_selection));
+        Dirty();
+    }
+
+    // ------------------------------------------------------------------ клавиши
+
+    void Keyboard(Event e)
+    {
+        if (e.type == EventType.KeyUp) { _keys.Remove(e.keyCode); return; }
+        if (e.type != EventType.KeyDown || e.keyCode == KeyCode.None) return;
+        if (e.keyCode == KeyCode.F8) { Later(Close); e.Use(); return; }
+        if (_palette) return;
+        if (_typing)
+        {
+            if (e.keyCode == KeyCode.Return || e.keyCode == KeyCode.KeypadEnter || e.keyCode == KeyCode.Escape) { GUIUtility.keyboardControl = 0; e.Use(); }
+            return;
+        }
+        _keys.Add(e.keyCode);
+        var k = e.keyCode;
+        var ctrl = e.control || e.command;
+        if (ctrl)
+        {
+            if (k == KeyCode.Z && e.shift) Later(Redo);
+            else if (k == KeyCode.Z) Later(Undo);
+            else if (k == KeyCode.Y) Later(Redo);
+            else if (k == KeyCode.D) Later(Duplicate);
+            else if (k == KeyCode.C) Later(Copy);
+            else if (k == KeyCode.V) Later(Paste);
+            else if (k == KeyCode.G && e.shift) Later(Ungroup);
+            else if (k == KeyCode.G) Later(Group);
+            else if (k == KeyCode.S) Later(Save);
+            else if (k == KeyCode.K) Later(() => OpenPalette(""));
+            else if (k == KeyCode.A) Later(() => SelectWhere(p => true));
+            else if (e.shift && k >= KeyCode.Alpha1 && k <= KeyCode.Alpha9) { var n = k - KeyCode.Alpha0; Later(() => RunAct(FindAct("bm.save" + n))); }
+            e.Use();
+            return;
+        }
+        if (e.alt && k == KeyCode.S) { Later(ToggleSimulate); e.Use(); return; }
+        if (e.shift && k >= KeyCode.Alpha1 && k <= KeyCode.Alpha9) { var n = k - KeyCode.Alpha0; Later(() => GoBookmark(n)); e.Use(); return; }
+        if (_rmb) return;
+        switch (k)
+        {
+            case KeyCode.Q: _mode = "select"; break;
+            case KeyCode.W: case KeyCode.Alpha1: _mode = "move"; break;
+            case KeyCode.E: case KeyCode.Alpha2: _mode = "rotate"; break;
+            case KeyCode.R: case KeyCode.Alpha3: _mode = "scale"; break;
+            case KeyCode.Space: Later(() => OpenPalette("")); break;
+            case KeyCode.Tab: Later(() => _showToolbox = !_showToolbox); break;
+            case KeyCode.I: Later(() => OpenRight("props")); break;
+            case KeyCode.F1: Later(() => _showHelp = !_showHelp); break;
+            case KeyCode.F10: Later(() => _clean = !_clean); break;
+            case KeyCode.G: _snap = !_snap; break;
+            case KeyCode.F: if (_sel != null) FocusOn(_sel); break;
+            case KeyCode.End: Later(DropToGround); break;
+            case KeyCode.Delete: Later(Delete); break;
+            case KeyCode.H: if (e.alt) ShowAll(); else foreach (var g in TopSelection()) ToggleEye(g); break;
+            case KeyCode.Escape:
+                if (_pop != "") _pop = "";
+                else if (_showHelp) _showHelp = false;
+                else if (_ghost != null) CancelPlace();
+                else if (_marquee) { _marquee = false; _pressed = false; }
+                else Later(() => Select(null, false));
+                break;
+            default: return;
+        }
+        e.Use();
+    }
+
+    // ------------------------------------------------------------------ острова: название, сохранение и «Играть»
+
+    GUIStyle _island, _pill, _dockOn, _palRow, _palRowOn, _keyChip, _tileText;
+
+    void Island(Rect r) { GUI.Box(Reg(r), GUIContent.none, _island); }
+
+    bool IconButton(Rect r, string icon, bool on, string tip, float size)
+    {
+        var hover = r.Contains(Event.current.mousePosition);
+        if (on) GUI.Box(r, GUIContent.none, _dockOn);
+        else if (hover) GUI.Box(r, GUIContent.none, _pill);
+        DrawIcon(new Rect(r.center.x - size / 2, r.center.y - size / 2, size, size), icon, on ? new Color(0.08f, 0.06f, 0.02f) : hover ? Color.white : Ink);
+        return GUI.Button(r, new GUIContent("", tip), GUIStyle.none);
+    }
+
+    void TopIslands(float w)
+    {
+        // 23.7: у каждой игры — своё имя в шапке (из профиля ModLaunch); без профиля — ModScript Studio.
+        var title = _gameName != "" ? _gameName : "ModScript Studio";
+        var tw = Mathf.Min(_title.CalcSize(new GUIContent(title)).x + 4, 300);
+        var sw = Mathf.Min(_muted.CalcSize(new GUIContent(_scene)).x + 4, 150);
+        var left = new Rect(14, 12, 46 + tw + 12 + sw + 14, 44);
+        Island(left);
+        GUI.Label(new Rect(left.x + 9, left.y + 8, 28, 28), "{ }", _mark);
+        GUI.Label(new Rect(left.x + 46, left.y, tw, 44), new GUIContent(title, "ModScript Studio"), _title);
+        GUI.Label(new Rect(left.x + 46 + tw + 12, left.y, sw, 44), _scene, _muted);
+
+        var right = new Rect(w - 14 - 300, 12, 300, 44);
+        Island(right);
+        Fill(new Rect(right.x + 14, right.center.y - 4, 8, 8), _dirty ? Amber : new Color(0.4f, 0.8f, 0.45f));
+        GUI.Label(new Rect(right.x + 28, right.y, 100, 44), _dirty ? T("unsaved", "Saving…") : T("saved", "Saved"), _small);
+        if (IconButton(new Rect(right.x + 120, right.y + 6, 32, 32), "camera", false, T("shot", "Screenshot"), 18))
+        {
+            var name = "shot-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".png";
+            Shot(name);
+            Status(T("shotSaved", "Screenshot saved") + ": " + name);
+        }
+        if (IconButton(new Rect(right.x + 154, right.y + 6, 32, 32), "save", false, T("save", "Save") + " (Ctrl+S)", 18)) Later(Save);
+        var play = new Rect(right.xMax - 108, right.y + 6, 100, 32);
+        if (GUI.Button(play, GUIContent.none, _primary)) Later(Close);
+        DrawIcon(new Rect(play.x + 12, play.y + 8, 16, 16), "play", new Color(0.08f, 0.06f, 0.02f));
+        GUI.Label(new Rect(play.x + 32, play.y, 66, play.height), T("play", "Play"), Text(new Color(0.08f, 0.06f, 0.02f), 13, FontStyle.Bold, TextAnchor.MiddleLeft));
+    }
+
+    void StatsIsland(float w)
+    {
+        var text = T("placed", "Placed by you") + " " + _placed.Count + "   ·   " + T("selected", "Selected") + " " + _selection.Count + "   ·   " + Mathf.RoundToInt(_fps) + " FPS";
+        var size = _small.CalcSize(new GUIContent(text));
+        var r = new Rect(w / 2 - size.x / 2 - 16, 18, size.x + 32, 32);
+        Island(r);
+        GUI.Label(new Rect(r.x + 16, r.y, size.x + 4, r.height), text, _small);
+    }
+
+    // ------------------------------------------------------------------ док инструментов внизу
+
+    void Dock(float w, float h)
+    {
+        const float b = 46, gap = 4, sep = 14;
+        // 23.7: док короче — только главное; кисть, симуляция, сцена и свойства — в «Ещё».
+        var items = new[] { "select", "move", "rotate", "scale", "|", "plus", "|", "undo", "redo", "|", "search", "more" };
+        var width = 16f;
+        foreach (var it in items) width += it == "|" ? sep : b + gap;
+        _dockRect = new Rect(w / 2 - width / 2, h - b - 42, width, b + 14);
+        Island(_dockRect);
+        var x = _dockRect.x + 10;
+        var y = _dockRect.y + 7;
+        foreach (var it in items)
+        {
+            if (it == "|") { Fill(new Rect(x + sep / 2 - 3, y + 10, 1, b - 20), LineC); x += sep; continue; }
+            var r = new Rect(x, y, b, b);
+            x += b + gap;
+            switch (it)
+            {
+                case "select":
+                case "move":
+                case "rotate":
+                case "scale":
+                    var keys = it == "select" ? "Q" : it == "move" ? "W" : it == "rotate" ? "E" : "R";
+                    if (IconButton(r, it, _mode == it, T(it, it) + " (" + keys + ")", 24)) _mode = it;
+                    break;
+                case "more": if (IconButton(r, "more", _dockMore || _mode == "paint" || _simulate || _rightOpen, T("dockMore", "More tools"), 22)) Later(() => _dockMore = !_dockMore); break;
+                case "plus": if (IconButton(r, "plus", _showToolbox, T("toolbox", "Add") + " (Tab)", 24)) Later(() => _showToolbox = !_showToolbox); break;
+                case "search": if (IconButton(r, "search", _palette, T("palette", "All commands") + " (Space)", 22)) Later(() => OpenPalette("")); break;
+                case "undo": GUI.enabled = _undo.Count > 0; if (IconButton(r, "undo", false, T("undo", "Undo") + " (Ctrl+Z)", 22)) Later(Undo); GUI.enabled = true; break;
+                case "redo": GUI.enabled = _redo.Count > 0; if (IconButton(r, "redo", false, T("redo", "Redo") + " (Ctrl+Y)", 22)) Later(Redo); GUI.enabled = true; break;
+                case "physics": if (IconButton(r, "physics", _simulate, T("simulate", "Simulate") + " (Alt+S)", 24)) Later(ToggleSimulate); break;
+                case "model": if (IconButton(r, "model", _rightOpen && _rightTab == "scene", T("explorer.title", "Scene"), 22)) Later(() => OpenRight("scene")); break;
+                case "gear": if (IconButton(r, "gear", _rightOpen && _rightTab == "props", T("properties", "Properties") + " (I)", 22)) Later(() => OpenRight("props")); break;
+            }
+        }
+        // Подсказка под доком: главное действие — поиск команд.
+        if (_selection.Count == 0 && _ghost == null)
+            GUI.Label(new Rect(_dockRect.x - 100, _dockRect.yMax + 2, _dockRect.width + 200, 18), T("dockHint", "Space — all commands · Tab — add · F1 — keys"), _cap);
+    }
+
+    void Toast(float w, float h)
+    {
+        var fresh = Time.realtimeSinceStartup - _statusAt < 4f;
+        var text = _ghost != null ? T("placing", "Click to place · Shift — several · Esc — cancel") : _simulate ? T("simulating", "Simulation · Alt+S — stop") : fresh ? _status : "";
+        if (string.IsNullOrEmpty(text)) return;
+        var size = _txt.CalcSize(new GUIContent(text));
+        var tw = Mathf.Min(size.x, w - 80);
+        var r = new Rect(w / 2 - tw / 2 - 18, _dockRect.y - 48, tw + 36, 36);
+        GUI.Box(r, GUIContent.none, _pill);
+        GUI.Label(new Rect(r.x + 18, r.y, r.width - 30, r.height), text, _txt);
+    }
+
+    // ------------------------------------------------------------------ панель действий над выбранным
+
+    string _pop = "";
+
+    void ContextBar(float w, float h)
+    {
+        _ctxRect = new Rect();
+        if (_sel == null || !_sel.activeInHierarchy || _drag >= 0 || _ghost != null || _marquee || _surface || _rmb) { _pop = ""; return; }
+        var tops = TopSelection();
+        var b = AllBounds(tops.Count > 0 ? tops : new List<GameObject> { _sel });
+        var top = _cam.WorldToScreenPoint(new Vector3(b.center.x, b.max.y, b.center.z));
+        if (top.z <= 0) return;
+        var items = new[] { "duplicate", "palette", "texture", "gear", "ground", "group", "trash", "search" };
+        const float s = 36;
+        var width = items.Length * (s + 2) + 12;
+        var gx = Mathf.Clamp((_vpPx.x + top.x) / _ui - width / 2, 14, w - width - 14);
+        var gy = Mathf.Clamp((Screen.height - _vpPx.y - top.y) / _ui - s - 40, 70, h - 180);
+        _ctxRect = new Rect(gx, gy, width, s + 12);
+        Island(_ctxRect);
+        var x = _ctxRect.x + 6;
+        foreach (var it in items)
+        {
+            var r = new Rect(x, _ctxRect.y + 6, s, s);
+            x += s + 2;
+            switch (it)
+            {
+                case "duplicate": if (IconButton(r, it, false, T("duplicate", "Duplicate") + " (Ctrl+D)", 20)) Later(Duplicate); break;
+                case "palette": if (IconButton(r, it, _pop == "color", T("tint", "Colour"), 20)) Later(() => _pop = _pop == "color" ? "" : "color"); break;
+                case "texture": if (IconButton(r, it, _pop == "look", T("section.look", "Material"), 20)) Later(() => _pop = _pop == "look" ? "" : "look"); break;
+                case "gear": if (IconButton(r, it, _pop == "behaviour", T("section.behaviour", "Behaviour"), 20)) Later(() => _pop = _pop == "behaviour" ? "" : "behaviour"); break;
+                case "ground": if (IconButton(r, it, false, T("ground", "Put on the ground") + " (End)", 20)) Later(DropToGround); break;
+                case "group": if (IconButton(r, it, false, T("group", "Group") + " (Ctrl+G)", 20)) Later(Group); break;
+                case "trash": if (IconButton(r, it, false, T("delete", "Delete") + " (Del)", 20)) Later(Delete); break;
+                case "search": if (IconButton(r, it, false, T("moreCmds", "More commands") + " (Space)", 20)) Later(() => OpenPalette("")); break;
+            }
+        }
+        if (_pop != "") Popover(w, h);
+    }
+
+    Vector2 _popScroll;
+
+    /// <summary>Всплывающий набор команд одной группы: цвета — кружками, остальное — списком в два столбца.</summary>
+    void Popover(float w, float h)
+    {
+        var acts = Acts().Where(a => a.Group == _pop).ToList();
+        var color = _pop == "color";
+        const int cols = 12;
+        var rows = color ? Mathf.CeilToInt(acts.Count / (float)cols) : Mathf.CeilToInt(acts.Count / 2f);
+        var width = color ? cols * 30 + 20 : 480;
+        var height = color ? rows * 30 + 20 : Mathf.Min(rows * 30 + 20, 330);
+        var x = Mathf.Clamp(_ctxRect.center.x - width / 2, 14, w - width - 14);
+        var y = _ctxRect.y - height - 8 < 70 ? _ctxRect.yMax + 8 : _ctxRect.y - height - 8;
+        _popRect = new Rect(x, y, width, height);
+        Island(_popRect);
+        if (color)
+        {
+            for (var i = 0; i < acts.Count; i++)
+            {
+                var r = new Rect(_popRect.x + 10 + (i % cols) * 30, _popRect.y + 10 + (i / cols) * 30, 26, 26);
+                var sw = SwatchOf(acts[i]);
+                if (sw.a > 0) GUI.DrawTexture(r, _knob, ScaleMode.StretchToFill, true, 0, sw, 0, 0);
+                else DrawIcon(r, "close", Muted);
+                var act = acts[i];
+                if (GUI.Button(r, new GUIContent("", act.Name), GUIStyle.none)) Later(() => RunAct(act));
+            }
+            return;
+        }
+        GUILayout.BeginArea(new Rect(_popRect.x + 8, _popRect.y + 8, _popRect.width - 16, _popRect.height - 16));
+        _popScroll = GUILayout.BeginScrollView(_popScroll, false, false, GUIStyle.none, GUI.skin.verticalScrollbar);
+        for (var i = 0; i < acts.Count; i += 2)
+        {
+            GUILayout.BeginHorizontal();
+            for (var j = i; j < Math.Min(i + 2, acts.Count); j++)
+            {
+                var act = acts[j];
+                if (GUILayout.Button(act.Name, _palRow, GUILayout.Width(_popRect.width / 2 - 14), GUILayout.Height(28))) Later(() => RunAct(act));
+            }
+            GUILayout.EndHorizontal();
+        }
+        GUILayout.EndScrollView();
+        GUILayout.EndArea();
+    }
+
+    Color SwatchOf(Act a)
+    {
+        if (!a.Id.StartsWith("color.")) return Color.clear;
+        var key = a.Id.Substring(6);
+        for (var i = 0; i < Neutrals.Length; i++) if (key == Neutrals[i]) return NeutralC[i];
+        for (var i = 0; i < Hues.Length; i++)
+            if (key.StartsWith(Hues[i]) && key.Length == Hues[i].Length + 1) return HueColor(i, (int)char.GetNumericValue(key[key.Length - 1]));
+        return Color.clear;
+    }
+
+    // ------------------------------------------------------------------ палитра команд (Space или Ctrl+K)
+
+    string _pq = "", _pGroup = "";
+    int _pIndex;
+    bool _pFocus;
+    Vector2 _pScroll;
+    List<Act> _pList = new List<Act>();
+
+    void OpenPalette(string query)
+    {
+        _palette = true;
+        _pq = query;
+        _pGroup = "";
+        _pIndex = 0;
+        _pFocus = true;
+        _pop = "";
+    }
+
+    List<Act> PaletteResults()
+    {
+        var all = Acts();
+        var q = _pq.Trim().ToLowerInvariant();
+        if (q == "")
+        {
+            if (_pGroup != "") return all.Where(a => a.Group == _pGroup).ToList();
+            var list = _recent.Select(FindAct).Where(a => a != null).ToList();
+            list.AddRange(all.Where(a => a.Group != "add" && !list.Contains(a)).Take(60));
+            return list;
+        }
+        var words = q.Split(new[] { " " }, StringSplitOptions.RemoveEmptyEntries);
+        return all.Where(a => (_pGroup == "" || a.Group == _pGroup) && words.All(wd => a.Search.Contains(wd)))
+            .OrderBy(a => a.Name.ToLowerInvariant().StartsWith(words[0]) ? 0 : 1).ThenBy(a => a.Name.Length).Take(120).ToList();
+    }
+
+    void PaletteKeys(Event e)
+    {
+        switch (e.keyCode)
+        {
+            case KeyCode.Escape: Later(() => _palette = false); e.Use(); break;
+            case KeyCode.DownArrow: _pIndex = Math.Min(_pIndex + 1, Math.Max(0, _pList.Count - 1)); EnsureVisible(); e.Use(); break;
+            case KeyCode.UpArrow: _pIndex = Math.Max(_pIndex - 1, 0); EnsureVisible(); e.Use(); break;
+            case KeyCode.Return:
+            case KeyCode.KeypadEnter:
+                if (_pIndex < _pList.Count) { var a = _pList[_pIndex]; var keep = e.shift; Later(() => { if (!keep) _palette = false; RunAct(a); }); }
+                e.Use();
+                break;
+        }
+    }
+
+    void EnsureVisible()
+    {
+        var y = _pIndex * 34f;
+        if (y < _pScroll.y) _pScroll.y = y;
+        if (y > _pScroll.y + _palRect.height - 190) _pScroll.y = y - (_palRect.height - 190);
+    }
+
+    void Palette(float w, float h)
+    {
+        Fill(new Rect(0, 0, w, h), new Color(0, 0, 0, 0.35f));
+        var pw = Mathf.Min(760, w - 60);
+        _palRect = new Rect(w / 2 - pw / 2, Mathf.Max(60, h * 0.12f), pw, Mathf.Min(560, h * 0.74f));
+        Island(_palRect);
+        var field = new Rect(_palRect.x + 16, _palRect.y + 16, _palRect.width - 32, 44);
+        var style = new GUIStyle(_field) { fontSize = 17, padding = new RectOffset(44, 12, 10, 10) };
+        GUI.SetNextControlName("modscript-palette");
+        var q = GUI.TextField(field, _pq, style);
+        if (_pFocus) { GUI.FocusControl("modscript-palette"); _pFocus = false; }
+        DrawIcon(new Rect(field.x + 13, field.y + 12, 20, 20), "search", Amber);
+        if (q == "" && Event.current.type == EventType.Repaint) GUI.Label(new Rect(field.x + 44, field.y, field.width - 50, field.height), T("palHint", "What to do? For example: stairs, red, spin, sunset…"), Text(Faint, 15, FontStyle.Normal, TextAnchor.MiddleLeft));
+        if (q != _pq) { var v = q; Later(() => { _pq = v; _pIndex = 0; _pScroll = Vector2.zero; }); }
+        // Группы — фишками: щелчок показывает все команды группы.
+        var gx = _palRect.x + 16;
+        var gy = field.yMax + 10;
+        foreach (var g in ActGroups)
+        {
+            var label = GroupName(g);
+            var cw = _chip.CalcSize(new GUIContent(label)).x + 6;
+            if (gx + cw > _palRect.xMax - 16) { gx = _palRect.x + 16; gy += 30; }
+            var r = new Rect(gx, gy, cw, 26);
+            gx += cw + 4;
+            if (GUI.Button(r, label, _pGroup == g ? _chipOn : _chip)) { var gg = g; Later(() => { _pGroup = _pGroup == gg ? "" : gg; _pIndex = 0; _pScroll = Vector2.zero; }); }
+        }
+        var listTop = gy + 36;
+        _pList = PaletteResults();
+        var header = _pq == "" && _pGroup == "" ? T("palRecent", "Recent and useful") : Fmt(T("palFound", "Found: {0}"), _pList.Count);
+        GUI.Label(new Rect(_palRect.x + 18, listTop - 4, 300, 20), header, _small);
+        GUILayout.BeginArea(new Rect(_palRect.x + 8, listTop + 16, _palRect.width - 16, _palRect.yMax - listTop - 24));
+        _pScroll = GUILayout.BeginScrollView(_pScroll, false, false, GUIStyle.none, GUI.skin.verticalScrollbar);
+        for (var i = 0; i < _pList.Count; i++)
+        {
+            var a = _pList[i];
+            var r = GUILayoutUtility.GetRect(10, 34, GUILayout.ExpandWidth(true), GUILayout.Height(34));
+            var on = i == _pIndex;
+            var hover = r.Contains(Event.current.mousePosition);
+            if (Event.current.type == EventType.Repaint)
+            {
+                if (on) GUI.Box(r, GUIContent.none, _palRowOn);
+                else if (hover) Fill(r, new Color(1, 1, 1, 0.04f));
+                var sw = SwatchOf(a);
+                if (sw.a > 0) GUI.DrawTexture(new Rect(r.x + 12, r.y + 8, 18, 18), _knob, ScaleMode.StretchToFill, true, 0, sw, 0, 0);
+                else DrawIcon(new Rect(r.x + 12, r.y + 8, 18, 18), a.Icon, on ? Amber : Muted);
+                GUI.Label(new Rect(r.x + 42, r.y, r.width - 220, r.height), a.Name, on ? _bold : _txt);
+                GUI.Label(new Rect(r.xMax - 176, r.y, 110, r.height), GroupName(a.Group), Text(Faint, 12, FontStyle.Normal, TextAnchor.MiddleRight));
+                if (a.Keys != "") { var kw = _keyChip.CalcSize(new GUIContent(a.Keys)).x + 8; GUI.Label(new Rect(r.xMax - kw - 10, r.y + 8, kw, 18), a.Keys, _keyChip); }
+            }
+            if (Event.current.type == EventType.MouseDown && Event.current.button == 0 && hover)
+            {
+                var act = a;
+                var keep = Event.current.shift;
+                Later(() => { if (!keep) _palette = false; RunAct(act); });
+                Event.current.Use();
+            }
+        }
+        if (_pList.Count == 0) GUILayout.Label(T("nothing", "Nothing found"), _muted);
+        GUILayout.EndScrollView();
+        GUILayout.EndArea();
+    }
+
+    // ------------------------------------------------------------------ подсказка по клавишам (F1)
+
+    void HelpCard(float w, float h)
+    {
+        var r = Reg(new Rect(w / 2 - 320, h / 2 - 240, 640, 480));
+        GUI.Box(r, GUIContent.none, _island);
+        GUI.Label(new Rect(r.x + 24, r.y + 16, 400, 30), T("c.help", "Keyboard shortcuts"), _title);
+        if (IconButton(new Rect(r.xMax - 44, r.y + 14, 30, 30), "close", false, "Esc", 16)) Later(() => _showHelp = false);
+        var lines = T("helpText", "Space / Ctrl+K — all commands\nTab — add objects\nQ W E R — select, move, rotate, scale\nRight mouse + WASD, Q/E — fly\nAlt + left mouse — orbit · wheel — zoom\nF — look at the selected · End — put on the ground\nCtrl+D — duplicate · Ctrl+G — group · Del — delete\nCtrl+Z / Ctrl+Y — undo / redo\nG — snapping · H — hide · Alt+H — show all\nShift+1…9 — camera spots · Ctrl+Shift+1…9 — remember\nAlt+S — simulation · F10 — clean view · F8 — play").Split('\n');
+        for (var i = 0; i < lines.Length; i++)
+        {
+            // Переводы ставят перед тире неразрывный пробел — приводим к обычному, чтобы разделить клавиши и действие.
+            var parts = lines[i].Replace(' ', ' ').Split(new[] { " — " }, 2, StringSplitOptions.None);
+            GUI.Label(new Rect(r.x + 24, r.y + 60 + i * 36, 260, 30), parts[0], Text(Amber, 13, FontStyle.Bold, TextAnchor.MiddleLeft));
+            if (parts.Length > 1) GUI.Label(new Rect(r.x + 290, r.y + 60 + i * 36, 330, 30), parts[1], _txt);
+        }
+    }
+
+    // ------------------------------------------------------------------ выдвижные панели: «Добавить» и «Свойства / Сцена»
+
+    string _addCat = "build";
+    Vector2 _addScroll;
+    static readonly string[] AddCats = { "build", "shapes", "nature", "terrain", "furniture", "vehicles", "lights", "effects", "text", "game", "fromGame", "models", "materials" };
+
+    void AddDrawer()
+    {
+        Island(_leftRect);
+        GUI.Label(new Rect(_leftRect.x + 16, _leftRect.y + 8, 200, 30), T("toolbox", "Add"), _title);
+        if (IconButton(new Rect(_leftRect.xMax - 40, _leftRect.y + 8, 28, 28), "close", false, "Tab", 14)) Later(() => _showToolbox = false);
+        if (_addCat == "fromGame" && IconButton(new Rect(_leftRect.xMax - 72, _leftRect.y + 8, 28, 28), "refresh", false, T("refresh", "Refresh list"), 14)) Later(BuildLibrary);
+        GUILayout.BeginArea(new Rect(_leftRect.x + 8, _leftRect.y + 42, _leftRect.width - 16, _leftRect.height - 50));
+        var s = SearchField(_search);
+        if (s != _search) { var v = s; Later(() => _search = v); }
+        QuickRow(_leftRect.width - 24);
+        // Разделы — фишками: нужные этой игре и «Ещё» (все остальные).
+        var x = 0f;
+        GUILayout.BeginHorizontal();
+        var cats = VisibleCats().ToList();
+        cats.Add(_allCats ? "-less" : "-more");
+        foreach (var c in cats)
+        {
+            var label = c == "-more" ? T("cats.more", "More…") : c == "-less" ? T("cats.less", "Fewer") : T("cat." + c, c);
+            var cw = _chip.CalcSize(new GUIContent(label)).x + 8;
+            if (x + cw > _leftRect.width - 24) { GUILayout.EndHorizontal(); GUILayout.BeginHorizontal(); x = 0; }
+            x += cw + 4;
+            if (GUILayout.Button(label, _addCat == c ? _chipOn : _chip, GUILayout.Width(cw), GUILayout.Height(26))) { var cc = c; Later(() => { if (cc[0] == '-') _allCats = cc == "-more"; else { _addCat = cc; _addScroll = Vector2.zero; } }); }
+        }
+        GUILayout.EndHorizontal();
+        GUILayout.Space(6);
+        _addScroll = GUILayout.BeginScrollView(_addScroll, false, false, GUIStyle.none, GUI.skin.verticalScrollbar);
+        if (_addCat == "fromGame") Objects();
+        else if (_addCat == "models") Models();
+        else if (_addCat == "materials") Materials();
+        else KitTiles(_search != "" ? "*" : _addCat);
+        GUILayout.EndScrollView();
+        GUILayout.EndArea();
+    }
+
+    /// <summary>Плитки готовых деталей раздела: значок и имя; щелчок — деталь едет за курсором.</summary>
+    void KitTiles(string cat)
+    {
+        var items = Kits().Where(k => (k.Group == cat || cat == "*") && (_search == "" || k.Name.IndexOf(_search, StringComparison.OrdinalIgnoreCase) >= 0)).ToList();
+        if (cat == "lights") GUILayout.Label(T("lightsTip", "Lights glow in the dark and light up everything around."), _muted);
+        var tile = (_leftRect.width - 34) / 3f;
+        for (var i = 0; i < items.Count; i += 3)
+        {
+            GUILayout.BeginHorizontal();
+            for (var j = i; j < Math.Min(i + 3, items.Count); j++)
+            {
+                var it = items[j];
+                var placing = _ghost != null && _ghostSource == "kit:" + it.Id;
+                var r = GUILayoutUtility.GetRect(tile, tile * 1.12f, GUILayout.Width(tile), GUILayout.Height(tile * 1.12f));
+                var inner = new Rect(r.x + 2, r.y + 2, r.width - 4, r.height - 4);
+                var hover = inner.Contains(Event.current.mousePosition);
+                if (Event.current.type == EventType.Repaint)
+                {
+                    GUI.Box(inner, GUIContent.none, placing ? _chipOn : _tile);
+                    if (hover && !placing) Fill(inner, new Color(1, 1, 1, 0.04f));
+                    // Настоящее превью детали (снимается своей камерой), пока его нет — значок.
+                    var pv = Preview(it.Id);
+                    var pic = new Rect(inner.x + 5, inner.y + 5, inner.width - 10, inner.height - 40);
+                    if (pv != null) GUI.DrawTexture(pic, pv, ScaleMode.ScaleAndCrop, false);
+                    else DrawIcon(new Rect(pic.center.x - 14, pic.center.y - 14, 28, 28), it.Icon, placing ? Amber : Muted);
+                    GUI.Label(new Rect(inner.x + 4, inner.yMax - 34, inner.width - 8, 32), it.Name, _tileText);
+                }
+                if (GUI.Button(inner, new GUIContent("", it.Name), GUIStyle.none)) { var src = "kit:" + it.Id; var n = it.Name; Later(() => BeginPlace(src, n)); }
+            }
+            GUILayout.EndHorizontal();
+        }
+        if (items.Count == 0) GUILayout.Label(T("nothing", "Nothing found"), _muted);
+        GUILayout.Space(6);
+        GUILayout.Label(T("shapesTip", "Shift+click in the scene places several in a row."), _small);
+    }
+
+    void RightDrawer()
+    {
+        Island(_rightRect);
+        var tabs = new[] { "props", "scene" };
+        var tx = _rightRect.x + 12;
+        foreach (var t in tabs)
+        {
+            var label = t == "props" ? T("properties", "Properties") : T("explorer.title", "Scene");
+            var tw = _tabOn.CalcSize(new GUIContent(label)).x + 20;
+            var r = new Rect(tx, _rightRect.y + 8, tw, 32);
+            tx += tw + 4;
+            var on = _rightTab == t;
+            if (GUI.Button(r, label, on ? _tabOn : _tab)) { var tt = t; Later(() => _rightTab = tt); }
+            if (on) Fill(new Rect(r.x + 8, r.yMax - 2, r.width - 16, 2), Amber);
+        }
+        if (IconButton(new Rect(_rightRect.xMax - 40, _rightRect.y + 8, 28, 28), "close", false, "I", 14)) Later(() => _rightOpen = false);
+        if (_rightTab == "scene") ExplorerPanel(); else PropertiesPanel();
+    }
+
+    // ------------------------------------------------------------------ панели: заголовок, поиск, переключатель, строка дерева
+
+    void PanelHeader(Rect r, string icon, string title, string sub)
+    {
+        Island(r);
+        Fill(new Rect(r.x + 12, r.y + 30, r.width - 24, 1), LineC);
+        DrawIcon(new Rect(r.x + 10, r.y + 7, 16, 16), icon, Amber);
+        GUI.Label(new Rect(r.x + 32, r.y, r.width - 40, 30), title, _hdr);
+        if (!string.IsNullOrEmpty(sub))
+        {
+            var tw = _hdr.CalcSize(new GUIContent(title)).x;
+            GUI.Label(new Rect(r.x + 38 + tw, r.y, r.width - 50 - tw, 30), sub, _small);
+        }
+    }
+
+    string SearchField(string value)
+    {
+        var r = GUILayoutUtility.GetRect(10, 28, GUILayout.ExpandWidth(true), GUILayout.Height(28));
+        var inner = new Rect(r.x + 6, r.y + 2, r.width - 12, 26);
+        var style = new GUIStyle(_field) { padding = new RectOffset(28, 8, 4, 4) };
+        var v = GUI.TextField(inner, value, style);
+        DrawIcon(new Rect(inner.x + 7, inner.y + 5, 16, 16), "search", Faint);
+        if (v == "" && Event.current.type == EventType.Repaint) GUI.Label(new Rect(inner.x + 28, inner.y, inner.width - 30, inner.height), T("search", "Search"), _small);
+        return v;
+    }
+
+    bool MiniSwitch(bool value)
+    {
+        var r = GUILayoutUtility.GetRect(36, 22, GUILayout.Width(36), GUILayout.Height(22));
+        var track = new Rect(r.x, r.y + 2, 34, 18);
+        if (GUI.Button(track, GUIContent.none, GUIStyle.none)) value = !value;
+        GUI.Box(track, GUIContent.none, value ? _swOn : _swOff);
+        GUI.DrawTexture(new Rect(value ? track.xMax - 16 : track.x + 2, track.y + 2, 14, 14), _knob);
+        return value;
+    }
+
+    bool Switch(bool value, string text)
+    {
+        GUILayout.BeginHorizontal();
+        var nv = MiniSwitch(value);
+        if (GUILayout.Button(text, _txt, GUILayout.Height(22))) nv = !value;
+        GUILayout.EndHorizontal();
+        return nv;
+    }
+
+    /// <summary>Строка дерева: 0 — ничего, 1 — щелчок, 2 — стрелка раскрытия, 3 — глаз, 4 — двойной щелчок.</summary>
+    int TreeRow(int depth, string icon, string label, bool on, bool kids, bool open, GameObject eyeOf, Color iconColor)
+    {
+        var r = GUILayoutUtility.GetRect(10, 24, GUILayout.ExpandWidth(true), GUILayout.Height(24));
+        var e = Event.current;
+        var hover = r.Contains(e.mousePosition);
+        var x = r.x + 6 + depth * 14;
+        var chev = new Rect(x, r.y + 4, 16, 16);
+        var eye = new Rect(r.xMax - 26, r.y + 3, 18, 18);
+        var hidden = eyeOf != null && _eyeHidden.ContainsKey(eyeOf);
+        if (e.type == EventType.Repaint)
+        {
+            if (on) { Fill(r, AmberSoft); Fill(new Rect(r.x, r.y, 2, r.height), Amber); }
+            else if (hover) Fill(r, new Color(1, 1, 1, 0.045f));
+            if (kids) DrawIcon(chev, open ? "chevD" : "chevR", Muted);
+            DrawIcon(new Rect(x + 18, r.y + 4, 16, 16), icon, hidden ? Faint : iconColor);
+            GUI.Label(new Rect(x + 40, r.y, r.xMax - x - 70, r.height), label, on ? _bold : (hidden ? _small : _txt));
+            if (eyeOf != null && (hover || hidden)) DrawIcon(eye, hidden ? "eyeOff" : "eye", hidden ? Muted : Faint);
+        }
+        if (e.type == EventType.MouseDown && e.button == 0 && hover)
+        {
+            e.Use();
+            if (kids && chev.Contains(e.mousePosition)) return 2;
+            if (eyeOf != null && eye.Contains(e.mousePosition)) return 3;
+            return e.clickCount > 1 ? 4 : 1;
+        }
+        return 0;
+    }
+
+    // ------------------------------------------------------------------ библиотека (слева)
+
+    string _search = "";
+    string _group = "";
+    Vector2 _toolScroll;
+
+    static string GroupIcon(string g)
+    {
+        switch (g)
+        {
+            case "vehicles": return "car";
+            case "nature": return "tree";
+            case "buildings": return "house";
+            case "lights": return "bulb";
+            case "scene": return "layers";
+            default: return "model";
+        }
+    }
+
+    void Objects()
+    {
+        if (_library == null) BuildLibrary();
+        var groups = new[] { "", "vehicles", "buildings", "nature", "lights", "props", "scene" };
+        for (var row = 0; row < 3; row++)
+        {
+            GUILayout.BeginHorizontal();
+            for (var i = row * 3; i < Math.Min(groups.Length, row * 3 + 3); i++)
+            {
+                var g = groups[i];
+                var n = g == "" ? _library.Count : _library.Count(x => x.Group == g);
+                if (GUILayout.Button(T("group." + (g == "" ? "all" : g), g == "" ? "All" : g) + " " + n, _group == g ? _chipOn : _chip, GUILayout.Height(24))) { var v = g; Later(() => _group = v); }
+            }
+            GUILayout.EndHorizontal();
+        }
+        GUILayout.Label(T("dragHint", "Click an object, then click in the scene"), _muted);
+        var shown = 0;
+        foreach (var it in _library)
+        {
+            if (_group != "" && it.Group != _group) continue;
+            if (_search != "" && it.Name.IndexOf(_search, StringComparison.OrdinalIgnoreCase) < 0) continue;
+            if (++shown > 250) { GUILayout.Label(T("more", "Type to narrow the list"), _small); break; }
+            var placing = _ghost != null && _ghostSource == it.Source;
+            if (GUILayout.Button(it.Name, placing ? _chipOn : _row, GUILayout.Height(28))) { var e = it; Later(() => BeginPlace(e.Source, e.Name)); }
+            var r = GUILayoutUtility.GetLastRect();
+            DrawIcon(new Rect(r.x + 8, r.y + 6, 16, 16), GroupIcon(it.Group), placing ? Amber : Muted);
+        }
+        if (shown == 0) GUILayout.Label(T("nothing", "Nothing found"), _small);
+    }
+
+    void Models()
+    {
+        GUILayout.Label(T("section.models", "My 3D models (OBJ)"), _hdr);
+        var dir = Path.Combine(_root, "models");
+        string[] files = new string[0];
+        try { files = Directory.GetFiles(dir, "*.obj"); } catch { }
+        foreach (var f in files)
+        {
+            var name = Path.GetFileNameWithoutExtension(f);
+            if (_search != "" && name.IndexOf(_search, StringComparison.OrdinalIgnoreCase) < 0) continue;
+            if (GUILayout.Button(name, _row, GUILayout.Height(28))) { var src = "obj:" + Path.GetFileName(f); Later(() => BeginPlace(src, name)); }
+            var r = GUILayoutUtility.GetLastRect();
+            DrawIcon(new Rect(r.x + 8, r.y + 6, 16, 16), "model", Muted);
+        }
+        if (files.Length == 0) GUILayout.Label(T("models.none", "Put .obj files (and a .png with the same name for the texture) into the models folder."), _muted);
+        GUILayout.Space(6);
+        if (GUILayout.Button(T("openModels", "Open the models folder…"), _btn, GUILayout.Height(28))) Application.OpenURL("file:///" + dir.Replace('\\', '/'));
+    }
+
+    void Materials()
+    {
+        if (_materials == null)
+            _materials = Resources.FindObjectsOfTypeAll<Material>().Where(m => m != null && m.shader != null && !m.name.StartsWith("Hidden") && m.hideFlags == HideFlags.None && m.name != "")
+                .GroupBy(m => m.name).Select(g => g.First()).OrderBy(m => m.name).Take(2000).ToList();
+        GUILayout.Label(_selection.Count == 0 ? T("pickFirst", "Select an object, then click a material.") : T("applyTo", "Click to apply to the selected object"), _muted);
+        GUILayout.Label(T("myTextures", "My textures"), _hdr);
+        var dir = Path.Combine(_root, "textures");
+        string[] files = new string[0];
+        try { files = Directory.GetFiles(dir).Where(f => f.EndsWith(".png", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase)).ToArray(); } catch { }
+        foreach (var f in files)
+        {
+            if (GUILayout.Button(Path.GetFileName(f), _row, GUILayout.Height(28))) { var m = "tex:" + Path.GetFileName(f); Later(() => SetMaterial(m)); }
+            var r = GUILayoutUtility.GetLastRect();
+            DrawIcon(new Rect(r.x + 8, r.y + 6, 16, 16), "texture", Muted);
+        }
+        if (GUILayout.Button(T("openTextures", "Open the textures folder…"), _btn, GUILayout.Height(26))) Application.OpenURL("file:///" + dir.Replace('\\', '/'));
+        GUILayout.Space(6);
+        GUILayout.Label(T("gameMaterials", "Game materials"), _hdr);
+        var shown = 0;
+        foreach (var m in _materials)
+        {
+            if (_search != "" && m.name.IndexOf(_search, StringComparison.OrdinalIgnoreCase) < 0) continue;
+            if (++shown > 250) { GUILayout.Label(T("more", "Type to narrow the list"), _small); break; }
+            if (GUILayout.Button(m.name, _row, GUILayout.Height(28))) { var name = m.name; Later(() => SetMaterial(name)); }
+            var r = GUILayoutUtility.GetLastRect();
+            var sw = new Rect(r.x + 6, r.y + 5, 18, 18);
+            Texture2D tex = null;
+            try { tex = m.mainTexture as Texture2D; } catch { }
+            if (tex != null) GUI.DrawTexture(sw, tex, ScaleMode.ScaleAndCrop);
+            else
+            {
+                var c = Color.gray;
+                try { if (m.HasProperty("_BaseColor")) c = m.GetColor("_BaseColor"); else if (m.HasProperty("_Color")) c = m.color; } catch { }
+                Fill(sw, new Color(c.r, c.g, c.b, 1));
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------ «Проводник» (справа сверху)
+
+    string _expSearch = "";
+    Vector2 _expScroll;
+    readonly HashSet<int> _expanded = new HashSet<int>();
+    bool _openYours = true, _openLevel = true;
+
+    void ExplorerPanel()
+    {
+
+        GUILayout.BeginArea(_explorerRect);
+        var s = SearchField(_expSearch);
+        if (s != _expSearch) { var v = s; Later(() => _expSearch = v); }
+        GUILayout.Space(2);
+        _expScroll = GUILayout.BeginScrollView(_expScroll, false, false, GUIStyle.none, GUI.skin.verticalScrollbar);
+        if (TreeRow(0, "sun", T("lighting", "Lighting"), _lighting, false, false, null, Amber) > 0) Later(() => { _selection.Clear(); _lighting = true; });
+        var tops = _placed.Where(p => p.Go != null && TopPlaced(p.Go) == p).ToList();
+        var a = TreeRow(0, "cube", T("placed", "Placed by you") + "  " + tops.Count, false, true, _openYours, null, Amber);
+        if (a > 0) Later(() => _openYours = !_openYours);
+        if (_openYours) foreach (var p in tops) PlacedNode(p.Go.transform, 1);
+        var shown = 0;
+        var lv = TreeRow(0, "layers", T("level", "Level") + "  ·  " + _scene, false, true, _openLevel, null, Amber);
+        if (lv > 0) Later(() => _openLevel = !_openLevel);
+        if (_openLevel)
+            foreach (var root in SceneManager.GetActiveScene().GetRootGameObjects())
+            {
+                if (PlacedExact(root) != null || root.name.StartsWith("ModScript Studio") || root == _ghost) continue;
+                LevelNode(root.transform, 1, ref shown);
+                if (shown > 400) { GUILayout.Label(T("more", "Type to narrow the list"), _small); break; }
+            }
+        GUILayout.EndScrollView();
+        GUILayout.EndArea();
+    }
+
+    void PlacedNode(Transform t, int depth)
+    {
+        var go = t.gameObject;
+        var p = PlacedExact(go);
+        if (p == null || !go.activeSelf) return;
+        var kids = new List<Transform>();
+        foreach (Transform c in t) if (PlacedExact(c.gameObject) != null && c.gameObject.activeSelf) kids.Add(c);
+        if (_expSearch != "" && go.name.IndexOf(_expSearch, StringComparison.OrdinalIgnoreCase) < 0 && kids.Count == 0) return;
+        var id = go.GetInstanceID();
+        var open = _expanded.Contains(id) || _expSearch != "";
+        var beh = go.GetComponent<ModScriptBehaviour>();
+        var label = go.name + (beh != null && beh.Code() != "" ? "  ⚙" : "");
+        var res = TreeRow(depth, IconOfSource(p.Source), label, _selection.Contains(go), kids.Count > 0, open, go, Ink);
+        Explore(res, go, id);
+        if (open) foreach (var c in kids) PlacedNode(c, depth + 1);
+    }
+
+    static string IconOfSource(string source)
+    {
+        if (source.StartsWith("prim:Light")) return "bulb";
+        if (source.StartsWith("prim:Spot")) return "spot";
+        if (source.StartsWith("prim:Empty")) return "group";
+        if (source.StartsWith("prim:Sphere")) return "sphere";
+        if (source.StartsWith("prim:Cylinder")) return "cylinder";
+        if (source.StartsWith("prim:Capsule")) return "capsule";
+        if (source.StartsWith("prim:Plane") || source.StartsWith("prim:Quad")) return "plane";
+        if (source.StartsWith("prim:")) return "cube";
+        if (source.StartsWith("obj:")) return "model";
+        return "model";
+    }
+
+    void Explore(int res, GameObject go, int id)
+    {
+        if (res == 1) { var add = Event.current.shift || Event.current.control; Later(() => Select(go, add)); }
+        else if (res == 4) Later(() => { Select(go, false); FocusOn(go); });
+        else if (res == 2) Later(() => { if (!_expanded.Remove(id)) _expanded.Add(id); });
+        else if (res == 3) Later(() => ToggleEye(go));
+    }
+
+    void LevelNode(Transform t, int depth, ref int shown)
+    {
+        if (_expSearch != "" && !Matches(t, 4)) return;
+        shown++;
+        var id = t.GetInstanceID();
+        var open = _expanded.Contains(id) || (_expSearch != "" && depth < 5);
+        var go = t.gameObject;
+        var icon = go.GetComponent<Light>() != null ? "bulb" : go.GetComponent<Renderer>() != null ? "cube" : t.childCount > 0 ? "folder" : "empty";
+        var res = TreeRow(depth, icon, (go.activeSelf ? "" : "× ") + t.name, _selection.Contains(go), t.childCount > 0, open, go, go.activeSelf ? Muted : Faint);
+        Explore(res, go, id);
+        if (!open) return;
+        for (var i = 0; i < t.childCount && shown < 400; i++) LevelNode(t.GetChild(i), depth + 1, ref shown);
+    }
+
+    bool Matches(Transform t, int depth)
+    {
+        if (t.name.IndexOf(_expSearch, StringComparison.OrdinalIgnoreCase) >= 0) return true;
+        if (depth <= 0) return false;
+        for (var i = 0; i < t.childCount; i++) if (Matches(t.GetChild(i), depth - 1)) return true;
+        return false;
+    }
+
+    // ------------------------------------------------------------------ «Свойства» (справа снизу)
+
+    Vector2 _propScroll;
+    readonly HashSet<string> _openComp = new HashSet<string>();
+    readonly HashSet<string> _closedSections = new HashSet<string>();
+    readonly Dictionary<string, string> _edit = new Dictionary<string, string>();
+    string[] _fields;
+    GameObject _fieldsFor;
+    List<Snap> _fieldBefore;
+    int _scrub = -1;
+    float _scrubStart;
+    Vector2 _scrubMouse;
+    List<Snap> _scrubBefore;
+    int _arrayCount = 5, _arrayAxis;
+
+    void PropertiesPanel()
+    {
+        var sub = _lighting ? T("lighting", "Lighting") : _selection.Count > 1 ? T("selected", "Selected") + ": " + _selection.Count : _sel != null ? _sel.name : "";
+        if (sub != "") GUI.Label(new Rect(_propsRect.x + 12, _propsRect.y - 4, _propsRect.width - 24, 20), sub, _small);
+        GUILayout.BeginArea(new Rect(_propsRect.x, _propsRect.y + 16, _propsRect.width, _propsRect.height - 16));
+        _propScroll = GUILayout.BeginScrollView(_propScroll, false, false, GUIStyle.none, GUI.skin.verticalScrollbar);
+        GUILayout.BeginVertical(new GUIStyle { padding = new RectOffset(8, 10, 2, 10) });
+        if (_lighting) LightingProps();
+        else if (_sel == null) GUILayout.Label(T("propsEmpty", "Select an object in the scene or in the Explorer — its properties appear here."), _muted);
+        else ObjectProps();
+        GUILayout.EndVertical();
+        GUILayout.EndScrollView();
+        GUILayout.EndArea();
+        // Конец пропуска полей: правка по буквам закончилась, когда отпустили фокус.
+        if (_fieldBefore != null && GUIUtility.keyboardControl == 0 && _sel != null)
+        {
+            PushSnap(T("section.transform", "Transform"), _fieldBefore, SnapOf(new[] { _sel }));
+            _fieldBefore = null;
+        }
+    }
+
+    bool Section(string key, string icon, string title)
+    {
+        var r = GUILayoutUtility.GetRect(10, 28, GUILayout.ExpandWidth(true), GUILayout.Height(28));
+        var open = !_closedSections.Contains(key);
+        var e = Event.current;
+        if (e.type == EventType.Repaint)
+        {
+            Fill(new Rect(r.x - 8, r.y + 3, r.width + 18, 1), LineC);
+            DrawIcon(new Rect(r.x, r.y + 7, 14, 14), open ? "chevD" : "chevR", Faint);
+            DrawIcon(new Rect(r.x + 18, r.y + 7, 14, 14), icon, Muted);
+            GUI.Label(new Rect(r.x + 38, r.y + 2, r.width - 40, 26), title, _hdr);
+        }
+        if (e.type == EventType.MouseDown && e.button == 0 && r.Contains(e.mousePosition))
+        {
+            e.Use();
+            Later(() => { if (!_closedSections.Remove(key)) _closedSections.Add(key); });
+        }
+        return open;
+    }
+
+    float Slider(string label, float value, float min, float max)
+    {
+        GUILayout.BeginHorizontal();
+        GUILayout.Label(label, _propLabel, GUILayout.Width(110), GUILayout.Height(22));
+        var v = GUILayout.HorizontalSlider(value, min, max, GUILayout.Height(22));
+        GUILayout.Label(v.ToString("0.##", Inv), _propLabel, GUILayout.Width(40), GUILayout.Height(22));
+        GUILayout.EndHorizontal();
+        return v;
+    }
+
+    void LightingProps()
+    {
+        GUILayout.Label(T("world.text", "Light and air of this level. Saved with the map."), _muted);
+        var sun = Sun();
+        if (Section("sun", "sun", T("world.sun", "Sun")))
+        {
+            if (sun == null) GUILayout.Label(T("world.noSun", "This level has no sun."), _muted);
+            else
+            {
+                var i = Slider(T("world.brightness", "Brightness"), sun.intensity, 0, 5);
+                if (!Mathf.Approximately(i, sun.intensity)) { sun.intensity = i; _world.SunIntensity = i; Dirty(); }
+                var eu = sun.transform.eulerAngles;
+                var pitch = eu.x > 180 ? eu.x - 360 : eu.x;
+                var np = Slider(T("world.height", "Height"), pitch, -10, 90);
+                var ny = Slider(T("world.direction", "Direction"), eu.y, 0, 360);
+                if (!Mathf.Approximately(np, pitch) || !Mathf.Approximately(ny, eu.y))
+                {
+                    sun.transform.rotation = Quaternion.Euler(np, ny, 0);
+                    _world.SunPitch = np; _world.SunYaw = ny; Dirty();
+                }
+                GUILayout.BeginHorizontal();
+                foreach (var preset in new[] { "dawn", "noon", "sunset", "night" })
+                    if (GUILayout.Button(T("world." + preset, preset), _chip, GUILayout.Height(24)))
+                    {
+                        var p = preset == "dawn" ? 8f : preset == "noon" ? 70f : preset == "sunset" ? 4f : -8f;
+                        var b = preset == "night" ? 0.05f : preset == "noon" ? 1.3f : 0.7f;
+                        sun.transform.rotation = Quaternion.Euler(p, eu.y, 0);
+                        sun.intensity = b;
+                        _world.SunPitch = p; _world.SunYaw = eu.y; _world.SunIntensity = b; Dirty();
+                    }
+                GUILayout.EndHorizontal();
+            }
+        }
+        if (Section("ambient", "palette", T("world.ambient", "Ambient light")))
+        {
+            var a = Slider(T("world.brightness", "Brightness"), RenderSettings.ambientIntensity, 0, 3);
+            if (!Mathf.Approximately(a, RenderSettings.ambientIntensity)) { RenderSettings.ambientIntensity = a; _world.Ambient = a; Dirty(); }
+        }
+        if (Section("fog", "fog", T("world.fog", "Fog")))
+        {
+            var fog = Switch(RenderSettings.fog, T("world.fogOn", "Fog on"));
+            if (fog != RenderSettings.fog) { RenderSettings.fog = fog; _world.Fog = fog ? 1 : 0; Dirty(); }
+            if (RenderSettings.fog)
+            {
+                var d = Slider(T("world.density", "Density"), RenderSettings.fogDensity, 0, 0.1f);
+                if (!Mathf.Approximately(d, RenderSettings.fogDensity)) { RenderSettings.fogDensity = d; _world.FogDensity = d; Dirty(); }
+            }
+        }
+    }
+
+    void ObjectProps()
+    {
+        var p = PlacedExact(_sel);
+        // Имя и что это.
+        if (p != null && _selection.Count == 1)
+        {
+            var n = GUILayout.TextField(p.Name, _field, GUILayout.Height(28));
+            if (n != p.Name) { p.Name = n; _sel.name = n; Dirty(); }
+        }
+        else GUILayout.Label(_selection.Count > 1 ? T("selected", "Selected") + ": " + _selection.Count : _sel.name, _title);
+        GUILayout.Label(p != null ? T("yours", "Placed by you") + (p.Source.StartsWith("prim:Empty") ? "  ·  " + T("groupName", "Group") : "") : T("fromMap", "Part of the level"), _small);
+
+        if (Section("transform", "move", T("section.transform", "Transform"))) TransformRows();
+
+        if (Section("edit", "duplicate", T("section.edit", "Edit")))
+        {
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button(T("duplicate", "Duplicate"), _btn, GUILayout.Height(26))) Later(Duplicate);
+            if (GUILayout.Button(T("ground", "Put on the ground"), _btn, GUILayout.Height(26))) Later(DropToGround);
+            GUILayout.EndHorizontal();
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button(T("focus", "Look at it") + "  F", _btn, GUILayout.Height(26))) Later(() => FocusOn(_sel));
+            if (_sel.transform.parent != null && GUILayout.Button(T("parent", "Select parent"), _btn, GUILayout.Height(26))) { var par = _sel.transform.parent.gameObject; Later(() => Select(par, false)); }
+            if (p != null && p.Source == "prim:Empty" && GUILayout.Button(T("ungroup", "Ungroup"), _btn, GUILayout.Height(26))) Later(Ungroup);
+            GUILayout.EndHorizontal();
+            GUILayout.BeginHorizontal();
+            GUILayout.Label(T("array", "Array"), _propLabel, GUILayout.Width(70), GUILayout.Height(26));
+            if (GUILayout.Button("−", _chip, GUILayout.Width(26), GUILayout.Height(24))) _arrayCount = Math.Max(1, _arrayCount - 1);
+            GUILayout.Label(_arrayCount.ToString(), _txt, GUILayout.Width(24), GUILayout.Height(26));
+            if (GUILayout.Button("+", _chip, GUILayout.Width(26), GUILayout.Height(24))) _arrayCount = Math.Min(50, _arrayCount + 1);
+            foreach (var ax in new[] { 0, 1, 2 })
+                if (GUILayout.Button(ax == 0 ? "X" : ax == 1 ? "Y" : "Z", _arrayAxis == ax ? _chipOn : _chip, GUILayout.Width(28), GUILayout.Height(24))) _arrayAxis = ax;
+            if (GUILayout.Button(new GUIContent("", T("array", "Array")), _btn, GUILayout.Width(34), GUILayout.Height(24))) { var c = _arrayCount; var a = _arrayAxis; Later(() => MakeArray(c, a)); }
+            DrawIcon(new Rect(GUILayoutUtility.GetLastRect().x + 8, GUILayoutUtility.GetLastRect().y + 3, 18, 18), "array", Ink);
+            GUILayout.EndHorizontal();
+        }
+
+        if (p != null && _selection.Count == 1)
+        {
+            if (Section("behaviour", "gear", T("section.behaviour", "Behaviour")))
+            {
+                var beh = _sel.GetComponent<ModScriptBehaviour>();
+                var spin = beh != null ? beh.Spin : 0;
+                var bob = beh != null ? beh.Bob : 0;
+                var ns = Slider(T("beh.spin", "Spin, °/s"), spin, -360, 360);
+                var nb = Slider(T("beh.bob", "Float, m"), bob, 0, 3);
+                if (Mathf.Abs(ns) < 4) ns = 0;
+                if (nb < 0.03f) nb = 0;
+                if (!Mathf.Approximately(ns, spin) || !Mathf.Approximately(nb, bob))
+                {
+                    if (beh == null) { beh = _sel.AddComponent<ModScriptBehaviour>(); beh.Paused = true; }
+                    beh.Spin = ns; beh.Bob = nb;
+                    p.Beh = beh.Code();
+                    Dirty();
+                }
+            }
+            if (Section("look", "palette", T("section.look", "Look")))
+            {
+                var phys = Switch(p.Physics, T("physics", "Physics: falls and can be pushed"));
+                if (phys != p.Physics) { p.Physics = phys; Dirty(); }
+                GUILayout.Label(T("tint", "Colour"), _propLabel);
+                var colors = new[] { Color.white, new Color(0.85f, 0.25f, 0.2f), new Color(0.95f, 0.55f, 0.15f), new Color(0.95f, 0.8f, 0.2f), new Color(0.3f, 0.75f, 0.35f), new Color(0.2f, 0.65f, 0.75f), new Color(0.25f, 0.45f, 0.9f), new Color(0.55f, 0.35f, 0.85f), new Color(0.45f, 0.3f, 0.2f), new Color(0.2f, 0.2f, 0.22f) };
+                GUILayout.BeginHorizontal();
+                foreach (var c in colors)
+                {
+                    var r = GUILayoutUtility.GetRect(24, 24, GUILayout.Width(24), GUILayout.Height(24));
+                    Fill(new Rect(r.x + 1, r.y + 1, r.width - 2, r.height - 2), c);
+                    if (p.Tinted && p.Tint == c) Fill(new Rect(r.x + 1, r.yMax - 4, r.width - 2, 3), Amber);
+                    if (GUI.Button(r, GUIContent.none, GUIStyle.none))
+                    {
+                        var col = c;
+                        Later(() =>
+                        {
+                            foreach (var go in TopSelection())
+                            {
+                                var gp = PlacedOf(go);
+                                if (gp == null) continue;
+                                gp.Tint = col; gp.Tinted = col != Color.white;
+                                ApplyTint(go, col);
+                            }
+                            Dirty();
+                        });
+                    }
+                }
+                GUILayout.EndHorizontal();
+            }
+        }
+
+        if (_selection.Count == 1 && Section("components", "layers", T("components", "Components"))) ComponentsSection();
+        GUILayout.Space(10);
+        if (GUILayout.Button(T("delete", "Delete") + "  Del", _btn, GUILayout.Height(28))) Later(Delete);
+    }
+
+    void TransformRows()
+    {
+        var t = _sel.transform;
+        var e = Event.current;
+        if (_fieldsFor != _sel || GUIUtility.keyboardControl == 0)
+        {
+            _fieldsFor = _sel;
+            var eu = t.eulerAngles;
+            _fields = new[] { t.position.x, t.position.y, t.position.z, eu.x, eu.y, eu.z, t.localScale.x, t.localScale.y, t.localScale.z }.Select(v => v.ToString("0.###", Inv)).ToArray();
+        }
+        var labels = new[] { T("position", "Position"), T("rotation", "Rotation"), T("scale", "Scale") };
+        var changed = false;
+        var fw = (_propsRect.width - 120) / 3f - 18;
+        for (var row = 0; row < 3; row++)
+        {
+            GUILayout.BeginHorizontal();
+            GUILayout.Label(labels[row], _propLabel, GUILayout.Width(76), GUILayout.Height(26));
+            for (var c = 0; c < 3; c++)
+            {
+                var i = row * 3 + c;
+                // Буква оси: тянуть мышью — менять значение (как в UE5).
+                var lr = GUILayoutUtility.GetRect(16, 26, GUILayout.Width(16), GUILayout.Height(26));
+                if (e.type == EventType.Repaint)
+                {
+                    Fill(new Rect(lr.x + 2, lr.y + 4, 14, 18), new Color(AxisColors[c].r, AxisColors[c].g, AxisColors[c].b, _scrub == i ? 1f : 0.85f));
+                    GUI.Label(new Rect(lr.x + 2, lr.y + 4, 14, 18), c == 0 ? "X" : c == 1 ? "Y" : "Z", Text(Color.white, 11, FontStyle.Bold, TextAnchor.MiddleCenter));
+                }
+                if (e.type == EventType.MouseDown && e.button == 0 && lr.Contains(e.mousePosition))
+                {
+                    _scrub = i; _scrubMouse = e.mousePosition; _scrubBefore = SnapOf(_selection);
+                    _scrubStart = float.Parse(_fields[i], NumberStyles.Float, Inv);
+                    GUIUtility.keyboardControl = 0;
+                    e.Use();
+                }
+                var v = GUILayout.TextField(_fields[i], _field, GUILayout.Width(fw), GUILayout.Height(24));
+                if (v != _fields[i]) { _fields[i] = v; changed = true; }
+            }
+            GUILayout.EndHorizontal();
+        }
+        if (_scrub >= 0 && e.type == EventType.MouseDrag)
+        {
+            var step = _scrub < 3 ? 0.02f : _scrub < 6 ? 0.5f : 0.01f;
+            var nv = _scrubStart + (e.mousePosition.x - _scrubMouse.x) * step;
+            if (_snap && _scrub < 3) nv = Mathf.Round(nv / _grid) * _grid;
+            if (_snap && _scrub >= 3 && _scrub < 6) nv = Mathf.Round(nv / AngleSnap) * AngleSnap;
+            _fields[_scrub] = nv.ToString("0.###", Inv);
+            ApplyFields();
+            e.Use();
+        }
+        if (_scrub >= 0 && e.type == EventType.MouseUp)
+        {
+            _scrub = -1;
+            PushSnap(T("section.transform", "Transform"), _scrubBefore, SnapOf(_selection));
+            e.Use();
+        }
+        if (changed)
+        {
+            if (_fieldBefore == null) _fieldBefore = SnapOf(new[] { _sel });
+            ApplyFields();
+        }
+    }
+
+    void ApplyFields()
+    {
+        var nv = new float[9];
+        for (var i = 0; i < 9; i++)
+            if (!float.TryParse(_fields[i].Replace(',', '.'), NumberStyles.Float, Inv, out nv[i])) return;
+        var t = _sel.transform;
+        t.position = new Vector3(nv[0], nv[1], nv[2]);
+        t.eulerAngles = new Vector3(nv[3], nv[4], nv[5]);
+        t.localScale = new Vector3(nv[6], nv[7], nv[8]);
+        Touch(_sel);
+        Dirty();
+    }
+
+    /// <summary>Все компоненты объекта и их простые поля — как окно Properties в Roblox Studio или Details в UE5.</summary>
+    void ComponentsSection()
+    {
+        foreach (var c in _sel.GetComponents<Component>())
+        {
+            if (c == null || c is Transform || c is ModScriptBehaviour) continue;
+            var type = c.GetType().Name;
+            var open = _openComp.Contains(type);
+            var en = EnabledOf(c);
+            GUILayout.BeginHorizontal();
+            var r = GUILayoutUtility.GetRect(18, 24, GUILayout.Width(18), GUILayout.Height(24));
+            DrawIcon(new Rect(r.x, r.y + 5, 14, 14), open ? "chevD" : "chevR", Faint);
+            if (en.HasValue)
+            {
+                var v = MiniSwitch(en.Value);
+                if (v != en.Value) { var comp = c; var nv = v; Later(() => EditProp(comp, "enabled", nv ? "true" : "false")); }
+            }
+            if (GUILayout.Button(type, _bold, GUILayout.Height(24)) || GUI.Button(r, GUIContent.none, GUIStyle.none)) { var ty = type; Later(() => { if (!_openComp.Remove(ty)) _openComp.Add(ty); }); }
+            GUILayout.EndHorizontal();
+            if (!open) continue;
+            var members = MembersOf(c.GetType());
+            if (members.Count == 0) GUILayout.Label("  " + T("noFields", "No simple properties"), _small);
+            foreach (var m in members) MemberRow(c, m);
+            GUILayout.Space(4);
+        }
+    }
+
+    static string Nice(string name)
+    {
+        var sb = new StringBuilder();
+        for (var i = 0; i < name.Length; i++)
+        {
+            var ch = name[i];
+            if (i == 0) { sb.Append(char.ToUpperInvariant(ch)); continue; }
+            if (char.IsUpper(ch) && !char.IsUpper(name[i - 1])) sb.Append(' ');
+            sb.Append(ch);
+        }
+        return sb.ToString().TrimStart('_', 'm', ' ');
+    }
+
+    static string Hex(Color c)
+    {
+        return "#" + ((int)(Mathf.Clamp01(c.r) * 255)).ToString("X2") + ((int)(Mathf.Clamp01(c.g) * 255)).ToString("X2") + ((int)(Mathf.Clamp01(c.b) * 255)).ToString("X2");
+    }
+
+    static bool FromHex(string s, float alpha, out Color c)
+    {
+        c = Color.white;
+        s = s.Trim().TrimStart('#');
+        if (s.Length != 6) return false;
+        int v;
+        if (!int.TryParse(s, NumberStyles.HexNumber, Inv, out v)) return false;
+        c = new Color(((v >> 16) & 255) / 255f, ((v >> 8) & 255) / 255f, (v & 255) / 255f, alpha);
+        return true;
+    }
+
+    void MemberRow(Component c, Member m)
+    {
+        object v;
+        try { v = m.Get(c); } catch { return; }
+        GUILayout.BeginHorizontal();
+        GUILayout.Space(18);
+        GUILayout.Label(new GUIContent(Nice(m.Name), m.Name + " · " + m.Type.Name), _propLabel, GUILayout.Width(_propsRect.width * 0.42f), GUILayout.Height(24));
+        var key = c.GetInstanceID() + "." + m.Name;
+        if (m.Type == typeof(bool))
+        {
+            var b = (bool)v;
+            var nb = MiniSwitch(b);
+            if (nb != b) { var comp = c; var name = m.Name; Later(() => EditProp(comp, name, nb ? "true" : "false")); }
+        }
+        else if (m.Type.IsEnum)
+        {
+            if (GUILayout.Button(v.ToString(), _chip, GUILayout.Height(24)))
+            {
+                var vals = Enum.GetValues(m.Type);
+                var idx = Array.IndexOf(vals, v);
+                var next = vals.GetValue((idx + (Event.current.shift ? vals.Length - 1 : 1)) % vals.Length).ToString();
+                var comp = c; var name = m.Name;
+                Later(() => EditProp(comp, name, next));
+            }
+        }
+        else if (m.Type == typeof(Color))
+        {
+            var col = (Color)v;
+            var sw = GUILayoutUtility.GetRect(24, 24, GUILayout.Width(24), GUILayout.Height(24));
+            Fill(new Rect(sw.x + 2, sw.y + 3, 20, 18), new Color(col.r, col.g, col.b, 1));
+            string shown;
+            if (!_edit.TryGetValue(key, out shown)) shown = Hex(col);
+            var nv = GUILayout.TextField(shown, _field, GUILayout.Height(24));
+            Color parsed;
+            if (nv != shown) { _edit[key] = nv; if (FromHex(nv, col.a, out parsed)) EditProp(c, m.Name, C(parsed)); }
+        }
+        else
+        {
+            string shown;
+            if (!_edit.TryGetValue(key, out shown)) shown = Str(v);
+            var nv = GUILayout.TextField(shown, _field, GUILayout.Height(24));
+            if (nv != shown)
+            {
+                _edit[key] = nv;
+                try { Parse(nv, m.Type); EditProp(c, m.Name, nv.Replace(" ", "")); } catch { }
+            }
+        }
+        GUILayout.EndHorizontal();
+    }
+
+    class Holder { public string V; }
+    string _lastPropKey;
+    float _lastPropAt;
+    Cmd _lastPropCmd;
+    Holder _lastHolder;
+
+    /// <summary>Изменить свойство с отменой; правки одного поля подряд (набор цифр) — одна отмена.</summary>
+    void EditProp(Component c, string member, string value)
+    {
+        if (c == null) return;
+        string old;
+        try
+        {
+            if (member == "enabled") old = EnabledOf(c) == true ? "true" : "false";
+            else old = Str(MembersOf(c.GetType()).First(x => x.Name == member).Get(c));
+        }
+        catch { old = null; }
+        SetProp(c, member, value);
+        if (old == null || old == value) return;
+        var key = c.GetInstanceID() + "." + member;
+        var now = Time.realtimeSinceStartup;
+        if (key == _lastPropKey && now - _lastPropAt < 1.5f && _undo.Count > 0 && _undo[_undo.Count - 1] == _lastPropCmd)
+        {
+            _lastHolder.V = value;
+            _lastPropAt = now;
+            return;
+        }
+        var holder = new Holder { V = value };
+        var target = c;
+        Push(Nice(member), () => { if (target != null) SetProp(target, member, old); }, () => { if (target != null) SetProp(target, member, holder.V); });
+        _lastHolder = holder;
+        _lastPropKey = key;
+        _lastPropAt = now;
+        _lastPropCmd = _undo[_undo.Count - 1];
+    }
+
+    // ------------------------------------------------------------------ вывод и строка состояния
+
+    void OutputPanel()
+    {
+        PanelHeader(_outputRect, "output", T("output", "Output"), _log.Count.ToString());
+        if (GUI.Button(new Rect(_outputRect.xMax - 92, _outputRect.y + 3, 84, 24), T("clear", "Clear"), _ghostBtn)) Later(() => _log.Clear());
+        GUILayout.BeginArea(new Rect(_outputRect.x + 1, _outputRect.y + 31, _outputRect.width - 1, _outputRect.height - 31));
+        if (_logSeen != _log.Count) { _logSeen = _log.Count; _logScroll.y = float.MaxValue; }
+        _logScroll = GUILayout.BeginScrollView(_logScroll, false, false, GUIStyle.none, GUI.skin.verticalScrollbar);
+        GUILayout.BeginVertical(new GUIStyle { padding = new RectOffset(10, 10, 4, 4) });
+        foreach (var l in _log)
+        {
+            var color = l.Type == LogType.Error || l.Type == LogType.Exception || l.Type == LogType.Assert ? new Color(1f, 0.45f, 0.42f) : l.Type == LogType.Warning ? Amber : (l.Text.StartsWith("ModScript Studio") ? new Color(0.55f, 0.78f, 1f) : Ink);
+            _logStyle.normal.textColor = color;
+            GUILayout.Label(l.Text, _logStyle);
+        }
+        GUILayout.EndVertical();
+        GUILayout.EndScrollView();
+        GUILayout.EndArea();
+    }
+
+    /// <summary>Подписи поверх окна просмотра: буквы осей, значение при перетаскивании, подсказка при пустом выборе.</summary>
+    void ViewportOverlay()
+    {
+        if (_cam == null) return;
+        var m = _cam.worldToCameraMatrix;
+        var c = new Vector2(48f * _ui, 48f * _ui);
+        for (var i = 0; i < 3; i++)
+        {
+            var d = m.MultiplyVector(Axes[i]);
+            var p = c + new Vector2(d.x, d.y) * 30f * _ui;
+            var g = new Vector2(_vpRect.x + p.x / _ui, _vpRect.yMax - p.y / _ui);
+            GUI.Label(new Rect(g.x - 8, g.y - 22, 16, 16), i == 0 ? "X" : i == 1 ? "Y" : "Z", Text(AxisColors[i], 11, FontStyle.Bold, TextAnchor.MiddleCenter));
+        }
+        if (_showLabels)
+            foreach (var p in TopPlaceds().Take(80))
+            {
+                var b = BoundsOf(p.Go);
+                var s = _cam.WorldToScreenPoint(new Vector3(b.center.x, b.max.y, b.center.z));
+                if (s.z <= 0 || s.z > 80) continue;
+                var g = new Vector2((_vpPx.x + s.x) / _ui, (Screen.height - _vpPx.y - s.y) / _ui);
+                var size = _small.CalcSize(new GUIContent(p.Name));
+                GUI.Label(new Rect(g.x - size.x / 2 - 6, g.y - 26, size.x + 12, 20), p.Name, _keyChip);
+            }
+        if (_drag >= 0)
+        {
+            var text = _mode == "rotate" ? _dragValue.ToString("0.#", Inv) + "°" : _mode == "scale" ? "×" + _dragValue.ToString("0.##", Inv) : _dragValue.ToString("0.###", Inv) + " m";
+            var mp = Event.current.mousePosition;
+            GUI.Label(new Rect(mp.x + 16, mp.y + 14, 120, 22), text, _tip);
+        }
+        if (_snap)
+        {
+            var r = new Rect(_vpRect.xMax - 14 - 170, 64, 170, 24);
+            GUI.Label(r, T("snap", "Snap") + "  " + _grid.ToString("0.##", Inv) + " m · " + AngleSnap + "°", _tip);
+        }
+    }
+}

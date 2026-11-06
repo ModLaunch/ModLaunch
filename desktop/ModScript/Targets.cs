@@ -20,7 +20,7 @@ public abstract class Target
     public abstract string Language { get; }
     public virtual string[] Events => ModxDoc.Events;
 
-    public static readonly Target[] All = [new RenPy(), new RpgMaker(), new Unity(), new Godot(), new LuaMods(), new Unreal(), new Html5(), new ReEngine()];
+    public static readonly Target[] All = [new RenPy(), new RpgMaker(), new Unity(), new Godot(), new LuaMods(), new Unreal(), new Html5(), new ReEngine(), new CustomTarget()];
     public static Target? Find(string id) => All.FirstOrDefault(t => t.Id == id || t.Aliases.Contains(id));
     protected virtual string[] Aliases => [];
 

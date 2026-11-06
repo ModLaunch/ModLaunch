@@ -44,6 +44,8 @@ public static partial class ModxInsight
         /// <summary>Строки, после которых в том же блоке код не выполнится (return, break, continue).</summary>
         public readonly List<int> Exits = [];
         public bool HasNatives;
+        /// <summary>22.0: текст написан простым синтаксисом (когда / если / конец).</summary>
+        public bool Simple;
 
         Dictionary<string, Symbol>? _index;
         Dictionary<string, List<Ref>>? _uses;
@@ -107,6 +109,7 @@ public static partial class ModxInsight
 
     public static Model Read(string text)
     {
+        if (MX.Simple.IsSimple(text)) return ReadSimple(text);
         var m = new Model { Lines = text.Replace("\r\n", "\n").Split('\n') };
         var lines = m.Lines;
         m.Scope = new string[lines.Length];
@@ -154,6 +157,163 @@ public static partial class ModxInsight
             }
         }
         return m;
+    }
+
+    // ---------------------------------------------------------------- 22.0: простой синтаксис
+
+    [GeneratedRegex(@"^\s*(?:функция|function|func|fn|def)\s+([\p{L}_][\p{L}\w]*)\s*(?:\((.*)\))?", RegexOptions.IgnoreCase)]
+    private static partial Regex SimpleFn();
+
+    [GeneratedRegex(@"^\s*(?:пусть|переменная|запомни|заведи|let|var)\s+([\p{L}_][\p{L}\w]*)", RegexOptions.IgnoreCase)]
+    private static partial Regex SimpleLet();
+
+    [GeneratedRegex(@"^\s*(?:для|for)\s+(?:каждого\s+|каждой\s+|каждый\s+|each\s+)?([\p{L}_][\p{L}\w]*)\s+(?:от|from|в|во|из|in|of)\s", RegexOptions.IgnoreCase)]
+    private static partial Regex SimpleFor();
+
+    [GeneratedRegex(@"^\s*(?:дай|добавь|прибавь|начисли|увеличь|give|increase|забери|отними|убавь|уменьши|вычти|сними|take|decrease|умножь|раздели|подели|multiply|divide|поставь|установи|сделай|назначь|set|make)\s+(?:игроку\s+|мне\s+|ему\s+|у\s+игрока\s+)?(?:-?[\d.]+\s+)?([\p{L}_][\p{L}\w]*)", RegexOptions.IgnoreCase)]
+    private static partial Regex SimpleWrite();
+
+    [GeneratedRegex(@"^\s*([\p{L}_][\p{L}\w]*)\s*(?:=(?!=)|\+=|-=|\*=|/=|\s+(?:станет|теперь|будет)\s)", RegexOptions.IgnoreCase)]
+    private static partial Regex SimpleAssign();
+
+    /// <summary>
+    /// Разбор простого синтаксиса для среды. Блоки и их строки — из раскладки переводчика (Simple.ToModx), имена — по
+    /// словам строк: служебные слова языка (когда, дай, больше…) не имена. Так работают подсветка одинаковых имён,
+    /// переход к определению, переименование и подсказки — на тех строках и столбцах, которые написал автор.
+    /// </summary>
+    static Model ReadSimple(string text)
+    {
+        var m = new Model { Lines = text.Replace("\r\n", "\n").Split('\n'), Simple = true };
+        var lines = m.Lines;
+        m.Scope = new string[lines.Length];
+        Array.Fill(m.Scope, "");
+        var layout = MX.Simple.ToModx(text);
+        foreach (var (start, end, kind, _) in layout.Blocks)
+        {
+            string? scope = null;
+            if (kind == "native") { scope = "native"; m.HasNatives = true; }
+            else if (kind == "hook") scope = $"hook:{MX.ModxDoc.Events.FirstOrDefault(e => MX.Simple.ToModx(lines[start - 1]).Text.Contains("hook " + e + " ")) ?? "start"}:{start}";
+            else if (kind == "fn" && SimpleFn().Match(lines[start - 1]) is { Success: true } f)
+            {
+                var name = f.Groups[1].Value;
+                scope = "fn:" + name;
+                var pars = f.Groups[2].Value;
+                var sig = $"{name}({string.Join(", ", Split(pars))})";
+                m.Symbols.Add(new Symbol(name, Kind.Function, start, f.Groups[1].Index, "", "функция " + sig));
+                foreach (var w in Words(pars))
+                    if (!w.Member) m.Symbols.Add(new Symbol(w.Name, Kind.Param, start, f.Groups[2].Index + w.Col, scope, sig));
+            }
+            if (scope is null) continue;
+            for (var k = start; k < Math.Min(end, lines.Length); k++) m.Scope[k] = scope;
+        }
+        for (var i = 0; i < lines.Length; i++)
+        {
+            if (m.Scope[i] == "native" || layout.Depth[i] < 0) continue;
+            var kind = MX.Simple.Classify(lines[i]);
+            if (kind is "hook" or "header" or "fn" or "close") continue;
+            var code = Code(lines[i]);
+            var scope = m.Scope[i];
+            int? decl = null, write = null;
+            if (SimpleLet().Match(code) is { Success: true } l)
+            {
+                decl = l.Groups[1].Index;
+                var name = l.Groups[1].Value;
+                var k = scope == "" ? Kind.Shared : Kind.Local;
+                if (!m.Symbols.Any(s => s.Name == name && (s.Kind == Kind.Shared || s.Scope == scope && s.Kind is Kind.Local or Kind.Param)))
+                    m.Symbols.Add(new Symbol(name, k, i + 1, decl.Value, scope, code.Trim()));
+            }
+            else if (SimpleFor().Match(code) is { Success: true } fl)
+            {
+                decl = fl.Groups[1].Index;
+                if (!m.Symbols.Any(s => s.Kind == Kind.Loop && s.Scope == scope && s.Name == fl.Groups[1].Value))
+                    m.Symbols.Add(new Symbol(fl.Groups[1].Value, Kind.Loop, i + 1, decl.Value, scope, code.Trim()));
+            }
+            else if (SimpleWrite().Match(code) is { Success: true } wr && !MX.Simple.Reserved.Contains(wr.Groups[1].Value)) write = wr.Groups[1].Index;
+            else if (SimpleAssign().Match(code) is { Success: true } a && !MX.Simple.Reserved.Contains(a.Groups[1].Value)) write = a.Groups[1].Index;
+            if (Regex.IsMatch(code, @"^\s*(?:верни|return|стоп|хватит|break|stop|дальше|пропусти|continue|skip)\b", RegexOptions.IgnoreCase)) m.Exits.Add(i + 1);
+            // «скажи Привет, {имя}!» без кавычек — это текст: имена только в {…}.
+            var scan = lines[i];
+            if (Regex.Match(code, @"^(\s*(?:скажи|напиши|покажи|выведи|сообщи|say|show|tell|запиши|лог|log)\s+)(.+)$", RegexOptions.IgnoreCase) is { Success: true } say
+                && !say.Groups[2].Value.Contains('"') && !Regex.IsMatch(say.Groups[2].Value.Trim(), @"^[\p{L}_][\p{L}\w.]*(\(.*\))?$"))
+            {
+                var chars = scan.ToCharArray();
+                var depth = 0;
+                for (var k = say.Groups[2].Index; k < code.Length; k++)
+                {
+                    if (chars[k] == '{') { depth++; chars[k] = ' '; continue; }
+                    if (chars[k] == '}') { depth = Math.Max(0, depth - 1); chars[k] = ' '; continue; }
+                    if (depth == 0) chars[k] = ' ';
+                }
+                scan = new string(chars);
+            }
+            foreach (var w in Words(scan))
+            {
+                if (w.Member || MX.Simple.Reserved.Contains(w.Name) || Keywords.Contains(w.Name)) continue;
+                m.Refs.Add(new Ref(i + 1, w.Col, w.Name, scope, w.Col == decl || w.Col == write, w.Call));
+            }
+        }
+        return m;
+    }
+
+    /// <summary>Слово простого синтаксиса под курсором: событие (вся строка «когда…»), команда, слово условия или функция.</summary>
+    static MX.Simple.Entry? SimpleEntry(Model m, int line, int col)
+    {
+        if (line < 1 || line > m.Lines.Length) return null;
+        var text = m.Lines[line - 1];
+        if (MX.Simple.Classify(text) == "hook")
+        {
+            var modx = MX.Simple.ToModx(text).Text;
+            return MX.Simple.Vocabulary.FirstOrDefault(e => e.Group == "event" && modx.Contains(e.Modx + " "));
+        }
+        foreach (var w in Words(text))
+            if (col >= w.Col && col <= w.Col + w.Name.Length)
+            {
+                var low = w.Name.ToLowerInvariant();
+                // «больше или равно», «иначе если» — сначала фразы из нескольких слов.
+                var rest = text[w.Col..].ToLowerInvariant();
+                return MX.Simple.Vocabulary.Where(e => e.Word.Contains(' ') && rest.StartsWith(e.Word, StringComparison.Ordinal)).OrderByDescending(e => e.Word.Length).FirstOrDefault()
+                       ?? MX.Simple.Vocabulary.FirstOrDefault(e => e.Word == low);
+            }
+        return null;
+    }
+
+    static List<Item> CompleteSimple(Model m, int line, int col)
+    {
+        var text = line >= 1 && line <= m.Lines.Length ? m.Lines[line - 1] : "";
+        var before = text[..Math.Min(col, text.Length)];
+        var items = new List<Item>();
+        if (before.TrimStart().StartsWith('#')) return items;
+        var scope = line >= 1 && line <= m.Scope.Length ? m.Scope[line - 1] : "";
+        if (scope == "native") return items;
+        var inString = Code(before).Count(c => c == '"') % 2 == 1;
+        if (inString)
+        {
+            var open = before.LastIndexOf('{');
+            if (open < 0 || before.LastIndexOf('}') > open) return items;
+        }
+        var statement = !inString && Regex.IsMatch(before, @"^\s*[\p{L}\w]*$");
+        var top = scope == "" && (line < 1 || line > m.Lines.Length || !Regex.IsMatch(before, @"^\s+"));
+        foreach (var s in m.Symbols.Where(s => s.Kind is Kind.Param or Kind.Local or Kind.Loop && s.Scope == scope && scope != ""))
+            items.Add(new Item(s.Name, s.Name, s.Kind == Kind.Param ? I18n.T("v19.kind.param") : s.Detail, s.Kind, 6));
+        foreach (var s in m.Symbols.Where(s => s.Kind == Kind.Shared))
+            items.Add(new Item(s.Name, s.Name, s.Detail, Kind.Shared, 5));
+        foreach (var g in m.Refs.Where(r => !r.Call).Select(r => Resolve(m, r)).Where(s => s.Kind == Kind.Game).Select(s => s.Name).Distinct())
+            items.Add(new Item(g, g, MX.Simple.InCode(g) is { } c ? "в игре: " + c : I18n.T("v19.kind.game"), Kind.Game, 3));
+        if (inString) return [.. items.DistinctBy(i => i.Label)];
+        foreach (var s in m.Symbols.Where(s => s.Kind == Kind.Function))
+            items.Add(new Item(s.Name, s.Name + "($0)", s.Detail, Kind.Function, 4));
+        foreach (var e in MX.Simple.Vocabulary)
+        {
+            var group = e.Group;
+            var fits = statement
+                ? top ? group is "event" or "header" or "command" or "block" : group is "command" or "block"
+                : group is "op" or "fn";
+            if (!fits) continue;
+            var kind = group switch { "event" => Kind.Event, "fn" => Kind.Builtin, _ => Kind.Keyword };
+            var prio = group == "event" && top ? 8 : group is "command" or "block" ? 6 : 4;
+            items.Add(new Item(e.Word, e.Snippet, e.Meaning, kind, prio, e.Snippet.Contains('\n')));
+        }
+        return [.. items.DistinctBy(i => (i.Label, i.Snippet))];
     }
 
     /// <summary>Тело хука или функции: объявления let и for, запись в переменные, остальные слова — чтение и вызовы.</summary>
@@ -278,7 +438,7 @@ public static partial class ModxInsight
             if (col >= w.Col && col <= w.Col + w.Name.Length)
             {
                 if (Regex.IsMatch(text, @"^\s*hook\s+" + Regex.Escape(w.Name) + @"\b") && MX.ModxDoc.Events.Contains(w.Name)) return new Symbol(w.Name, Kind.Event, 0, 0, "", w.Name);
-                if (Keywords.Contains(w.Name) || Headers.Contains(w.Name)) return new Symbol(w.Name, Kind.Keyword, 0, 0, "", w.Name);
+                if (Keywords.Contains(w.Name) || Headers.Contains(w.Name) || m.Simple && MX.Simple.Reserved.Contains(w.Name)) return new Symbol(w.Name, Kind.Keyword, 0, 0, "", w.Name);
             }
         return null;
     }
@@ -303,7 +463,7 @@ public static partial class ModxInsight
         if (!s.Renamable) return (null, "v19.rename.fixed");
         if (!Ident().IsMatch(name)) return (null, "v19.rename.bad");
         if (name == s.Name) return (text, null);
-        if (Keywords.Contains(name) || Builtins.Contains(name) || Headers.Contains(name) || MX.ModxDoc.Events.Contains(name)) return (null, "v19.rename.reserved");
+        if (Keywords.Contains(name) || Builtins.Contains(name) || Headers.Contains(name) || MX.ModxDoc.Events.Contains(name) || MX.Simple.Reserved.Contains(name)) return (null, "v19.rename.reserved");
         var m = Read(text);
         var taken = s.Kind is Kind.Param or Kind.Local or Kind.Loop
             ? m.Refs.Any(r => r.Name == name && (r.Scope == s.Scope || Resolve(m, r).Kind is Kind.Shared or Kind.Function)) || m.Symbols.Any(x => x.Name == name && (x.Scope == s.Scope || x.Scope == ""))
@@ -352,6 +512,16 @@ public static partial class ModxInsight
 
     /// <summary>Справка под курсором: заголовок (подпись или объявление) и текст.</summary>
     public static (string Title, string Text)? Hover(Model m, int line, int col)
+    {
+        if (!m.Simple) return HoverCode(m, line, col);
+        // 22.0: простой синтаксис — что значит слово языка и как имя называется в коде игры.
+        if (SimpleEntry(m, line, col) is { } e) return (e.Word, e.Meaning + "\n" + I18n.T("v22.hover.modx", ("code", e.Modx)));
+        if (HoverCode(m, line, col) is not { } h) return null;
+        var word = At(m, line, col)?.Name ?? "";
+        return MX.Simple.InCode(word) is { } c ? (h.Title, h.Text + "\n" + I18n.T("v22.hover.incode", ("name", c))) : h;
+    }
+
+    static (string Title, string Text)? HoverCode(Model m, int line, int col)
     {
         if (At(m, line, col) is not { } s) return null;
         int Uses() => References(m, s).Count(x => !(x.Line == s.Line && x.Col == s.Col));
@@ -419,9 +589,11 @@ public static partial class ModxInsight
                     var pars = Regex.Match(fn.Detail, @"\((.*)\)").Groups[1].Value;
                     return (name, Split(pars), commas, DocAbove(m, fn.Line));
                 }
-                if (Builtins.Contains(name))
+                // 22.0: случайно(…), шанс(…) — встроенные функции простого синтаксиса.
+                var builtin = MX.Simple.Vocabulary.FirstOrDefault(e => e.Group == "fn" && e.Word.Equals(name, StringComparison.OrdinalIgnoreCase))?.Modx ?? name;
+                if (Builtins.Contains(builtin))
                 {
-                    var (sig, doc) = BuiltinDoc(name);
+                    var (sig, doc) = BuiltinDoc(builtin);
                     return (name, Split(Regex.Match(sig, @"\((.*)\)").Groups[1].Value), commas, doc);
                 }
                 return null;
@@ -451,6 +623,7 @@ public static partial class ModxInsight
     /// <summary>Что предложить в этом месте: после hook — события, после native — языки, после engine — движки, в коде — по смыслу.</summary>
     public static List<Item> Complete(Model m, int line, int col)
     {
+        if (m.Simple) return CompleteSimple(m, line, col);
         var text = line >= 1 && line <= m.Lines.Length ? m.Lines[line - 1] : "";
         var before = text[..Math.Min(col, text.Length)];
         var items = new List<Item>();
@@ -568,6 +741,21 @@ public static partial class ModxInsight
     public static List<Issue> Lint(Model m)
     {
         var issues = new List<Issue>();
+        // 22.0: в простом синтаксисе ошибки показывает сам перевод (на строках автора); «опечатки» по словам
+        // русского текста давали бы ложные находки — здесь только код после «верни» и «стоп».
+        if (m.Simple)
+        {
+            foreach (var exit in m.Exits)
+                for (var i = exit; i < m.Lines.Length; i++)
+                {
+                    var t = Code(m.Lines[i]).Trim();
+                    if (t == "") continue;
+                    if (MX.Simple.Classify(m.Lines[i]) is not ("close" or "else" or "hook" or "fn") && Indent(m.Lines[i]) >= Indent(m.Lines[exit - 1]))
+                        issues.Add(new Issue(i + 1, Indent(m.Lines[i]), t.Length, I18n.T("v19.lint.unreachable"), true));
+                    break;
+                }
+            return issues;
+        }
         var fns = m.Symbols.Where(s => s.Kind == Kind.Function).ToList();
         var declared = m.Symbols.Where(s => s.Kind is not Kind.Function).Select(s => s.Name).ToHashSet();
         var written = m.Refs.Where(r => r.Write).Select(r => r.Name).ToHashSet();
@@ -631,6 +819,7 @@ public static partial class ModxInsight
     /// <summary>Что можно свернуть: блоки hook, fn, native, if, while, for (строки начала и конца).</summary>
     public static List<(int Start, int End)> Folds(string text)
     {
+        if (MX.Simple.IsSimple(text)) return [.. MX.Simple.ToModx(text).Blocks.Where(b => b.End > b.Start).Select(b => (b.Start, b.End))];
         var lines = text.Replace("\r\n", "\n").Split('\n');
         var folds = new List<(int, int)>();
         var open = new Stack<int>();
@@ -664,6 +853,7 @@ public static partial class ModxInsight
     /// </summary>
     public static (string Text, bool Safe) Format(string text)
     {
+        if (MX.Simple.IsSimple(text)) return MX.Simple.Format(text) is { } simple ? (simple, true) : (text, false);
         var source = text.Replace("\r\n", "\n");
         var lines = source.Split('\n');
         var output = new List<string>();

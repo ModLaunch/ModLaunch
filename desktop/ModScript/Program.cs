@@ -9,20 +9,24 @@ return exitCode;
 static class Cli
 {
     const string Usage = """
-        ModScript X 2.0 — one .modx script, every game scripting language.
+        ModScript X 3.0 — one .modx script, every game scripting language.
 
           modscript inspect <gameDir>                       detect the engine and show the game's scripts and variables
           modscript inject  <file.modx> --game <gameDir>    translate and install into the game
           modscript watch   <file.modx> --game <gameDir>    re-inject on every save (live editing)
           modscript build   <file.modx> [--out dir]         translate only, without touching a game
+          modscript show    <file.modx>                     show simple syntax (когда / если / конец) as regular .modx
           modscript run     <file.modx> [--ticks n] [--set "gold=100; hp=50"]
                                                             run the mod in the sandbox, without a game
           modscript eject   <modId> --game <gameDir>        remove a mod installed by ModScript X
           modscript list    <gameDir>                       mods installed by ModScript X
           modscript targets                                 supported engines
+          modscript profile <gameDir> [--language lua]      describe your own engine (modscript.engine.json)
           modscript selftest                                built-in checks
 
-        Options: --target renpy|rpgmaker|unity|godot|lua (overrides 'engine' in the file and auto-detection).
+        Options: --target renpy|rpgmaker|unity|godot|lua|unreal|html5|reengine|custom (overrides 'engine' in the file and auto-detection).
+                 --profile engine.json — build for a custom engine without a game folder.
+        Simple syntax: write mods in plain words — когда игра началась / дай золото 100 / скажи Привет / конец.
         For single-player games only: games with anti-cheat are refused.
         """;
 
@@ -34,6 +38,8 @@ static class Cli
         var arg = pos.ElementAtOrDefault(1);
         var game = Opt("--game");
         var target = Opt("--target");
+        if (Opt("--profile") is { } profile) { CustomTarget.ProfilePath = profile; target ??= "custom"; }
+        try { Console.OutputEncoding = System.Text.Encoding.UTF8; } catch (IOException) { }
         try
         {
             switch (cmd)
@@ -48,6 +54,24 @@ static class Cli
                     Engines.Inspect(arg, t).ForEach(Console.WriteLine);
                     var ac = Engines.FindAntiCheat(arg);
                     if (ac != null) Console.WriteLine($"warning: {ac} found — inject is disabled for this game");
+                    return 0;
+                }
+                case "profile" when arg != null:
+                {
+                    // 22.0: заготовка modscript.engine.json — описание своего (самодельного) движка.
+                    var path = Path.Combine(arg, EngineProfile.FileName);
+                    if (File.Exists(path)) { Console.WriteLine($"{path} already exists:"); Console.WriteLine(File.ReadAllText(path)); return 0; }
+                    File.WriteAllText(path, EngineProfile.Template(arg, Opt("--language")));
+                    Console.WriteLine($"created {path}:");
+                    Console.WriteLine(File.ReadAllText(path));
+                    Console.WriteLine("Check \"file\" (where mods go) and \"events\" (how the game calls them), then: modscript inject <file.modx> --game <gameDir>");
+                    return 0;
+                }
+                case "show" when arg != null:
+                {
+                    // 22.0: во что превращается простой синтаксис — обычный .modx, строка за строкой.
+                    var src = File.ReadAllText(arg);
+                    Console.WriteLine(Simple.IsSimple(src) ? Simple.ToModx(src).Text : src);
                     return 0;
                 }
                 case "build" when arg != null:

@@ -1,0 +1,1163 @@
+
+// ===================================================================== Studio.Tools — выбор, стрелки, сетка, правки
+// Как в редакторах UE5 и Roblox Studio: стрелки с наконечниками и плоскостями (двигать по двум осям), кольца вращения,
+// кубики размера; ось под курсором светится; мир/локально; сетка на земле; объекты из библиотеки ставятся под курсор;
+// выделение рамкой; группы; отмена и повтор любой правки.
+public partial class ModScriptStudio
+{
+    // ------------------------------------------------------------------ выбор
+
+    readonly List<GameObject> _selection = new List<GameObject>();
+    GameObject _sel { get { return _selection.Count > 0 ? _selection[_selection.Count - 1] : null; } }
+    bool _lighting;
+    GameObject _hoverGo;
+
+    void Select(GameObject go, bool add)
+    {
+        _lighting = false;
+        if (!add) _selection.Clear();
+        if (go == null) return;
+        if (_selection.Contains(go)) { if (add) _selection.Remove(go); return; }
+        _selection.Add(go);
+    }
+
+    Placed PlacedExact(GameObject go)
+    {
+        if (go == null) return null;
+        foreach (var p in _placed) if (p.Go == go) return p;
+        return null;
+    }
+
+    /// <summary>Ближайший поставленный объект, в который входит go (он сам или его группа).</summary>
+    Placed PlacedOf(GameObject go)
+    {
+        for (var t = go != null ? go.transform : null; t != null; t = t.parent)
+        {
+            var p = PlacedExact(t.gameObject);
+            if (p != null) return p;
+        }
+        return null;
+    }
+
+    /// <summary>Самая внешняя группа: щелчок выбирает модель целиком, Alt+щелчок — её часть (как в Roblox Studio).</summary>
+    Placed TopPlaced(GameObject go)
+    {
+        Placed top = null;
+        for (var t = go != null ? go.transform : null; t != null; t = t.parent)
+        {
+            var p = PlacedExact(t.gameObject);
+            if (p != null) top = p;
+        }
+        return top;
+    }
+
+    Touched TouchedOf(GameObject go, bool create)
+    {
+        var path = PathOf(go.transform);
+        var t = _touched.FirstOrDefault(x => x.Path == path);
+        if (t == null && create) { t = new Touched { Path = path, Go = go }; _touched.Add(t); }
+        return t;
+    }
+
+    /// <summary>Объект уровня сдвинули — запомнить, чтобы сохранить.</summary>
+    void Touch(GameObject go)
+    {
+        if (go == null || PlacedOf(go) != null) return;
+        var t = TouchedOf(go, true);
+        t.Moved = true;
+        t.Go = go;
+    }
+
+    /// <summary>
+    /// Объект под курсором. Сначала луч по коллайдерам; нет попадания (объекты без коллайдеров, 2D) — среди видимых
+    /// Renderer, в чьи экранные границы попал курсор, самый маленький: земля и небо не перекрывают предметы на них.
+    /// </summary>
+    GameObject Pick(Vector2 screen, bool inner)
+    {
+        GameObject hitGo = null;
+        RaycastHit hit;
+        if (!_cam.orthographic && Physics.Raycast(_cam.ScreenPointToRay(new Vector3(screen.x, screen.y, 0)), out hit, 5000f, ~0, QueryTriggerInteraction.Ignore))
+        {
+            var r = hit.collider.GetComponentInParent<Renderer>();
+            if (r == null) r = hit.collider.GetComponentInChildren<Renderer>();
+            hitGo = r != null ? r.gameObject : hit.collider.gameObject;
+        }
+        else
+        {
+            var bestArea = float.MaxValue;
+            foreach (var r in FindObjectsOfType<Renderer>())
+            {
+                if (!r.enabled || !r.isVisible || r is ParticleSystemRenderer || r.gameObject == _gridGo) continue;
+                Rect rect;
+                if (!ScreenRect(r.bounds, out rect) || !rect.Contains(screen)) continue;
+                var area = rect.width * rect.height;
+                if (area < bestArea) { bestArea = area; hitGo = r.gameObject; }
+            }
+        }
+        if (hitGo == null || hitGo == _ghost) return null;
+        var p = inner ? PlacedOf(hitGo) : TopPlaced(hitGo);
+        return p != null ? p.Go : hitGo;
+    }
+
+    bool ScreenRect(Bounds b, out Rect rect)
+    {
+        rect = new Rect();
+        var min = new Vector2(float.MaxValue, float.MaxValue);
+        var max = new Vector2(float.MinValue, float.MinValue);
+        var any = false;
+        for (var i = 0; i < 8; i++)
+        {
+            var s = _cam.WorldToScreenPoint(Corner(b, i));
+            if (s.z <= 0.05f) continue;
+            any = true;
+            min = Vector2.Min(min, new Vector2(s.x, s.y));
+            max = Vector2.Max(max, new Vector2(s.x, s.y));
+        }
+        if (!any) return false;
+        rect = Rect.MinMaxRect(min.x, min.y, max.x, max.y);
+        return true;
+    }
+
+    static Vector3 Corner(Bounds b, int i)
+    {
+        return b.center + Vector3.Scale(b.extents, new Vector3((i & 1) == 0 ? -1 : 1, (i & 2) == 0 ? -1 : 1, (i & 4) == 0 ? -1 : 1));
+    }
+
+    static Bounds BoundsOf(GameObject go)
+    {
+        var rs = go.GetComponentsInChildren<Renderer>();
+        if (rs.Length == 0) return new Bounds(go.transform.position, Vector3.one * 0.5f);
+        var b = rs[0].bounds;
+        foreach (var r in rs) b.Encapsulate(r.bounds);
+        return b;
+    }
+
+    // ------------------------------------------------------------------ рамка выделения
+
+    bool _marquee;
+    Vector2 _marq0, _marq1;
+
+    void FinishMarquee(bool add)
+    {
+        var r = Rect.MinMaxRect(Mathf.Min(_marq0.x, _marq1.x), Mathf.Min(_marq0.y, _marq1.y), Mathf.Max(_marq0.x, _marq1.x), Mathf.Max(_marq0.y, _marq1.y));
+        if (!add) Select(null, false);
+        _lighting = false;
+        foreach (var p in _placed)
+        {
+            if (p.Go == null || !p.Go.activeInHierarchy || TopPlaced(p.Go) != p) continue;
+            var s = _cam.WorldToScreenPoint(BoundsOf(p.Go).center);
+            if (s.z > 0 && r.Contains(new Vector2(s.x, s.y)) && !_selection.Contains(p.Go)) _selection.Add(p.Go);
+        }
+        // Объекты уровня — те, что целиком внутри рамки (не больше 200).
+        var level = 0;
+        foreach (var rd in FindObjectsOfType<Renderer>())
+        {
+            if (level >= 200) break;
+            if (!rd.enabled || !rd.isVisible || rd is ParticleSystemRenderer || rd.gameObject == _gridGo || PlacedOf(rd.gameObject) != null) continue;
+            Rect sr;
+            if (!ScreenRect(rd.bounds, out sr) || !r.Contains(sr.min) || !r.Contains(sr.max)) continue;
+            if (!_selection.Contains(rd.gameObject)) { _selection.Add(rd.gameObject); level++; }
+        }
+        Status(T("selected", "Selected") + ": " + _selection.Count);
+    }
+
+    // ------------------------------------------------------------------ стрелки (гизмо)
+
+    string _mode = "move";
+    bool _local;
+    bool _snap;
+    float _grid = 0.5f;
+    const float AngleSnap = 15f;
+    int _hover = -1, _drag = -1;
+    Vector3 _pivot0, _hit0;
+    float _t0, _size0, _dragValue;
+    Vector2 _mouse0;
+    readonly Vector3[] _axes0 = new Vector3[3];
+    List<Snap> _before;
+    Vector3[] _pos0, _scale0;
+    Quaternion[] _rot0;
+
+    static readonly Vector3[] Axes = { Vector3.right, Vector3.up, Vector3.forward };
+    static readonly Color[] AxisColors = { new Color(0.94f, 0.30f, 0.30f), new Color(0.48f, 0.84f, 0.30f), new Color(0.30f, 0.56f, 1f) };
+    static readonly Color Hot = new Color(1f, 0.86f, 0.22f);
+
+    Vector3 AxisOf(int i)
+    {
+        return (_local || _mode == "scale") && _sel != null ? _sel.transform.rotation * Axes[i] : Axes[i];
+    }
+
+    /// <summary>Размер стрелок в мире, чтобы на экране они были всегда одной величины.</summary>
+    float GizmoSize(Vector3 at)
+    {
+        var px = 96f * _ui;
+        var h = Mathf.Max(1f, _cam.pixelHeight);
+        if (_cam.orthographic) return _cam.orthographicSize * 2f * px / h;
+        var d = Mathf.Max(0.05f, Vector3.Dot(at - _cam.transform.position, _cam.transform.forward));
+        return d * Mathf.Tan(_cam.fieldOfView * 0.5f * Mathf.Deg2Rad) * 2f * px / h;
+    }
+
+    Vector2 Scr(Vector3 w)
+    {
+        var p = _cam.WorldToScreenPoint(w);
+        return new Vector2(p.x, p.y);
+    }
+
+    bool Visible(Vector3 w) { return _cam.WorldToScreenPoint(w).z > 0.05f; }
+
+    Vector3[] PlaneQuad(Vector3 o, int n, float size, Vector3[] axes)
+    {
+        var a = axes[(n + 1) % 3] * size;
+        var b = axes[(n + 2) % 3] * size;
+        return new[] { o + a * 0.2f + b * 0.2f, o + a * 0.42f + b * 0.2f, o + a * 0.42f + b * 0.42f, o + a * 0.2f + b * 0.42f };
+    }
+
+    Vector3[] RingPoints(Vector3 o, Vector3 axis, float r, int segs)
+    {
+        var u = Vector3.Cross(axis, Mathf.Abs(Vector3.Dot(axis, Vector3.up)) > 0.9f ? Vector3.right : Vector3.up).normalized;
+        var w = Vector3.Cross(axis, u);
+        var pts = new Vector3[segs + 1];
+        for (var i = 0; i <= segs; i++)
+        {
+            var a = i * Mathf.PI * 2f / segs;
+            pts[i] = o + (u * Mathf.Cos(a) + w * Mathf.Sin(a)) * r;
+        }
+        return pts;
+    }
+
+    static float DistanceToSegment(Vector2 p, Vector2 a, Vector2 b)
+    {
+        var ab = b - a;
+        var t = ab.sqrMagnitude < 0.001f ? 0 : Mathf.Clamp01(Vector2.Dot(p - a, ab) / ab.sqrMagnitude);
+        return Vector2.Distance(p, a + ab * t);
+    }
+
+    static bool InPoly(Vector2 p, Vector2[] poly)
+    {
+        var inside = false;
+        for (int i = 0, j = poly.Length - 1; i < poly.Length; j = i++)
+            if ((poly[i].y > p.y) != (poly[j].y > p.y) && p.x < (poly[j].x - poly[i].x) * (p.y - poly[i].y) / (poly[j].y - poly[i].y) + poly[i].x) inside = !inside;
+        return inside;
+    }
+
+    /// <summary>Ручка под курсором: 0–2 ось (или кольцо), 3–5 плоскость (по нормали), 6 центр; -1 — нет.</summary>
+    int HandleAt(Vector2 m)
+    {
+        if (_sel == null || _mode == "select" || _mode == "paint" || _cam == null) return -1;
+        var o = _sel.transform.position;
+        if (!Visible(o)) return -1;
+        var size = GizmoSize(o);
+        var axes = new[] { AxisOf(0), AxisOf(1), AxisOf(2) };
+        var so = Scr(o);
+        var tol = 9f * _ui;
+        if (_mode == "rotate")
+        {
+            int best = -1;
+            var bd = tol;
+            for (var i = 0; i < 3; i++)
+            {
+                var pts = RingPoints(o, axes[i], size * 0.95f, 48);
+                for (var k = 0; k < 48; k++)
+                {
+                    if (!Visible(pts[k])) continue;
+                    var d = DistanceToSegment(m, Scr(pts[k]), Scr(pts[k + 1]));
+                    if (d < bd) { bd = d; best = i; }
+                }
+            }
+            return best;
+        }
+        if (Vector2.Distance(m, so) < tol * 1.2f) return 6;
+        if (_mode == "move")
+            for (var n = 0; n < 3; n++)
+            {
+                var q = PlaneQuad(o, n, size, axes);
+                if (InPoly(m, new[] { Scr(q[0]), Scr(q[1]), Scr(q[2]), Scr(q[3]) })) return 3 + n;
+            }
+        int ba = -1;
+        var bda = tol;
+        for (var i = 0; i < 3; i++)
+        {
+            var d = DistanceToSegment(m, so, Scr(o + axes[i] * size));
+            if (d < bda) { bda = d; ba = i; }
+        }
+        return ba;
+    }
+
+    static bool RayPlane(Ray ray, Vector3 p, Vector3 n, out Vector3 hit)
+    {
+        hit = Vector3.zero;
+        float enter;
+        var plane = new Plane(n, p);
+        if (!plane.Raycast(ray, out enter)) return false;
+        hit = ray.GetPoint(enter);
+        return true;
+    }
+
+    /// <summary>Точка на оси (p + a·t), ближайшая к лучу мыши, — так тянут стрелку настоящие редакторы.</summary>
+    static float LineParam(Ray ray, Vector3 p, Vector3 a)
+    {
+        var w0 = p - ray.origin;
+        var b = Vector3.Dot(a, ray.direction);
+        var d = Vector3.Dot(a, w0);
+        var e = Vector3.Dot(ray.direction, w0);
+        var denom = 1f - b * b;
+        if (Mathf.Abs(denom) < 1e-4f) return 0;
+        return (b * e - d) / denom;
+    }
+
+    static float SignedAngle(Vector3 from, Vector3 to, Vector3 axis)
+    {
+        var a = Vector3.Angle(from, to);
+        return Vector3.Dot(axis, Vector3.Cross(from, to)) < 0 ? -a : a;
+    }
+
+    Vector3 PlaneNormal(int handle)
+    {
+        return handle == 6 ? -_cam.transform.forward : _axes0[handle - 3];
+    }
+
+    void BeginDrag(int handle, Vector2 m)
+    {
+        _drag = handle;
+        _mouse0 = m;
+        _before = SnapOf(_selection);
+        var o = _sel.transform.position;
+        _pivot0 = o;
+        _size0 = GizmoSize(o);
+        for (var i = 0; i < 3; i++) _axes0[i] = AxisOf(i);
+        _pos0 = _selection.Select(g => g.transform.position).ToArray();
+        _rot0 = _selection.Select(g => g.transform.rotation).ToArray();
+        _scale0 = _selection.Select(g => g.transform.localScale).ToArray();
+        var ray = _cam.ScreenPointToRay(m);
+        if (_mode == "rotate") RayPlane(ray, o, _axes0[handle], out _hit0);
+        else if (handle < 3) _t0 = LineParam(ray, o, _axes0[handle]);
+        else RayPlane(ray, o, PlaneNormal(handle), out _hit0);
+    }
+
+    Vector3 SnapVec(Vector3 v)
+    {
+        if (!_local) return new Vector3(Mathf.Round(v.x / _grid) * _grid, Mathf.Round(v.y / _grid) * _grid, Mathf.Round(v.z / _grid) * _grid);
+        var r = Vector3.zero;
+        for (var i = 0; i < 3; i++) r += _axes0[i] * Mathf.Round(Vector3.Dot(v, _axes0[i]) / _grid) * _grid;
+        return r;
+    }
+
+    void DragTo(Vector2 m)
+    {
+        if (_drag < 0 || _sel == null || _pos0 == null || _pos0.Length != _selection.Count) return;
+        var ray = _cam.ScreenPointToRay(m);
+        if (_mode == "move")
+        {
+            Vector3 delta;
+            if (_drag < 3)
+            {
+                var t = LineParam(ray, _pivot0, _axes0[_drag]) - _t0;
+                if (_snap) t = Mathf.Round(t / _grid) * _grid;
+                delta = _axes0[_drag] * t;
+                _dragValue = t;
+            }
+            else
+            {
+                Vector3 h;
+                if (!RayPlane(ray, _pivot0, PlaneNormal(_drag), out h)) return;
+                delta = h - _hit0;
+                if (_snap) delta = SnapVec(delta);
+                _dragValue = delta.magnitude;
+            }
+            for (var i = 0; i < _selection.Count; i++) _selection[i].transform.position = _pos0[i] + delta;
+        }
+        else if (_mode == "rotate")
+        {
+            var a = _axes0[_drag];
+            float angle;
+            Vector3 h;
+            var edgeOn = Mathf.Abs(Vector3.Dot(a, (_pivot0 - _cam.transform.position).normalized)) < 0.12f;
+            if (!edgeOn && RayPlane(ray, _pivot0, a, out h)) angle = SignedAngle(_hit0 - _pivot0, h - _pivot0, a);
+            else angle = (m.x - _mouse0.x) * 0.5f;
+            if (_snap) angle = Mathf.Round(angle / AngleSnap) * AngleSnap;
+            _dragValue = angle;
+            var q = Quaternion.AngleAxis(angle, a);
+            for (var i = 0; i < _selection.Count; i++)
+            {
+                _selection[i].transform.rotation = q * _rot0[i];
+                _selection[i].transform.position = _pivot0 + q * (_pos0[i] - _pivot0);
+            }
+        }
+        else if (_mode == "scale")
+        {
+            float k;
+            if (_drag == 6) k = 1 + ((m.x - _mouse0.x) + (m.y - _mouse0.y)) / (140f * _ui);
+            else k = 1 + (LineParam(ray, _pivot0, _axes0[_drag]) - _t0) / Mathf.Max(0.01f, _size0);
+            k = Mathf.Max(0.02f, k);
+            if (_snap) k = Mathf.Max(0.1f, Mathf.Round(k * 10f) / 10f);
+            _dragValue = k;
+            for (var i = 0; i < _selection.Count; i++)
+            {
+                var s = _scale0[i];
+                if (_drag == 6) s *= k; else s[_drag] = _scale0[i][_drag] * k;
+                _selection[i].transform.localScale = s;
+            }
+        }
+    }
+
+    void EndDrag()
+    {
+        if (_drag < 0) return;
+        _drag = -1;
+        var after = SnapOf(_selection);
+        var before = _before;
+        foreach (var g in _selection) Touch(g);
+        PushSnap(T(_mode, _mode), before, after);
+        Dirty();
+    }
+
+    // ------------------------------------------------------------------ рисование в окне просмотра (GL поверх кадра)
+
+    static Material _glMat;
+
+    static Material GlMat()
+    {
+        if (_glMat != null) return _glMat;
+        var sh = Shader.Find("Hidden/Internal-Colored");
+        if (sh == null) return null;
+        _glMat = new Material(sh) { hideFlags = HideFlags.HideAndDontSave };
+        _glMat.SetInt("_SrcBlend", 5);
+        _glMat.SetInt("_DstBlend", 10);
+        _glMat.SetInt("_Cull", 0);
+        _glMat.SetInt("_ZWrite", 0);
+        _glMat.SetInt("_ZTest", 8);
+        return _glMat;
+    }
+
+    static void Vx(Vector2 p) { GL.Vertex3(p.x, p.y, 0); }
+
+    static void Seg(Vector2 a, Vector2 b, float w, Color c)
+    {
+        var d = b - a;
+        if (d.sqrMagnitude < 0.0001f) return;
+        d.Normalize();
+        var n = new Vector2(-d.y, d.x) * (w * 0.5f);
+        GL.Begin(GL.QUADS);
+        GL.Color(c);
+        Vx(a - n); Vx(a + n); Vx(b + n); Vx(b - n);
+        GL.End();
+    }
+
+    static void Tri(Vector2 a, Vector2 b, Vector2 c, Color col)
+    {
+        GL.Begin(GL.TRIANGLES);
+        GL.Color(col);
+        Vx(a); Vx(b); Vx(c);
+        GL.End();
+    }
+
+    static void Box(Vector2 c, float r, Color col)
+    {
+        GL.Begin(GL.QUADS);
+        GL.Color(col);
+        Vx(c + new Vector2(-r, -r)); Vx(c + new Vector2(r, -r)); Vx(c + new Vector2(r, r)); Vx(c + new Vector2(-r, r));
+        GL.End();
+    }
+
+    static void Fill(Vector2[] q, Color col)
+    {
+        GL.Begin(GL.QUADS);
+        GL.Color(col);
+        foreach (var p in q) Vx(p);
+        GL.End();
+    }
+
+    void WorldSeg(Vector3 a, Vector3 b, float w, Color c)
+    {
+        if (!Visible(a) || !Visible(b)) return;
+        Seg(Scr(a), Scr(b), w, c);
+    }
+
+    void WireBox(Bounds b, float w, Color c)
+    {
+        int[] e = { 0, 1, 2, 3, 4, 5, 6, 7, 0, 2, 1, 3, 4, 6, 5, 7, 0, 4, 1, 5, 2, 6, 3, 7 };
+        for (var i = 0; i < e.Length; i += 2) WorldSeg(Corner(b, e[i]), Corner(b, e[i + 1]), w, c);
+    }
+
+    /// <summary>
+    /// Всё, что рисуется поверх кадра: выбранное, наведённое, стрелки, рамка выделения, оси вида. Рисуем прямо в текстуру
+    /// окна просмотра, в её же точках (их и даёт WorldToScreenPoint камеры), — так стрелки всегда совпадают с объектами.
+    /// </summary>
+    void DrawViewport()
+    {
+        var mat = GlMat();
+        if (mat == null || _cam == null || _rt == null) return;
+        var prevRt = RenderTexture.active;
+        RenderTexture.active = _rt;
+        GL.PushMatrix();
+        mat.SetPass(0);
+        GL.LoadPixelMatrix(0, _rt.width, 0, _rt.height);
+        try { DrawOverlay(); }
+        finally
+        {
+            GL.PopMatrix();
+            RenderTexture.active = prevRt;
+        }
+    }
+
+    void DrawOverlay()
+    {
+        if (_hoverGo != null && !_selection.Contains(_hoverGo) && _drag < 0) WireBox(BoundsOf(_hoverGo), 1f * _ui, new Color(1f, 1f, 1f, 0.35f));
+        foreach (var s in _selection)
+            if (s != null && s.activeInHierarchy) WireBox(BoundsOf(s), 1.4f * _ui, s == _sel ? new Color(0.96f, 0.72f, 0.18f, 0.95f) : new Color(0.96f, 0.72f, 0.18f, 0.5f));
+        if (_ghost == null) DrawGizmo();
+        if (_marquee)
+        {
+            var a = _marq0; var b = _marq1;
+            Fill(new[] { a, new Vector2(b.x, a.y), b, new Vector2(a.x, b.y) }, new Color(0.96f, 0.72f, 0.18f, 0.10f));
+            var c = new Color(0.96f, 0.72f, 0.18f, 0.9f);
+            Seg(a, new Vector2(b.x, a.y), 1.2f, c); Seg(new Vector2(b.x, a.y), b, 1.2f, c); Seg(b, new Vector2(a.x, b.y), 1.2f, c); Seg(new Vector2(a.x, b.y), a, 1.2f, c);
+        }
+        DrawViewAxes();
+    }
+
+    /// <summary>Центр окна просмотра в его же точках.</summary>
+    Vector2 ViewCenter { get { return new Vector2(_vpPx.width / 2f, _vpPx.height / 2f); } }
+
+    Color HandleColor(int id, Color normal)
+    {
+        return _drag == id || (_drag < 0 && _hover == id) ? Hot : normal;
+    }
+
+    void DrawGizmo()
+    {
+        if (_sel == null || _mode == "select" || _mode == "paint" || !_sel.activeInHierarchy) return;
+        var o = _sel.transform.position;
+        if (!Visible(o)) return;
+        var size = _drag >= 0 ? _size0 : GizmoSize(o);
+        var axes = _drag >= 0 ? _axes0 : new[] { AxisOf(0), AxisOf(1), AxisOf(2) };
+        var so = Scr(o);
+        var lw = 3f * _ui;
+        if (_mode == "rotate")
+        {
+            for (var i = 0; i < 3; i++)
+            {
+                var pts = RingPoints(o, axes[i], size * 0.95f, 64);
+                var col = HandleColor(i, AxisColors[i]);
+                // Задняя половина кольца — бледнее: видно, где перед, где зад.
+                for (var k = 0; k < 64; k++)
+                {
+                    if (!Visible(pts[k]) || !Visible(pts[k + 1])) continue;
+                    var back = Vector3.Dot((pts[k] - o).normalized, (_cam.transform.position - o).normalized) < -0.05f;
+                    var c = back && _drag != i ? new Color(col.r, col.g, col.b, 0.28f) : col;
+                    Seg(Scr(pts[k]), Scr(pts[k + 1]), _drag == i || _hover == i ? lw * 1.2f : lw * 0.85f, c);
+                }
+            }
+            Box(so, 2.5f * _ui, Color.white);
+            return;
+        }
+        if (_mode == "move")
+            for (var n = 0; n < 3; n++)
+            {
+                var q = PlaneQuad(o, n, size, axes);
+                var sq = new[] { Scr(q[0]), Scr(q[1]), Scr(q[2]), Scr(q[3]) };
+                var c = HandleColor(3 + n, AxisColors[n]);
+                Fill(sq, new Color(c.r, c.g, c.b, _hover == 3 + n || _drag == 3 + n ? 0.65f : 0.32f));
+                for (var k = 0; k < 4; k++) Seg(sq[k], sq[(k + 1) % 4], 1.2f * _ui, new Color(c.r, c.g, c.b, 0.9f));
+            }
+        for (var i = 0; i < 3; i++)
+        {
+            var tip = Scr(o + axes[i] * size);
+            if ((tip - so).magnitude < 6f * _ui) continue;
+            var col = HandleColor(i, AxisColors[i]);
+            if (_mode == "move")
+            {
+                var neck = Scr(o + axes[i] * size * 0.8f);
+                Seg(so, neck, lw, col);
+                var d = (tip - neck).normalized;
+                var n = new Vector2(-d.y, d.x) * 6.5f * _ui;
+                Tri(tip, neck + n, neck - n, col);
+            }
+            else
+            {
+                Seg(so, tip, lw, col);
+                Box(tip, 5.5f * _ui, col);
+            }
+        }
+        Box(so, (_mode == "scale" ? 6f : 4.5f) * _ui, HandleColor(6, new Color(0.95f, 0.95f, 0.95f)));
+    }
+
+    /// <summary>Оси вида в углу окна просмотра — куда смотрят X, Y и Z (как в UE5).</summary>
+    void DrawViewAxes()
+    {
+        var c = new Vector2(48f * _ui, 48f * _ui);
+        var m = _cam.worldToCameraMatrix;
+        for (var i = 0; i < 3; i++)
+        {
+            var d = m.MultiplyVector(Axes[i]);
+            var dir = new Vector2(d.x, d.y) * 30f * _ui;
+            Seg(c, c - dir * 0.7f, 1.5f * _ui, new Color(AxisColors[i].r, AxisColors[i].g, AxisColors[i].b, 0.3f));
+            Seg(c, c + dir, 2.4f * _ui, AxisColors[i]);
+            Box(c + dir, 3.5f * _ui, AxisColors[i]);
+        }
+    }
+
+    // ------------------------------------------------------------------ сетка на земле
+
+    GameObject _gridGo;
+    Material _gridMat;
+    float _gridCell, _gridY, _gridProbeAt;
+    bool _showGrid = true;
+
+    void UpdateGrid()
+    {
+        if (!_open || !_showGrid || _cam == null)
+        {
+            if (_gridGo != null) _gridGo.SetActive(false);
+            return;
+        }
+        var cell = _snap ? Mathf.Max(0.25f, _grid) : 1f;
+        if (_gridGo == null || !Mathf.Approximately(cell, _gridCell)) BuildGrid(cell);
+        if (_gridGo == null) return;
+        _gridGo.SetActive(true);
+        if (_sel != null && _sel.activeInHierarchy) _gridY = BoundsOf(_sel).min.y;
+        else if (Time.realtimeSinceStartup > _gridProbeAt)
+        {
+            _gridProbeAt = Time.realtimeSinceStartup + 0.5f;
+            RaycastHit h;
+            if (Physics.Raycast(_cam.transform.position, Vector3.down, out h, 1000f, ~0, QueryTriggerInteraction.Ignore)) _gridY = h.point.y;
+        }
+        var f = _cam.transform.position + _cam.transform.forward * 12f;
+        _gridGo.transform.position = new Vector3(Mathf.Round(f.x / (cell * 10)) * cell * 10, _gridY + 0.02f, Mathf.Round(f.z / (cell * 10)) * cell * 10);
+    }
+
+    void BuildGrid(float cell)
+    {
+        _gridCell = cell;
+        if (_gridGo == null)
+        {
+            var sh = Shader.Find("Hidden/Internal-Colored");
+            if (sh == null) return;
+            _gridGo = new GameObject("ModScript Studio Grid");
+            _gridGo.AddComponent<MeshFilter>();
+            var mr = _gridGo.AddComponent<MeshRenderer>();
+            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            mr.receiveShadows = false;
+            _gridMat = new Material(sh) { hideFlags = HideFlags.HideAndDontSave };
+            _gridMat.SetInt("_SrcBlend", 5);
+            _gridMat.SetInt("_DstBlend", 10);
+            _gridMat.SetInt("_Cull", 0);
+            _gridMat.SetInt("_ZWrite", 0);
+            _gridMat.SetInt("_ZTest", 4);
+            mr.sharedMaterial = _gridMat;
+        }
+        const int n = 50;
+        const int segs = 10;
+        var half = n * cell;
+        var verts = new List<Vector3>();
+        var cols = new List<Color>();
+        var idx = new List<int>();
+        for (var i = -n; i <= n; i++)
+        {
+            var major = i % 10 == 0;
+            for (var dir = 0; dir < 2; dir++)
+            {
+                var baseA = i == 0 ? 0.75f : major ? 0.55f : 0.30f;
+                var tone = i == 0 ? (dir == 0 ? AxisColors[2] : AxisColors[0]) : new Color(0.42f, 0.44f, 0.50f);
+                for (var s = 0; s < segs; s++)
+                {
+                    var a0 = -half + 2f * half * s / segs;
+                    var a1 = -half + 2f * half * (s + 1) / segs;
+                    var p0 = dir == 0 ? new Vector3(i * cell, 0, a0) : new Vector3(a0, 0, i * cell);
+                    var p1 = dir == 0 ? new Vector3(i * cell, 0, a1) : new Vector3(a1, 0, i * cell);
+                    verts.Add(p0); verts.Add(p1);
+                    cols.Add(new Color(tone.r, tone.g, tone.b, baseA * Mathf.Pow(Mathf.Clamp01(1 - p0.magnitude / half), 1.6f)));
+                    cols.Add(new Color(tone.r, tone.g, tone.b, baseA * Mathf.Pow(Mathf.Clamp01(1 - p1.magnitude / half), 1.6f)));
+                    idx.Add(verts.Count - 2); idx.Add(verts.Count - 1);
+                }
+            }
+        }
+        var mesh = new Mesh { name = "ModScript Studio Grid" };
+        mesh.vertices = verts.ToArray();
+        mesh.colors = cols.ToArray();
+        mesh.SetIndices(idx.ToArray(), MeshTopology.Lines, 0);
+        mesh.bounds = new Bounds(Vector3.zero, new Vector3(half * 2, 1, half * 2));
+        _gridGo.GetComponent<MeshFilter>().sharedMesh = mesh;
+    }
+
+    // ------------------------------------------------------------------ отмена и повтор
+
+    class Cmd { public string Name; public Action Undo, Redo; }
+    class Snap { public GameObject Go; public Transform Parent; public Vector3 P, S; public Quaternion R; }
+
+    readonly List<Cmd> _undo = new List<Cmd>();
+    readonly List<Cmd> _redo = new List<Cmd>();
+
+    void Push(string name, Action undo, Action redo)
+    {
+        _undo.Add(new Cmd { Name = name, Undo = undo, Redo = redo });
+        if (_undo.Count > 300) _undo.RemoveAt(0);
+        _redo.Clear();
+    }
+
+    void Undo()
+    {
+        if (_undo.Count == 0) return;
+        var c = _undo[_undo.Count - 1];
+        _undo.RemoveAt(_undo.Count - 1);
+        try { c.Undo(); } catch (Exception e) { Logger.LogWarning("undo: " + e.Message); }
+        _redo.Add(c);
+        _selection.RemoveAll(g => g == null || !g.activeInHierarchy);
+        Status(T("undone", "Undone") + ": " + c.Name);
+        Dirty();
+    }
+
+    void Redo()
+    {
+        if (_redo.Count == 0) return;
+        var c = _redo[_redo.Count - 1];
+        _redo.RemoveAt(_redo.Count - 1);
+        try { c.Redo(); } catch (Exception e) { Logger.LogWarning("redo: " + e.Message); }
+        _undo.Add(c);
+        _selection.RemoveAll(g => g == null || !g.activeInHierarchy);
+        Status(T("redone", "Redone") + ": " + c.Name);
+        Dirty();
+    }
+
+    static List<Snap> SnapOf(IEnumerable<GameObject> gos)
+    {
+        var list = new List<Snap>();
+        foreach (var g in gos)
+            if (g != null) list.Add(new Snap { Go = g, Parent = g.transform.parent, P = g.transform.localPosition, R = g.transform.localRotation, S = g.transform.localScale });
+        return list;
+    }
+
+    static void Restore(List<Snap> list)
+    {
+        foreach (var s in list)
+        {
+            if (s.Go == null) continue;
+            if (s.Go.transform.parent != s.Parent) s.Go.transform.SetParent(s.Parent, false);
+            s.Go.transform.localPosition = s.P;
+            s.Go.transform.localRotation = s.R;
+            s.Go.transform.localScale = s.S;
+        }
+    }
+
+    void PushSnap(string name, List<Snap> before, List<Snap> after)
+    {
+        Push(name, () => { Restore(before); foreach (var s in before) Touch(s.Go); }, () => { Restore(after); foreach (var s in after) Touch(s.Go); });
+    }
+
+    // ------------------------------------------------------------------ поставить (под курсор), копии, группы, удалить
+
+    static string NewId() { return Guid.NewGuid().ToString("N").Substring(0, 8); }
+
+    Vector3 Aim()
+    {
+        var ray = _cam.ScreenPointToRay(new Vector3(ViewCenter.x, ViewCenter.y, 0));
+        RaycastHit hit;
+        if (!_cam.orthographic && Physics.Raycast(ray, out hit, 500f, ~0, QueryTriggerInteraction.Ignore)) return hit.point;
+        if (_cam.orthographic) { var p = _cam.transform.position; return new Vector3(p.x, p.y, 0); }
+        return ray.origin + ray.direction * 8f;
+    }
+
+    Placed Register(GameObject go, string source, string name)
+    {
+        var p = new Placed { Id = NewId(), Source = source, Name = name, Go = go };
+        _placed.Add(p);
+        Select(go, false);
+        Push(T("cmd.place", "Place") + " " + name,
+            () => { _placed.Remove(p); go.SetActive(false); },
+            () => { go.SetActive(true); if (!_placed.Contains(p)) _placed.Add(p); });
+        Dirty();
+        return p;
+    }
+
+    /// <summary>Поставить сразу в центр вида (кнопки «Вставка» и самопроверка).</summary>
+    GameObject Place(string source, string name)
+    {
+        GameObject go;
+        try { go = Make(source, Aim(), Quaternion.identity); }
+        catch (Exception e) { Status(e.Message); return null; }
+        if (go == null) { Status(T("cantPlace", "This object can't be placed")); return null; }
+        go.name = name;
+        if (go.GetComponentInChildren<Renderer>() != null) go.transform.position += Vector3.up * (go.transform.position.y - BoundsOf(go).min.y);
+        SetPhysics(go, false);
+        Register(go, source, name);
+        return go;
+    }
+
+    GameObject _ghost;
+    string _ghostSource, _ghostName;
+    float _ghostLift;
+    readonly List<Collider> _ghostCols = new List<Collider>();
+
+    /// <summary>Объект из библиотеки следует за курсором по поверхностям; щелчок — поставить (Shift — ещё один), Esc — отмена.</summary>
+    void BeginPlace(string source, string name)
+    {
+        CancelPlace();
+        GameObject go;
+        try { go = Make(source, Aim(), Quaternion.identity); }
+        catch (Exception e) { Status(e.Message); return; }
+        if (go == null) { Status(T("cantPlace", "This object can't be placed")); return; }
+        go.name = name;
+        SetPhysics(go, false);
+        foreach (var c in go.GetComponentsInChildren<Collider>(true)) if (c.enabled) { c.enabled = false; _ghostCols.Add(c); }
+        _ghostLift = go.GetComponentInChildren<Renderer>() != null ? go.transform.position.y - BoundsOf(go).min.y : 0;
+        _ghost = go;
+        _ghostSource = source;
+        _ghostName = name;
+        Status(T("placing", "Click to place · Shift — several · Esc — cancel"));
+    }
+
+    void MoveGhost(Vector2 m)
+    {
+        if (_ghost == null) return;
+        var ray = _cam.ScreenPointToRay(new Vector3(m.x, m.y, 0));
+        RaycastHit h;
+        Vector3 p;
+        if (!_cam.orthographic && Physics.Raycast(ray, out h, 2000f, ~0, QueryTriggerInteraction.Ignore)) p = h.point;
+        else p = ray.origin + ray.direction * 10f;
+        if (_snap) { p.x = Mathf.Round(p.x / _grid) * _grid; p.z = Mathf.Round(p.z / _grid) * _grid; }
+        _ghost.transform.position = p + Vector3.up * _ghostLift;
+    }
+
+    void DropGhost(bool keep)
+    {
+        if (_ghost == null) return;
+        var go = _ghost;
+        _ghost = null;
+        foreach (var c in _ghostCols) if (c != null) c.enabled = true;
+        _ghostCols.Clear();
+        Register(go, _ghostSource, _ghostName);
+        if (keep) BeginPlace(_ghostSource, _ghostName);
+    }
+
+    void CancelPlace()
+    {
+        if (_ghost != null) Destroy(_ghost);
+        _ghost = null;
+        _ghostCols.Clear();
+    }
+
+    /// <summary>Копия объекта (с частями группы): тот же источник, материал, цвет, физика и поведение.</summary>
+    GameObject Clone(GameObject from, List<Placed> made)
+    {
+        var p = PlacedExact(from);
+        var source = p != null ? p.Source : "clone:" + PathOf(from.transform);
+        var go = Make(source, from.transform.position, from.transform.rotation);
+        if (go == null) return null;
+        go.transform.rotation = from.transform.rotation;
+        go.transform.localScale = from.transform.lossyScale;
+        var np = new Placed { Id = NewId(), Source = source, Name = p != null ? p.Name : from.name, Go = go, Scale = go.transform.localScale };
+        if (p != null)
+        {
+            np.Mat = p.Mat; np.Tint = p.Tint; np.Tinted = p.Tinted; np.Physics = p.Physics;
+            var b = from.GetComponent<ModScriptBehaviour>();
+            np.Beh = b != null ? b.Code() : "";
+            Dress(np);
+            var nb = go.GetComponent<ModScriptBehaviour>();
+            if (nb != null) nb.Paused = true;
+        }
+        else SetPhysics(go, false);
+        go.name = np.Name;
+        _placed.Add(np);
+        made.Add(np);
+        foreach (Transform child in from.transform)
+        {
+            if (PlacedExact(child.gameObject) == null) continue;
+            var c = Clone(child.gameObject, made);
+            if (c != null) c.transform.SetParent(go.transform, true);
+        }
+        return go;
+    }
+
+    void PushMade(string name, List<Placed> made)
+    {
+        Push(name,
+            () => { foreach (var m in made) { _placed.Remove(m); if (m.Go != null) m.Go.SetActive(false); } },
+            () => { foreach (var m in made) { if (m.Go != null) m.Go.SetActive(true); if (!_placed.Contains(m)) _placed.Add(m); } });
+        Dirty();
+    }
+
+    List<GameObject> TopSelection()
+    {
+        // Без частей, чья группа тоже выбрана: копируется и удаляется группа целиком.
+        return _selection.Where(g => g != null && !_selection.Any(o => o != g && g.transform.IsChildOf(o.transform))).ToList();
+    }
+
+    Vector3 FlatRight()
+    {
+        var r = _cam.transform.right;
+        r.y = 0;
+        return r.sqrMagnitude < 0.01f ? Vector3.right : r.normalized;
+    }
+
+    void Duplicate()
+    {
+        var tops = TopSelection();
+        if (tops.Count == 0) return;
+        var all = BoundsOf(tops[0]);
+        foreach (var g in tops) all.Encapsulate(BoundsOf(g));
+        var offset = FlatRight() * Mathf.Max(0.5f, Mathf.Max(all.size.x, all.size.z));
+        var made = new List<Placed>();
+        var news = new List<GameObject>();
+        foreach (var g in tops)
+        {
+            var c = Clone(g, made);
+            if (c == null) continue;
+            c.transform.position += offset;
+            news.Add(c);
+        }
+        _selection.Clear();
+        _selection.AddRange(news);
+        PushMade(T("duplicate", "Duplicate"), made);
+    }
+
+    readonly List<GameObject> _clipboard = new List<GameObject>();
+
+    void Copy()
+    {
+        _clipboard.Clear();
+        _clipboard.AddRange(TopSelection());
+        Status(T("copied", "Copied") + ": " + _clipboard.Count);
+    }
+
+    void Paste()
+    {
+        var src = _clipboard.Where(g => g != null).ToList();
+        if (src.Count == 0) return;
+        var anchor = src[0].transform.position;
+        var aim = Aim();
+        var made = new List<Placed>();
+        var news = new List<GameObject>();
+        foreach (var g in src)
+        {
+            var c = Clone(g, made);
+            if (c == null) continue;
+            c.transform.position += aim - anchor;
+            news.Add(c);
+        }
+        _selection.Clear();
+        _selection.AddRange(news);
+        PushMade(T("paste", "Paste"), made);
+    }
+
+    /// <summary>Массив: n копий выбранного вдоль оси с шагом в размер объекта (забор, дорога, ряд фонарей).</summary>
+    void MakeArray(int n, int axis)
+    {
+        if (_sel == null || n < 1) return;
+        var from = _sel;
+        var dir = AxisOf(axis);
+        var size = BoundsOf(from).size;
+        var step = dir * Mathf.Max(0.1f, Mathf.Abs(Vector3.Dot(size, new Vector3(Mathf.Abs(dir.x), Mathf.Abs(dir.y), Mathf.Abs(dir.z)))));
+        var made = new List<Placed>();
+        var news = new List<GameObject> { from };
+        for (var i = 1; i <= n; i++)
+        {
+            var c = Clone(from, made);
+            if (c == null) continue;
+            c.transform.position = from.transform.position + step * i;
+            news.Add(c);
+        }
+        _selection.Clear();
+        _selection.AddRange(news);
+        PushMade(T("array", "Array"), made);
+    }
+
+    void Delete()
+    {
+        var tops = TopSelection();
+        if (tops.Count == 0) return;
+        var removed = new List<Placed>();
+        var hidden = new List<Touched>();
+        var level = new List<GameObject>();
+        foreach (var go in tops)
+        {
+            var p = PlacedExact(go);
+            if (p != null)
+            {
+                foreach (var part in _placed.Where(x => x.Go != null && x.Go.transform.IsChildOf(go.transform)).ToList()) removed.Add(part);
+                go.SetActive(false);
+            }
+            else
+            {
+                var t = TouchedOf(go, true);
+                t.Hidden = true;
+                go.SetActive(false);
+                hidden.Add(t);
+                level.Add(go);
+            }
+        }
+        foreach (var r in removed) _placed.Remove(r);
+        var tops2 = tops.ToList();
+        Push(T("delete", "Delete"),
+            () => { foreach (var r in removed) if (!_placed.Contains(r)) _placed.Add(r); foreach (var t in hidden) t.Hidden = false; foreach (var g in tops2) if (g != null) g.SetActive(true); },
+            () => { foreach (var r in removed) _placed.Remove(r); foreach (var t in hidden) t.Hidden = true; foreach (var g in tops2) if (g != null) g.SetActive(false); });
+        _selection.Clear();
+        Dirty();
+    }
+
+    /// <summary>Группа (Ctrl+G): выбранные поставленные объекты — в одну модель; двигается и копируется целиком.</summary>
+    void Group()
+    {
+        var parts = TopSelection().Where(g => PlacedExact(g) != null).ToList();
+        if (parts.Count < 1) { Status(T("groupOnlyYours", "Only objects you placed can be grouped")); return; }
+        var b = BoundsOf(parts[0]);
+        foreach (var g in parts) b.Encapsulate(BoundsOf(g));
+        var before = SnapOf(parts);
+        var group = Make("prim:Empty", new Vector3(b.center.x, b.min.y, b.center.z), Quaternion.identity);
+        var name = T("groupName", "Group");
+        group.name = name;
+        var p = new Placed { Id = NewId(), Source = "prim:Empty", Name = name, Go = group };
+        _placed.Add(p);
+        foreach (var g in parts) g.transform.SetParent(group.transform, true);
+        var after = SnapOf(parts);
+        _selection.Clear();
+        _selection.Add(group);
+        Push(T("group", "Group"),
+            () => { Restore(before); _placed.Remove(p); group.SetActive(false); },
+            () => { group.SetActive(true); if (!_placed.Contains(p)) _placed.Add(p); Restore(after); });
+        Dirty();
+    }
+
+    void Ungroup()
+    {
+        var p = _sel != null ? PlacedExact(_sel) : null;
+        if (p == null || p.Source != "prim:Empty") return;
+        var group = p.Go;
+        var parts = new List<GameObject>();
+        foreach (Transform c in group.transform) parts.Add(c.gameObject);
+        var before = SnapOf(parts);
+        foreach (var g in parts) g.transform.SetParent(group.transform.parent, true);
+        var after = SnapOf(parts);
+        _placed.Remove(p);
+        group.SetActive(false);
+        _selection.Clear();
+        _selection.AddRange(parts);
+        Push(T("ungroup", "Ungroup"),
+            () => { group.SetActive(true); if (!_placed.Contains(p)) _placed.Add(p); Restore(before); },
+            () => { Restore(after); _placed.Remove(p); group.SetActive(false); });
+        Dirty();
+    }
+
+    void DropToGround()
+    {
+        var tops = TopSelection();
+        if (tops.Count == 0) return;
+        var before = SnapOf(tops);
+        foreach (var go in tops)
+        {
+            var b = BoundsOf(go);
+            var cols = go.GetComponentsInChildren<Collider>().Where(c => c.enabled).ToList();
+            foreach (var c in cols) c.enabled = false;
+            RaycastHit hit;
+            var found = Physics.Raycast(new Vector3(b.center.x, b.max.y + 0.5f, b.center.z), Vector3.down, out hit, 2000f, ~0, QueryTriggerInteraction.Ignore);
+            foreach (var c in cols) c.enabled = true;
+            if (found) go.transform.position += Vector3.up * (hit.point.y - b.min.y);
+            Touch(go);
+        }
+        PushSnap(T("ground", "Put on the ground"), before, SnapOf(tops));
+        Dirty();
+    }
+
+    void SetMaterial(string material)
+    {
+        var targets = TopSelection();
+        if (targets.Count == 0) { Status(T("pickFirst", "Select an object, then click a material.")); return; }
+        var rs = targets.SelectMany(g => g.GetComponentsInChildren<Renderer>(true)).ToArray();
+        var old = rs.Select(r => r.sharedMaterials).ToArray();
+        var oldMats = targets.Select(g => { var p = PlacedOf(g); return p != null ? p.Mat : null; }).ToArray();
+        foreach (var g in targets)
+        {
+            ApplyMaterial(g, material);
+            var p = PlacedOf(g);
+            if (p != null) p.Mat = material;
+        }
+        var now = rs.Select(r => r.sharedMaterials).ToArray();
+        Push(T("tab.materials", "Material"),
+            () => { for (var i = 0; i < rs.Length; i++) if (rs[i] != null) rs[i].sharedMaterials = old[i]; for (var i = 0; i < targets.Count; i++) { var p = PlacedOf(targets[i]); if (p != null) p.Mat = oldMats[i] ?? ""; } },
+            () => { for (var i = 0; i < rs.Length; i++) if (rs[i] != null) rs[i].sharedMaterials = now[i]; for (var i = 0; i < targets.Count; i++) { var p = PlacedOf(targets[i]); if (p != null) p.Mat = material; } });
+        if (targets.Any(g => PlacedOf(g) == null)) Status(T("sceneMaterial", "Material changes stay for placed objects; scene objects are changed until the level reloads"));
+        Dirty();
+    }
+
+    void FocusOn(GameObject go)
+    {
+        if (_cam == null || go == null) return;
+        var b = BoundsOf(go);
+        if (_cam.orthographic) { _cam.transform.position = new Vector3(b.center.x, b.center.y, _cam.transform.position.z); return; }
+        _cam.transform.position = b.center - _cam.transform.forward * Mathf.Max(3, b.size.magnitude * 1.6f);
+        _orbit = b.center;
+    }
+
+    // ------------------------------------------------------------------ скрыть в редакторе (глаз в «Проводнике»)
+
+    readonly Dictionary<GameObject, List<Renderer>> _eyeHidden = new Dictionary<GameObject, List<Renderer>>();
+
+    void ToggleEye(GameObject go)
+    {
+        if (go == null) return;
+        List<Renderer> rs;
+        if (_eyeHidden.TryGetValue(go, out rs))
+        {
+            foreach (var r in rs) if (r != null) r.enabled = true;
+            _eyeHidden.Remove(go);
+            return;
+        }
+        rs = go.GetComponentsInChildren<Renderer>().Where(r => r.enabled).ToList();
+        foreach (var r in rs) r.enabled = false;
+        _eyeHidden[go] = rs;
+    }
+
+    void ShowAll()
+    {
+        foreach (var kv in _eyeHidden) foreach (var r in kv.Value) if (r != null) r.enabled = true;
+        _eyeHidden.Clear();
+    }
+
+    // ------------------------------------------------------------------ библиотека объектов игры
+
+    class Entry { public string Source, Name, Group; }
+    List<Entry> _library;
+    List<Material> _materials;
+
+    static readonly string[][] Groups =
+    {
+        new[] { "vehicles", "car", "vehicle", "truck", "bike", "boat", "cart", "wagon", "bus", "tank", "plane", "heli", "kart" },
+        new[] { "nature", "tree", "rock", "stone", "bush", "grass", "plant", "flower", "log", "cliff", "mushroom", "shroom" },
+        new[] { "buildings", "wall", "house", "door", "floor", "build", "roof", "fence", "stair", "window", "bridge", "pillar", "ladder", "plank", "rope" },
+        new[] { "lights", "light", "lamp", "torch", "candle", "fire", "lantern" },
+    };
+
+    string GroupOf(string name)
+    {
+        var n = name.ToLowerInvariant();
+        foreach (var g in Groups)
+            for (var i = 1; i < g.Length; i++) if (n.Contains(g[i])) return g[0];
+        return "props";
+    }
+
+    static bool Drawable(GameObject go)
+    {
+        foreach (var r in go.GetComponentsInChildren<Renderer>(true))
+            if (r is MeshRenderer || r is SkinnedMeshRenderer || r is SpriteRenderer) return true;
+        return false;
+    }
+
+    void BuildLibrary()
+    {
+        var list = new List<Entry>();
+        var seen = new HashSet<string>();
+        foreach (var go in Resources.FindObjectsOfTypeAll<GameObject>())
+        {
+            if (go.scene.IsValid() || go.transform.parent != null || go.hideFlags != HideFlags.None) continue;
+            if (go.GetComponent<RectTransform>() != null || !Drawable(go) || !seen.Add("a" + go.name)) continue;
+            list.Add(new Entry { Source = "asset:" + go.name, Name = go.name, Group = GroupOf(go.name) });
+            if (list.Count > 1500) break;
+        }
+        foreach (var r in FindObjectsOfType<Renderer>())
+        {
+            var go = r.gameObject;
+            if (r is ParticleSystemRenderer || go == _gridGo || go.GetComponent<RectTransform>() != null || !seen.Add("s" + go.name) || PlacedOf(go) != null) continue;
+            list.Add(new Entry { Source = "clone:" + PathOf(go.transform), Name = go.name, Group = "scene" });
+            if (list.Count > 3000) break;
+        }
+        _library = list.OrderBy(e => e.Name).ToList();
+    }
+}

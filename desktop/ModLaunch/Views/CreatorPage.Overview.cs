@@ -103,7 +103,7 @@ public sealed partial class CreatorPage
         var pill = new Border
         {
             BorderBrush = HubLook.Edge, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(3), Padding = new Thickness(8, 3),
-            Child = Ui.Row(7, Ui.Dot(color, 7), HubLook.MonoText(I18n.T($"v12.pj.st.{status}").ToUpper(I18n.Culture), 10.5, Ui.Res("Text"))),
+            Child = Ui.Row(7, Ui.Dot(color, 7), HubLook.MonoText(I18n.T($"v12.pj.st.{status}"), 10.5, Ui.Res("Text"))),
             VerticalAlignment = VerticalAlignment.Center,
         };
         var title = new TextBlock { Text = p.Name, FontFamily = Look.Display, FontSize = 20, FontWeight = FontWeight.Bold, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
@@ -166,9 +166,9 @@ public sealed partial class CreatorPage
         if (stats?.Hub is not { } hub)
             return stats?.HubError is { } error && meta.HubId is not null ? Block("Hub", Icons.Globe, Ui.Text(error, "small muted", wrap: true)) : null;
         var row = Ui.Row(28,
-            Gx.Stat(I18n.Compact(hub.Downloads), I18n.T("hub.stat.downloads"), null, 20),
-            Gx.Stat(I18n.Compact(hub.Likes), I18n.T("hub.stat.likes"), null, 20),
-            Gx.Stat(I18n.Compact(hub.Comments), I18n.T("hub.stat.comments"), null, 20));
+            HubLook.Stat(I18n.Compact(hub.Downloads), I18n.T("hub.stat.downloads"), null, 20),
+            HubLook.Stat(I18n.Compact(hub.Likes), I18n.T("hub.stat.likes"), null, 20),
+            HubLook.Stat(I18n.Compact(hub.Comments), I18n.T("hub.stat.comments"), null, 20));
         var body = new List<Control> { row };
         // Загрузки по дням — из своих снимков в project.json: без новых правил базы и запросов.
         var days = meta.Downloads.Values.ToList();
@@ -190,9 +190,9 @@ public sealed partial class CreatorPage
         if (!Account.SignedIn && !Program.Screenshot) return null;
         if (stats?.Listing is not { } l) return stats?.MarketError is { } error ? Block(I18n.T("v12.pj.market"), Icons.Bag, Ui.Text(error, "small muted", wrap: true)) : null;
         var row = Ui.Row(28,
-            Gx.Stat(stats.Sales.ToString(), I18n.T("v12.pj.market.sales"), null, 20),
-            Gx.Stat(Market.Money(stats.Revenue), I18n.T("v12.pj.market.revenue"), Ui.Res("Good"), 20),
-            Gx.Stat(l.Free ? I18n.T("v12.pj.market.free") : Market.Money(l.Price), I18n.T("v12.pj.market.price"), null, 20));
+            HubLook.Stat(stats.Sales.ToString(), I18n.T("v12.pj.market.sales"), null, 20),
+            HubLook.Stat(Market.Money(stats.Revenue), I18n.T("v12.pj.market.revenue"), Ui.Res("Good"), 20),
+            HubLook.Stat(l.Free ? I18n.T("v12.pj.market.free") : Market.Money(l.Price), I18n.T("v12.pj.market.price"), null, 20));
         return Block(I18n.T("v12.pj.market"), Icons.Bag, row, Ui.Text(Dotted(l.Title, l.Active ? "" : I18n.T("v12.pj.market.hidden")), "small muted"));
     }
 

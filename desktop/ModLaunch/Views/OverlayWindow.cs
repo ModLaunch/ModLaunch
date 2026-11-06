@@ -76,9 +76,17 @@ public sealed class OverlayWindow : Window
 
     static string Clock(TimeSpan t) => t.TotalHours >= 1 ? $"{(int)t.TotalHours}:{t.Minutes:00}:{t.Seconds:00}" : $"{t.Minutes:00}:{t.Seconds:00}";
 
+    /// <summary>23.0: открыт ли «Создать мод» (инструменты прямо в игре) вместо обычной панели.</summary>
+    static bool _studio;
+
     void Build()
     {
         var g = GameId is null ? null : AppState.Game(GameId);
+        if (_studio && g is not null)
+        {
+            Content = Frame(OverlayStudio.Panel(g, () => { _studio = false; Build(); }, () => { if (IsVisible) Build(); }), 540, null);
+            return;
+        }
         var panel = Ui.Col(16);
 
         // Игра и время.
@@ -92,6 +100,16 @@ public sealed class OverlayWindow : Window
             panel.Children.Add(Ui.Text(I18n.T("ovl.total", ("time", PlayTime.Format(PlayTime.Get(g.Def.Id).TotalMs))), "small", color: Ui.Hex("#C9CFDB")));
             var mods = g.Registry?.List().Where(m => m.Bool("enabled", true) && m.Str("kind") != "preset").Select(m => m.Str("name") ?? "").ToList() ?? [];
             panel.Children.Add(Ui.Text(mods.Count == 0 ? I18n.T("ovl.noMods") : I18n.T("ovl.mods." + I18n.Plural(mods.Count, "one", "few", "many"), ("n", mods.Count)) + ": " + string.Join(", ", mods.Take(8)), "small", color: Ui.Hex("#C9CFDB"), wrap: true));
+
+            // 23.0: «Создать мод» — инструменты Creator Hub прямо во время игры.
+            var create = new Button
+            {
+                Classes = { "ghost" }, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch, Padding = new Thickness(14, 12),
+                Background = new SolidColorBrush(Color.FromArgb(40, 0xF0, 0xB4, 0x29)), BorderBrush = HubLook.Amber, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(14),
+                Content = Ui.Row(12, CreatorPage.XMark(36), Ui.Col(2, Ui.Text(I18n.T("v23.ig.create"), "h3", color: Brushes.White), Ui.Text(I18n.T("v23.ig.create.text"), "small", color: Ui.Hex("#C9CFDB"), wrap: true))),
+            };
+            create.Click += (_, _) => { _studio = true; Build(); };
+            panel.Children.Add(create);
 
             var last = Backups.List(g.Def.Id).FirstOrDefault();
             var backupHint = Ui.Text(last is null ? "" : I18n.T("ovl.backup.last", ("time", last.At.ToString("t"))), "small", color: Ui.Hex("#AAB2C2"));
@@ -137,9 +155,18 @@ public sealed class OverlayWindow : Window
             Ui.Text(I18n.T("ovl.hint", ("key", Hotkey.Display(Hotkey.KeyOf(Settings.Data.Str("overlayKey"))))), "small", color: Ui.Hex("#AAB2C2")));
         foreach (var c in footer.Children) c.VerticalAlignment = VerticalAlignment.Center;
 
+        Content = Frame(Ui.Col(20, panel, friends), 420, footer);
+    }
+
+    /// <summary>Карточка оверлея слева поверх затемнения: содержимое с прокруткой и (необязательно) подвал.</summary>
+    Control Frame(Control body, double width, Control? footer)
+    {
+        var dock = new DockPanel();
+        if (footer is not null) { DockPanel.SetDock(footer, Avalonia.Controls.Dock.Bottom); dock.Children.Add(footer); }
+        dock.Children.Add(new ScrollViewer { Content = body });
         var card = new Border
         {
-            Width = 420,
+            Width = width,
             Margin = new Thickness(28),
             Padding = new Thickness(24),
             CornerRadius = new CornerRadius(20),
@@ -148,13 +175,11 @@ public sealed class OverlayWindow : Window
             BorderThickness = new Thickness(1),
             HorizontalAlignment = HorizontalAlignment.Left,
             VerticalAlignment = VerticalAlignment.Stretch,
-            Child = new DockPanel { Children = { Dock(footer), new ScrollViewer { Content = Ui.Col(20, panel, friends) } } },
+            Child = dock,
         };
         var shade = new Border { Background = new SolidColorBrush(Color.Parse("#8C000000")) };
         shade.PointerPressed += (_, _) => Hide();
-        Content = new Panel { Children = { shade, card } };
-
-        static Control Dock(Control c) { DockPanel.SetDock(c, Avalonia.Controls.Dock.Bottom); return c; }
+        return new Panel { Children = { shade, card } };
     }
 
     /// <summary>Игра запущена — занять сочетание клавиш; закрыта — освободить.</summary>
@@ -162,6 +187,9 @@ public sealed class OverlayWindow : Window
     {
         GameId = gameId;
         StartedAt = DateTime.UtcNow;
+        _studio = false;
+        // 23.0: в игре стоят моды из Creator Hub — копия сохранений «до» (защита прогресса).
+        try { ProgressGuard.Begin(AppState.Game(gameId)); } catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException) { }
         if (Settings.Data.Bool("overlay", true)) Hotkey.Arm(Settings.Data.Str("overlayKey") ?? Hotkey.Keys[0], Toggle);
     }
 
@@ -170,5 +198,7 @@ public sealed class OverlayWindow : Window
         Hotkey.Disarm();
         Current?.Hide();
         StartedAt = null;
+        _studio = false;
+        OverlayStudio.Reset();
     }
 }

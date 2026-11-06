@@ -60,11 +60,18 @@ public static class Health
                     I18n.T("health.files.text", ("list", string.Join(", ", gone.Take(6).Select(m => m.Str("name") ?? m.Str("id"))))),
                     gone.Select(m => m.Str("id")!).ToList()));
 
+            // 23.0: «один мод дважды» чинится сам (старшая копия выключается); «разные моды спорят за файл» — по кнопке.
             var conflicts = Conflicts.Find(registry);
-            if (conflicts.Count > 0)
-                list.Add(new("conflicts", HealthLevel.Warning, I18n.T("health.conflicts", ("n", conflicts.Count)),
-                    string.Join("\n", conflicts.Take(5).Select(c => I18n.T("v4.conflict.pair", ("a", c.A), ("b", c.B), ("n", c.Files)))),
-                    OlderDuplicates(registry, conflicts)));
+            var dups = conflicts.Where(c => c.Kind == "duplicate").ToList();
+            if (dups.Count > 0)
+                list.Add(new("conflicts", HealthLevel.Warning, I18n.T("v23.cf.dup", ("n", dups.Count)),
+                    string.Join("\n", dups.Take(5).Select(c => I18n.T("v23.cf.dup.line", ("mod", c.WinnerName ?? c.A)))),
+                    dups.Select(c => c.Loser).OfType<string>().Distinct().ToList()));
+            var overlaps = conflicts.Where(c => c.Kind == "overlap").ToList();
+            if (overlaps.Count > 0)
+                list.Add(new("overlap", HealthLevel.Warning, I18n.T("v23.cf.overlap", ("n", overlaps.Count)),
+                    string.Join("\n", overlaps.Take(5).Select(c => I18n.T("v23.cf.overlap.line", ("a", c.A), ("b", c.B), ("file", c.Shared![0]), ("win", c.WinnerName ?? c.A)))),
+                    overlaps.Select(c => c.Loser).OfType<string>().Distinct().ToList()));
 
             if (!quick)
             {
@@ -162,19 +169,6 @@ public static class Health
         return n.Length >= 3 && (Deps.Norm(record.Str("name")) == n || Deps.Norm(record.Str("folder")) == n);
     }
 
-    /// <summary>Из пары одинаковых модов — тот, что поставлен раньше (его и выключаем).</summary>
-    static List<string> OlderDuplicates(ModRegistry registry, List<Conflict> conflicts)
-    {
-        var byName = registry.List().Where(m => m.Bool("enabled", true)).GroupBy(m => m.Str("name") ?? m.Str("id") ?? "").ToDictionary(x => x.Key, x => x.First());
-        var result = new List<string>();
-        foreach (var c in conflicts)
-        {
-            if (!byName.TryGetValue(c.A, out var a) || !byName.TryGetValue(c.B, out var b)) continue;
-            var older = string.CompareOrdinal(a.Str("installedAt") ?? "", b.Str("installedAt") ?? "") <= 0 ? a : b;
-            if (older.Str("id") is string id && !result.Contains(id)) result.Add(id);
-        }
-        return result;
-    }
 
     /// <summary>Можно ли писать в папку игры (пробный файл, ответ помним минуту).</summary>
     static bool CanWrite(string dir)

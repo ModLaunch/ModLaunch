@@ -110,6 +110,20 @@ public static partial class Launcher
     }
 
     /// <summary>
+    /// 24.0: игра упала, а процесса мы так и не увидели (Minecraft до окна игры): записать «закрылась сама»
+    /// и сообщить окну, как при обычном выходе, — откроется «Почему игра упала».
+    /// </summary>
+    public static void ReportCrash(GameDef game, DateTime startedUtc, long ms)
+    {
+        lock (Running)
+        {
+            if (Running.ContainsKey(game.Id)) return;
+            Last[game.Id] = new ExitInfo(startedUtc, ms, null, false);
+        }
+        Avalonia.Threading.Dispatcher.UIThread.Post(() => Exited?.Invoke(game.Id, false, ms));
+    }
+
+    /// <summary>
     /// Следить за процессом игры, запущенной не нами напрямую (Minecraft — через свой лаунчер):
     /// «Запущено», кнопка «Остановить» и время в игре работают так же.
     /// </summary>

@@ -28,7 +28,7 @@
     "v20.acc.dl": "{n} скач.",
     "v20.acc.fee": "Суммы — после комиссии площадки ({fee} %). Баланс, пополнение и вывод — во вкладке «Кошелёк».",
     "new.v20.subtitle": "Creator Hub проще и красивее, а доход — только в аккаунте",
-    "new.v20.hub": "Creator Hub: слева «ModScript X» (внутри «Создать» и «Мои проекты») и «Рынок» — больше ничего",
+    "new.v20.hub": "Creator Hub: слева «ModScript» (внутри «Создать» и «Мои проекты») и «Рынок» — больше ничего",
     "new.v20.earnings": "Аккаунт → «Заработок»: всего и за 30 дней, продажи, скачивания, лайки, график и ваши работы. На рынке денег автора больше нет — только покупки",
     "v20.hub.market": "Рынок",
     "v20.x.tools": "Консоль и справка"
@@ -62,7 +62,7 @@
     "v20.acc.dl": "{n} downloads",
     "v20.acc.fee": "Amounts are after the platform fee ({fee}%). Balance, top-ups and withdrawals are in the Wallet tab.",
     "new.v20.subtitle": "A simpler, prettier Creator Hub, and your income only in the account",
-    "new.v20.hub": "Creator Hub: ModScript X (with Create and My projects inside) and the Market on the left — nothing else",
+    "new.v20.hub": "Creator Hub: ModScript (with Create and My projects inside) and the Market on the left — nothing else",
     "new.v20.earnings": "Account → Earnings: total and last 30 days, sales, downloads, likes, a chart and your works. The market no longer shows creator money — it's for shopping",
     "v20.hub.market": "Market",
     "v20.x.tools": "Console & reference"

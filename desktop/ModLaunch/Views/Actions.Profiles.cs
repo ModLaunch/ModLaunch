@@ -50,7 +50,7 @@ public static partial class Actions
             if (withConfig)
             {
                 using var zip = new ZipArchive(new MemoryStream(profile.Zip));
-                ModSetup.RestoreConfig(registry, zip);
+                ModSetup.RestoreConfig(registry, zip, fromCode: true);
             }
             // Свой профиль с тем же именем («Default») не затираем — новый получит номер.
             try { Profiles.Save(g.Def.Id, Profiles.FreeName(g.Def.Id, profile.Name), registry); } catch { }

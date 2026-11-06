@@ -18,21 +18,32 @@ public sealed partial class GamePage
 
     // ---------------------------------------------------------------- код сборки
 
+    /// <summary>
+    /// 24.0: «Поделиться сборкой» — для всех игр: код ModLaunch (ABCD-EFGH), друг вставляет его и получает те же моды.
+    /// У игр с Thunderstore ниже остаётся код r2modman и файл .r2z — для друзей с r2modman и Gale.
+    /// </summary>
     Control ShareCard()
     {
-        var (inCode, left) = ProfileCode.Pick(_g.Registry!);
-        var get = Ui.Button(_sharing ? I18n.T("code.getting") : I18n.T("code.get"), GetCode, "primary", Icons.Upload);
-        get.IsEnabled = !_sharing && inCode.Count > 0;
+        var mods = _g.Registry?.List().Count(r => !r.Bool("missing")) ?? 0;
+        var share = Ui.Button(I18n.T("v24.share.go"), () => ShareUi.Share(_g), "primary", Icons.Users);
+        share.IsEnabled = mods > 0;
         var col = Ui.Col(14,
-            Ui.Text(I18n.T("code.title"), "h2"),
-            Ui.Text(I18n.T("code.hint"), "muted", wrap: true),
-            Ui.Row(10,
-                get,
-                Ui.Button(I18n.T("code.enter"), EnterCode, "", Icons.Download),
+            Ui.Text(I18n.T("v24.share.title"), "h2"),
+            Ui.Text(I18n.T("v24.share.hint"), "muted", wrap: true),
+            Ui.Row(10, share, Ui.Button(I18n.T("v24.share.enter"), () => ShareUi.Enter(_g), "", Icons.Download)));
+        if (ProfileCode.Supported(_g.Def))
+        {
+            var (inCode, left) = ProfileCode.Pick(_g.Registry!);
+            var get = Ui.Button(_sharing ? I18n.T("code.getting") : I18n.T("v24.share.r2code"), GetCode, "ghost", Icons.Upload);
+            get.IsEnabled = !_sharing && inCode.Count > 0;
+            var label = Ui.Text(I18n.T("v24.share.r2"), "small muted");
+            label.VerticalAlignment = VerticalAlignment.Center;
+            col.Children.Add(Ui.Row(6, label, get,
                 Ui.Button(I18n.T("code.saveFile"), SaveR2z, "ghost", Icons.Save),
                 Ui.Button(I18n.T("code.openFile"), OpenR2z, "ghost", Icons.FilePlus)));
-        if (left.Count > 0)
-            col.Children.Add(Ui.Row(8, Ui.Icon(Icons.Info, 15, Ui.Res("Muted")), Ui.Text(I18n.T("code.left", ("list", string.Join(", ", left.Take(5)))), "small muted", wrap: true)));
+            if (left.Count > 0)
+                col.Children.Add(Ui.Row(8, Ui.Icon(Icons.Info, 15, Ui.Res("Muted")), Ui.Text(I18n.T("code.left", ("list", string.Join(", ", left.Take(5)))), "small muted", wrap: true)));
+        }
         return Ui.Card(col, 22);
     }
 
@@ -95,7 +106,7 @@ public sealed partial class GamePage
     }
 
     /// <summary>Что в сборке друга: есть, другая версия, поставим. Галочки: настройки и лишние моды.</summary>
-    void PreviewCode(CodeProfile profile)
+    internal void PreviewCode(CodeProfile profile)
     {
         var w = MainWindow.Current!;
         var registry = _g.Registry!;

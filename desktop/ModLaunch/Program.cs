@@ -43,6 +43,8 @@ public static class Program
         // 21.0: кусочки кода (use "Название") — купленные на Рынке и бесплатные.
         Creator.Pieces.Register();
         if (args.Contains("--selfcheck")) return SelfCheck.Run().GetAwaiter().GetResult();
+        // 23.1: собрать конструктор в игру (и самопроверку в игре) из командной строки.
+        if (args.Contains("--dev-prepare")) { StartHeadless(); return Features.DevMode.Cli(args); }
         if (args.Contains("--selftest")) { Hooks.PrepareSelfTest(); StartHeadless(); return Hooks.SelfTest(); }
         var shot = Array.IndexOf(args, "--screenshot");
         if (shot >= 0 && shot + 1 < args.Length) return Screenshots(args[shot + 1], args.Contains("--only"));
@@ -316,11 +318,7 @@ public static class Program
         Save("15c-running");
         Features.Launcher.DemoRunning("subnautica", false);
         AppState.Notify();
-        window.ShowCrash(sub, 12_000, -532462766,
-        [
-            new MainWindow.Culprit("Nautilus", "NullReferenceException: Object reference not set to an instance of an object at Nautilus.Handlers.CraftDataHandler.Awake()", null),
-            new MainWindow.Culprit("Slot Extender", "Could not load type 'SlotExtender.Patches.uGUI_QuickSlots_Patch' from assembly 'SlotExtender'", null),
-        ]);
+        window.ShowCrash(AppState.Game("lethal-company"), MainWindow.DemoCrash(AppState.Game("lethal-company")));
         Save("15d-crash");
         window.CloseDialog();
         window.OpenAccountPanel();

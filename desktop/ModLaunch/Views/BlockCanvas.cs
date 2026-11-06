@@ -118,9 +118,8 @@ public sealed class BlockCanvas : UserControl
         {
             Text = text, Watermark = watermark, MinWidth = min, MaxWidth = 420, MinHeight = 26, Padding = new Thickness(9, 3), FontSize = 12.5,
             FontFamily = mono ? HubLook.Mono : FontFamily.Default, VerticalAlignment = VerticalAlignment.Center, VerticalContentAlignment = VerticalAlignment.Center,
-            CornerRadius = new CornerRadius(13), BorderThickness = new Thickness(1), AcceptsReturn = false,
-            Background = Look.IsLight ? new SolidColorBrush(Color.FromArgb(235, 255, 255, 255)) : new SolidColorBrush(Color.FromArgb(150, 6, 8, 14)),
-            BorderBrush = Look.IsLight ? new SolidColorBrush(Color.FromArgb(40, 0, 0, 0)) : new SolidColorBrush(Color.FromArgb(40, 255, 255, 255)),
+            CornerRadius = new CornerRadius(6), BorderThickness = new Thickness(1), AcceptsReturn = false,
+            Background = Ui.Res("Bg"), BorderBrush = HubLook.Edge,
         };
         return box;
     }
@@ -251,7 +250,7 @@ public sealed class BlockCanvas : UserControl
         var grip = new Border
         {
             Width = 16, Cursor = new Cursor(StandardCursorType.SizeAll), Background = Brushes.Transparent, VerticalAlignment = VerticalAlignment.Stretch,
-            Child = new TextBlock { Text = "⋮⋮", FontSize = 12, LetterSpacing = -3, Foreground = hat ? new SolidColorBrush(Color.FromArgb(170, 255, 255, 255)) : Ui.Res("Faint"), VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center },
+            Child = new TextBlock { Text = "⋮⋮", FontSize = 12, LetterSpacing = -3, Foreground = Ui.Res("Faint"), VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center },
         };
         ToolTip.SetTip(grip, I18n.T("v21.b.drag"));
         StartDrag(grip, () => { _dragBlock = b; DragTemplate = null; });
@@ -259,7 +258,7 @@ public sealed class BlockCanvas : UserControl
         var acts = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2, Opacity = 0, VerticalAlignment = VerticalAlignment.Center };
         Button Act(string icon, string tip, Action run)
         {
-            var x = new Button { Classes = { "icon", "ghost" }, Width = 24, Height = 24, Padding = new Thickness(0), Content = Ui.Icon(icon, 12, hat ? Brushes.White : Ui.Res("Muted")) };
+            var x = new Button { Classes = { "icon", "ghost" }, Width = 24, Height = 24, Padding = new Thickness(0), Content = Ui.Icon(icon, 12, Ui.Res("Muted")) };
             ToolTip.SetTip(x, I18n.T(tip));
             x.Click += (_, e) => { e.Handled = true; run(); };
             return x;
@@ -346,12 +345,13 @@ public sealed class BlockCanvas : UserControl
             box = new Border { Padding = new Thickness(4, 5, 6, 5), Child = new StackPanel { Children = { Header(b, Line(b)), error } } };
         }
         box.CornerRadius = new CornerRadius(9);
-        box.Background = Fill(hue, Look.IsLight ? (byte)0x22 : (byte)0x26);
-        box.BorderBrush = Fill(hue, 0x70);
+        // 23.0: «взрослый» вид — строки правил на поверхности темы; род блока — тонкой полосой и значком, без заливки цветом.
+        box.Background = HubLook.Raised;
+        box.BorderBrush = HubLook.Edge;
         box.BorderThickness = new Thickness(1);
         box.HorizontalAlignment = HorizontalAlignment.Stretch;
         // Полоса цвета слева — как у кирпичика: видно, какого он рода, даже мельком.
-        var bar = new Border { Width = 4, CornerRadius = new CornerRadius(9, 0, 0, 9), Background = Solid(hue), HorizontalAlignment = HorizontalAlignment.Left, IsHitTestVisible = false };
+        var bar = new Border { Width = 3, CornerRadius = new CornerRadius(9, 0, 0, 9), Background = Fill(hue, 0xC0), HorizontalAlignment = HorizontalAlignment.Left, IsHitTestVisible = false };
         var wrap = new Panel { Children = { box, bar } };
         _views[b] = (box, error);
         if (b == _selected) Highlight(b, true);
@@ -362,7 +362,7 @@ public sealed class BlockCanvas : UserControl
     Control Arm(List<XBlock> list, string hue)
     {
         var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("14,*"), Margin = new Thickness(4, 0, 8, 0) };
-        grid.Children.Add(new Border { Background = Fill(hue, 0x55), CornerRadius = new CornerRadius(3), Margin = new Thickness(4, 0, 6, 0) });
+        grid.Children.Add(new Border { Background = HubLook.Edge, Width = 2, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(4, 0, 6, 0) });
         var inner = List(list);
         Grid.SetColumn(inner, 1);
         grid.Children.Add(inner);
@@ -560,7 +560,7 @@ public sealed class BlockCanvas : UserControl
     void Highlight(XBlock b, bool on)
     {
         if (!_views.TryGetValue(b, out var v)) return;
-        v.Box.BorderBrush = on ? (Look.IsLight ? Brushes.Black : Brushes.White) : v.Error.IsVisible ? Ui.Res("Bad") : Fill(Hue(b.Kind), 0x70);
+        v.Box.BorderBrush = on ? HubLook.Amber : v.Error.IsVisible ? Ui.Res("Bad") : HubLook.Edge;
         v.Box.BorderThickness = new Thickness(on ? 1.5 : 1);
     }
 
@@ -732,38 +732,33 @@ public sealed class BlockCanvas : UserControl
         var hue = Hue(h.Kind);
         var row = new WrapPanel();
         void Add(Control c) { c.Margin = new Thickness(0, 2, 8, 2); row.Children.Add(c); }
-        Add(Ui.Icon(h.Kind == "hook" ? Icons.Zap : Icons.Code, 17, Brushes.White));
+        Add(Ui.Icon(h.Kind == "hook" ? Icons.Zap : Icons.Code, 16, HubLook.Violet));
         if (h.Kind == "hook")
         {
-            Add(new TextBlock { Text = I18n.T("v21.b.when"), FontSize = 15, FontWeight = FontWeight.Bold, Foreground = Brushes.White, VerticalAlignment = VerticalAlignment.Center });
+            Add(new TextBlock { Text = I18n.T("v21.b.when"), FontSize = 15, FontWeight = FontWeight.Bold, Foreground = Ui.Res("Text"), VerticalAlignment = VerticalAlignment.Center });
             var events = _events();
             Add(Pick(MX.ModxDoc.Events.OrderBy(e => Array.IndexOf(EventOrder, e)).Select(e => (e, I18n.T($"v21.ev.{e}") + (events.Contains(e) ? "" : "  ·  " + I18n.T("v21.ev.none")))), h["event"],
                 v => { h["event"] = v; Commit(true); }));
         }
         else
         {
-            Add(new TextBlock { Text = I18n.T("v21.b.fnTitle"), FontSize = 15, FontWeight = FontWeight.Bold, Foreground = Brushes.White, VerticalAlignment = VerticalAlignment.Center });
+            Add(new TextBlock { Text = I18n.T("v21.b.fnTitle"), FontSize = 15, FontWeight = FontWeight.Bold, Foreground = Ui.Res("Text"), VerticalAlignment = VerticalAlignment.Center });
             Add(Bind(h, "name", "my_command"));
-            Add(new TextBlock { Text = "(", FontSize = 15, Foreground = Brushes.White, VerticalAlignment = VerticalAlignment.Center });
+            Add(new TextBlock { Text = "(", FontSize = 15, Foreground = Ui.Res("Muted"), VerticalAlignment = VerticalAlignment.Center });
             Add(Bind(h, "params", "a, b"));
-            Add(new TextBlock { Text = ")", FontSize = 15, Foreground = Brushes.White, VerticalAlignment = VerticalAlignment.Center });
+            Add(new TextBlock { Text = ")", FontSize = 15, Foreground = Ui.Res("Muted"), VerticalAlignment = VerticalAlignment.Center });
         }
-        var c1 = C(hue);
+        // 23.0: шапка правила «Когда …» — спокойной строкой над телом (без заливки и градиента), разделитель снизу.
         var head = new Border
         {
-            CornerRadius = new CornerRadius(12, 12, 4, 4), Padding = new Thickness(8, 8, 8, 8),
-            Background = new LinearGradientBrush
-            {
-                StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
-                GradientStops = { new GradientStop(Look.Mix(c1, Colors.Black, 0.18), 0), new GradientStop(Look.Mix(c1, Colors.Black, 0.42), 1) },
-            },
+            CornerRadius = new CornerRadius(12, 12, 0, 0), Padding = new Thickness(8, 8, 8, 8),
+            Background = HubLook.Raised, BorderBrush = HubLook.Edge, BorderThickness = new Thickness(0, 0, 0, 1),
             Child = Header(h, row, hat: true),
         };
         var error = new TextBlock { FontSize = 12, Foreground = Ui.Res("Bad"), TextWrapping = TextWrapping.Wrap, IsVisible = false, Margin = new Thickness(12, 4, 8, 0) };
         var card = new Border
         {
-            Background = HubLook.Panel, BorderBrush = Fill(hue, 0x60), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(12),
-            BoxShadow = new BoxShadows(new BoxShadow { OffsetY = 8, Blur = 26, Color = Color.FromArgb(Look.IsLight ? (byte)22 : (byte)70, 0, 0, 0) }),
+            Background = HubLook.Panel, BorderBrush = HubLook.Edge, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(12),
             Child = Ui.Col(0, head, error, new Border { Padding = new Thickness(4, 6, 4, 8), Child = Arm(h.Body, hue) }),
         };
         _views[h] = (card, error);
@@ -852,12 +847,8 @@ public sealed class BlockCanvas : UserControl
         var tile = new Border
         {
             Width = 40, Height = 40, CornerRadius = new CornerRadius(10), VerticalAlignment = VerticalAlignment.Top,
-            Background = new LinearGradientBrush
-            {
-                StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
-                GradientStops = { new GradientStop(C(hex), 0), new GradientStop(Look.Mix(C(hex), Colors.Black, 0.45), 1) },
-            },
-            Child = Ui.Icon(piece?.Icon ?? Icons.Alert, 19, Brushes.White),
+            Background = Fill(hex, 0x30),
+            Child = Ui.Icon(piece?.Icon ?? Icons.Alert, 19, Solid(hex)),
         };
         var who = piece is null ? I18n.T("v21.piece.missing") : piece.Free ? I18n.T("v21.piece.byFree") : I18n.T("v21.piece.bought", ("seller", piece.Seller));
         var text = Ui.Col(2, new TextBlock { Text = use["name"], FontSize = 14, FontWeight = FontWeight.Bold, TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = 170 },
@@ -906,12 +897,7 @@ public sealed class BlockCanvas : UserControl
         var card = new Border
         {
             Width = 260, Margin = new Thickness(0, 0, 12, 12), Padding = new Thickness(12, 12, 8, 12), CornerRadius = new CornerRadius(12),
-            Background = new LinearGradientBrush
-            {
-                StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
-                GradientStops = { new GradientStop(Color.FromArgb(Look.IsLight ? (byte)0x30 : (byte)0x26, 0xF5, 0xB9, 0x4A), 0), new GradientStop(Color.FromArgb(0x08, 0xF5, 0xB9, 0x4A), 1) },
-            },
-            BorderBrush = Fill("#F5B94A", 0x90), BorderThickness = new Thickness(1), Child = col,
+            Background = HubLook.Panel, BorderBrush = HubLook.Edge, BorderThickness = new Thickness(1), Child = col,
         };
         ToolTip.SetTip(card, I18n.T("v21.piece.tip", ("line", Pieces.Line(use["name"]))));
         card.PointerPressed += (_, e) => { if (!InField(e.Source)) Select(use); };

@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.VisualTree;
 using ModLaunch.Core;
 using ModLaunch.Games;
 using ModLaunch.Sources;
@@ -67,7 +68,8 @@ public static class ModRow
         stats.MinWidth = 150;
 
         var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"), ColumnSpacing = 16 };
-        var thumb = Ui.Thumb(mod.Icon, mod.Name, compact ? 52 : 68, compact ? 10 : 12, 200);
+        // 23.0: вместо квадратного значка — широкая обложка (лучший скриншот мода) со значком в углу.
+        var thumb = new Border { Width = compact ? 92 : 160, Height = compact ? 52 : 90, CornerRadius = new CornerRadius(compact ? 8 : 10), ClipToBounds = true, Child = ModCovers.Art(game, mod, compact ? 52 : 90), VerticalAlignment = VerticalAlignment.Center };
         grid.Children.Add(thumb);
         Grid.SetColumn(middle, 1);
         grid.Children.Add(middle);
@@ -88,7 +90,8 @@ public static class ModRow
     /// <summary>Плитка мода для вида «сеткой» (как в Modrinth): большая картинка, имя, автор, загрузки.</summary>
     public static Control Tile(GameDef game, ModInfo mod, bool installed, bool installing, Action install, Action open, string? badge = null, bool compact = false)
     {
-        var picture = new Border { Height = compact ? 84 : 132, CornerRadius = new CornerRadius(12, 12, 0, 0), ClipToBounds = true, Child = Ui.Thumb(mod.Icon, mod.Name, 236, 0, 480) };
+        // 23.0: обложка — лучший скриншот со страницы мода (Covers), значок — в углу; пока ищем — значок на своём размытом фоне.
+        var picture = new Border { Height = compact ? 84 : 132, CornerRadius = new CornerRadius(12, 12, 0, 0), ClipToBounds = true, Child = ModCovers.Art(game, mod, compact ? 84 : 132) };
         var layers = new Panel { Children = { picture } };
         if (Badge(badge) is { } b)
         {
@@ -148,4 +151,63 @@ public static class ModRow
         Padding = new Thickness(9, 3),
         Child = new TextBlock { Text = text, FontSize = 12, FontWeight = FontWeight.SemiBold, Foreground = fg },
     };
+}
+
+public static partial class ModCovers
+{
+    /// <summary>
+    /// 23.0: картинка карточки каталога. Сразу — значок мода по центру на размытом самом себе (не растянутый значок);
+    /// если карточка задержалась на экране (≈0.35 с — не при быстрой прокрутке), ищем обложку (Covers) и, когда
+    /// найдена, плавно показываем её, а значок уезжает в левый нижний угол.
+    /// </summary>
+    public static Control Art(GameDef game, ModInfo mod, double height)
+    {
+        var host = new Panel { Height = height, ClipToBounds = true, Background = Ui.Res("Surface3") };
+        var backdrop = new Image { Stretch = Stretch.UniformToFill, Opacity = 0.55, Effect = new BlurEffect { Radius = 26 } };
+        var icon = Ui.Thumb(mod.Icon, mod.Name, Math.Min(72, height - 24), 14, 160);
+        icon.HorizontalAlignment = HorizontalAlignment.Center;
+        icon.VerticalAlignment = VerticalAlignment.Center;
+        var iconFrame = new Border { CornerRadius = new CornerRadius(14), Child = icon, BoxShadow = BoxShadows.Parse("0 6 18 0 #70000000"), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        host.Children.Add(backdrop);
+        host.Children.Add(iconFrame);
+        if (!string.IsNullOrEmpty(mod.Icon))
+            _ = Images.FromUrl(mod.Icon, 96).ContinueWith(t => { if (t.Result is { } bmp) Avalonia.Threading.Dispatcher.UIThread.Post(() => backdrop.Source = bmp); });
+
+        void Show(string url) => _ = Images.FromUrl(url, 560).ContinueWith(t =>
+        {
+            if (t.Result is not { } bmp) return;
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                var cover = new Image { Source = bmp, Stretch = Stretch.UniformToFill, Opacity = 0 };
+                cover.Transitions = [new Avalonia.Animation.DoubleTransition { Property = Visual.OpacityProperty, Duration = TimeSpan.FromMilliseconds(260) }];
+                host.Children.Insert(1, cover);
+                // Значок — маленьким в угол, с рамкой, чтобы читался на любой картинке.
+                var small = Math.Min(40, height * 0.42);
+                iconFrame.Child = Ui.Thumb(mod.Icon, mod.Name, small, 9, 96);
+                iconFrame.CornerRadius = new CornerRadius(10);
+                iconFrame.BorderBrush = new SolidColorBrush(Color.FromArgb(140, 255, 255, 255));
+                iconFrame.BorderThickness = new Thickness(1.5);
+                iconFrame.HorizontalAlignment = HorizontalAlignment.Left;
+                iconFrame.VerticalAlignment = VerticalAlignment.Bottom;
+                iconFrame.Margin = new Thickness(10);
+                cover.Opacity = 1;
+            });
+        });
+
+        var cached = Covers.Cached(game, mod, out var known);
+        if (cached is not null) Show(cached);
+        else if (!known)
+        {
+            var timer = new Avalonia.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(350) };
+            timer.Tick += (_, _) =>
+            {
+                timer.Stop();
+                if (host.GetVisualRoot() is null) return;
+                _ = Covers.Pick(game, mod).ContinueWith(t => { if (t.Result is { } url) Avalonia.Threading.Dispatcher.UIThread.Post(() => Show(url)); });
+            };
+            host.AttachedToVisualTree += (_, _) => timer.Start();
+            host.DetachedFromVisualTree += (_, _) => timer.Stop();
+        }
+        return host;
+    }
 }

@@ -96,6 +96,15 @@ public static class Vanilla
     }
 
     /// <summary>Вернуть загрузчик на место. Файл, появившийся заново (загрузчик переставили), не трогаем.</summary>
+    /// <summary>23.2: вернуть загрузчик игре по её папке (временная парковка — «temp» или «inject»), как перед запуском.</summary>
+    public static void UnparkFolder(string gamePath)
+    {
+        var full = Path.GetFullPath(gamePath).TrimEnd('\\', '/');
+        foreach (var def in GameCatalog.All)
+            if (Games[def.Id] is JsonObject e && e.Str("path") is { } p && string.Equals(Path.GetFullPath(p).TrimEnd('\\', '/'), full, StringComparison.OrdinalIgnoreCase) && Mode(def.Id) is "temp" or "inject")
+                Unpark(def);
+    }
+
     public static void Unpark(GameDef game)
     {
         if (Games[game.Id] is not JsonObject entry) return;
