@@ -1,0 +1,40 @@
+{
+  "results": [
+    {
+      "name": "установщик собран",
+      "ok": true,
+      "detail": "D:\\a\\ModLaunch\\ModLaunch\\dist\\ModLaunch-Setup-3.2.0.exe"
+    },
+    {
+      "name": "размер установщика",
+      "ok": true,
+      "detail": "82 МБ"
+    },
+    {
+      "name": "файлы программы на месте",
+      "ok": true,
+      "detail": "C:\\Users\\runneradmin\\AppData\\Local\\Programs\\ModLaunch"
+    },
+    {
+      "name": "отметка установки",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "программа запустилась после установки",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "ярлык в «Пуске»",
+      "ok": true,
+      "detail": "C:\\Users\\runneradmin\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\ModLaunch.lnk"
+    },
+    {
+      "name": "строка в «Приложениях» Windows",
+      "ok": true,
+      "detail": "DisplayName    REG_SZ    ModLaunch"
+    }
+  ],
+  "failed": 0
+}
