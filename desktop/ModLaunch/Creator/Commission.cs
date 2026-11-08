@@ -64,6 +64,8 @@ public static class Commission
                     ["name"] = Firebase.Doc("config/market"),
                     ["fields"] = Firebase.ToFields(new Dictionary<string, object?> { ["fee"] = (long)percent, ["by"] = uid }),
                 },
+                // 25.0: только процент — реквизиты для пополнения и лот Premium в том же документе не трогаем.
+                ["updateMask"] = new JsonObject { ["fieldPaths"] = new JsonArray("fee", "by") },
                 ["updateTransforms"] = new JsonArray(Hub.ServerTime("updated")),
             },
         ], token);

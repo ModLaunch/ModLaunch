@@ -19,7 +19,29 @@ try {
   # GitHub CLI: в PATH или в обычной папке установки.
   $gh = (Get-Command gh -ErrorAction SilentlyContinue).Source
   if (-not $gh) { foreach ($p in @("$env:ProgramFiles\GitHub CLI\gh.exe", "${env:ProgramFiles(x86)}\GitHub CLI\gh.exe", "$env:LOCALAPPDATA\Programs\GitHub CLI\gh.exe")) { if (Test-Path $p) { $gh = $p; break } } }
-  if (-not $gh) { Log "NO_GH: GitHub CLI не установлен"; exit 2 }
+  if (-not $gh) {
+    # 25.0: без GitHub CLI выпуск собирает сам GitHub — достаточно отправить тег vX.Y.Z (release.yml).
+    Log "GitHub CLI не установлен — выкладываю тегом v$Version (соберёт GitHub Actions)"
+    Push-Location $root
+    try {
+      # Новые файлы (??) тоже считаются: без них GitHub соберёт выпуск из неполного кода и сборка упадёт.
+      $dirty = (git status --porcelain)
+      if ($dirty) { Log "DIRTY: есть незакоммиченные или новые файлы — сначала коммит"; $dirty | ForEach-Object { Log "  $_" }; exit 6 }
+      $head = (git rev-parse HEAD).Trim()
+      git rev-parse -q --verify "refs/tags/v$Version" *> $null
+      if ($LASTEXITCODE -eq 0) {
+        # Тег уже есть: на другом коммите — не двигаем молча (повторная отправка того же тега выпуск не пересоберёт).
+        $tagged = (git rev-list -n 1 "v$Version").Trim()
+        if ($tagged -ne $head) { Log "STALE_TAG: тег v$Version стоит на $tagged, а не на $head — поднимите версию или удалите тег"; exit 7 }
+      } else { git tag "v$Version" 2>&1 | ForEach-Object { Log $_ } }
+      git push origin HEAD "v$Version" 2>&1 | ForEach-Object { Log $_ }
+      if ($LASTEXITCODE -ne 0) { Log "FAILED: git push вернул $LASTEXITCODE"; exit 5 }
+      Log "TAG_SENT: тег v$Version отправлен — выпуск соберёт GitHub Actions за 15–30 минут: https://github.com/$Repo/actions"
+      # Отдельный код: выпуска ещё нет, его соберёт GitHub (PUBLISH.bat пишет об этом, а не «Готово»).
+      exit 10
+    }
+    finally { Pop-Location }
+  }
   Log "gh: $gh"
   $auth = & $gh auth status 2>&1 | Out-String
   Log ("auth: " + ($auth -replace "`r?`n", ' | '))

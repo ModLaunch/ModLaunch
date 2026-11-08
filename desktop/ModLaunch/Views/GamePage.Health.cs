@@ -152,6 +152,14 @@ public sealed partial class GamePage
         buttons.Children.Add(purged
             ? Ui.Button(I18n.T("vanilla.restore"), RestorePurge, "primary", Icons.Refresh)
             : Ui.Button(I18n.T("vanilla.purge"), ConfirmPurge, "", Icons.EyeOff));
+        // 25.0: «Найти виновника» — и отсюда; идёт поиск — шаг и «Остановить».
+        if (!purged && Bisect.Get(_g.Def.Id) is { } bis)
+        {
+            buttons.Children.Add(Ui.Button(I18n.T("v25.bis.running", ("n", bis.Round + 1), ("left", Bisect.RunsLeft(bis))), () => Actions.Play(_g), "primary", Icons.Play));
+            buttons.Children.Add(Ui.Button(I18n.T("v25.bis.stop"), () => BisectUi.Stop(_g), "ghost", Icons.Close));
+        }
+        else if (!purged && _g.Registry is { } reg && Bisect.Candidates(reg).Suspects.Count >= 2)
+            buttons.Children.Add(Ui.Button(I18n.T("v25.bis.title"), () => BisectUi.Offer(_g), "", Icons.Search));
         return Ui.Card(Ui.Col(12,
             Ui.Row(10, Ui.Icon(Icons.Shield, 18, Ui.Res("Muted")), Ui.Text(I18n.T("vanilla.title"), "h3")),
             Ui.Text(I18n.T(purged ? "vanilla.purged.text" : "vanilla.text"), "muted", wrap: true),
@@ -243,5 +251,25 @@ public sealed partial class GamePage
         text.VerticalAlignment = VerticalAlignment.Center;
         row.Children.Add(text);
         return new Border { Background = Ui.Res("BrandSoft"), CornerRadius = new CornerRadius(14), Padding = new Thickness(16, 12), Child = row };
+    }
+
+    /// <summary>25.0: идёт «Найти виновника» — шаг, «Играть» и «Остановить» прямо над вкладками.</summary>
+    Control? BisectBanner()
+    {
+        if (Bisect.Get(_g.Def.Id) is not { } s) return null;
+        var buttons = Ui.Row(8,
+            Ui.Button(I18n.T("v25.bis.stop"), () => BisectUi.Stop(_g), "ghost", Icons.Close),
+            Ui.Button(I18n.T("v24.fixed.play"), () => Actions.Play(_g), "primary", Icons.Play));
+        buttons.VerticalAlignment = VerticalAlignment.Center;
+        DockPanel.SetDock(buttons, Dock.Right);
+        var row = new DockPanel { Children = { buttons } };
+        var text = Ui.Row(10, Ui.Icon(Icons.Search, 18, Ui.Res("Warn")), Ui.Col(2,
+            Ui.Text(I18n.T("v25.bis.step", ("n", s.Round + 1), ("left", Bisect.RunsLeft(s))), "h3"),
+            Ui.Text(s.Verify is { } v
+                ? I18n.T("v25.bis.verify.text", ("mod", _g.Registry?.Get(v)?.Str("name") ?? v))
+                : I18n.T("v25.bis.next.text", ("n", s.Round + 1), ("left", Bisect.RunsLeft(s)), ("count", s.Suspects.Count)), "small muted", wrap: true)));
+        text.VerticalAlignment = VerticalAlignment.Center;
+        row.Children.Add(text);
+        return new Border { Background = Ui.Soft("#3A2A12", "#F2B84B"), CornerRadius = new CornerRadius(14), Padding = new Thickness(16, 12), Child = row };
     }
 }

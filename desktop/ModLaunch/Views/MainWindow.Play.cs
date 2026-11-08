@@ -31,6 +31,8 @@ public sealed partial class MainWindow
         _accountButton.Click += (_, _) => ToggleAccountPanel();
         Social.Account.Changed += () => Dispatcher.UIThread.Post(() => { RenderAccount(); if (_accountPanel.IsVisible) RenderAccountPanel(); });
         Features.Cosmetics.Changed += () => Dispatcher.UIThread.Post(RenderAccount);
+        // 25.0: Premium куплен или найден при запуске — звёздочка на аватаре сразу.
+        Features.Premium.Changed += () => Dispatcher.UIThread.Post(RenderAccount);
     }
 
     // ---------------------------------------------------------------- экран запуска
@@ -72,8 +74,18 @@ public sealed partial class MainWindow
             };
             // 9.9: аватар в надетой рамке (награда за достижения).
             var ring = ProfileKit.Avatar(name, 40, ring: 3);
-            _accountButton.Content = new Panel { Width = 40, Height = 40, Children = { ring, online } };
-            ToolTip.SetTip(_accountButton, name);
+            var avatar = new Panel { Width = 40, Height = 40, Children = { ring, online } };
+            // 25.0: золотая звёздочка Premium в углу аватара.
+            if (Features.Premium.Active)
+                avatar.Children.Add(new Border
+                {
+                    Width = 16, Height = 16, CornerRadius = new CornerRadius(8), Background = Ui.Hex("#F0B429"),
+                    BorderBrush = Ui.Res("Rail"), BorderThickness = new Thickness(2),
+                    HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(-3, -3, 0, 0),
+                    Child = Ui.Icon(Icons.Sparkles, 8, Brushes.White),
+                });
+            _accountButton.Content = avatar;
+            ToolTip.SetTip(_accountButton, Features.Premium.Active ? name + " · Premium" : name);
         }
         else
         {
@@ -110,6 +122,11 @@ public sealed partial class MainWindow
         StoreKit.OnClick(card, () => { CloseAccountPanel(); Navigate(() => new ProfilePage()); });
         col.Children.Add(card);
         col.Children.Add(MenuRow(I18n.T("v99.home.profile"), Icons.Trophy, () => Navigate(() => new ProfilePage())));
+        // 25.0: ModLaunch Premium — золотой пункт; у кого он есть — «Premium ✓».
+        var premium = MenuRow(Features.Premium.Active ? "Premium ✓" : I18n.T("v25.prem.menu"), Icons.Sparkles, () => Navigate(() => new AccountPage("premium")));
+        premium.Foreground = Ui.Hex("#F0B429");
+        col.Children.Add(premium);
+        col.Children.Add(MenuRow(I18n.T("v25.bug.title"), Icons.Flag, () => BugReportUi.Show()));
         if (p.SignedIn)
         {
             col.Children.Add(MenuRow(I18n.T("acc.menu.account"), Icons.User, () => Navigate(() => new AccountPage())));

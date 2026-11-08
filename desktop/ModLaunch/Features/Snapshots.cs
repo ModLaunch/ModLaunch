@@ -16,8 +16,9 @@ public static class Snapshots
 
     static string Dir(string gameId) => Path.Combine(Paths.DataDir, "snapshots", gameId);
 
-    /// <summary>Сделать снимок. reason — ключ: update, remove, import, code, profile, manager.</summary>
-    public static void Take(GameState g, string reason)
+    /// <summary>Сделать снимок. reason — ключ: update, remove, import, code, profile, manager.
+    /// keep — снимок, который сейчас возвращают: его не удаляем, даже если он самый старый.</summary>
+    public static void Take(GameState g, string reason, Snapshot? keep = null)
     {
         if (g.Registry is not { } registry) return;
         try
@@ -34,10 +35,60 @@ public static class Snapshots
                 ["config"] = hasConfig,
                 ["mods"] = ModSetup.ToJson(mods),
             }.ToJsonString());
-            foreach (var old in List(g.Def.Id).Skip(Keep)) Delete(old);
+            // «Рабочая сборка» хранится одна и не вытесняется двадцатью другими снимками.
+            foreach (var old in List(g.Def.Id).Where(s => s.Reason != "works" && s.File != keep?.File).Skip(Keep)) Delete(old);
         }
         catch { /* снимок — подстраховка, из-за него дело не должно сорваться */ }
     }
+
+    /// <summary>
+    /// 25.0: «рабочая сборка» — состав модов после игры без вылета (5+ минут). Хранится один такой снимок;
+    /// состав не поменялся — новый не пишем. Начала игра падать после обновлений — одна кнопка вернёт как было.
+    /// </summary>
+    public static void RememberWorking(GameState g)
+    {
+        if (g.Registry is not { } registry) return;
+        try
+        {
+            var mods = ModSetup.Capture(registry);
+            if (mods.Count == 0) return;
+            // Запоминаем только тот набор, с которым игру и запускали: моды меняли во время игры — не он.
+            List<SetupMod>? launched;
+            lock (AtLaunch) launched = AtLaunch.GetValueOrDefault(g.Def.Id);
+            if (launched is null || !Same(launched, mods)) return;
+            if (LastWorking(g.Def.Id) is { } last && Same(Mods(last), mods)) return;
+            Take(g, "works");
+            foreach (var old in List(g.Def.Id).Where(s => s.Reason == "works").Skip(1)) Delete(old);
+        }
+        catch { }
+    }
+
+    /// <summary>Набор модов в момент запуска игры — с ним сверяется «рабочая сборка» после выхода.</summary>
+    static readonly Dictionary<string, List<SetupMod>> AtLaunch = [];
+
+    public static void NoteLaunch(GameState g)
+    {
+        if (g.Registry is not { } registry) return;
+        try
+        {
+            var mods = ModSetup.Capture(registry);
+            lock (AtLaunch) AtLaunch[g.Def.Id] = mods;
+        }
+        catch { }
+    }
+
+    public static Snapshot? LastWorking(string gameId) => List(gameId).FirstOrDefault(s => s.Reason == "works");
+
+    /// <summary>Отличается ли сейчас состав от рабочей сборки (иначе возвращать нечего).</summary>
+    public static bool DiffersFromWorking(GameState g)
+    {
+        try { return g.Registry is { } registry && LastWorking(g.Def.Id) is { } last && !Same(Mods(last), ModSetup.Capture(registry)); }
+        catch { return false; }
+    }
+
+    static bool Same(List<SetupMod> a, List<SetupMod> b) =>
+        a.Count == b.Count && a.OrderBy(m => m.Id, StringComparer.Ordinal).Select(m => (m.Id, m.Version, m.Enabled))
+            .SequenceEqual(b.OrderBy(m => m.Id, StringComparer.Ordinal).Select(m => (m.Id, m.Version, m.Enabled)));
 
     public static List<Snapshot> List(string gameId)
     {

@@ -30,12 +30,28 @@ public sealed partial class MainWindow
         CrashReport report;
         try { report = await Task.Run(() => CrashDoctor.Analyze(g, exit, mc)); }
         catch (Exception e) { Guard.Log(e); return; }
-        if (!report.Crashed) return;
+        if (!report.Crashed)
+        {
+            // 25.0: поиграли без вылета 5+ минут — запоминаем эту сборку как рабочую. Но не запуск без модов,
+            // не «чистую игру» и не шаг поиска виновника: там играли вовсе не с этим набором модов.
+            if (exit.Ms > 300_000 && !exit.Vanilla && !Vanilla.IsPurged(g.Def.Id) && !Bisect.Running(g.Def.Id))
+                Snapshots.RememberWorking(g);
+            return;
+        }
         // Сначала пусть человек ответит на окно, открытое при выходе игры («оставить прогресс?»), — не закрываем его.
         for (var i = 0; i < 1200 && _overlay.IsVisible; i++) await Task.Delay(500);
         // Игру уже запустили снова — не мешаем.
         if (Features.Launcher.IsRunning(g.Def.Id) || _overlay.IsVisible) return;
         ShowCrash(g, report);
+    }
+
+    /// <summary>25.0: вопрос «Игра упала?» во время поиска виновника — после окна «оставить прогресс?», не поверх него.</summary>
+    async Task AskBisectLater(GameState g)
+    {
+        await Task.Delay(400);
+        for (var i = 0; i < 1200 && _overlay.IsVisible; i++) await Task.Delay(500);
+        if (Features.Launcher.IsRunning(g.Def.Id) || !Bisect.Running(g.Def.Id)) return;
+        BisectUi.Ask(g);
     }
 
     /// <summary>«Почему упала?» со вкладки «Проверка», лога или страницы Minecraft: разобрать последний запуск.</summary>
@@ -89,6 +105,7 @@ public sealed partial class MainWindow
             share = Ui.Button(I18n.T("v24.crash.shareLog"), () => ShareCrashLog(log, share), "ghost", Icons.Link);
             tools.Children.Add(share);
         }
+        tools.Children.Add(Ui.Button(I18n.T("v25.bug.short"), () => { CloseDialog(); BugReportUi.Show(g, r.Headline); }, "ghost", Icons.Flag));
         body.Children.Add(tools);
         if (fixable && !g.Def.IsMinecraft)
         {
@@ -104,13 +121,26 @@ public sealed partial class MainWindow
         }
 
         var actions = new List<Control> { Ui.Button(I18n.T("common.close"), CloseDialog) };
+        // 25.0: игра работала раньше с другим набором модов — одна кнопка вернёт ту сборку.
+        if (!g.Def.IsMinecraft && !Bisect.Running(g.Def.Id) && Snapshots.DiffersFromWorking(g) && Snapshots.LastWorking(g.Def.Id) is { } works)
+        {
+            var back = Ui.Button(I18n.T("v25.works.back"), () => { CloseDialog(); Actions.RestoreSnapshot(g, works); }, "", Icons.Undo);
+            ToolTip.SetTip(back, I18n.T("v25.works.tip", ("when", Ui.Ago(works.At))));
+            actions.Add(back);
+        }
         var urlOnly = !fixable && r.Causes.FirstOrDefault(c => c.Fix is { Kind: "url" })?.Fix?.Url is { } url ? url : null;
         if (fixable)
             actions.Add(Ui.Button(I18n.T("v24.crash.fix"), () => { CloseDialog(); Actions.FixCrash(g, r); }, "primary", Icons.Wand));
         else if (urlOnly is not null)
             actions.Add(Ui.Button(I18n.T("v24.crash.openPage"), () => Ui.OpenUrl(urlOnly), "primary", Icons.External));
-        else if (!g.Def.IsMinecraft && g.Path is not null && Vanilla.Supported(g.Def, g.Path) && !Vanilla.IsPurged(g.Def.Id))
-            actions.Add(Ui.Button(I18n.T("vanilla.play"), () => { CloseDialog(); Actions.Play(g, vanilla: true); }, "primary", Icons.Play));
+        else
+        {
+            if (!g.Def.IsMinecraft && g.Path is not null && Vanilla.Supported(g.Def, g.Path) && !Vanilla.IsPurged(g.Def.Id))
+                actions.Add(Ui.Button(I18n.T("vanilla.play"), () => { CloseDialog(); Actions.Play(g, vanilla: true); }, "", Icons.Play));
+            // 25.0: причину не понять — «Найти виновника»: моды по половинам, пара запусков (если поиск уже не идёт).
+            if (!g.Def.IsMinecraft && !Bisect.Running(g.Def.Id) && g.Registry is { } reg && Bisect.Candidates(reg).Suspects.Count >= 2)
+                actions.Add(Ui.Button(I18n.T("v25.bis.title"), () => { CloseDialog(); BisectUi.Offer(g); }, "primary", Icons.Search));
+        }
         Dialog(I18n.T("v24.crash.title"), body, 640, actions.ToArray());
     }
 

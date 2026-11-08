@@ -36,8 +36,13 @@ public static class ModUpdates
         registry.List().Where(r => !r.Bool("missing") && !r.Bool("hold") && r.Str("source") is not (null or "file") && r.Str("kind") != "preset"
             && r.Str("id") is { } id && !id.Contains('#')).ToList();
 
+    /// <summary>25.0: сколько модов последняя проверка смогла спросить у каталога и у скольких не вышло (нет сети) —
+    /// чтобы не говорить «моды актуальны», когда их никто не проверял.</summary>
+    public static readonly ConcurrentDictionary<string, (int Checked, int Failed)> Coverage = new();
+
     public static async Task<List<ModUpdate>> Check(GameState g, CancellationToken ct = default)
     {
+        Coverage.TryRemove(g.Def.Id, out _);
         // У Minecraft свои обновления — по сборке (Modrinth, по хешам файлов): в фоне, список — на странице Minecraft.
         if (g.Def.IsMinecraft)
         {
@@ -49,6 +54,8 @@ public static class ModUpdates
         g.Registry.Reconcile();
         var records = Candidates(g.Registry);
         var result = new ConcurrentBag<ModUpdate>();
+        var asked = 0;
+        var failed = 0;
         using var gate = new SemaphoreSlim(4);
         await Task.WhenAll(records.Select(async r =>
         {
@@ -56,6 +63,7 @@ public static class ModUpdates
             var catalogId = g.Def.CatalogId(recordId);
             if (catalogId is null) return;
             await gate.WaitAsync(ct);
+            Interlocked.Increment(ref asked);
             try
             {
                 var source = g.Def.SourceOf(recordId, r.Str("source"));
@@ -63,11 +71,12 @@ public static class ModUpdates
                 if (Versions.IsNewer(latest, r.Str("version")))
                     result.Add(new ModUpdate(recordId, catalogId, r.Str("name") ?? recordId, r.Str("version") ?? "", latest!, r.Str("icon"), source == "nexus" && !NexusDirect, source));
             }
-            catch { /* нет сети или мод убрали из каталога — просто не знаем */ }
+            catch { Interlocked.Increment(ref failed); /* нет сети или мод убрали из каталога — просто не знаем */ }
             finally { gate.Release(); }
         }));
         var list = result.OrderBy(u => u.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
         Found[g.Def.Id] = list;
+        Coverage[g.Def.Id] = (asked, failed);
         return list;
     }
 

@@ -79,7 +79,7 @@ public static partial class Actions
             Dispatcher.UIThread.Post(() =>
             {
                 AppState.Notify();
-                if (failed.Count == 0) W.Toast(I18n.T("v24.share.installed", ("name", pack.Name)));
+                if (failed.Count == 0) { W.Toast(I18n.T("v24.share.installed", ("name", pack.Name))); Premium.Count("codesUsed"); }
             });
             if (failed.Count > 0) throw new InvalidOperationException(I18n.T("code.failedSome", ("list", string.Join(", ", failed.Take(8)))));
         });

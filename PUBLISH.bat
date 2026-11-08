@@ -6,6 +6,7 @@ echo.
 echo  ==== ModLaunch: выкладываю установщик на сайт ====
 echo.
 powershell -NoProfile -ExecutionPolicy Bypass -File build\publish-release.ps1
+if %errorlevel% equ 10 (echo. & echo  Тег отправлен - выпуск соберёт GitHub Actions за 15-30 минут. Проверьте вкладку Actions на GitHub. & pause & exit /b 0)
 if errorlevel 1 (echo. & echo  Не получилось - подробности в build\publish.log. & pause & exit /b 1)
 echo.
 echo  Готово! Кнопка «Скачать» на modlaunchapp.com ведёт на новую версию.

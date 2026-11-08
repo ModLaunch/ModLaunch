@@ -105,6 +105,7 @@ public sealed partial class GamePage : Page
         if (_g.Status == Detect.Found)
         {
             if (PurgeBanner() is { } banner) content.Children.Add(banner);
+            if (BisectBanner() is { } bisect) content.Children.Add(bisect);
             content.Children.Add(Tabs());
             var body = _tab switch
             {

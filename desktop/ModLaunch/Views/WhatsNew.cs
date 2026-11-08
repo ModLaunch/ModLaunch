@@ -12,6 +12,13 @@ public static class WhatsNew
 {
     static readonly (string Icon, string Key, Func<Page>? Open)[] Items =
     [
+        // 25.0 (юбилейная): Premium, кошельки, «Найти виновника», «Сообщить о проблеме», юбилейные награды.
+        (Icons.Sparkles, "new.v25.premium", () => new AccountPage("premium")),
+        (Icons.Bag, "new.v25.wallet", () => new AccountPage("wallet")),
+        (Icons.Search, "new.v25.bisect", null),
+        (Icons.Flag, "new.v25.report", null),
+        (Icons.Refresh, "new.v25.patch", null),
+        (Icons.Trophy, "new.v25.jubilee", () => new ProfilePage("rewards")),
         // 24.0: «Почему игра упала», сборка по коду для всех игр, «Обновить всё» одной кнопкой.
         (Icons.Wand, "new.v24.crash", null),
         (Icons.Users, "new.v24.share", () => new HomePage()),
@@ -148,7 +155,7 @@ public static class WhatsNew
             }
         // 23.8: все пункты переведены на все восемь языков — новый пункт без перевода тест не пропустит.
         if (missing.FirstOrDefault() is { } bad) throw new Exception("raw or empty: " + bad + (missing.Count > 1 ? $" (+{missing.Count - 1})" : ""));
-        if (I18n.T("new.v24.subtitle") == "new.v24.subtitle") throw new Exception("no subtitle for 24");
+        if (I18n.T("new.v25.subtitle") == "new.v25.subtitle") throw new Exception("no subtitle for 25");
         var (fr, frText) = Split("new.v21.blocks", k => k == "new.v21.blocks" ? "Blocs dans ModScript : texte" : k);
         var (zh, zhText) = Split("new.v21.blocks", k => k == "new.v21.blocks" ? "积木：文字" : k);
         if (fr != "Blocs dans ModScript" || frText != "Texte" || zh != "积木" || zhText != "文字") throw new Exception("colon split: " + fr + "|" + zh);
@@ -218,7 +225,7 @@ public static class WhatsNew
             },
             Child = Ui.Col(2,
                 new TextBlock { Text = $"ModLaunch {Http.Version}", FontSize = 24, FontWeight = FontWeight.Bold, Foreground = Brushes.White },
-                new TextBlock { Text = I18n.T("new.v24.subtitle"), Foreground = new SolidColorBrush(Color.FromArgb(220, 255, 255, 255)), TextWrapping = TextWrapping.Wrap }),
+                new TextBlock { Text = I18n.T("new.v25.subtitle"), Foreground = new SolidColorBrush(Color.FromArgb(220, 255, 255, 255)), TextWrapping = TextWrapping.Wrap }),
         };
         w.Dialog(I18n.T("new.title"), new ScrollViewer { MaxHeight = 560, Content = Ui.Col(12, hero, list) }, 620,
             Ui.Button(I18n.T("new.ok"), w.CloseDialog, "primary", Icons.Check));

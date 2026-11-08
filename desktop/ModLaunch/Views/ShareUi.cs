@@ -66,6 +66,7 @@ public static class ShareUi
             offline = true;
         }
         finally { _busy = false; }
+        Premium.Count("codesShared");
         ShowCode(pack, code, offline);
     }
 

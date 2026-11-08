@@ -117,7 +117,7 @@ public static partial class Actions
         try { mods = Snapshots.Mods(snapshot); }
         catch (Exception e) { W.Toast(Jobs.Explain(e), bad: true); return; }
         // Сам возврат тоже можно отменить — делаем снимок и перед ним.
-        Snapshots.Take(g, "restore");
+        Snapshots.Take(g, "restore", keep: snapshot);
         ModSetup.ApplyEnabled(registry, mods);
         if (Snapshots.ConfigZip(snapshot) is { } zip) ModSetup.RestoreConfig(registry, zip);
         var (missing, other) = ModSetup.Differences(registry, mods);

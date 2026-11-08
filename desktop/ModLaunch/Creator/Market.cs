@@ -250,6 +250,24 @@ public static class Market
         catch (ServiceError e) when (e.Code is "NOT_FOUND" or "DENIED") { return false; }
     }
 
+    /// <summary>
+    /// 25.0: куплен ли лот этим аккаунтом — по записи продажи. В отличие от Bought, «не пустили правила» и
+    /// сбои сети — не «нет покупки», а ошибка: по ним Premium не снимается.
+    /// </summary>
+    public static async Task<bool> HasSale(string listingId)
+    {
+        if (!Account.SignedIn) return false;
+        if (Owned.Contains(listingId)) return true;
+        var (uid, token, _) = await Hub.Member();
+        try
+        {
+            await Hub.Call(Firebase.Url($"/market/{listingId}/sales/{uid}"), HttpMethod.Get, null, token);
+            Owned.Add(listingId);
+            return true;
+        }
+        catch (ServiceError e) when (e.Code is "NOT_FOUND") { return false; }
+    }
+
     // ---------------------------------------------------------------- кошелёк (9.5: журнал, см. Creator/Wallet.cs)
 
     static Wallet ToWallet(WalletState w) => new(w.Balance, w.Earned, w.Spent, w.PaidOut, w.ToppedUp, w.Seq);
@@ -321,7 +339,7 @@ public static class Market
     /// копия в «Библиотеку» — одной пачкой; правила базы сверяют цену, комиссию и сумму списания.
     /// Выручку продавец заберёт сам (ClaimSales), поэтому покупатель в чужой кошелёк не пишет.
     /// </summary>
-    public static async Task Buy(Listing l)
+    public static async Task Buy(Listing l, long? expectedPrice = null)
     {
         var (uid, token, name) = await Hub.Member();
         if (l.Uid == uid) throw new ServiceError("OWN");
@@ -329,6 +347,9 @@ public static class Market
         var fresh = await Get(l.Id) ?? throw new ServiceError("NOT_FOUND");
         if (!fresh.Active) throw new ServiceError("NOT_FOUND");
         var price = fresh.Price;
+        // 25.0: человек подтвердил одну цену, а продавец успел поменять — не списываем больше обещанного.
+        if (expectedPrice is { } expected && expected != price)
+            throw new ServiceError("PRICE_CHANGED", price.ToString(System.Globalization.CultureInfo.InvariantCulture));
         // Процент мог смениться: правила базы сверяют комиссию с config/market прямо сейчас.
         await LoadFee(force: true);
         var fee = Fee(price);
@@ -558,10 +579,13 @@ public static class Market
     }
 
     /// <summary>Заявка на пополнение: человек оплатил по ссылке, админ сверяет и зачисляет.</summary>
+    /// <summary>25.0: больше за одну заявку правила базы (topups: amount ≤ 10 000 000) не примут.</summary>
+    public const long MaxTopUp = 10_000_000;
+
     public static async Task RequestTopUp(long amount, string reference)
     {
         var (uid, token, name) = await Hub.Member();
-        if (amount <= 0 || Hub.Clip(reference, 300) == "") throw new ServiceError("INVALID");
+        if (amount <= 0 || amount > MaxTopUp || Hub.Clip(reference, 300) == "") throw new ServiceError("INVALID");
         await MyWallet();
         await Hub.Commit([NewDoc($"topups/{uid}_{DateTime.UtcNow:yyyyMMddHHmmss}",
             new() { ["uid"] = uid, ["author"] = name, ["amount"] = amount, ["reference"] = Hub.Clip(reference, 300), ["status"] = "pending" })], token);

@@ -13,6 +13,8 @@ public static class SettingsTransfer
     static readonly HashSet<string> Private = new(StringComparer.OrdinalIgnoreCase)
     {
         "gamePaths", "detected", "nexusApiKey", "nexusPremium", "account", "accounts", "friends", "lastGame", "customGames",
+        // 25.0: покупка Premium привязана к аккаунту, номера сборок игр и поиск виновника — к этому ПК.
+        "premium", "gameBuilds", "bisect",
     };
 
     public static string Export()

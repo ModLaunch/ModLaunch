@@ -30,6 +30,7 @@ public sealed partial class GamePage
         {
             content.Children.Add(StorePivot());
             if (PurgeBanner() is { } banner) content.Children.Add(banner);
+            if (BisectBanner() is { } bisect) content.Children.Add(bisect);
             var body = _tab switch
             {
                 "installed" => InstalledView(),

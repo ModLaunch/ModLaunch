@@ -235,11 +235,44 @@ public sealed class WalletPanel : UserControl
 
     // ---------------------------------------------------------------- пополнить и вывести
 
-    static void TopUpDialog(Action done)
+    /// <summary>Название способа оплаты: «СБП», «Банковская карта», «ЮMoney»…</summary>
+    public static string MethodName(string id) => I18n.T("v25.pay." + id);
+
+    static string MethodIcon(string id) => id switch
+    {
+        "sbp" => Icons.Zap, "card" => Icons.Key, "yoomoney" => Icons.Bag, "usdt" => Icons.Globe, "paypal" => Icons.Users, _ => Icons.More,
+    };
+
+    /// <summary>
+    /// 25.0: пополнение любым кошельком — СБП, карта, ЮMoney, USDT, PayPal (реквизиты владельца из config/market.pay):
+    /// перевод с кодом ML-… в комментарии и заявка; владелец видит способ, код и номер операции.
+    /// </summary>
+    internal static async void TopUpDialog(Action done)
     {
         var w = MainWindow.Current;
         if (w is null) return;
         var uid = Social.Account.Uid ?? "";
+        await PayMethods.Load();
+        var code = PayMethods.Code(uid);
+        var methods = PayMethods.All.Where(m => PayMethods.Owner.ContainsKey(m.Id)).ToList();
+        var picked = methods.FirstOrDefault()?.Id;
+        var details = new SelectableTextBlock { FontSize = 16, FontWeight = FontWeight.SemiBold, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
+        var chips = new WrapPanel();
+        void ShowMethod()
+        {
+            chips.Children.Clear();
+            foreach (var m in methods)
+            {
+                var id = m.Id;
+                var chip = Ui.Button(MethodName(id), () => { picked = id; ShowMethod(); }, "chip", MethodIcon(id));
+                chip.Margin = new Thickness(0, 0, 6, 6);
+                if (id == picked) chip.Classes.Add("active");
+                chips.Children.Add(chip);
+            }
+            details.Text = picked is not null && PayMethods.Owner.TryGetValue(picked, out var d) ? d : "";
+        }
+        ShowMethod();
+        async void Copy(string text) { if (TopLevel.GetTopLevel(w)?.Clipboard is { } c) { await c.SetTextAsync(text); w.Toast(I18n.T("acc.copied")); } }
         var amount = new TextBox { Watermark = "500", Width = 160 };
         var presets = Ui.Row(6);
         foreach (var rub in new[] { 100, 300, 500, 1000 })
@@ -249,43 +282,64 @@ public sealed class WalletPanel : UserControl
             chip.Padding = new Thickness(10, 4);
             presets.Children.Add(chip);
         }
-        var reference = new TextBox { Watermark = I18n.T("acc.topup.ref"), MaxLength = 300 };
-        var steps = Ui.Col(12,
-            Ui.Text(I18n.T("acc.topup.text"), "muted", wrap: true),
-            Ui.Row(8, Ui.Text(I18n.T("acc.topup.id"), "small muted"), new SelectableTextBlock { Text = uid, FontSize = 12, VerticalAlignment = VerticalAlignment.Center },
-                Ui.Button("", async () => { if (TopLevel.GetTopLevel(w)?.Clipboard is { } c) { await c.SetTextAsync(uid); w.Toast(I18n.T("acc.copied")); } }, "icon ghost", Icons.Copy, I18n.T("acc.copy"))));
+        var reference = new TextBox { Watermark = I18n.T("v25.topup.ref"), MaxLength = 200 };
+        var steps = Ui.Col(12, Ui.Text(I18n.T("v25.topup.how", ("code", code)), "muted", wrap: true));
+        if (methods.Count > 0)
+        {
+            var copyDetails = Ui.Button("", () => Copy(details.Text ?? ""), "icon ghost", Icons.Copy, I18n.T("acc.copy"));
+            copyDetails.VerticalAlignment = VerticalAlignment.Center;
+            DockPanel.SetDock(copyDetails, Dock.Right);
+            steps.Children.Add(chips);
+            steps.Children.Add(new Border { Background = Ui.Res("Surface2"), CornerRadius = new CornerRadius(12), Padding = new Thickness(14, 10), Child = new DockPanel { Children = { copyDetails, details } } });
+        }
+        else if (Market.TopUpUrl == "")
+            steps.Children.Add(Ui.Text(I18n.T(Social.Account.Owner ? "v25.topup.setup" : "v25.topup.none"), "small", color: Ui.Res("Warn"), wrap: true));
         if (Market.TopUpUrl != "") steps.Children.Add(Ui.Button(I18n.T("acc.topup.pay"), () => Ui.OpenUrl(Market.TopUpUrl.Replace("{uid}", uid)), "", Icons.External));
+        var codeBox = new SelectableTextBlock { Text = code, FontSize = 16, FontWeight = FontWeight.Bold, FontFamily = new FontFamily("Consolas, monospace"), VerticalAlignment = VerticalAlignment.Center };
+        steps.Children.Add(Ui.Row(8, Ui.Text(I18n.T("v25.topup.code"), "small muted"), codeBox, Ui.Button("", () => Copy(code), "icon ghost", Icons.Copy, I18n.T("acc.copy"))));
         steps.Children.Add(Ui.Col(6, Ui.Text(I18n.T("v95.w.amount"), "small muted"), Ui.Row(8, amount, Ui.Text(Market.Currency, "muted")), presets));
-        steps.Children.Add(Ui.Col(6, Ui.Text(I18n.T("acc.topup.ref"), "small muted"), reference));
+        steps.Children.Add(Ui.Col(6, Ui.Text(I18n.T("v25.topup.ref"), "small muted"), reference));
         var send = Ui.Button(I18n.T("acc.topup.send"), async () =>
         {
             var a = Market.ParseMoney(amount.Text);
             if (a is null or 0) { w.Toast(I18n.T("mk.f.price.bad"), bad: true); return; }
+            // Правила базы принимают заявку до 100 000 ₽ — больше честно говорим, а не «сервис недоступен».
+            if (a > Market.MaxTopUp) { w.Toast(I18n.T("v25.topup.max", ("max", Market.Money(Market.MaxTopUp))), bad: true); return; }
             if (string.IsNullOrWhiteSpace(reference.Text)) { w.Toast(I18n.T("v95.w.ref.need"), bad: true); return; }
-            try { await Market.RequestTopUp(a.Value, reference.Text ?? ""); w.CloseDialog(); w.Toast(I18n.T("acc.topup.sent")); done(); }
+            // Владелец видит в заявке способ, код перевода и номер операции — по ним сверяет поступление.
+            var note = $"{(picked is null ? "" : MethodName(picked) + " · ")}{code} · {reference.Text!.Trim()}";
+            try { await Market.RequestTopUp(a.Value, note); w.CloseDialog(); w.Toast(I18n.T("acc.topup.sent")); done(); }
             catch (Exception e) { w.Toast(Market.Explain(e), bad: true); }
         }, "primary", Icons.Check);
+        send.IsEnabled = methods.Count > 0 || Market.TopUpUrl != "";
         w.Dialog(I18n.T("acc.wallet.topup"), steps, 520, Ui.Button(I18n.T("common.cancel"), w.CloseDialog), send);
     }
 
-    static void PayoutDialog(long balance, Action done)
+    internal static void PayoutDialog(long balance, Action done)
     {
         var w = MainWindow.Current;
         if (w is null) return;
         var amount = new TextBox { Watermark = (Market.MinPayout / 100).ToString(I18n.Culture), Width = 160 };
         var all = Ui.Button(I18n.T("acc.payout.all"), () => amount.Text = (balance / 100m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture), "chip");
         all.Padding = new Thickness(10, 4);
-        var method = new TextBox { Watermark = I18n.T("acc.payout.method"), MaxLength = 300 };
+        // 25.0: выплата на любой кошелёк — способ из списка и реквизиты с проверкой формата.
+        var kind = new ComboBox { Width = 220 };
+        foreach (var m in PayMethods.All) kind.Items.Add(MethodName(m.Id));
+        kind.SelectedIndex = 0;
+        var method = new TextBox { Watermark = PayMethods.All[0].Example, MaxLength = 200 };
+        kind.SelectionChanged += (_, _) => method.Watermark = PayMethods.All[Math.Max(0, kind.SelectedIndex)].Example;
         var body = Ui.Col(12,
             Ui.Text(I18n.T("acc.payout.text", ("min", Market.Money(Market.MinPayout))), "muted", wrap: true),
             Ui.Text(I18n.T("v95.w.available", ("sum", Market.Money(balance))), "h3"),
             Ui.Col(6, Ui.Text(I18n.T("v95.w.amount"), "small muted"), Ui.Row(8, amount, Ui.Text(Market.Currency, "muted"), all)),
-            Ui.Col(6, Ui.Text(I18n.T("acc.payout.method"), "small muted"), method));
+            Ui.Col(6, Ui.Text(I18n.T("v25.payout.where"), "small muted"), kind, method));
         var send = Ui.Button(I18n.T("acc.payout.send"), async () =>
         {
             var a = Market.ParseMoney(amount.Text);
             if (a is null or 0) { w.Toast(I18n.T("mk.f.price.bad"), bad: true); return; }
-            try { await Market.RequestPayout(a.Value, method.Text ?? ""); w.CloseDialog(); w.Toast(I18n.T("acc.payout.sent")); done(); }
+            var id = PayMethods.All[Math.Max(0, kind.SelectedIndex)].Id;
+            if (PayMethods.Check(id, method.Text ?? "") is { } bad) { w.Toast(I18n.T(bad), bad: true); return; }
+            try { await Market.RequestPayout(a.Value, $"{MethodName(id)}: {(method.Text ?? "").Trim()}"); w.CloseDialog(); w.Toast(I18n.T("acc.payout.sent")); done(); }
             catch (Exception e) { w.Toast(Market.Explain(e), bad: true); }
         }, "primary", Icons.Upload);
         w.Dialog(I18n.T("acc.payout"), body, 520, Ui.Button(I18n.T("common.cancel"), w.CloseDialog), send);

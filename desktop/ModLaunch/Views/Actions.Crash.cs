@@ -56,6 +56,7 @@ public static partial class Actions
         catch (Exception e) { failed.Add(Jobs.Explain(e)); Guard.Log(e); }
         finally { _fixingCrash = false; }
         AppState.Notify();
+        if (done.Count > 0) Premium.Count("crashFixed");
         ShowFixed(g, done, failed, mc);
     }
 
@@ -348,7 +349,7 @@ public static partial class Actions
                     if (current is null || !current.Enabled) { McContent.ForgetUpdate(a, u.Item); continue; }
                     // Уже обновили (например, при прошлой попытке).
                     if (McContent.Updates(a).All(x => x.Item.Key != u.Item.Key)) continue;
-                    try { await McModrinth.Update(a, u, progress, ct); Interlocked.Increment(ref ok); }
+                    try { await McModrinth.Update(a, u, progress, ct); Interlocked.Increment(ref ok); Premium.Count("modsUpdated"); }
                     catch (OperationCanceledException) { throw; }
                     catch (Exception e) { failed++; Guard.Log(e); }
                 }

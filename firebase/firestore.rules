@@ -496,8 +496,14 @@ service cloud.firestore {
     match /config/{name} {
       allow get: if true;
       allow create, update: if mAdmin() && name == 'market'
-        && request.resource.data.keys().hasOnly(['fee', 'updated', 'by'])
-        && request.resource.data.fee is int && request.resource.data.fee >= 0 && request.resource.data.fee <= 50
+        && request.resource.data.keys().hasOnly(['fee', 'updated', 'by', 'pay', 'premium', 'premiumAll'])
+        && (!('fee' in request.resource.data)
+          || (request.resource.data.fee is int && request.resource.data.fee >= 0 && request.resource.data.fee <= 50))
+        // 25.0: реквизиты для пополнения кошельков (способ → реквизиты) и лот ModLaunch Premium.
+        && (!('pay' in request.resource.data) || (request.resource.data.pay is map && request.resource.data.pay.size() <= 10))
+        // id лота — uid (28) + «_» + имя пакета (до 60): до 128 с запасом. premiumAll — все лоты Premium (купившие их не теряют его).
+        && (!('premium' in request.resource.data) || (request.resource.data.premium is string && request.resource.data.premium.size() <= 128))
+        && (!('premiumAll' in request.resource.data) || (request.resource.data.premiumAll is list && request.resource.data.premiumAll.size() <= 20))
         && request.resource.data.updated == request.time && request.resource.data.by == request.auth.uid;
     }
 

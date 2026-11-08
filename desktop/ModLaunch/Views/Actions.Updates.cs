@@ -61,6 +61,7 @@ public static partial class Actions
                         if (u.Source == "nexus")
                             await ModUpdates.Replace(g, u.RecordId, () => InstallNexus(g, registry, u.CatalogId, u.Name, null, job, step, ct, withDeps: true));
                         else await ModUpdates.Update(g, u, step, ct);
+                        Premium.Count("modsUpdated");
                     }
                     catch (Exception) when (mine.Count > 1 && !ct.IsCancellationRequested) { failed.Add(u.Name); }
                     finally

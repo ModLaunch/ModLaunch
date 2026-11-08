@@ -17,7 +17,7 @@ public static partial class Launcher
     static readonly Dictionary<string, (System.Diagnostics.Process Process, DateTime Started)> Running = [];
 
     /// <summary>Как закончился последний запуск — для помощника при вылете.</summary>
-    public sealed record ExitInfo(DateTime Started, long Ms, int? Code, bool ByUser);
+    public sealed record ExitInfo(DateTime Started, long Ms, int? Code, bool ByUser, bool Vanilla = false);
     static readonly Dictionary<string, ExitInfo> Last = [];
     static readonly HashSet<string> StopRequested = [];
     /// <summary>Снимки экранов: «запущенная» игра без настоящего процесса.</summary>
@@ -140,6 +140,8 @@ public static partial class Launcher
         if (track) PlayTime.Start(game.Id);
         // 11.0: и часы той сборки, с которой запущена игра.
         if (track) try { BuildTime.Start(AppState.Game(game.Id), vanilla); } catch { }
+        // 25.0: с каким набором модов запустили — «рабочая сборка» после выхода сверяется с ним.
+        if (!vanilla) try { Snapshots.NoteLaunch(AppState.Game(game.Id)); } catch { }
         process.EnableRaisingEvents = true;
         lock (Running) { Running[game.Id] = (process, DateTime.UtcNow); StopRequested.Remove(game.Id); }
         process.Exited += (_, _) =>
@@ -152,7 +154,7 @@ public static partial class Launcher
                 var started = Running.TryGetValue(game.Id, out var r) ? r.Started : DateTime.UtcNow;
                 Running.Remove(game.Id);
                 ran = DateTime.UtcNow - started;
-                Last[game.Id] = new ExitInfo(started, (long)ran.TotalMilliseconds, code, StopRequested.Remove(game.Id));
+                Last[game.Id] = new ExitInfo(started, (long)ran.TotalMilliseconds, code, StopRequested.Remove(game.Id), vanilla);
             }
             // Этот поток — не окно: сбой записи (диск полон, файл держит антивирус) здесь ронял бы всю программу.
             var (counted, ms) = (false, 0L);

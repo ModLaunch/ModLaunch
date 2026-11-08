@@ -32,6 +32,8 @@ public sealed class CommissionPanel : UserControl
         _loading = true;
         _ = Task.Run(async () =>
         {
+            // 25.0: реквизиты и лот Premium — до того, как форма заполнится (иначе «Сохранить» затёр бы их пустыми).
+            try { await PayMethods.Load(force: true); } catch { }
             try { await Market.LoadFee(force: true); _sales = await Commission.AllSales(); _error = null; }
             catch (Exception e) { _error = Market.Explain(e); _sales = null; }
             _loading = false;
@@ -110,10 +112,95 @@ public sealed class CommissionPanel : UserControl
         if (s.Recent.Count == 0) table.Children.Add(new Border { Padding = new Thickness(0, 12), Child = Ui.Text(I18n.T("v14.fee.none"), "small muted", wrap: true) });
         col.Children.Add(Ui.Card(Ui.Col(10, Ui.Text(I18n.T("v14.fee.sales"), "h3"), table), 22));
 
-        // Приём оплаты: провайдер ещё не выбран.
-        col.Children.Add(Ui.Card(Ui.Row(16, Ui.Icon(Icons.Shield, 22, Ui.Res("Muted")),
-            Ui.Col(4, Ui.Text(I18n.T("v14.fee.pay"), "h3"), Ui.Text(I18n.T("v14.fee.pay.text"), "small muted", wrap: true))), 22));
+        // 25.0: приём оплаты — реквизиты для пополнения кошельков и продажа ModLaunch Premium.
+        var payPremium = new Grid { ColumnDefinitions = new ColumnDefinitions("*,*"), ColumnSpacing = 18 };
+        var payCard = PayCard();
+        payPremium.Children.Add(payCard);
+        var premiumCard = PremiumCard();
+        Grid.SetColumn(premiumCard, 1);
+        payPremium.Children.Add(premiumCard);
+        col.Children.Add(payPremium);
         Content = col;
+    }
+
+    /// <summary>Реквизиты: по полю на способ. Пустое поле — способ не показывается в окне пополнения.</summary>
+    Control PayCard()
+    {
+        var boxes = new Dictionary<string, TextBox>();
+        var rows = Ui.Col(8);
+        foreach (var m in PayMethods.All)
+        {
+            var box = new TextBox { Watermark = m.Example == "" ? WalletPanel.MethodName(m.Id) : m.Example, Text = PayMethods.Owner.GetValueOrDefault(m.Id, ""), MaxLength = 200 };
+            boxes[m.Id] = box;
+            var label = Ui.Text(WalletPanel.MethodName(m.Id), "small muted");
+            label.Width = 130;
+            label.VerticalAlignment = VerticalAlignment.Center;
+            var row = new DockPanel();
+            DockPanel.SetDock(label, Dock.Left);
+            row.Children.Add(label);
+            row.Children.Add(box);
+            rows.Children.Add(row);
+        }
+        var save = Ui.Button(I18n.T("v25.pay.save"), async () =>
+        {
+            // Реквизиты так и не прочитались (нет сети) — сохранение затёрло бы сохранённые способы пустыми.
+            if (!PayMethods.Loaded) { MainWindow.Current?.Toast(I18n.T("v14.fee.error"), bad: true); Reset(); Render(); return; }
+            try
+            {
+                await PayMethods.Save(boxes.ToDictionary(kv => kv.Key, kv => kv.Value.Text ?? ""));
+                MainWindow.Current?.Toast(I18n.T("v25.pay.saved", ("n", PayMethods.Owner.Count)));
+            }
+            catch (Exception e) { MainWindow.Current?.Toast(Market.Explain(e), bad: true); }
+        }, "primary", Icons.Check);
+        save.IsEnabled = PayMethods.Loaded;
+        return Ui.Card(Ui.Col(12,
+            Ui.Row(10, Ui.Icon(Icons.Bag, 20, Ui.Res("Brand2")), Ui.Text(I18n.T("v25.pay.title"), "h3")),
+            Ui.Text(I18n.T("v25.pay.text"), "small muted", wrap: true),
+            rows, save), 22);
+    }
+
+    /// <summary>ModLaunch Premium: какой свой лот продавать как Premium (его цена — цена Premium).</summary>
+    Control PremiumCard()
+    {
+        var pick = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch, PlaceholderText = I18n.T("v25.prem.owner.pick") };
+        var status = Ui.Text(Features.Premium.ListingId is { } cur ? I18n.T("v25.prem.owner.on", ("id", cur)) : I18n.T("v25.prem.owner.off"), "small muted", wrap: true);
+        List<Listing> mine = [];
+        _ = Task.Run(async () =>
+        {
+            try { await PayMethods.Load(); mine = Program.Demo ? [] : await Market.Mine(); } catch { }
+            Dispatcher.UIThread.Post(() =>
+            {
+                pick.Items.Clear();
+                foreach (var l in mine) pick.Items.Add($"{l.Title} · {Market.Money(l.Price)}");
+                pick.SelectedIndex = mine.FindIndex(l => l.Id == Features.Premium.ListingId);
+                status.Text = Features.Premium.ListingId is { } now ? I18n.T("v25.prem.owner.on", ("id", now)) : I18n.T("v25.prem.owner.off");
+            });
+        });
+        var save = Ui.Button(I18n.T("v25.prem.owner.save"), async () =>
+        {
+            if (pick.SelectedIndex < 0 || pick.SelectedIndex >= mine.Count) { MainWindow.Current?.Toast(I18n.T("v25.prem.owner.pick"), bad: true); return; }
+            try
+            {
+                var l = mine[pick.SelectedIndex];
+                await Features.Premium.SetOffer(l.Id);
+                status.Text = I18n.T("v25.prem.owner.on", ("id", l.Id));
+                MainWindow.Current?.Toast(I18n.T("v25.prem.owner.saved", ("price", Market.Money(l.Price))));
+            }
+            catch (Exception e) { MainWindow.Current?.Toast(Market.Explain(e), bad: true); }
+        }, "primary", Icons.Sparkles);
+        var newLot = Ui.Button(I18n.T("v25.prem.owner.new"), () => MainWindow.Current?.Navigate(() => new CreatorPage("shop")), "ghost", Icons.Plus);
+        return Ui.Card(Ui.Col(12,
+            Ui.Row(10, Ui.Icon(Icons.Sparkles, 20, Ui.Hex("#F0B429")), Ui.Text(I18n.T("v25.prem.owner.title"), "h3")),
+            Ui.Text(I18n.T("v25.prem.owner.text", ("price", Market.Money(Features.Premium.Price))), "small muted", wrap: true),
+            pick, status, Ui.Text(PremiumSold(), "small", color: Ui.Hex("#F0B429"), wrap: true), Ui.Row(8, save, newLot)), 22);
+    }
+
+    /// <summary>Сколько раз куплен Premium и на какую сумму (из продаж рынка).</summary>
+    static string PremiumSold()
+    {
+        var ids = Features.Premium.AllListings.Append(Features.Premium.ListingId ?? "").ToHashSet();
+        var sold = _sales?.Where(x => ids.Contains(x.ListingId) && x.Price > 0).ToList() ?? [];
+        return I18n.T("v25.prem.owner.sold", ("n", sold.Count), ("sum", Market.Money(sold.Sum(x => x.Price))));
     }
 
     async Task Save(int percent)

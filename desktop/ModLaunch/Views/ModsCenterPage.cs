@@ -123,8 +123,12 @@ public sealed class ModsCenterPage : Page
             Build();
         }, "", Icons.Refresh);
         var top = Ui.Row(8, check);
-        // «Обновить всё» по всем играм сразу — через окно со списком.
-        if (all.Count > 0) top.Children.Add(Ui.Button(I18n.T("upd.allN", ("n", all.Count)), () => UpdateReview.Show(all), "primary", Icons.ArrowUp));
+        // 25.0: как везде — «Обновить всё» сразу (моды игр и сборки Minecraft), «Подробнее» — окно со списком.
+        if (all.Count > 0 || Actions.PendingUpdates() > 0)
+        {
+            top.Children.Add(Ui.Button(I18n.T("upd.allN", ("n", Math.Max(all.Count, Actions.PendingUpdates()))), () => { Actions.UpdateEverything(); Build(); }, "primary", Icons.ArrowUp));
+            if (all.Count > 0) top.Children.Add(Ui.Button(I18n.T("v24.upd.pick"), () => UpdateReview.Show(all), "ghost", Icons.List));
+        }
         top.HorizontalAlignment = HorizontalAlignment.Left;
         return Ui.Col(12, top, List(rows, I18n.T("mc.updates.none")));
     }

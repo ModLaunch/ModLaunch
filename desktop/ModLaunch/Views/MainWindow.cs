@@ -967,22 +967,59 @@ public sealed partial class MainWindow : Window
         // 11.0: инжекты, оставшиеся от ModLaunch, закрытого посреди игры, — снять; сеть — под присмотром (авто-офлайн).
         try { Features.Inject.Recover(); } catch { }
         Offline.StartWatching();
+        // 25.0: вошли, вышли или сменили аккаунт — Premium проверяется для этого аккаунта сразу.
+        Features.Premium.Watch();
         _ = Task.Run(async () =>
         {
             try { await Features.Tracking.Check(); } catch { }
             try { await Creator.Hub.All(); } catch { }
+            // 25.0: Premium куплен на другом ПК или до переустановки — узнаём по покупке.
+            try { await Features.Premium.Refresh(); } catch { }
+            // 25.0: владельцу — сколько заявок на пополнение и вывод ждут подтверждения (пока не подтвердить, деньги не придут).
+            if (!Program.Demo && Social.Account.SignedIn && Social.Account.Get().Admin)
+                try
+                {
+                    var topups = (await Creator.Market.PendingTopUps()).Count;
+                    var payouts = (await Creator.Market.PendingPayouts()).Count;
+                    if (topups + payouts > 0) Dispatcher.UIThread.Post(() => Toast(I18n.T("v25.admin.pending", ("topups", topups), ("payouts", payouts))));
+                }
+                catch { }
             Dispatcher.UIThread.Post(RenderBell);
             await CloudFlow.Check();
         });
         if (Program.StartupLink is string link) OnExternal(link);
-        if (Features.ModUpdates.OnStart)
+        // 25.0: игра обновилась в Steam с прошлого запуска — после патча моды ломаются чаще всего: проверяем их сразу.
+        List<GameState> patched = [];
+        try { if (!Program.Demo) patched = Features.GamePatch.Changed(); } catch { }
+        foreach (var g in patched) Toast(I18n.T("v25.patch.found", ("game", g.Def.Name)));
+        if (Features.ModUpdates.OnStart || patched.Count > 0)
         {
-            foreach (var g in AppState.Games.Where(g => g.Status == Detect.Found && g.ModCount > 0))
+            foreach (var g in AppState.Games.Where(g => g.Status == Detect.Found && g.ModCount > 0 && (Features.ModUpdates.OnStart || patched.Contains(g))))
             {
                 try { await Features.ModUpdates.Check(g); } catch { }
             }
             AppState.Notify();
             Actions.AutoUpdate();
+            // 25.0: «Есть обновления у N модов» — заметно, а не только счётчиком (если они не ставятся сами).
+            var pending = Actions.PendingUpdates();
+            if (!Features.ModUpdates.Auto && pending > 0 && patched.Count == 0) Toast(I18n.T("v25.upd.found", ("n", pending)));
+        }
+        foreach (var g in patched)
+        {
+            var ups = Features.ModUpdates.Found.TryGetValue(g.Def.Id, out var found) ? found : [];
+            // «Обновлять моды сами» уже ставит всё, что можно без браузера, — «нажмите Обновить всё» только про остальное.
+            var manual = Features.ModUpdates.Auto ? ups.Count(u => u.Manual) : ups.Count;
+            var auto = ups.Count - manual;
+            if (auto > 0) Toast(I18n.T("v25.patch.auto", ("game", g.Def.Name), ("n", auto)));
+            if (manual > 0) Toast(I18n.T("v25.patch.updates", ("game", g.Def.Name), ("n", manual)));
+            else if (auto == 0)
+            {
+                // «Моды актуальны» — только если их правда спросили у каталога и ответ пришёл.
+                var asked = Features.ModUpdates.Coverage.TryGetValue(g.Def.Id, out var c) ? c : (Checked: -1, Failed: 0);
+                if (asked.Checked < 0 || asked.Failed > 0) { Toast(I18n.T("v25.patch.offline", ("game", g.Def.Name))); continue; }
+                Toast(I18n.T(asked.Checked == 0 ? "v25.patch.manual" : "v25.patch.ok", ("game", g.Def.Name)));
+            }
+            Features.GamePatch.Commit(g);
         }
     }
 
@@ -1012,6 +1049,10 @@ public sealed partial class MainWindow : Window
         AppState.Notify();
         // Закрылась сама — возможно, вылет: смотрим логи. 24.0: и после долгой игры (вылет через час — тоже вылет);
         // окно появится, только если это правда вылет (код ошибки, файл о вылете или серьёзная причина в логе).
+        // 25.0: идёт «Найти виновника» — вместо разбора спрашиваем, упала ли игра (так надёжнее любого лога).
+        // Спрашиваем только про запуск с модами этого шага: без модов или начатый до шага — не ответ.
+        if (Features.Bisect.Get(gameId) is { } bis && Features.Launcher.LastExit(gameId) is { Vanilla: false } last && Features.Bisect.Counts(bis, last.Started))
+        { _ = AskBisectLater(game); return; }
         if (Features.Launcher.LastExit(gameId) is { ByUser: false } exit && Settings.Data.Bool("crashHelper", true))
             _ = CheckCrash(game, exit);
     }

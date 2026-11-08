@@ -71,6 +71,8 @@ public sealed partial class AccountPage : Page
         var sections = new List<(string Id, string Key, string Icon)>
         {
             ("profile", "acc.s.profile", Icons.User),
+            // 25.0: ModLaunch Premium — видно и без входа (купить можно после входа).
+            ("premium", "v25.prem.tab", Icons.Sparkles),
             ("security", "acc.s.security", Icons.Lock),
             ("wallet", "acc.s.wallet", Icons.Bag),
             ("purchases", "acc.s.purchases", Icons.Download),
@@ -81,8 +83,8 @@ public sealed partial class AccountPage : Page
         if (Account.Owner && p.SignedIn) sections.Add(("commission", "v14.mk.tab.commission", Icons.Percent));
         if (p.Admin) sections.Add(("admin", "acc.s.admin", Icons.Shield));
         // Снимки экрана: «Заработок» на примере, без входа.
-        var demo = Program.Screenshot && _tab == "earnings";
-        if (!p.SignedIn && !demo) _tab = "profile";
+        var demo = Program.Screenshot && _tab is "earnings" or "premium";
+        if (!p.SignedIn && !demo && _tab != "premium") _tab = "profile";
 
         var tabs = new StackPanel { Spacing = 4, Width = 230 };
         var head = Ui.Row(12, ProfileKit.Avatar(p.SignedIn ? p.Name ?? p.Email ?? "?" : "?", 46),
@@ -94,13 +96,15 @@ public sealed partial class AccountPage : Page
             var b = Ui.Button(I18n.T(key), () => { _tab = id; _error = null; Build(); }, "tab", icon);
             b.HorizontalAlignment = HorizontalAlignment.Stretch;
             b.HorizontalContentAlignment = HorizontalAlignment.Left;
-            b.IsEnabled = p.SignedIn || id == "profile" || demo;
+            b.IsEnabled = p.SignedIn || id is "profile" or "premium" || demo;
             if (_tab == id) b.Classes.Add("active");
+            if (id == "premium") b.Foreground = Ui.Hex("#F0B429");
             tabs.Children.Add(b);
         }
 
         Control body;
-        if (demo) body = Earnings();
+        if (_tab == "premium") body = new PremiumPanel();
+        else if (demo) body = Earnings();
         else if (!p.Configured) body = Card(I18n.T("acc.title"), I18n.T("acc.off"));
         else if (!p.SignedIn) body = SignForm();
         else body = _tab switch

@@ -180,8 +180,13 @@ public static class Cosmetics
         foreach (var a in all) if (a.Done && a.Reward is { } r) set.Add(r.Key);
         // 16.0: награды пути уровней.
         foreach (var r in LevelRoad.Unlocked(Achievements.Level(all).Level)) set.Add(r.Key);
+        // 25.0: юбилейный подарок — всем; награды Premium — с Premium.
+        foreach (var r in Premium.Jubilee) set.Add(r.Key);
+        if (Premium.Active) foreach (var r in Premium.Rewards) set.Add(r.Key);
         return set;
     }
+
+    public static void NotifyChanged() => Changed?.Invoke();
 
     /// <summary>Все награды, которые можно получить: стартовые и за каждое достижение.</summary>
     public static List<(Reward Reward, Achievement? From)> Catalog(List<Achievement>? all = null)
@@ -191,6 +196,7 @@ public static class Cosmetics
         foreach (var a in all) if (a.Reward is { } r) list.Add((r, a));
         foreach (var (_, r) in LevelRoad.Road) list.Add((r, null));
         foreach (var (_, r) in LevelRoad.Bonus) list.Add((r, null));
+        foreach (var r in Premium.Jubilee.Concat(Premium.Rewards)) list.Add((r, null));
         return list;
     }
 

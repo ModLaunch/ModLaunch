@@ -97,6 +97,10 @@ public static class GameCard
             return m;
         }
         if (g.Status == Detect.Found && g.LoaderInstalled) menu.Items.Add(Item(I18n.T("games.play"), Icons.Play, () => Actions.Play(g)));
+        // 25.0: поделиться сборкой и найти мод-виновника — прямо с карточки игры.
+        if (g.Status == Detect.Found && g.ModCount > 0) menu.Items.Add(Item(I18n.T("v24.share.go"), Icons.Users, () => ShareUi.Share(g)));
+        if (g.Status == Detect.Found && !g.Def.IsMinecraft && g.Registry is { } reg && Features.Bisect.Candidates(reg).Suspects.Count >= 2 && !Features.Bisect.Running(id))
+            menu.Items.Add(Item(I18n.T("v25.bis.title"), Icons.Search, () => BisectUi.Offer(g)));
         if (g.Def.IsMinecraft && g.Status == Detect.Found)
         {
             menu.Items.Add(Item(I18n.T("mine.build.new"), Icons.Plus, () => { MainWindow.Current?.Navigate(() => new MinecraftPage("builds")); MinecraftPage.CreateDialog(); }));

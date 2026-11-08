@@ -75,6 +75,19 @@ public sealed partial class ProfilePage : Page
             Child = new TextBlock { Text = level.ToString(), FontFamily = Gx.Display, FontWeight = FontWeight.Bold, FontSize = 14, Foreground = Brushes.White },
         };
         avatar.Children.Add(lvl);
+        // 25.0: значок Premium в углу аватара — нажатие ведёт на страницу Premium.
+        if (Premium.Active)
+        {
+            var star = new Border
+            {
+                Width = 30, Height = 30, CornerRadius = new CornerRadius(15), Background = Ui.Hex("#F0B429"), BorderBrush = Ui.Res("Surface"), BorderThickness = new Thickness(3),
+                HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top, Child = Ui.Icon(Icons.Sparkles, 14, Brushes.White),
+                Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand),
+            };
+            ToolTip.SetTip(star, "ModLaunch Premium");
+            StoreKit.OnClick(star, () => MainWindow.Current?.Navigate(() => new AccountPage("premium")));
+            avatar.Children.Add(star);
+        }
 
         var bar = new ProgressBar { Minimum = 0, Maximum = 300, Value = 300 - next, Height = 6, Width = 300, HorizontalAlignment = HorizontalAlignment.Left };
         var words = Ui.Col(6,
@@ -208,14 +221,18 @@ public sealed partial class ProfilePage : Page
         preview.HorizontalAlignment = HorizontalAlignment.Center;
         if (!have) preview.Opacity = 0.4;
         var title = new TextBlock { Text = Cosmetics.Name(r), FontWeight = FontWeight.SemiBold, FontSize = 13.5, TextTrimming = TextTrimming.CharacterEllipsis, HorizontalAlignment = HorizontalAlignment.Center };
+        // 25.0: награды Premium — так и подписаны, закрытая ведёт к Premium (а не «Откройте „“»).
+        var premium = Premium.Rewards.Contains(r);
         var sub = new TextBlock
         {
-            Text = LevelRoad.LevelOf(r) is int lv
+            Text = premium ? I18n.T("v25.prem.reward")
+                : LevelRoad.LevelOf(r) is int lv
                 ? I18n.T(have ? "v16.road.got" : "v16.road.locked", ("n", lv))
                 : have ? (from is null ? I18n.T("v99.rewards.starter") : from.Title) : I18n.T("v99.rewards.locked", ("ach", from?.Title ?? "")),
             FontSize = 11.5, Foreground = Ui.Res("Muted"), TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap, MaxLines = 2, TextTrimming = TextTrimming.CharacterEllipsis,
         };
-        Control action = !have ? Ui.Row(6, Ui.Icon(Icons.Lock, 13, Ui.Res("Faint")), Ui.Text(I18n.T("v99.rewards.closed"), "small muted"))
+        Control action = !have && premium ? Ui.Button(I18n.T("v25.prem.tab"), () => MainWindow.Current?.Navigate(() => new AccountPage("premium")), "", Icons.Sparkles)
+            : !have ? Ui.Row(6, Ui.Icon(Icons.Lock, 13, Ui.Res("Faint")), Ui.Text(I18n.T("v99.rewards.closed"), "small muted"))
             // 17.0: сборка создателя применяется (как конфиг); страницу перерисует смена оформления.
             : r.Kind == "config"
                 ? Ui.Button(on ? I18n.T("v17.cb.on") : I18n.T("v10.set.apply"), () =>
