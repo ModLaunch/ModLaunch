@@ -1175,6 +1175,8 @@ public sealed partial class MainWindow : Window
             MaxHeight = Math.Max(320, Bounds.Height - 72),
             Child = DialogLayout(Ui.Text(title, "h2", wrap: true), body, buttons),
         };
+        // 26.0: окно поверх Creator Hub — в облике хаба (янтарная главная кнопка, рамки), а не синим цветом темы.
+        if (HubNav.IsHub(CurrentPage) || CurrentPage is ListingPage) HubLook.Scope(card);
         var shade = new Border { Background = new SolidColorBrush(Color.Parse("#99000000")) };
         shade.PointerPressed += (_, _) => CloseDialog();
         _overlay.Children.Clear();

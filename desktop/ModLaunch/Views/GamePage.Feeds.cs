@@ -64,14 +64,14 @@ public sealed partial class GamePage
     }
 
     // «18+» и «Только рабочие» — тоже в ключе: выключили 18+ — полка не должна показывать запомненные моды 18+.
-    string FeedKey() => $"{_g.Def.Id}|{_source ?? _g.Def.PrimarySource}|{_feed}|{_adult}|{OnlyWorking}";
+    string FeedKey() => $"{_g.Def.Id}|{CurrentSource}|{_feed}|{_adult}|{OnlyWorking}";
 
     async Task LoadFeed(string key)
     {
         _feedLoading = true;
         await Task.Yield();
         var feed = _feed;
-        var source = _source ?? _g.Def.PrimarySource;
+        var source = CurrentSource;
         var adult = _adult;
         var onlyWorking = OnlyWorking;
         // Нас зовут из середины RenderList. Каталог может ответить сразу (ModLaunch Hub из кэша, демо) —

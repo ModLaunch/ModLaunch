@@ -85,17 +85,84 @@ public static class MarketTiles
     public static Control Art(Listing l, int decode = 768, bool hero = true)
     {
         if (l.Images.Count > 0) return StoreKit.UrlImage(l.Images[0], decode);
-        var game = GameCatalog.ById(l.Game);
-        if (game is null) return new Border { Background = HubLook.Raised, Child = Ui.Icon(KindIcon(l.Kind), decode <= 384 ? 18 : 30, Ui.Res("Muted")) };
-        return Ui.GameImage(game, decode, art: hero ? Images.Art.Hero : Images.Art.Header);
+        // 26.0: широкий баннер — по-прежнему арт игры; карточки и строки — своя обложка лота, а не одна и та же
+        // картинка игры у всех лотов (на рынке Subnautica все карточки были одинаковыми).
+        if (decode >= 1600 && GameCatalog.ById(l.Game) is { } game) return Ui.GameImage(game, decode, art: Images.Art.Hero);
+        return Cover(l.Kind, l.Id, l.Game, KindIcon(l.Kind), compact: decode <= 384);
     }
 
     public static Control Art(HubMod h, int decode = 768)
     {
         if (h.Images.Count > 0) return StoreKit.UrlImage(h.Images[0], decode);
-        var game = GameCatalog.ById(h.Game);
-        if (game is null) return new Border { Background = HubLook.Raised, Child = Ui.Icon(h.IsPackage ? Icons.Package : Icons.Code, decode <= 384 ? 18 : 30, Ui.Res("Muted")) };
-        return Ui.GameImage(game, decode, art: Images.Art.Hero);
+        if (decode >= 1600 && GameCatalog.ById(h.Game) is { } game) return Ui.GameImage(game, decode, art: Images.Art.Hero);
+        return Cover(h.IsPackage ? "pack" : "code", h.Id, h.Game, h.IsPackage ? Icons.Package : Icons.Code, compact: decode <= 384);
+    }
+
+    /// <summary>Цвета обложки по виду лота: код — фиолетовый, скрипты — янтарный, ассеты — бирюзовый…</summary>
+    static (Color From, Color To) KindColors(string kind) => kind switch
+    {
+        "code" or "snippet" => (Color.Parse("#6366F1"), Color.Parse("#7C3AED")),
+        "script" or "scripts" => (Color.Parse("#F0B429"), Color.Parse("#D9480F")),
+        "asset" or "assets" => (Color.Parse("#14B8A6"), Color.Parse("#0E7490")),
+        "model" or "models" => (Color.Parse("#EC4899"), Color.Parse("#7E22CE")),
+        "pack" or "build" or "builds" => (Color.Parse("#22C55E"), Color.Parse("#0F766E")),
+        "config" => (Color.Parse("#38BDF8"), Color.Parse("#1D4ED8")),
+        _ => (Color.Parse("#64748B"), Color.Parse("#1E293B")),
+    };
+
+    static Color Shift(Color c, double by)
+    {
+        // Небольшой сдвиг яркости по номеру лота — соседние карточки одного вида не сливаются.
+        byte F(byte v) => (byte)Math.Clamp(v + by * 255, 0, 255);
+        return Color.FromRgb(F(c.R), F(c.G), F(c.B));
+    }
+
+    /// <summary>
+    /// 26.0: обложка лота без своих картинок — градиент вида лота (оттенок и угол зависят от номера лота), мягкие
+    /// круги-блики, значок вида в стеклянном круге и маленький значок игры в углу.
+    /// </summary>
+    public static Control Cover(string kind, string id, string gameId, string icon, bool compact = false)
+    {
+        var seed = (uint)StringComparer.Ordinal.GetHashCode(id ?? "");
+        var r = new Random((int)(seed & 0x7FFFFFFF));
+        var (from, to) = KindColors(kind);
+        var shift = (r.NextDouble() - 0.5) * 0.16;
+        var angle = r.NextDouble();
+        var bg = new LinearGradientBrush
+        {
+            StartPoint = new RelativePoint(angle * 0.4, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1 - angle * 0.4, 1, RelativeUnit.Relative),
+            GradientStops = { new GradientStop(Shift(from, shift), 0), new GradientStop(Shift(to, shift / 2), 1) },
+        };
+        var panel = new Panel();
+        for (var i = 0; i < (compact ? 1 : 3); i++)
+        {
+            var size = compact ? 60 : 90 + r.Next(120);
+            panel.Children.Add(new Avalonia.Controls.Shapes.Ellipse
+            {
+                Width = size, Height = size, Fill = Brushes.White, Opacity = 0.06 + r.NextDouble() * 0.07,
+                HorizontalAlignment = r.Next(2) == 0 ? HorizontalAlignment.Left : HorizontalAlignment.Right,
+                VerticalAlignment = r.Next(2) == 0 ? VerticalAlignment.Top : VerticalAlignment.Bottom,
+                Margin = new Thickness(-size / 3),
+            });
+        }
+        var badgeSize = compact ? 30 : 58;
+        panel.Children.Add(new Border
+        {
+            Width = badgeSize, Height = badgeSize, CornerRadius = new CornerRadius(badgeSize / 2),
+            Background = new SolidColorBrush(Color.FromArgb(60, 255, 255, 255)),
+            BorderBrush = new SolidColorBrush(Color.FromArgb(80, 255, 255, 255)), BorderThickness = new Thickness(1),
+            HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+            Child = Ui.Icon(icon, compact ? 15 : 26, Brushes.White),
+        });
+        if (!compact && GameCatalog.ById(gameId) is { } game)
+            panel.Children.Add(new Border
+            {
+                Width = 26, Height = 26, CornerRadius = new CornerRadius(7), ClipToBounds = true, Margin = new Thickness(10),
+                BorderBrush = new SolidColorBrush(Color.FromArgb(120, 255, 255, 255)), BorderThickness = new Thickness(1),
+                HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Bottom,
+                Child = Ui.GameImage(game, 96, art: Images.Art.Cover),
+            });
+        return new Border { Background = bg, ClipToBounds = true, Child = panel };
     }
 
     public static string GameName(string id) => GameCatalog.ById(id)?.ShortName ?? (id == "" ? I18n.T("mk.anyGame") : id);

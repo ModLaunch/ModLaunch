@@ -20,9 +20,12 @@ public static class SelfCheck
         if (Directory.Exists(root)) Directory.Delete(root, true);
         Environment.SetEnvironmentVariable("MODLAUNCH_DATA", Path.Combine(root, "data"));
         var failed = 0;
+        // 26.0: MODLAUNCH_CHECK=часть имени — только эти проверки (вся самопроверка идёт больше 5 минут).
+        var only = Environment.GetEnvironmentVariable("MODLAUNCH_CHECK");
 
         async Task Check(string name, Func<Task<string>> body)
         {
+            if (!string.IsNullOrWhiteSpace(only) && !name.Contains(only, StringComparison.OrdinalIgnoreCase)) return;
             try { Console.WriteLine($"ok   {name}: {await body()}"); }
             catch (Exception e)
             {
@@ -95,6 +98,23 @@ public static class SelfCheck
         {
             var page = await Nexus.Browse("subnautica", new Query("Nautilus"), [], []);
             return $"{page.Total} hits, first {page.Mods.FirstOrDefault()?.Name}";
+        });
+        // 26.0: рандомайзер врагов Silksong есть только на Thunderstore, а основной каталог — Nexus. «Все источники» и
+        // умный поиск должны находить его и по-русски, и по-английски во множественном числе.
+        await Check("smart search all sources", async () =>
+        {
+            var g = GameCatalog.ById("hollow-knight-silksong")!;
+            var found = new List<string>();
+            foreach (var text in new[] { "рандомные враги", "random enemies", "enemy randomizer" })
+            {
+                var page = await Catalog.Browse(g, new Query(text), source: Catalog.AllSources);
+                var at = page.Mods.FindIndex(m => m.Id.Equals("cometcake575-SimpleEnemyRando", StringComparison.OrdinalIgnoreCase));
+                if (at < 0) throw new Exception($"«{text}»: SimpleEnemyRando not found in {page.Mods.Count} ({string.Join(", ", page.Mods.Take(5).Select(m => m.Name))})");
+                found.Add($"«{text}» #{at + 1} of {page.Mods.Count}");
+            }
+            var browse = await Catalog.Browse(g, new Query(), source: Catalog.AllSources);
+            if (!browse.Mods.Any(m => m.Source == "thunderstore") || !browse.Mods.Any(m => m.Source == "nexus")) throw new Exception("all sources did not mix Nexus and Thunderstore");
+            return string.Join("; ", found) + $"; browse mixes {browse.Mods.Count(m => m.Source == "nexus")} Nexus + {browse.Mods.Count(m => m.Source == "thunderstore")} Thunderstore";
         });
         await Check("nexus details", async () =>
         {
@@ -338,7 +358,15 @@ public static class SelfCheck
             {
                 var found = await Catalog.Many(g, g.Picks);
                 var ids = found.Select(m => m.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
-                bad.AddRange(g.Picks.Where(p => !ids.Contains(p)).Select(p => $"{g.Id}:{p}"));
+                // 26.0: каталог иногда отвечает ошибкой на один запрос (так CI 25.0 «потерял» живой мод ULTRAKILL) —
+                // пропавшее спрашиваем ещё раз, прежде чем считать его удалённым.
+                foreach (var p in g.Picks.Where(p => !ids.Contains(p)).ToList())
+                {
+                    await Task.Delay(1500);
+                    ModInfo? again = null;
+                    try { again = await Catalog.Get(g, p); } catch { }
+                    if (again is null) bad.Add($"{g.Id}:{p}");
+                }
             }
             if (bad.Count > 0) throw new Exception("not found: " + string.Join(", ", bad));
             return $"{GameCatalog.Builtin.Sum(g => g.Picks.Length)} picks, all found";

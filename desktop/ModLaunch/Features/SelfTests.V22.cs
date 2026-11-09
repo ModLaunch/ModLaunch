@@ -43,6 +43,7 @@ static class V22Tests
         var fresh = all.Where(k => k.StartsWith("v22.", StringComparison.Ordinal) || k.StartsWith("v23.", StringComparison.Ordinal) || k.StartsWith("v24.", StringComparison.Ordinal)
             || k.StartsWith("new.v24.", StringComparison.Ordinal) || k.StartsWith("err.share.", StringComparison.Ordinal) || k == "snap.reason.crash"
             || k.StartsWith("v25.", StringComparison.Ordinal) || k.StartsWith("new.v25.", StringComparison.Ordinal) || k is "snap.reason.bisect" or "snap.reason.works"
+            || k.StartsWith("v26.", StringComparison.Ordinal) || k.StartsWith("new.v26.", StringComparison.Ordinal)
             || k is "v99.frame.premium" or "v99.banner.premium" or "v99.title.premium" or "v99.badge.premium" or "v99.frame.jubilee" or "v99.banner.jubilee" or "v99.title.jubilee").ToList();
         var missing = new List<string>();
         var backlog = new List<string>();

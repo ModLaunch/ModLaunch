@@ -79,7 +79,9 @@ public sealed class SearchPage : Page
                 await gate.WaitAsync(cts.Token);
                 try
                 {
-                    var page = Program.Demo ? Demo.Catalog(g.Def, new Query(text)) : await Catalog.Browse(g.Def, new Query(text), cts.Token);
+                    // 26.0: все каталоги игры сразу и умный поиск (русские слова, «enemies» = «enemy»).
+                    var page = Program.Demo ? Demo.Catalog(g.Def, new Query(text)) : await Catalog.Browse(g.Def, new Query(text), cts.Token,
+                        Catalog.HasSeveral(g.Def) ? Catalog.AllSources : null);
                     if (!cts.IsCancellationRequested) _results[g.Def.Id] = (page.Mods.Take(5).ToList(), Math.Max(page.Total, page.Mods.Count), null);
                 }
                 finally { gate.Release(); }

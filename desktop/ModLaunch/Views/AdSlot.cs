@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Shapes;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
@@ -67,6 +68,43 @@ public static class AdSlot
             if (!Program.Screenshot) timer.Start();
         };
         host.DetachedFromVisualTree += (_, _) => { timer?.Stop(); Ads.Changed -= Changed; I18n.Changed -= Changed; };
+    }
+
+    /// <summary>
+    /// 26.0: обложка своих объявлений ModLaunch вместо серого прямоугольника с иконкой — градиент своего цвета
+    /// у каждого раздела, значок в стеклянном круге и два мягких круга-блика.
+    /// </summary>
+    internal static Control HouseArt(Ad ad, double height)
+    {
+        var (from, to) = ad.Icon switch
+        {
+            "globe" => ("#3B82F6", "#7C3AED"),
+            "creator" => ("#F0B429", "#C2410C"),
+            "users" => ("#10B981", "#0E7490"),
+            _ => ("#64748B", "#334155"),
+        };
+        Control Blob(double size, double x, double y, double opacity) => new Ellipse
+        {
+            Width = size, Height = size, Fill = Brushes.White, Opacity = opacity,
+            HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(x, y, 0, 0),
+        };
+        var badge = new Border
+        {
+            Width = 58, Height = 58, CornerRadius = new CornerRadius(29), Background = new SolidColorBrush(Color.FromArgb(56, 255, 255, 255)),
+            BorderBrush = new SolidColorBrush(Color.FromArgb(90, 255, 255, 255)), BorderThickness = new Thickness(1),
+            HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+            Child = Ui.Icon(IconFor(ad), 28, Brushes.White),
+        };
+        return new Border
+        {
+            Height = height, ClipToBounds = true,
+            Background = new LinearGradientBrush
+            {
+                StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
+                GradientStops = { new GradientStop(Color.Parse(from), 0), new GradientStop(Color.Parse(to), 1) },
+            },
+            Child = new Panel { Children = { Blob(120, -40, -60, 0.10), Blob(70, SideWidth - 50, height - 40, 0.12), badge } },
+        };
     }
 
     static Control Mark(Ad ad, double size, double radius)
@@ -153,7 +191,7 @@ public static class AdSlot
             });
             Control art = ad.Image is not null
                 ? new Border { Height = SideWidth * 4 / 3, ClipToBounds = true, Child = HomePage.WebArt(ad.Image, null, ad.Title, 400) }
-                : new Border { Height = 96, Background = Ui.Res("Surface2"), Child = Ui.Icon(IconFor(ad), 30, Ui.Res("Muted")) };
+                : HouseArt(ad, 112);
             var title = new TextBlock { Text = ad.Title, FontSize = 13, FontWeight = FontWeight.SemiBold, TextWrapping = TextWrapping.Wrap, MaxLines = 2, TextTrimming = TextTrimming.CharacterEllipsis };
             var text = new TextBlock { Text = ad.Text, FontSize = 11.5, Foreground = Ui.Res("Muted"), TextWrapping = TextWrapping.Wrap, MaxLines = 3, TextTrimming = TextTrimming.CharacterEllipsis };
             var dots = Ui.Row(4);

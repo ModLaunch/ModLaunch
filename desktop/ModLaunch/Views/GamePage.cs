@@ -426,16 +426,20 @@ public sealed partial class GamePage : Page
         }
 
         // Источники: основной каталог и дополнительные (как в Vortex — моды с разных сайтов).
-        var source = _source ?? _g.Def.PrimarySource;
+        // 26.0: первым — «Все источники»: у Silksong рандомайзер врагов есть только на Thunderstore, а основной каталог — Nexus.
+        var source = CurrentSource;
+        var sourceList = (Catalog.HasSeveral(_g.Def) ? new[] { Catalog.AllSources } : []).Concat(_g.Def.Sources).ToArray();
+        string SourceCount(string src, bool compact) =>
+            (src == Catalog.AllSources ? (_sourceTotals.Count > 0 ? _sourceTotals.Values.Sum() : (long?)null) : _sourceTotals.TryGetValue(src, out var n) ? n : null) is long v && v > 0
+                ? " · " + (compact ? I18n.Compact(v) : v.ToString("N0", I18n.Culture)) : "";
         DockPanel? sourceDock = null; // в одну строку с источниками уходят переключатели «скрыть установленные», «только рабочие» и вид списка
         if (_g.Def.Sources.Length > 1 && side is not null)
         {
             if (_sourceTotals.Count < _g.Def.Sources.Length && !Program.Demo) _ = LoadSourceTotals();
             side.Children.Add(SideCaption(I18n.T("v4.source")));
-            foreach (var src in _g.Def.Sources)
+            foreach (var src in sourceList)
             {
-                var label = Catalog.Title(src) + (_sourceTotals.TryGetValue(src, out var n) ? $" · {I18n.Compact(n)}" : "");
-                var b = SideItem(Ui.Button(label, () => { _source = src; _section = "all"; _ = Load(reset: true); Build(); }, "chip"));
+                var b = SideItem(Ui.Button(Catalog.Title(src) + SourceCount(src, true), () => { _source = src; _section = "all"; _ = Load(reset: true); Build(); }, "chip"));
                 if (src == source) b.Classes.Add("active");
                 side.Children.Add(b);
             }
@@ -445,10 +449,9 @@ public sealed partial class GamePage : Page
             if (_sourceTotals.Count < _g.Def.Sources.Length && !Program.Demo) _ = LoadSourceTotals();
             var sources = Ui.Row(8, Ui.Text(I18n.T("v4.source"), "small muted"));
             sources.Children[0].VerticalAlignment = VerticalAlignment.Center;
-            foreach (var src in _g.Def.Sources)
+            foreach (var src in sourceList)
             {
-                var label = Catalog.Title(src) + (_sourceTotals.TryGetValue(src, out var n) ? $" · {n:N0}" : "");
-                var b = Ui.Button(label, () => { _source = src; _section = "all"; _ = Load(reset: true); Build(); }, "chip");
+                var b = Ui.Button(Catalog.Title(src) + SourceCount(src, false), () => { _source = src; _section = "all"; _ = Load(reset: true); Build(); }, "chip");
                 if (src == source) b.Classes.Add("active");
                 sources.Children.Add(b);
             }
@@ -458,13 +461,19 @@ public sealed partial class GamePage : Page
         }
 
         var chips = new WrapPanel();
-        var primarySource = source == _g.Def.PrimarySource;
+        // Разделы (категории) есть у основного каталога. Во «Всех источниках» они тоже видны: выбрали раздел —
+        // переходим в основной каталог, где он есть.
+        var primarySource = source == _g.Def.PrimarySource || source == Catalog.AllSources;
         side?.Children.Add(SideCaption(I18n.T("v9.sections")));
         foreach (var s in _g.Def.Sections)
         {
             if (!primarySource && s.Id is not ("all" or "best")) continue;
             if (s.Id == "packs" && _g.Def.Kits.Length == 0 && _g.Def.Catalog != CatalogKind.Nexus) continue;
-            var b = Ui.Button(I18n.T("sec." + s.Id), () => SelectSection(s.Id), "chip", SectionIcon(s.Id));
+            var b = Ui.Button(I18n.T("sec." + s.Id), () =>
+            {
+                if (source == Catalog.AllSources && s.Id is not ("all" or "best" or "picks" or "packs")) _source = _g.Def.PrimarySource;
+                SelectSection(s.Id);
+            }, "chip", SectionIcon(s.Id));
             if (_section == s.Id) b.Classes.Add("active");
             b.Margin = new Thickness(0, 0, 8, 8);
             if (side is not null) side.Children.Add(SideItem(b));
@@ -574,6 +583,9 @@ public sealed partial class GamePage : Page
 
     /// <summary>Открыть раздел каталога (для снимков экрана).</summary>
     public void ShowSection(string id) => SelectSection(id);
+
+    /// <summary>26.0: выбранный каталог; не выбран — «Все источники», если у игры их несколько, иначе основной.</summary>
+    string CurrentSource => _source ?? (Catalog.HasSeveral(_g.Def) && _section is "all" or "best" ? Catalog.AllSources : _g.Def.PrimarySource);
 
     void SelectSection(string id)
     {
@@ -740,7 +752,7 @@ public sealed partial class GamePage : Page
             {
                 var page = Program.Demo
                     ? Demo.Catalog(_g.Def, new Query(_query, _page, _sort, _section, _period, _adult))
-                    : await Catalog.Browse(_g.Def, new Query(_query, _page, _sort, _section, _period, _adult), source: _source);
+                    : await Catalog.Browse(_g.Def, new Query(_query, _page, _sort, _section, _period, _adult), source: CurrentSource);
                 if (id != _requestId) return;
                 var before = _mods.Count;
                 _mods.AddRange(page.Mods.Where(m => _mods.All(x => x.Id != m.Id)));
