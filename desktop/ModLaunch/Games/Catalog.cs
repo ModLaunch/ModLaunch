@@ -85,7 +85,8 @@ public static class GameCatalog
             Sections = Section.Pick("all", "picks", "best", "content", "items", "gameplay", "cosmetics", "audio", "tools", "visuals", "modpacks"),
             Picks =
             [
-                "notnotnotswipez-MoreCompany", "tinyhoot-ShipLoot", "anormaltwig-LateCompany", "x753-More_Suits", "Evaisa-LethalThings",
+                // 26.0: устаревшие (deprecated) ShipLoot, LateCompany и LethalThings заменены живыми модами.
+                "notnotnotswipez-MoreCompany", "PXC-ShipLootPlus", "LTGVE-VeryLateCompany", "x753-More_Suits", "qwbarch-Mirage",
                 "malco-Lategame_Upgrades", "x753-Mimics", "FlipMods-ReservedFlashlightSlot", "FlipMods-TooManyEmotes", "sunnobunno-YippeeMod",
                 "FlipMods-ReservedWalkieSlot", "EliteMasterEric-Coroner", "mrgrm7-LethalCasino", "Magic_Wesley-Wesleys_Moons",
                 "LethalResonance-LETHALRESONANCE", "Jordo-NeedyCats", "TwinDimensionalProductions-CoilHeadStare",
@@ -181,16 +182,18 @@ public static class GameCatalog
             LoaderSite = "https://thunderstore.io/c/valheim/p/denikson/BepInExPack_Valheim/",
             ThunderstorePackage = "denikson-BepInExPack_Valheim", ThunderstoreCommunity = "valheim",
             Catalog = CatalogKind.Thunderstore, BrowseUrl = "https://thunderstore.io/c/valheim/",
-            NexusDomain = "valheim", NexusGameId = 3667, NexusHide = ["15", "505"],
+            // 26.0: 3605 — BepInExPack с Nexus, второй загрузчик рядом с нашим.
+            NexusDomain = "valheim", NexusGameId = 3667, NexusHide = ["15", "505", "3605"],
             Sections = Section.Pick("all", "picks", "best", "buildings", "items", "content", "gameplay", "vehicles", "cosmetics", "audio", "tools", "modpacks"),
             Picks =
             [
                 "Advize-PlantEverything", "RandyKnapp-EquipmentAndQuickSlots", "shudnal-ExtraSlots", "Advize-PlantEasily",
                 "OdinPlus-TeleportEverything", "MSchmoecker-MultiUserChest", "ishid4-BetterArchery",
-                "Goldenrevolver-Quick_Stack_Store_Sort_Trash_Restock", "Tekla-AutoRepair", "BentoG-MissingPieces",
+                // 26.0: устаревшие AutoRepair, Sailing, Jewelcrafting и PassivePowers заменены живыми модами.
+                "Goldenrevolver-Quick_Stack_Store_Sort_Trash_Restock", "TastyChickenLegs-AutomaticFuel", "BentoG-MissingPieces",
                 "RustyMods-Seasonality", "RandyKnapp-EpicLoot", "Vapok-AdventureBackpacks", "OdinPlus-OdinArchitect",
-                "Therzie-Monstrum", "Therzie-Armory", "Smoothbrain-Sailing", "Smoothbrain-Jewelcrafting", "MathiasDecrock-PlanBuild",
-                "OdinPlus-OdinHorse", "Smoothbrain-PassivePowers", "JereKuusela-Server_devcommands",
+                "Therzie-Monstrum", "Therzie-Armory", "zolantris-ValheimRAFT", "Therzie-Warfare", "MathiasDecrock-PlanBuild",
+                "OdinPlus-OdinHorse", "WackyMole-WackyEpicMMOSystem", "JereKuusela-Server_devcommands",
             ],
             SignatureDirs = ["valheim_Data"], SignatureExes = ["valheim.exe"],
             Executables = ["valheim.exe"],
@@ -234,7 +237,7 @@ public static class GameCatalog
                 "YMC_MHZ-MoreHead", "BULLETBOT-MoreUpgrades", "Zehs-ExtractionPointConfirmButton", "Magic_Wesley-Wesleys_Enemies",
                 "flipf17-DeadTTS", "Cronchy-DeathHeadHopper", "Jettcodey-MoreShopItems_Updated",
                 "XiaohaiMod-XH_DamageShow_EnemyHealthBar", "Lazarus-BetterTruckHeals", "Tidaleus-MoreReviveHP",
-                "Magic_Wesley-Wesleys_Valuables", "Zehs-LethalCompanyValuables", "nickklmao-REPOConfig", "RESET-MoreHeadPlus", "eth9n-Mimic",
+                "Magic_Wesley-Wesleys_Valuables", "Zehs-LethalCompanyValuables", "REPOModding-REPOConfig", "RESET-MoreHeadPlus", "eth9n-Mimic",
                 "itsUndefined-Shop_Items_Spawn_in_Level", "AriIcedT-MinecraftStrongholdLevel", "Tansinator-Map_Value_Tracker",
                 "DiFFoZ-BepInEx_Faster_Load_AssetBundles_Patcher",
             ],
@@ -258,6 +261,26 @@ public static class GameCatalog
             Executables = ["PEAK.exe"],
             ModMarker = "dll",
         },
+        // 26.0: ATLYSS — одно из самых больших сообществ Thunderstore (600+ модов), плюс раздел на Nexus.
+        new()
+        {
+            Id = "atlyss", Name = "ATLYSS", ShortName = "ATLYSS", SteamAppId = 2768430,
+            FolderNames = ["ATLYSS"], Accent = "#8E6CF0", ArtUrl = GameDef.SteamArt(2768430),
+            Loader = LoaderKind.Bepinex, LoaderName = "BepInEx",
+            LoaderSite = "https://thunderstore.io/c/atlyss/p/BepInEx/BepInExPack/",
+            ThunderstorePackage = "BepInEx-BepInExPack", ThunderstoreCommunity = "atlyss",
+            Catalog = CatalogKind.Thunderstore, BrowseUrl = "https://thunderstore.io/c/atlyss/",
+            NexusDomain = "atlyss", NexusGameId = 7077,
+            Sections = Section.Pick("all", "picks", "best"),
+            Picks =
+            [
+                "Catman232-Homebrewery", "Nessie-EasySettings", "The_Queue_Of_Em-QM_Customization_Options", "WolfKann-WolfKann_Skins", "Xesy-Storefront",
+                "SnivyXXY-Atlyss_Emote_Wheel", "Marioalexsan-ModAudio", "WawaTofu-Haversack_Of_Everything", "WatchingPotatoes-EasyVanity",
+            ],
+            SignatureDirs = ["ATLYSS_Data"], SignatureExes = ["ATLYSS.exe"],
+            Executables = ["ATLYSS.exe"],
+            ModMarker = "dll",
+        },
         new()
         {
             Id = "h3vr", Name = "Hot Dogs, Horseshoes & Hand Grenades", ShortName = "H3VR", SteamAppId = 450540,
@@ -266,6 +289,8 @@ public static class GameCatalog
             LoaderSite = "https://thunderstore.io/c/h3vr/p/BepInEx/BepInExPack_H3VR/",
             ThunderstorePackage = "BepInEx-BepInExPack_H3VR", ThunderstoreCommunity = "h3vr",
             Catalog = CatalogKind.Thunderstore, BrowseUrl = "https://thunderstore.io/c/h3vr/",
+            // 26.0: раздел на Nexus (домен — полное имя игры, «h3vr» там нет).
+            NexusDomain = "hotdogshorseshoesandhandgrenades", NexusGameId = 3326,
             Sections = Section.Pick("all", "picks", "best", "items", "content", "gameplay", "cosmetics", "audio", "tools", "modpacks"),
             Picks = ["cityrobo-OpenScripts", "Andrew_FTW-FTW_Arms_AFCL", "nrgill28-Sodalite", "cityrobo-OpenScripts2", "WFIOST-H3VRUtilities", "devyndamonster-OtherLoader", "VIP-H3MP", "cityrobo-ModularWorkshop", "nrgill28-Atlas", "Meat_banono-Meats_ModulAR"],
             SignatureDirs = ["h3vr_Data"], SignatureExes = ["h3vr.exe"],
@@ -295,7 +320,7 @@ public static class GameCatalog
             LoaderSite = "https://thunderstore.io/c/ultrakill/p/BepInEx/BepInExPack/",
             ThunderstorePackage = "BepInEx-BepInExPack", ThunderstoreCommunity = "ultrakill",
             Catalog = CatalogKind.Thunderstore, BrowseUrl = "https://thunderstore.io/c/ultrakill/",
-            NexusDomain = "ultrakill", NexusGameId = 3515,
+            NexusDomain = "ultrakill", NexusGameId = 3515, NexusHide = ["200"],
             Sections = Section.Pick("all", "picks", "best", "items", "content", "gameplay", "cosmetics", "audio", "tools", "modpacks"),
             Picks = ["EternalsTeam-PluginConfigurator", "EternalsTeam-AngryLevelLoader", "Hydraxous-Configgy", "xzxADIxzx-Jaket", "Hydraxous-UltraFunGuns", "ZedDev-USTManager", "Waff1e-UltraTweaker", "GalvinVoltag-The_Timestopper", "bobthecorn-ULTRASKINS_GC", "Flazhik-CybergrindMusicExplorer"],
             SignatureDirs = ["ULTRAKILL_Data"], SignatureExes = ["ULTRAKILL.exe"],
@@ -338,10 +363,16 @@ public static class GameCatalog
             Loader = LoaderKind.Bepinex, LoaderName = "BepInEx",
             LoaderSite = "https://thunderstore.io/c/hollow-knight-silksong/p/silksong_modding/BepInExPack_Silksong/",
             ThunderstorePackage = "silksong_modding-BepInExPack_Silksong", ThunderstoreCommunity = "hollow-knight-silksong",
-            Catalog = CatalogKind.Nexus, NexusDomain = "hollowknightsilksong", NexusGameId = 8136, ExtraThunderstore = true,
+            // 26.0: 26 и 44 — сборки BepInEx на Nexus (самая популярная строка каталога), а загрузчик мы ставим сами.
+            Catalog = CatalogKind.Nexus, NexusDomain = "hollowknightsilksong", NexusGameId = 8136, ExtraThunderstore = true, NexusHide = ["26", "44"],
             BrowseUrl = "https://www.nexusmods.com/hollowknightsilksong/mods",
             Sections = Section.Pick("all", "picks", "best", "packs"),
-            Picks = ["cometcake575-Architect", "silksong_modding-ModMenu", "XiaohaiMod-ShowDamage_HealthBar"],
+            // 26.0: рандомайзеры (врагов, Archipelago), DebugMod и пантеон — есть только на Thunderstore.
+            Picks =
+            [
+                "cometcake575-Architect", "silksong_modding-ModMenu", "XiaohaiMod-ShowDamage_HealthBar", "cometcake575-SimpleEnemyRando",
+                "hk_speedrunning-DebugMod", "momochi003-Pantheon_Of_Pharloom", "BatAtVideoGames-SilksongArchipelagoRandomizer",
+            ],
             SignatureDirs = ["Hollow Knight Silksong_Data"], SignatureExes = ["Hollow Knight Silksong.exe"],
             Executables = ["Hollow Knight Silksong.exe"],
             SavesDir = _ => LocalLow("Team Cherry", "Hollow Knight Silksong"),
@@ -407,6 +438,11 @@ public static class GameCatalog
         Aaa("skyrim-se", "The Elder Scrolls V: Skyrim Special Edition", "Skyrim SE", 489830, ["Skyrim Special Edition"], "#8FA3B5", "creation", "SkyrimSE.exe", "Data", "skyrimspecialedition", 1704, Docs("My Games", "Skyrim Special Edition", "Saves")),
         Aaa("fallout-4", "Fallout 4", "Fallout 4", 377160, ["Fallout 4"], "#4FA34A", "creation", "Fallout4.exe", "Data", "fallout4", 1151, Docs("My Games", "Fallout4", "Saves")),
         Aaa("starfield", "Starfield", "Starfield", 1716740, ["Starfield"], "#D9DCE3", "creation", "Starfield.exe", "Data", "starfield", 4187, Docs("My Games", "Starfield", "Saves")),
+        // 26.0: классика Bethesda — самые большие разделы Nexus после Skyrim SE и Fallout 4 (73 тыс., 42 тыс., 34 тыс., 17 тыс. модов).
+        Aaa("skyrim-le", "The Elder Scrolls V: Skyrim", "Skyrim LE", 72850, ["Skyrim"], "#7E8FA1", "creation", "TESV.exe", "Data", "skyrim", 110, Docs("My Games", "Skyrim", "Saves")),
+        Aaa("fallout-new-vegas", "Fallout: New Vegas", "New Vegas", 22380, ["Fallout New Vegas", "Fallout New Vegas PCR"], "#C98B2E", "creation", "FalloutNV.exe", "Data", "newvegas", 130, Docs("My Games", "FalloutNV", "Saves")),
+        Aaa("oblivion", "The Elder Scrolls IV: Oblivion", "Oblivion", 22330, ["Oblivion"], "#9C8A5B", "creation", "Oblivion.exe", "Data", "oblivion", 101, Docs("My Games", "Oblivion", "Saves")),
+        Aaa("fallout-3", "Fallout 3", "Fallout 3", 22370, ["Fallout 3 goty", "Fallout 3"], "#7C8F3A", "creation", "Fallout3.exe", "Data", "fallout3", 120, Docs("My Games", "Fallout3", "Saves")),
         Aaa("oblivion-remastered", "The Elder Scrolls IV: Oblivion Remastered", "Oblivion Remastered", 2623190, ["Oblivion Remastered"], "#B59A5B", "unreal", P("OblivionRemastered", "Binaries", "Win64", "OblivionRemastered-Win64-Shipping.exe"), P("OblivionRemastered", "Content", "Paks", "~mods"), "oblivionremastered", 7587),
         Aaa("baldurs-gate-3", "Baldur's Gate 3", "Baldur's Gate 3", 1086940, ["Baldurs Gate 3", "Baldur's Gate 3"], "#C0392B", "larian", P("bin", "bg3.exe"), "Data", "baldursgate3", 3474, Local("Larian Studios", "Baldur's Gate 3", "PlayerProfiles")),
         Aaa("resident-evil-4", "Resident Evil 4", "Resident Evil 4", 2050650, ["RESIDENT EVIL 4  BIOHAZARD RE4", "RESIDENT EVIL 4 BIOHAZARD RE4", "Resident Evil 4"], "#7A1F1F", "re", "re4.exe", "natives", "residentevil42023", 5195),
@@ -416,6 +452,8 @@ public static class GameCatalog
         Aaa("devil-may-cry-5", "Devil May Cry 5", "Devil May Cry 5", 601150, ["Devil May Cry 5"], "#B0263C", "re", "DevilMayCry5.exe", "natives", "devilmaycry5", 2751),
         Aaa("monster-hunter-wilds", "Monster Hunter Wilds", "MH Wilds", 2246340, ["MonsterHunterWilds", "Monster Hunter Wilds"], "#C47F2C", "re", "MonsterHunterWilds.exe", "natives", "monsterhunterwilds", 6993),
         Aaa("monster-hunter-rise", "Monster Hunter Rise", "MH Rise", 1446780, ["MonsterHunterRise", "Monster Hunter Rise"], "#D1A33A", "re", "MonsterHunterRise.exe", "natives", "monsterhunterrise", 4095),
+        // 26.0: у World модов больше, чем у Wilds и Rise вместе (6,6 тыс.); движок MT Framework, моды — в nativePC.
+        Aaa("monster-hunter-world", "Monster Hunter: World", "MH World", 582010, ["Monster Hunter World"], "#B8823A", "mt", "MonsterHunterWorld.exe", "nativePC", "monsterhunterworld", 2531),
         Aaa("dragons-dogma-2", "Dragon's Dogma 2", "Dragon's Dogma 2", 2054970, ["Dragons Dogma 2", "Dragon's Dogma 2"], "#8C6A3F", "re", "DD2.exe", "natives", "dragonsdogma2", 6234),
         Aaa("hogwarts-legacy", "Hogwarts Legacy", "Hogwarts Legacy", 990080, ["Hogwarts Legacy"], "#C9A44C", "unreal", P("Phoenix", "Binaries", "Win64", "HogwartsLegacy.exe"), P("Phoenix", "Content", "Paks", "~mods"), "hogwartslegacy", 5113, Local("Hogwarts Legacy", "Saved", "SaveGames")),
         Aaa("palworld", "Palworld", "Palworld", 1623730, ["Palworld"], "#3FA7D6", "unreal", P("Pal", "Binaries", "Win64", "Palworld-Win64-Shipping.exe"), P("Pal", "Content", "Paks", "~mods"), "palworld", 6063, Local("Pal", "Saved", "SaveGames")),

@@ -71,27 +71,38 @@ public static partial class Catalog
     {
         var plan = SearchWords.Make(q.Text);
         var first = await raw(q with { Text = plan.Query });
-        if (first.Mods.Count > 0 || q.Page > 1) return first;
-        if (plan.Changed(q.Text))
+        // Дальше по страницам — тот же запрос всей фразой (повторы со страницей 1 отсеет список).
+        if (q.Page > 1) return first;
+        var pool = new List<ModInfo>(first.Mods);
+        if (pool.Count == 0 && plan.Changed(q.Text))
         {
-            var original = await raw(q);
-            if (original.Mods.Count > 0) return original;
+            // Пусто — вдруг это точное название мода, набранное как есть.
+            try { pool.AddRange((await raw(q)).Mods); } catch { }
         }
-        if (plan.Keywords.Count < 2) return first;
-        var pages = await Task.WhenAll(plan.Keywords.Take(4).Select(async k =>
+        // Мало найдено, а слов несколько — каждое слово отдельно (одним «И» каталог потерял бы SimpleEnemyRando).
+        var spread = plan.Keywords.Count > 1 && pool.Count < 8;
+        if (spread)
         {
-            try { return (await raw(q with { Text = k, Page = 1 })).Mods; }
-            catch { return []; }
-        }));
-        var found = pages.SelectMany(p => p).GroupBy(m => m.Id, StringComparer.OrdinalIgnoreCase).Select(g => g.First())
-            .Select(m => (Mod: m, Score: SearchWords.Score(m, plan), Name: SearchWords.NameScore(m, plan))).ToList();
-        if (found.Count == 0) return first;
-        // Нашлись моды со всеми словами — только они; иначе — с лучшим числом совпадений.
-        var best = found.Max(x => x.Score);
-        var list = found.Where(x => x.Score >= Math.Max(1, best)).OrderByDescending(x => x.Score).ThenByDescending(x => x.Name)
-            .ThenByDescending(x => x.Mod.Downloads).Select(x => x.Mod).Take(40).ToList();
-        return new Page(list, list.Count, false, 1);
+            var pages = await Task.WhenAll(plan.Keywords.Take(4).Select(async k =>
+            {
+                try { return (await raw(q with { Text = k, Page = 1 })).Mods; }
+                catch { return []; }
+            }));
+            pool.AddRange(pages.SelectMany(p => p));
+        }
+        if (pool.Count == 0) return first;
+        var ranked = Rank(pool.GroupBy(m => m.Id, StringComparer.OrdinalIgnoreCase).Select(g => g.First()), plan).ToList();
+        // Сначала моды со всеми словами; меньше восьми — за ними те, где совпало меньше.
+        var full = ranked.Where(m => SearchWords.Score(m, plan) >= plan.Counted).ToList();
+        var list = full.Count >= 8 || !spread ? (full.Count > 0 ? full : ranked) : full.Concat(ranked.Where(m => !full.Contains(m) && SearchWords.Score(m, plan) > 0)).ToList();
+        list = list.Take(spread ? 40 : list.Count).ToList();
+        return new Page(list, spread ? list.Count : first.Total, !spread && first.HasMore, 1);
     }
+
+    /// <summary>Порядок найденного: больше совпавших слов, вес совпадений (название важнее описания), скачивания.</summary>
+    public static IEnumerable<ModInfo> Rank(IEnumerable<ModInfo> mods, SearchWords.Plan plan) => mods
+        .Select(m => (Mod: m, Hits: SearchWords.Score(m, plan), Weight: SearchWords.Weight(m, plan)))
+        .OrderByDescending(x => x.Hits).ThenByDescending(x => x.Weight).ThenByDescending(x => x.Mod.Downloads).Select(x => x.Mod);
 
     /// <summary>
     /// 26.0: «Все источники»: та же страница из каждого каталога игры, одним списком без повторов (мод, выложенный
@@ -111,14 +122,10 @@ public static partial class Catalog
         }));
         var got = pages.OfType<Page>().ToList();
         if (got.Count == 0) throw error ?? new InvalidOperationException(I18n.T("catalog.error"));
-        var merged = got.SelectMany(p => p.Mods).GroupBy(SameKey).Select(g => g.OrderByDescending(m => m.Downloads).First()).ToList();
+        var merged = Merge(got.SelectMany(p => p.Mods));
         var text = q.Text.Trim();
         IEnumerable<ModInfo> ordered;
-        if (text != "")
-        {
-            var plan = SearchWords.Make(text);
-            ordered = merged.OrderByDescending(m => SearchWords.Score(m, plan)).ThenByDescending(m => SearchWords.NameScore(m, plan)).ThenByDescending(m => m.Downloads);
-        }
+        if (text != "") ordered = Rank(merged, SearchWords.Make(text));
         else ordered = (query.SectionId == "best" ? SortBy.Rating : q.Sort) switch
         {
             SortBy.Rating => merged.OrderByDescending(m => m.Rating).ThenByDescending(m => m.Downloads),
@@ -130,8 +137,40 @@ public static partial class Catalog
         return new Page(ordered.ToList(), got.Sum(p => p.Total), got.Any(p => p.HasMore), q.Page);
     }
 
-    /// <summary>Один и тот же мод на разных сайтах: имя без пробелов, знаков и регистра.</summary>
-    static string SameKey(ModInfo m) => new string((m.Name ?? m.Id).Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray()) is { Length: > 2 } k ? k : m.Source + ":" + m.Id;
+    static string Norm(string s) => new(s.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
+
+    /// <summary>
+    /// Один и тот же мод на разных сайтах: то же имя (без пробелов, знаков, регистра) и тот же автор (совпадает,
+    /// одно содержит другое или общее начало от 5 букв). Одноимённые моды разных авторов — разные моды: у Silksong
+    /// ModMenu от silksong_modding и ModMenu от Veltrix не склеиваются.
+    /// </summary>
+    public static bool SameMod(ModInfo a, ModInfo b)
+    {
+        if (a.Source == b.Source) return string.Equals(a.Id, b.Id, StringComparison.OrdinalIgnoreCase);
+        var na = Norm(a.Name);
+        if (na.Length < 3 || na != Norm(b.Name)) return false;
+        var (x, y) = (Norm(a.Author), Norm(b.Author));
+        if (x == "" || y == "") return false;
+        if (x == y || x.Contains(y) || y.Contains(x)) return true;
+        var common = 0;
+        while (common < Math.Min(x.Length, y.Length) && x[common] == y[common]) common++;
+        return common >= 5;
+    }
+
+    /// <summary>Склеить повторы: остаётся копия, которую ставим сами (Thunderstore, ModLinks, Hub), если нет Nexus Premium.</summary>
+    static List<ModInfo> Merge(IEnumerable<ModInfo> mods)
+    {
+        var list = new List<ModInfo>();
+        foreach (var m in mods)
+        {
+            var at = list.FindIndex(x => SameMod(x, m));
+            if (at < 0) { list.Add(m); continue; }
+            var keepNexus = Settings.NexusPremium && !string.IsNullOrEmpty(Settings.NexusApiKey);
+            bool Better(ModInfo c) => (c.Source == "nexus") == keepNexus;
+            if (Better(m) && !Better(list[at])) list[at] = m;
+        }
+        return list;
+    }
 
     /// <summary>ModLaunch Hub как каталог игры: поиск, сортировка и «Лучшие» — на месте.</summary>
     static async Task<Page> HubPage(GameDef game, Query q, Section section, CancellationToken ct)

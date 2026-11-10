@@ -1,26 +1,34 @@
 {
   "ru": {
-    "v26.src.all": "Все источники"
+    "v26.src.all": "Все источники",
+    "v26.src.searched": "Искали как: «{query}»"
   },
   "en": {
-    "v26.src.all": "All sources"
+    "v26.src.all": "All sources",
+    "v26.src.searched": "Searched as: «{query}»"
   },
   "uk": {
-    "v26.src.all": "Усі джерела"
+    "v26.src.all": "Усі джерела",
+    "v26.src.searched": "Шукали як: «{query}»"
   },
   "es": {
-    "v26.src.all": "Todas las fuentes"
+    "v26.src.all": "Todas las fuentes",
+    "v26.src.searched": "Búsqueda como: «{query}»"
   },
   "de": {
-    "v26.src.all": "Alle Quellen"
+    "v26.src.all": "Alle Quellen",
+    "v26.src.searched": "Gesucht als: «{query}»"
   },
   "fr": {
-    "v26.src.all": "Toutes les sources"
+    "v26.src.all": "Toutes les sources",
+    "v26.src.searched": "Recherché comme : «{query}»"
   },
   "pt-BR": {
-    "v26.src.all": "Todas as fontes"
+    "v26.src.all": "Todas as fontes",
+    "v26.src.searched": "Pesquisado como: «{query}»"
   },
   "zh-CN": {
-    "v26.src.all": "全部来源"
+    "v26.src.all": "全部来源",
+    "v26.src.searched": "按「{query}」搜索"
   }
 }

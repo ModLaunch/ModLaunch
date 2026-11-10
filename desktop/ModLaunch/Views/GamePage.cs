@@ -530,6 +530,14 @@ public sealed partial class GamePage : Page
             Grid.SetColumn(adult, 3);
             bar.Children.Add(adult);
             col.Children.Add(bar);
+            // 26.0: запрос перевели или привели к основам — показываем, как искали и где (иначе непонятно, откуда
+            // на «рандомные враги» английские моды).
+            if (_query.Trim() != "" && SearchWords.Make(_query) is { } plan && (plan.Translated || plan.Changed(_query)))
+            {
+                var how = Ui.Text(I18n.T("v26.src.searched", ("query", plan.Query)) + (CurrentSource == Catalog.AllSources ? " · " + I18n.T("v26.src.all") : ""), "small muted");
+                how.Margin = new Thickness(4, -4, 0, 0);
+                col.Children.Add(how);
+            }
 
             // Вторая строка, как в ModLaunch 3 и Modrinth: «скрыть установленные» и вид списком / сеткой.
             var hide = new ToggleSwitch { IsChecked = _hideInstalled, OnContent = "", OffContent = "", MinWidth = 0, VerticalAlignment = VerticalAlignment.Center };
@@ -755,7 +763,8 @@ public sealed partial class GamePage : Page
                     : await Catalog.Browse(_g.Def, new Query(_query, _page, _sort, _section, _period, _adult), source: CurrentSource);
                 if (id != _requestId) return;
                 var before = _mods.Count;
-                _mods.AddRange(page.Mods.Where(m => _mods.All(x => x.Id != m.Id)));
+                // 26.0: во «Всех источниках» один мод может прийти с Nexus и с Thunderstore на разных страницах.
+                _mods.AddRange(page.Mods.Where(m => _mods.All(x => x.Id != m.Id && !Catalog.SameMod(x, m))));
                 _total = page.Total;
                 _hasMore = page.HasMore;
                 if (_mods.Count > before || !_hasMore || extra >= 4) break;

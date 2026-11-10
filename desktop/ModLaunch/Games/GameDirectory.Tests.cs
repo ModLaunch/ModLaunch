@@ -197,10 +197,11 @@ public static partial class GameDirectory
         if (Get("nine-sols") is not { NexusDomain: "ninesolsgoty", Mods: 30 }) throw new Exception("nine sols: " + Get("nine-sols"));
         // Встроенная игра без Thunderstore получает Steam id из GameCatalog.
         var sdv = Get("stardewvalley");
-        if (sdv.SteamAppId != 413150 || !IsBuiltin(sdv) || IsBuiltin(Get("skyrim"))) throw new Exception("stardew: " + sdv);
+        // 26.0: старый Skyrim тоже стал встроенным — «не встроенную» проверяем на игре только с Nexus.
+        if (sdv.SteamAppId != 413150 || !IsBuiltin(sdv) || IsBuiltin(Get("pokemonfangame"))) throw new Exception("stardew: " + sdv);
         if (Get("skyrimspecialedition").Mods != 100000 || Get("pokemonfangame").Name != "Pokémon Fan Game") throw new Exception("nexus-only entries");
-        // 23.3: Skyrim SE теперь встроенная (обложка из Steam) — плитку Nexus проверяем на старом Skyrim.
-        if (Get("skyrimspecialedition").NexusId != 1704 || lc.NexusId != 5848 || Get("skyrim").Art?.EndsWith("tile_110.jpg") != true) throw new Exception("nexus id / tile art");
+        // 23.3: Skyrim SE встроенная (обложка из Steam), 26.0: и старый Skyrim — плитку Nexus проверяем на фан-игре (id 5).
+        if (Get("skyrimspecialedition").NexusId != 1704 || lc.NexusId != 5848 || Get("pokemonfangame").Art?.EndsWith("tile_5.jpg") != true) throw new Exception("nexus id / tile art: " + Get("pokemonfangame").Art);
         if (Get("some-new-game").Community != "some-new-game") throw new Exception("community from cyberstorm");
         // Ни модов, ни каталога: Empty Game, раздел «site», пустое и скрытое сообщества.
         foreach (var gone in new[] { "emptygame", "site", "dead-community", "phasmophobia" })

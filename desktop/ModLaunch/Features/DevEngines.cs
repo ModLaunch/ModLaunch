@@ -19,7 +19,8 @@ namespace ModLaunch.Features;
 /// </summary>
 public static partial class DevEngines
 {
-    static readonly string[] CreationExes = ["SkyrimSE.exe", "SkyrimVR.exe", "Fallout4.exe", "Fallout4VR.exe", "Starfield.exe"];
+    // 26.0: и классика (Skyrim LE, New Vegas, Fallout 3, Oblivion) — та же консоль: bat studio.txt с tfc и tm.
+    static readonly string[] CreationExes = ["SkyrimSE.exe", "SkyrimVR.exe", "Fallout4.exe", "Fallout4VR.exe", "Starfield.exe", "TESV.exe", "FalloutNV.exe", "Fallout3.exe", "Oblivion.exe"];
 
     /// <summary>Движок по файлам игры: re, creation, il2cpp, unreal или null.</summary>
     public static string? KindOf(string? gamePath)

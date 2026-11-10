@@ -158,7 +158,8 @@ public static partial class Actions
         if (n.Length < 3) return null;
         if (def.Catalog == CatalogKind.ModLinks)
             return (await ModLinks.Load(ct)).FirstOrDefault(m => Deps.Norm(m.Name) == n || Deps.Norm(m.Id) == n);
-        var page = await Catalog.Browse(def, new Query(Text: pretty), ct);
+        // 26.0: во всех каталогах игры — у Silksong часть модов есть только на Thunderstore.
+        var page = await Catalog.Browse(def, new Query(Text: pretty), ct, Catalog.HasSeveral(def) ? Catalog.AllSources : null);
         var author = name.Contains('.') && !name.Contains(' ') && name.Split('.') is { Length: >= 2 } parts ? Deps.Norm(parts[^2]) : null;
         var matches = page.Mods.Where(m => Deps.Norm(m.Name) == n || Deps.Norm(m.Id.Split('-').Last()) == n).ToList();
         return matches.FirstOrDefault(m => author is { Length: > 0 } && (Deps.Norm(m.Author) == author || Deps.Norm(m.Id.Split('-')[0]) == author)) ?? matches.FirstOrDefault();

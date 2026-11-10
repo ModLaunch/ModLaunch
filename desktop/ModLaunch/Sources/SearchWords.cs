@@ -3,161 +3,210 @@ using System.Text.RegularExpressions;
 namespace ModLaunch.Sources;
 
 /// <summary>
-/// 26.0: умный поиск модов. Каталоги ищут по-английски и требуют каждое слово целиком: «random enemies» на
+/// 26.0: умный поиск модов. Каталоги ищут по-английски и требуют каждое слово подстрокой: «random enemies» на
 /// Thunderstore не находит SimpleEnemyRando («enemies» ≠ «Enemy»), а «рандомные враги» не находит ничего нигде.
 /// Здесь запрос приводится к тому, что понимают каталоги: русские и украинские слова — по словарю в английские
-/// основы, английские — к основе (enemies → enemy, randomizer → rando), служебные слова отбрасываются.
-/// Если по всей фразе ничего нет, каталог спрашивают по каждому слову отдельно, а результаты сортируются по тому,
-/// сколько слов совпало (Catalog.Browse).
+/// основы, английские — к основе (enemies → enem, randomizer → rando), служебные слова отбрасываются, а «слабые»
+/// («больше», «без», «новые») не сужают поиск, только поднимают подходящие моды выше. Если по всей фразе находится
+/// мало, каталог спрашивают по каждому слову отдельно и сортируют по числу совпавших слов (Catalog.Smart).
 /// </summary>
 public static partial class SearchWords
 {
-    /// <summary>Что спросить у каталога: Query — вся фраза, Keywords — основы по отдельности (для запасного поиска),
-    /// Match — все формы каждого слова (для оценки совпадений).</summary>
-    public sealed record Plan(string Query, List<string> Keywords, List<string[]> Match)
+    /// <summary>
+    /// Что спросить у каталога. Query — основные слова одной строкой; Keywords — они же по отдельности (для запасного
+    /// поиска); Match — все формы каждого слова, включая «слабые» (для оценки совпадений); Weak — какие из них слабые.
+    /// </summary>
+    public sealed record Plan(string Query, List<string> Keywords, List<string[]> Match, List<bool> Weak, bool Translated)
     {
         public bool Changed(string original) => !string.Equals(Query, original.Trim(), StringComparison.OrdinalIgnoreCase);
+        /// <summary>Сколько слов должно совпасть, чтобы мод считался найденным «по всем словам».</summary>
+        public int Counted => Math.Max(1, Weak.Count(w => !w));
     }
 
-    [GeneratedRegex(@"[\p{L}\p{Nd}]+(?:['’][\p{L}]+)?")] private static partial Regex Word();
     [GeneratedRegex(@"\p{IsCyrillic}")] private static partial Regex Cyrillic();
+    [GeneratedRegex(@"^(.{4,}?)(izations?|isations?|izers?|isers?|izes|ises|ized|ised|izing|ising|ize|ise)$")] private static partial Regex Izer();
+    [GeneratedRegex(@"[^\p{L}\p{Nd}]+")] private static partial Regex NotWord();
+    [GeneratedRegex(@"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])")] private static partial Regex Camel();
 
-    static readonly HashSet<string> Stop = new(StringComparer.OrdinalIgnoreCase)
+    static readonly HashSet<string> Stop = new(StringComparer.Ordinal)
     {
-        "the", "a", "an", "of", "for", "and", "or", "to", "in", "on", "with", "mod", "mods", "modded",
-        "мод", "моды", "модов", "моде", "модами", "модик", "для", "и", "или", "в", "во", "на", "с", "со", "по", "из", "от", "к", "про", "чтобы", "что", "как",
-        "мода", "моди", "модів", "та", "й", "що", "щоб", "які", "який", "который", "которые", "которая", "которых", "чтоб", "это", "все", "всех",
-        "игра", "игры", "игре", "гра", "гри", "хочу", "нужен", "нужно", "надо", "где", "мне", "можно",
+        "the", "a", "an", "of", "for", "and", "or", "to", "in", "on", "with", "mod", "mods", "modded", "that", "which",
+        "мод", "моды", "модов", "моде", "модами", "модик", "модики", "мода", "для", "и", "или", "в", "во", "на", "с", "со", "по", "из", "от", "к", "ко",
+        "про", "чтобы", "чтоб", "что", "как", "который", "которые", "которая", "которых", "это", "все", "всех", "весь",
+        "игра", "игры", "игре", "игру", "хочу", "нужен", "нужно", "нужна", "надо", "где", "мне", "можно", "есть", "найти", "какой", "какие",
+        "режим", "режиме", "новые", "новый", "новая", "новое", "лучшие", "лучший", "популярные", "какой-нибудь",
+        "моди", "модів", "та", "й", "що", "щоб", "які", "який", "гра", "гри", "грі", "знайти", "треба", "потрібен", "нові", "новий",
     };
 
     /// <summary>
-    /// Словарь: начало русского или украинского слова → английские основы (первая — для запроса, остальные — для
-    /// оценки совпадений). Основы подобраны так, чтобы находиться подстрокой в названиях модов.
-    /// Самые длинные начала проверяются первыми («полоск здоровья» раньше «здоров»).
+    /// Словарь: начало русского или украинского слова → английские основы (первая — в запрос, остальные — для оценки).
+    /// Основы — подстроки, которые ловят все формы в названиях модов («enem» — и Enemy, и Enemies). Проверяется самое
+    /// длинное подходящее начало, поэтому «магазин» не станет «магией», а «миникарта» — «картой».
     /// </summary>
-    static readonly (string Stem, string En)[] Dictionary =
-    [
-        ("рандом", "rando|random"), ("случайн", "rando|random"), ("випадков", "rando|random"), ("перемеш", "rando|shuffle"),
-        ("враг", "enemy|enemies|monster"), ("ворог", "enemy|enemies|monster"), ("противник", "enemy|enemies"), ("монстр", "monster|enemy|creature"),
-        ("моб", "mob|monster|enemy"), ("существ", "creature|monster"), ("істот", "creature|monster"), ("босс", "boss"), ("бос", "boss"),
-        ("нпс", "npc"), ("непис", "npc"), ("персонаж", "character|npc"), ("герой", "hero|character|player"), ("игрок", "player"), ("гравц", "player"), ("гравец", "player"),
-        ("оруж", "weapon|gun|sword"), ("зброя", "weapon|gun"), ("зброї", "weapon|gun"), ("пушк", "gun|weapon"), ("ружь", "gun|rifle"), ("пистолет", "pistol|gun"),
-        ("меч", "sword|blade"), ("нож", "knife|blade"), ("лук", "bow"), ("стрел", "arrow"), ("патрон", "ammo"), ("боеприпас", "ammo"),
-        ("брон", "armor|armour"), ("обладун", "armor|armour"), ("доспех", "armor|armour"), ("щит", "shield"), ("шлем", "helmet|helm"),
-        ("одежд", "outfit|clothes|clothing"), ("одяг", "outfit|clothes|clothing"), ("костюм", "suit|costume|outfit"), ("скин", "skin"), ("шкурк", "skin"),
-        ("прическ", "hair|hairstyle"), ("волос", "hair"), ("зачіск", "hair|hairstyle"), ("лицо", "face"), ("лица", "face"), ("обличч", "face"), ("тело", "body"), ("тела", "body"),
-        ("картин", "texture|image|picture"), ("карт", "map"), ("мап", "map"), ("локац", "location|area|map"), ("уровн", "level"), ("рівн", "level"), ("мир", "world"), ("світ", "world"), ("остров", "island"),
-        ("предмет", "item"), ("вещ", "item"), ("реч", "item"), ("лут", "loot"), ("добыч", "loot"), ("сундук", "chest|storage"), ("скрин", "chest|storage"),
-        ("инвентар", "inventory"), ("інвентар", "inventory"), ("хранил", "storage"), ("склад", "storage"), ("рюкзак", "backpack|bag"), ("сумк", "bag|backpack"),
-        ("чит", "cheat"), ("бессмерт", "god|invincib|immortal"), ("безсмерт", "god|invincib|immortal"), ("неуязв", "invincib|god"), ("бог", "god"),
-        ("деньг", "money|gold|currency"), ("гроші", "money|gold|currency"), ("грош", "money|gold|currency"), ("монет", "coin|money"), ("золот", "gold"), ("валют", "currency|money"),
-        ("опыт", "xp|experience"), ("досвід", "xp|experience"), ("прокач", "level|xp|skill"), ("навык", "skill"), ("навич", "skill"), ("умени", "skill|ability"), ("способн", "ability|skill"), ("здібн", "ability|skill"),
-        ("сложн", "difficulty|hard"), ("складн", "difficulty|hard"), ("хардкор", "hardcore|hard"), ("легк", "easy"), ("лёгк", "easy"), ("легш", "easy"), ("баланс", "balance"),
-        ("мультиплеер", "multiplayer|coop"), ("мультиплеєр", "multiplayer|coop"), ("кооп", "coop|co-op|multiplayer"), ("сетев", "multiplayer|online"), ("онлайн", "online|multiplayer"),
-        ("больше игрок", "more players|morecompany|bigger lobby"), ("лобби", "lobby"), ("лоббі", "lobby"), ("друз", "friend"),
-        ("интерфейс", "ui|hud|interface"), ("інтерфейс", "ui|hud|interface"), ("худ", "hud"), ("меню", "menu"), ("миникарт", "minimap"), ("мінікарт", "minimap"),
-        ("полоск здоровья", "health bar|healthbar|hp bar"), ("полоса здоровья", "health bar|healthbar|hp bar"), ("смуг здоров", "health bar|healthbar"),
-        ("здоров", "health|hp"), ("хп", "hp|health"), ("жизн", "life|health"), ("житт", "life|health"), ("урон", "damage|dmg"), ("шкод", "damage"), ("пошкодж", "damage"),
-        ("скорост", "speed|fast"), ("швидк", "speed|fast"), ("быстр", "fast|speed|quick"), ("медлен", "slow"), ("прыж", "jump"), ("стриб", "jump"), ("стрибк", "jump"),
-        ("бег", "run|sprint"), ("біг", "run|sprint"), ("спринт", "sprint"), ("выносл", "stamina"), ("витривал", "stamina"), ("стамин", "stamina"), ("летать", "fly|flight"), ("полет", "fly|flight"), ("політ", "fly|flight"),
-        ("камер", "camera"), ("вид от перв", "first person|fpv"), ("от перв", "first person"), ("от трет", "third person"), ("зум", "zoom"), ("приближ", "zoom"),
-        ("график", "graphics|visual|shader"), ("графік", "graphics|visual|shader"), ("шейдер", "shader"), ("текстур", "texture|retexture"), ("освещ", "lighting|light"), ("освітл", "lighting|light"),
-        ("свет", "light"), ("світл", "light"), ("тени", "shadow"), ("тін", "shadow"), ("погод", "weather"), ("дожд", "rain"), ("снег", "snow"), ("сніг", "snow"), ("ночь", "night"), ("ніч", "night"), ("день", "day"),
-        ("музык", "music|soundtrack"), ("музик", "music|soundtrack"), ("звук", "sound|audio|sfx"), ("голос", "voice"), ("озвуч", "voice|dub"),
-        ("перевод", "translation|russian|localization"), ("переклад", "translation|ukrainian|localization"), ("русификатор", "russian|translation"), ("русск", "russian"), ("українськ", "ukrainian"), ("украинск", "ukrainian"), ("локализ", "localization|translation"),
-        ("сохран", "save"), ("збереж", "save"), ("сейв", "save"), ("загруз", "load|loader"), ("автосейв", "autosave|save"),
-        ("крафт", "craft|crafting"), ("создан", "craft|crafting|create"), ("рецепт", "recipe"), ("строит", "build|building|construction"), ("стройк", "build|building|construction"), ("будів", "build|building|construction"), ("постро", "build|building"), ("дом", "house|home"), ("будин", "house|home"), ("мебел", "furniture|decor"), ("декор", "decor|decoration"),
-        ("ферм", "farm|farming"), ("урожа", "crop|harvest"), ("посев", "seed|plant"), ("растен", "plant"), ("рослин", "plant"), ("семен", "seed"), ("насін", "seed"), ("рыбалк", "fishing|fish"), ("рибалк", "fishing|fish"), ("рыб", "fish"), ("риб", "fish"),
-        ("животн", "animal|pet"), ("тварин", "animal|pet"), ("питом", "pet"), ("кошк", "cat"), ("котик", "cat"), ("собак", "dog"), ("лошад", "horse"), ("коня", "horse"), ("кінь", "horse"),
-        ("машин", "car|vehicle"), ("автомоб", "car|vehicle"), ("транспорт", "vehicle|transport"), ("лодк", "boat"), ("корабл", "ship|boat"), ("самолет", "plane|aircraft"), ("літак", "plane|aircraft"),
-        ("еда", "food"), ("еды", "food"), ("їж", "food"), ("голод", "hunger|food"), ("кулинар", "cooking|food"), ("готовк", "cooking"),
-        ("качеств жизн", "quality of life|qol"), ("удобств", "qol|quality of life|convenience"), ("зручн", "qol|convenience"), ("автоматиз", "automation|auto"), ("авто", "auto"),
-        ("производительн", "performance|fps|optimization"), ("оптимиз", "optimization|performance|fps"), ("оптиміз", "optimization|performance|fps"), ("фпс", "fps|performance"), ("лаг", "lag|performance"),
-        ("исправ", "fix|patch"), ("виправ", "fix|patch"), ("баг", "bug|fix"), ("фикс", "fix"), ("патч", "patch"), ("библиотек", "library|lib|api"), ("бібліотек", "library|lib|api"), ("api", "api"),
-        ("квест", "quest"), ("задани", "quest|task"), ("завдан", "quest|task"), ("сюжет", "story"), ("диалог", "dialogue|dialog"), ("діалог", "dialogue|dialog"),
-        ("магия", "magic|spell"), ("маги", "magic|spell"), ("магі", "magic|spell"), ("заклинан", "spell"), ("закля", "spell"),
-        ("испытан", "challenge|trial"), ("випроб", "challenge|trial"), ("арен", "arena"), ("волн", "wave"), ("хвил", "wave"), ("спавн", "spawn"), ("появлен", "spawn"),
-        ("больше", "more"), ("більше", "more"), ("бесконеч", "infinite|unlimited"), ("нескінчен", "infinite|unlimited"), ("безлимит", "unlimited|infinite"),
-        ("новы", "new"), ("нов", "new"), ("смешн", "funny|meme"), ("мем", "meme|funny"), ("страшн", "horror|scary"), ("хоррор", "horror"), ("жах", "horror|scary"),
-        ("телепорт", "teleport"), ("портал", "portal"), ("редактор", "editor"), ("конструктор", "editor|builder"), ("консол", "console|command"), ("команд", "command"),
-        ("щит", "shield"), ("амулет", "charm|amulet"), ("талисман", "charm|amulet"), ("кольц", "ring"), ("зелье", "potion"), ("зілл", "potion"), ("эликсир", "potion|elixir"),
-    ];
+    static readonly Dictionary<string, string[]> Ru = Build(
+        "рандом=rando|random  случайн=rando|random  випадков=rando|random  враг=enem|mob  враж=enem|hostile  ворог=enem|mob  ворож=enem|hostile  " +
+        "противник=enem|foe  монстр=monster|creature  существ=creature|monster  істот=creature|monster  моб=mob|enem  босс=boss  бос=boss  нпс=npc  " +
+        "урон=damage|dmg  шкод=damage|dmg  атак=attack  оруж=weapon  збро=weapon  меч=sword|blade  взрыв=explos|bomb  брон=armor|armour  здоров=health|hp  " +
+        "хп=hp|health  жизн=life|lives  житт=life|lives  бессмерт=god|immortal  безсмерт=god|immortal  неуязвим=invinc|invuln  невразлив=invinc|invuln  " +
+        "бог=god  чит=cheat|trainer  трейнер=trainer|cheat  бесконечн=infinit|unlimit  нескінченн=infinit|unlimit  деньг=money|currency  денег=money|currency  " +
+        "грош=money|currency  монет=coin|money  золот=gold  сложност=difficult  сложн=difficult|hard  складн=difficult|hard  легк=easy|casual  хардкор=hardcore|hard  " +
+        "мультиплеер=multiplayer  кооп=coop|co-op  сетев=multiplayer|online  онлайн=online|multiplayer  друз=friend|coop  сервер=server  лобби=lobby  " +
+        "игрок=player  гравц=player  гравец=player  больш=more|bigger  більш=more|bigger  интерфейс=ui|hud  інтерфейс=ui|hud  худ=hud  меню=menu  полоск=bar  " +
+        "шкал=bar|meter  таймер=timer  прицел=crosshair|aim  миникарт=minimap  мінікарт=minimap  карт=map  мап=map  метк=marker|pin  скорост=speed|fast  " +
+        "быстр=fast|speed  швидк=fast|speed  прыж=jump  стриб=jump  двойн=double  подвійн=double  полет=fly|flight  політ=fly|flight  бег=run|sprint  " +
+        "телепорт=teleport|warp  камер=camera|cam  график=graphic|visual  графік=graphic|visual  текстур=texture  освещ=lighting|light  освітл=lighting|light  " +
+        "свет=light  світл=light  шейдер=shader  решейд=reshade  разрешен=resolution  качеств=quality  якіст=quality  якост=quality  реализм=realis  " +
+        "погод=weather  ноч=night  музык=music  музик=music  звук=sound|audio  озвуч=voice|dub  перевод=translat|locali  переклад=translat|locali  " +
+        "русифик=russian|translat  русск=russian  російськ=russian  украин=ukrain  україн=ukrain  локализ=locali|translat  локаліз=locali|translat  " +
+        "сохран=save  збереж=save  крафт=craft  рецепт=recipe  строит=build  строй=build  будів=build  мебел=furniture  ферм=farm  рыб=fish  риб=fish  " +
+        "охот=hunt  животн=animal|creature  тварин=animal|creature  транспорт=vehicle  машин=car|vehicle  автомоб=car|vehicle  лодк=boat  корабл=ship|boat  " +
+        "самолет=plane|aircraft  персонаж=character  скин=skin  скін=skin  внешн=appearance|skin  зовнішн=appearance|skin  костюм=suit|costume  " +
+        "одежд=cloth|outfit  одяг=cloth|outfit  прическ=hair  волос=hair  предмет=item  инвентар=inventory  інвентар=inventory  сундук=chest|storage  " +
+        "лут=loot  зель=potion  амулет=charm|amulet  инструмент=tool  інструмент=tool  навык=skill  способн=abilit  заклин=spell  магазин=shop|store  " +
+        "маг=magic|mage  уров=level  рівен=level  опыт=xp|experience  улучш=upgrade|improv  квест=quest  сюжет=story  диалог=dialog  діалог=dialog  " +
+        "торгов=trade|merchant  смерт=death  респаун=respawn  удобн=qol|quality  зручн=qol|quality  производительн=performance|fps  оптимиз=optimi|performance  " +
+        "оптиміз=optimi|performance  фпс=fps  лаг=lag|performance  фикс=fix  исправл=fix  виправл=fix  баг=bug|fix  вылет=crash|fix  настро=config|setting  " +
+        "налашт=config|setting  конфиг=config  консол=console  дебаг=debug  редактор=editor  смешн=funny|meme  эмоц=emote  танц=dance|emote  страш=horror|scary  " +
+        "хоррор=horror  спидран=speedrun  мир=world  мирн=peaceful|passive  локац=location|area  спутник=companion|follower  размер=size|scale  " +
+        "пропуск=skip  без=no|without  лошад=horse|mount  лагер=camp  щит=shield  шлем=helmet|helm  лук=bow  стрел=arrow  патрон=ammo  " +
+        "волн=wave  хвил=wave  арен=arena  спавн=spawn  карти=texture|image  питом=pet  собак=dog  кошк=cat  багато=many|more  много=many|more");
 
-    /// <summary>Английские слова, которые каталоги пишут по-разному: одна основа ловит все формы.</summary>
-    static readonly (string Prefix, string Stem)[] EnglishStems =
-    [
-        ("random", "rando"), ("rando", "rando"), ("enem", "enemy"), ("monster", "monster"), ("weapon", "weapon"), ("skin", "skin"),
-        ("cheat", "cheat"), ("invincib", "invincib"), ("multiplayer", "multiplayer"), ("coop", "coop"), ("co-op", "coop"), ("texture", "texture"),
-        ("optimi", "optimi"), ("translat", "translat"), ("localiz", "locali"), ("localis", "locali"), ("crafting", "craft"), ("building", "build"),
-    ];
+    static Dictionary<string, string[]> Build(string table)
+    {
+        var map = new Dictionary<string, string[]>(StringComparer.Ordinal);
+        foreach (var pair in table.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var eq = pair.IndexOf('=');
+            map[pair[..eq]] = pair[(eq + 1)..].Split('|');
+        }
+        return map;
+    }
+
+    static readonly int MaxStem = Ru.Keys.Max(k => k.Length);
+
+    /// <summary>Английские слова, которые каталоги пишут по-разному: одна основа ловит все формы и синонимы.</summary>
+    static readonly Dictionary<string, string[]> EnAlias = new(StringComparer.Ordinal)
+    {
+        ["rando"] = ["rando", "random"], ["random"] = ["rando", "random"], ["randomi"] = ["rando", "random"],
+        ["god"] = ["god", "invinc"], ["godmode"] = ["god", "invinc"], ["coop"] = ["coop", "multiplayer"], ["co-op"] = ["coop", "multiplayer"],
+        ["multiplayer"] = ["multiplayer", "coop"], ["qol"] = ["qol", "quality"], ["hp"] = ["hp", "health"], ["health"] = ["health", "hp"],
+        ["ui"] = ["ui", "hud"], ["hud"] = ["hud", "ui"], ["fps"] = ["fps", "performance"], ["optimi"] = ["optimi", "performance"],
+        ["translat"] = ["translat", "locali"], ["locali"] = ["locali", "translat"], ["armor"] = ["armor", "armour"], ["armour"] = ["armor", "armour"],
+        ["cheat"] = ["cheat", "trainer"], ["dmg"] = ["dmg", "damage"], ["damage"] = ["damage", "dmg"],
+    };
+
+    /// <summary>Слабые слова: в запрос не идут (иначе «больше врагов» нашло бы один мод), но поднимают моды с ними в названии.</summary>
+    static readonly HashSet<string> WeakWords = new(StringComparer.Ordinal) { "more", "bigger", "no", "without", "new", "many" };
+
+    /// <summary>Основа английского слова: enemies → enem, randomizer → randomi, bosses → boss, building → build.</summary>
+    public static string Stem(string word)
+    {
+        var w = word.ToLowerInvariant();
+        if (w.Length < 4 || !w.All(c => c is >= 'a' and <= 'z')) return w;
+        if (Izer().Match(w) is { Success: true } m) return m.Groups[1].Value + "i";
+        if (w.EndsWith("ies", StringComparison.Ordinal) && w.Length > 4) return w[..^3];
+        if (w.Length >= 5 && w[^1] == 'y' && !"aeiou".Contains(w[^2])) return w[..^1];
+        if (w.Length > 4 && (w.EndsWith("ses", StringComparison.Ordinal) || w.EndsWith("xes", StringComparison.Ordinal) || w.EndsWith("zes", StringComparison.Ordinal)
+            || w.EndsWith("ches", StringComparison.Ordinal) || w.EndsWith("shes", StringComparison.Ordinal))) return w[..^2];
+        if (w.Length >= 7 && w.EndsWith("ing", StringComparison.Ordinal))
+        {
+            var s = w[..^3];
+            return s.Length > 3 && s[^1] == s[^2] && !"aeiou".Contains(s[^1]) ? s[..^1] : s;
+        }
+        if (w[^1] == 's' && !"siu".Contains(w[^2])) return w[..^1];
+        return w;
+    }
 
     public static Plan Make(string text)
     {
         var raw = (text ?? "").Trim();
-        if (raw == "") return new Plan("", [], []);
-        var lower = raw.ToLowerInvariant().Replace('ё', 'е');
-        var keywords = new List<string>();
+        if (raw == "") return new Plan("", [], [], [], false);
+        var lower = raw.ToLowerInvariant().Replace('ё', 'е').Replace("'", "").Replace("’", "").Replace("ʼ", "").Replace("`", "");
+        // Словосочетания, которые пишут по-разному.
+        lower = " " + NotWord().Replace(lower, " ") + " ";
+        foreach (var (from, to) in new[] { (" god mode ", " godmode "), (" co op ", " coop "), (" quality of life ", " qol "), (" режим бога ", " бог "), (" режиме бога ", " бог ") })
+            lower = lower.Replace(from, to);
         var match = new List<string[]>();
+        var weak = new List<bool>();
+        var translated = false;
         void Add(string[] forms)
         {
-            if (forms.Length == 0 || keywords.Contains(forms[0], StringComparer.OrdinalIgnoreCase)) return;
-            keywords.Add(forms[0]);
+            if (forms.Length == 0 || match.Any(f => f[0] == forms[0])) return;
             match.Add(forms);
+            weak.Add(WeakWords.Contains(forms[0]));
         }
-
-        // Сначала словосочетания из словаря («полоска здоровья», «больше игроков»), потом отдельные слова.
-        var rest = " " + string.Join(' ', Word().Matches(lower).Select(m => m.Value)) + " ";
-        foreach (var (stem, en) in Dictionary.Where(d => d.Stem.Contains(' ')).OrderByDescending(d => d.Stem.Length))
+        foreach (var token in lower.Split(' ', StringSplitOptions.RemoveEmptyEntries))
         {
-            var words = stem.Split(' ');
-            var pattern = @"(?<=\s)" + string.Join(@"\S*\s+", words.Select(Regex.Escape)) + @"\S*(?=\s)";
-            var hit = Regex.Match(rest, pattern);
-            if (!hit.Success) continue;
-            Add(en.Split('|'));
-            rest = rest.Remove(hit.Index, hit.Length).Insert(hit.Index, " ");
-        }
-        foreach (var token in rest.Split(' ', StringSplitOptions.RemoveEmptyEntries))
-        {
-            if (Stop.Contains(token) || token.Length < 2 && !char.IsDigit(token[0])) continue;
+            if (Stop.Contains(token)) continue;
             if (Cyrillic().IsMatch(token))
             {
-                var found = Dictionary.Where(d => !d.Stem.Contains(' ') && token.StartsWith(d.Stem, StringComparison.Ordinal))
-                    .OrderByDescending(d => d.Stem.Length).Select(d => d.En).FirstOrDefault();
-                // Незнакомое русское слово оставляем как есть: вдруг это название мода.
-                Add(found is null ? [token] : found.Split('|'));
+                string[]? found = null;
+                for (var n = Math.Min(token.Length, MaxStem); n >= 2 && found is null; n--)
+                    Ru.TryGetValue(token[..n], out found);
+                if (found is not null) translated = true;
+                // Незнакомое русское слово каталогам не поможет (названий по-русски там нет) — только для оценки.
+                Add(found ?? [token]);
             }
-            else Add(English(token));
+            else if (token.Length >= 2 || char.IsDigit(token[0]))
+            {
+                var stem = Stem(token);
+                Add(EnAlias.TryGetValue(stem, out var alias) ? alias : stem == token ? [stem] : [stem, token]);
+            }
         }
-        if (keywords.Count == 0) keywords.Add(raw);
-        if (match.Count == 0) match.Add([raw.ToLowerInvariant()]);
-        return new Plan(string.Join(' ', keywords), keywords, match);
+        if (match.Count == 0) { match.Add([raw.ToLowerInvariant()]); weak.Add(false); }
+        // В запрос — основные слова (не слабые и не незнакомые русские); основа короче 3 букв — только если она одна.
+        var useful = match.Select((f, i) => (f, i)).Where(x => !weak[x.i] && !Cyrillic().IsMatch(x.f[0])).Select(x => x.f[0]).ToList();
+        if (useful.Count == 0) useful = match.Where(f => !Cyrillic().IsMatch(f[0])).Select(f => f[0]).ToList();
+        if (useful.Count > 1) useful = useful.Where(k => k.Length >= 3).DefaultIfEmpty(useful[0]).ToList();
+        var query = useful.Count > 0 ? string.Join(' ', useful) : raw;
+        return new Plan(query, useful.Count > 0 ? useful : [raw], match, weak, translated);
     }
 
-    /// <summary>Основа английского слова и его формы: enemies → enemy, randomizer → rando.</summary>
-    static string[] English(string word)
+    static (string Text, HashSet<string> Words) Hay(string text)
     {
-        foreach (var (prefix, stem) in EnglishStems)
-            if (word.StartsWith(prefix, StringComparison.Ordinal)) return stem == word ? [stem] : [stem, word];
-        string? single = word.Length > 4 && word.EndsWith("ies", StringComparison.Ordinal) ? word[..^3] + "y"
-            : word.Length > 4 && (word.EndsWith("ches", StringComparison.Ordinal) || word.EndsWith("shes", StringComparison.Ordinal) || word.EndsWith("xes", StringComparison.Ordinal) || word.EndsWith("sses", StringComparison.Ordinal)) ? word[..^2]
-            : word.Length > 3 && word.EndsWith('s') && !word.EndsWith("ss", StringComparison.Ordinal) && !word.EndsWith("us", StringComparison.Ordinal) ? word[..^1]
-            : null;
-        return single is null ? [word] : [single, word];
+        var words = NotWord().Split(Camel().Replace(text ?? "", " ")).Where(w => w != "").Select(w => w.ToLowerInvariant()).ToHashSet();
+        return ((text ?? "").ToLowerInvariant().Replace('_', ' '), words);
     }
 
-    /// <summary>Сколько слов запроса нашлось у мода (в названии, номере, описании или разделах).</summary>
+    static bool Has((string Text, HashSet<string> Words) hay, string form) =>
+        form.Length < 3 ? hay.Words.Contains(form) : hay.Text.Contains(form, StringComparison.Ordinal) || hay.Text.Replace(" ", "").Contains(form.Replace(" ", ""), StringComparison.Ordinal);
+
+    /// <summary>Сколько основных (не слабых) слов запроса нашлось у мода — в названии, номере, описании или разделах.</summary>
     public static int Score(ModInfo mod, Plan plan)
     {
-        var hay = (mod.Name + " " + mod.Id + " " + mod.Description + " " + string.Join(' ', mod.Categories)).ToLowerInvariant().Replace('_', ' ');
-        var squashed = hay.Replace(" ", "").Replace("-", "");
-        return plan.Match.Count(forms => forms.Any(f => hay.Contains(f, StringComparison.Ordinal) || squashed.Contains(f.Replace(" ", ""), StringComparison.Ordinal)));
+        var all = Hay(mod.Name + " " + mod.Id + " " + mod.Description + " " + string.Join(' ', mod.Categories));
+        var hits = 0;
+        for (var i = 0; i < plan.Match.Count; i++)
+            if (!plan.Weak[i] && plan.Match[i].Any(f => Has(all, f))) hits++;
+        return hits;
     }
 
-    /// <summary>Совпадение в названии весит больше, чем в описании: для сортировки найденного по словам.</summary>
+    /// <summary>Сколько слов (и слабых тоже) нашлось в названии — совпадение в названии важнее описания.</summary>
     public static int NameScore(ModInfo mod, Plan plan)
     {
-        var name = (mod.Name + " " + mod.Id).ToLowerInvariant().Replace("_", "").Replace(" ", "").Replace("-", "");
-        return plan.Match.Count(forms => forms.Any(f => name.Contains(f.Replace(" ", ""), StringComparison.Ordinal)));
+        var name = Hay(mod.Name + " " + mod.Id);
+        return plan.Match.Count(forms => forms.Any(f => Has(name, f)));
+    }
+
+    /// <summary>Вес совпадений для сортировки: название ×3, разделы ×2, описание ×1; второстепенная форма ×0.8, слабое слово ×0.5.</summary>
+    public static double Weight(ModInfo mod, Plan plan)
+    {
+        var name = Hay(mod.Name + " " + mod.Id);
+        var cats = Hay(string.Join(' ', mod.Categories));
+        var desc = Hay(mod.Description);
+        double total = 0;
+        for (var i = 0; i < plan.Match.Count; i++)
+        {
+            double best = 0;
+            for (var j = 0; j < plan.Match[i].Length; j++)
+            {
+                var f = plan.Match[i][j];
+                var w = Has(name, f) ? 3 : Has(cats, f) ? 2 : Has(desc, f) ? 1 : 0;
+                best = Math.Max(best, w * (j == 0 ? 1 : 0.8));
+            }
+            total += plan.Weak[i] ? best * 0.5 : best;
+        }
+        return total;
     }
 
     [SelfTest]
@@ -169,20 +218,32 @@ public static partial class SearchWords
             var got = Make(input).Query;
             if (got != query) fail.Add($"«{input}» → «{got}», ждали «{query}»");
         }
-        Expect("рандомные враги", "rando enemy");
-        Expect("random enemies", "rando enemy");
-        Expect("Enemy Randomizer", "enemy rando");
+        Expect("рандомные враги", "rando enem");
+        Expect("random enemies", "rando enem");
+        Expect("Enemy Randomizer", "enem rando");
+        Expect("рандомні вороги", "rando enem");
         Expect("моды на оружие", "weapon");
-        Expect("полоска здоровья врагов", "health bar enemy");
-        Expect("больше игроков", "more players");
-        Expect("рандомні вороги", "rando enemy");
-        Expect("SimpleEnemyRando", "simpleenemyrando");
+        Expect("полоска здоровья врагов", "bar health enem");
+        Expect("больше игроков", "player");
+        Expect("без врагов", "enem");
+        Expect("режим бога", "god");
         Expect("бессмертие", "god");
+        Expect("русификатор", "russian");
+        Expect("SimpleEnemyRando", "simpleenemyrando");
         Expect("Content Patcher", "content patcher");
+        Expect("bosses", "boss");
+        Expect("building", "build");
+        Expect("магазин", "shop");
+        Expect("миникарта", "minimap");
         var rando = new ModInfo { Source = "thunderstore", Id = "cometcake575-SimpleEnemyRando", Name = "SimpleEnemyRando", Description = "A Silksong enemy and boss randomiser made using Architect" };
+        var bar = new ModInfo { Source = "thunderstore", Id = "ygsbzr-SSEnemyHPBar", Name = "SSEnemyHPBar", Description = "Shows enemy health" };
         var plan = Make("рандомные враги");
-        if (Score(rando, plan) != 2 || NameScore(rando, plan) != 2) fail.Add($"score {Score(rando, plan)}/{NameScore(rando, plan)}");
+        if (Score(rando, plan) != 2 || Score(bar, plan) != 1 || Weight(rando, plan) <= Weight(bar, plan)) fail.Add($"score {Score(rando, plan)}/{Score(bar, plan)}");
+        // Короткое слово «hp» — только целым словом (в SSEnemyHPBar оно отдельное слово по CamelCase).
+        if (Score(bar, Make("HP bar")) != 2) fail.Add("HP bar");
+        var more = Make("больше игроков");
+        if (!more.Weak.Contains(true) || NameScore(new ModInfo { Source = "thunderstore", Id = "x-MoreCompany", Name = "MoreCompany" }, more) != 1) fail.Add("weak more");
         if (fail.Count > 0) throw new Exception(string.Join("; ", fail));
-        return "«рандомные враги» и «random enemies» → «rando enemy»: SimpleEnemyRando совпадает по обоим словам; словосочетания и украинский тоже";
+        return "«рандомные враги» и «random enemies» → «rando enem»: SimpleEnemyRando совпадает по обоим словам; «больше», «без» не сужают поиск; украинский, «режим бога», bosses → boss";
     }
 }

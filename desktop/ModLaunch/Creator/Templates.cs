@@ -125,8 +125,8 @@ public static partial class Templates
             about "Больше игроков, заход в идущую игру, костюмы и удобные слоты"
             game lethal-company
 
-            needs notnotnotswipez-MoreCompany anormaltwig-LateCompany x753-More_Suits
-            needs tinyhoot-ShipLoot FlipMods-ReservedFlashlightSlot
+            needs notnotnotswipez-MoreCompany LTGVE-VeryLateCompany x753-More_Suits
+            needs PXC-ShipLootPlus FlipMods-ReservedFlashlightSlot
             """),
 
         new("valheim-builder", "valheim", """
@@ -326,7 +326,7 @@ public static partial class Templates
             game repo
 
             needs YMC_MHZ-MoreHead BULLETBOT-MoreUpgrades Zehs-ExtractionPointConfirmButton
-            needs nickklmao-REPOConfig
+            needs REPOModding-REPOConfig
             """),
         new("cw-viral", "content-warning", """
             # Сборка: моды одним пакетом (как сборка на Thunderstore).
@@ -398,7 +398,7 @@ public static partial class Templates
             about "Слоты, раскладка и автопочинка"
             game valheim
 
-            needs shudnal-ExtraSlots Goldenrevolver-Quick_Stack_Store_Sort_Trash_Restock Tekla-AutoRepair
+            needs shudnal-ExtraSlots Goldenrevolver-Quick_Stack_Store_Sort_Trash_Restock ComfyMods-ComfyAutoRepair
             """),
         new("gtfo-squad", "gtfo", """
             # Сборка: моды одним пакетом (как сборка на Thunderstore).

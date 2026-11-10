@@ -212,7 +212,8 @@ public static class AiBuilds
         var found = new Dictionary<string, ModInfo>();
         async Task Take(Query q)
         {
-            try { foreach (var m in (await Catalog.Browse(g.Def, q, ct)).Mods.Where(m => !m.Adult && !m.Deprecated)) found.TryAdd(m.Id, m); }
+            // 26.0: ИИ-сборки берут моды из всех каталогов игры, а не только из основного.
+            try { foreach (var m in (await Catalog.Browse(g.Def, q, ct, Catalog.HasSeveral(g.Def) ? Catalog.AllSources : null)).Mods.Where(m => !m.Adult && !m.Deprecated)) found.TryAdd(m.Id, m); }
             catch (Exception) when (!ct.IsCancellationRequested) { }
         }
         // 16.0: страницы каталога и поиск по словам — параллельно (раньше по очереди, до 8 запросов подряд).

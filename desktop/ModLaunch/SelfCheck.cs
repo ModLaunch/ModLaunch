@@ -358,6 +358,8 @@ public static class SelfCheck
             {
                 var found = await Catalog.Many(g, g.Picks);
                 var ids = found.Select(m => m.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                // 26.0: устаревший мод в «Выборе ModLaunch» — тоже ошибка (в подборке он горит красным «устарел»).
+                bad.AddRange(found.Where(m => m.Deprecated).Select(m => $"{g.Id}:{m.Id} (deprecated)"));
                 // 26.0: каталог иногда отвечает ошибкой на один запрос (так CI 25.0 «потерял» живой мод ULTRAKILL) —
                 // пропавшее спрашиваем ещё раз, прежде чем считать его удалённым.
                 foreach (var p in g.Picks.Where(p => !ids.Contains(p)).ToList())
