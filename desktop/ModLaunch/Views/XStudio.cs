@@ -181,15 +181,16 @@ public sealed partial class XStudio : Page
         _side.BorderThickness = new Thickness(0, 0, 1, 0);
         _side.Width = 290;
 
-        // 18.0: редактор обведён фирменной полосой — среда ModScript X сразу отличается от обычного редактора.
+        // 26.0: редактор и нижняя панель — листы хаба (тонкая линия, радиус 8). Янтарная рамка вокруг редактора и полоса
+        // под шапкой тратили фирменный цвет на украшение: его место — главная кнопка «В игру» и черта выбранной вкладки.
         var editor = new Border
         {
-            Background = HubLook.Panel, BorderBrush = HubLook.Premium(140), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(4), ClipToBounds = true,
+            Background = HubLook.Panel, BorderBrush = HubLook.Edge, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(8), ClipToBounds = true,
             Child = new DockPanel { Children = { Docked(_tabs, Dock.Top), _editorHost } },
         };
         var panel = new Border
         {
-            Background = HubLook.Panel, BorderBrush = HubLook.Edge, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(4), ClipToBounds = true,
+            Background = HubLook.Panel, BorderBrush = HubLook.Edge, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(8), ClipToBounds = true,
             Child = new DockPanel { Children = { Docked(_panelTabs, Dock.Top), _panelBody } },
         };
         // 21.0: в блоках нижняя панель — по содержимому (не выше 150): холсту нужно место, а «Проблем нет» — одна строка.
@@ -209,8 +210,7 @@ public sealed partial class XStudio : Page
         Grid.SetColumn(work, 2);
         center.Children.Add(work);
 
-        var line = new Border { Height = 2, Background = HubLook.Premium(), IsHitTestVisible = false };
-        var main = new DockPanel { Children = { Docked(_top, Dock.Top), Docked(line, Dock.Top), Docked(_status, Dock.Bottom), center } };
+        var main = new DockPanel { Children = { Docked(_top, Dock.Top), Docked(_status, Dock.Bottom), center } };
         var root = new Panel { Classes = { "hub-space" }, Children = { new HubLook.Blueprint(), main, _overlay } };
         HubLook.Scope(root);
         Content = root;
@@ -365,6 +365,27 @@ public sealed partial class XStudio : Page
         };
         var title = Sides.FirstOrDefault(x => x.Id == _s.Side).Key is { } key ? I18n.T(key) : "";
         var head = new Border { Padding = new Thickness(16, 14, 12, 10), Child = HubLook.Eyebrow(title, Color) };
+        if (_s.Side is not ("bridge" or "blocks" or "docs" or "history" or "settings"))
+        {
+            // 26.0: «создать файл» — одной кнопкой «+» в заголовке «Файлов» с меню из трёх вариантов. Три жирные кнопки
+            // между файлами проекта и «Другими скриптами» были тяжелее самих файлов и читались как файлы.
+            var add = Ui.Button("", () => { }, "icon ghost", Icons.Plus, I18n.T("v15.ms.new"));
+            add.Content = Ui.Icon(Icons.Plus, 16, Ui.Res("Muted"));
+            add.Width = add.Height = 28;
+            add.Padding = new Thickness(0);
+            add.HorizontalContentAlignment = HorizontalAlignment.Center;
+            add.VerticalContentAlignment = VerticalAlignment.Center;
+            add.Flyout = Ctx.Menu(
+                Ctx.Item(I18n.T("v15.ms.new"), Icons.FilePlus, NewFile, gesture: "Ctrl+N"),
+                Ctx.Item(I18n.T("v22.cmd.newSimple"), Icons.Sparkles, NewSimpleFile),
+                Ctx.Item(I18n.T("v22.file.new"), Icons.Plus, NewAnyFile));
+            var line = new DockPanel();
+            DockPanel.SetDock(add, Dock.Right);
+            line.Children.Add(add);
+            line.Children.Add(HubLook.Eyebrow(title, Color));
+            head.Child = line;
+            head.Padding = new Thickness(16, 10, 10, 6);
+        }
         _side.Child = new DockPanel { Children = { Docked(head, Dock.Top), new ScrollViewer { Content = body, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled } } };
     }
 
@@ -401,12 +422,8 @@ public sealed partial class XStudio : Page
     {
         var p = _p!;
         var col = new StackPanel { Spacing = 1, Margin = new Thickness(8, 0, 8, 12) };
-        // 22.0: создать — обычный .modx, простым языком или любой другой файл (заметки, JSON, Lua…).
-        var add = Ui.Button(I18n.T("v15.ms.new"), NewFile, "ghost", Icons.FilePlus);
-        var adds = new WrapPanel { Margin = new Thickness(0, 4, 0, 0) };
-        adds.Children.Add(add);
-        adds.Children.Add(Ui.Button(I18n.T("v22.cmd.newSimple"), NewSimpleFile, "ghost", Icons.Sparkles));
-        adds.Children.Add(Ui.Button(I18n.T("v22.file.new"), NewAnyFile, "ghost", Icons.Plus));
+        // 22.0: создать — обычный .modx, простым языком или любой другой файл (заметки, JSON, Lua…). 26.0: кнопка «+»
+        // в заголовке панели (RenderSide).
         var files = ProjectFiles();
         col.Children.Add(Caption(I18n.T("v16.x.files.project")));
         foreach (var f in files)
@@ -421,7 +438,6 @@ public sealed partial class XStudio : Page
             Ctx.Attach(row, () => FileMenu(path));
             col.Children.Add(row);
         }
-        col.Children.Add(adds);
 
         if (_s.Active is { Modx: true } a)
         {
@@ -503,7 +519,7 @@ public sealed partial class XStudio : Page
                 var has = t.Events.Contains(e);
                 var tag = new Border
                 {
-                    CornerRadius = new CornerRadius(3), Padding = new Thickness(7, 3), Margin = new Thickness(0, 0, 6, 6), BorderBrush = has ? HubLook.Cyan : HubLook.Edge, BorderThickness = new Thickness(1),
+                    CornerRadius = new CornerRadius(6), Padding = new Thickness(7, 3), Margin = new Thickness(0, 0, 6, 6), BorderBrush = has ? HubLook.Cyan : HubLook.Edge, BorderThickness = new Thickness(1),
                     Child = Ui.Row(5, Ui.Dot(has ? Ui.Res("Good") : Ui.Res("Faint"), 6), HubLook.MonoText(e, 11, has ? Ui.Res("Text") : Ui.Res("Faint"))),
                 };
                 ToolTip.SetTip(tag, has ? I18n.T($"v16.event.{e}.tip") : I18n.T("v16.event.missing", ("engine", t.Title)));
@@ -637,14 +653,14 @@ public sealed partial class XStudio : Page
         {
             var box = new Border
             {
-                Background = HubLook.Raised, CornerRadius = new CornerRadius(4), Padding = new Thickness(10, 8),
+                Background = HubLook.Raised, CornerRadius = new CornerRadius(8), Padding = new Thickness(10, 8),
                 Child = new SelectableTextBlock { Text = code, FontFamily = Mono, FontSize = 11.5, LineHeight = 17, TextWrapping = TextWrapping.Wrap },
             };
             col.Children.Add(Ui.Col(6, Ui.Text(I18n.T(key), "small strong"), box));
         }
         var builtins = new WrapPanel();
         foreach (var f in MX.ModxDoc.Builtins)
-            builtins.Children.Add(new Border { CornerRadius = new CornerRadius(3), Padding = new Thickness(6, 2), Margin = new Thickness(0, 0, 5, 5), Background = HubLook.Raised, Child = HubLook.MonoText(f + "()", 10.5, Ui.Res("Text")) });
+            builtins.Children.Add(new Border { CornerRadius = new CornerRadius(6), Padding = new Thickness(6, 2), Margin = new Thickness(0, 0, 5, 5), Background = HubLook.Raised, Child = HubLook.MonoText(f + "()", 10.5, Ui.Res("Text")) });
         col.Children.Add(Ui.Col(6, Ui.Text(I18n.T("v16.x.docs.builtins"), "small strong"), builtins));
         // 19.0: клавиши среды — вместо кнопки на старую страницу языка (её больше нет).
         var keys = Ui.Col(3);
@@ -1011,22 +1027,41 @@ public sealed partial class XStudio : Page
         ("search", "v19.p.search", Icons.Search), ("code", "v15.ms.p.code", Icons.Code), ("console", "v22.p.console", Icons.Keyboard), ("inject", "v16.x.p.bridge", Icons.Layers),
     ];
 
+    /// <summary>Нижняя панель уже, чем нужно восьми вкладкам с подписями: невыбранные — одними значками (подпись — в подсказке).</summary>
+    bool _compactTabs;
+    bool _tabsWatched;
+
     void RenderPanelTabs()
     {
+        // 26.0: вкладки не обрезаются краем панели («Журнал мост…»): на узкой панели невыбранные — значками, а строка
+        // при нужде прокручивается вбок.
+        if (!_tabsWatched)
+        {
+            _tabsWatched = true;
+            _panelTabs.SizeChanged += (_, e) =>
+            {
+                var compact = e.NewSize.Width < 820;
+                if (compact != _compactTabs) { _compactTabs = compact; RenderPanelTabs(); }
+            };
+        }
         var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2, Margin = new Thickness(8, 4) };
         var problems = (_s.Active?.Diags.Count ?? 0) + (_s.Active?.Lints.Count ?? 0);
         foreach (var (id, key, icon) in PanelTabs)
         {
             var tab = id;
-            var content = Ui.Row(6, Ui.Icon(icon, 13, _s.Panel == id ? Color : Ui.Res("Muted")), new TextBlock { Text = I18n.T(key), VerticalAlignment = VerticalAlignment.Center });
+            var on = _s.Panel == id;
+            var content = Ui.Row(6, Ui.Icon(icon, 13, on ? Color : Ui.Res("Muted")));
+            if (on || !_compactTabs) content.Children.Add(new TextBlock { Text = I18n.T(key), VerticalAlignment = VerticalAlignment.Center });
             if (id == "problems" && problems > 0) content.Children.Add(new Border { Classes = { "tab-badge" }, Child = Ui.Text(problems.ToString(), "tiny") });
             if (id == "debug" && _s.Debugging) content.Children.Add(Ui.Dot(new SolidColorBrush(Avalonia.Media.Color.Parse("#F5B83D")), 7));
-            var b = new Button { Classes = { "tab" }, Content = content };
-            if (_s.Panel == id) b.Classes.Add("active");
+            // Плотнее обычных вкладок (16,10): восемь подписей помещаются в панель при окне 1366 px.
+            var b = new Button { Classes = { "tab" }, Content = content, Padding = new Thickness(10, 7), FontSize = 12.5 };
+            if (on) b.Classes.Add("active");
+            if (!on && _compactTabs) ToolTip.SetTip(b, I18n.T(key));
             b.Click += (_, _) => { _s.Panel = tab; RenderPanel(); };
             row.Children.Add(b);
         }
-        _panelTabs.Child = row;
+        _panelTabs.Child = new ScrollViewer { Content = row, HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled };
         _panelTabs.BorderBrush = HubLook.Edge;
         _panelTabs.BorderThickness = new Thickness(0, 0, 0, 1);
     }

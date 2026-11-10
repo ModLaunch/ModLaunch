@@ -491,7 +491,7 @@ public sealed partial class XStudio
         }
         if (diff.All(x => x.Op == ' ')) lines.Children.Add(Ui.Text(I18n.T("v19.hist.same"), "small muted"));
         var body = Ui.Col(10, Ui.Text(I18n.T("v19.hist.diff"), "small muted", wrap: true),
-            new Border { BorderBrush = HubLook.Edge, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(4), MaxHeight = 380, Child = new ScrollViewer { Content = lines, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto } });
+            new Border { BorderBrush = HubLook.Edge, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(8), MaxHeight = 380, Child = new ScrollViewer { Content = lines, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto } });
         w.Dialog(I18n.T("v19.hist.title", ("time", e.At.ToLocalTime().ToString("d MMM HH:mm:ss", I18n.Culture))), body, 720,
             Ui.Button(I18n.T("common.cancel"), w.CloseDialog, "ghost"),
             Ui.Button(I18n.T("v19.hist.restore"), () =>

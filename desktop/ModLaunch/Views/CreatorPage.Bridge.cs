@@ -19,7 +19,7 @@ public sealed partial class CreatorPage
         if (r is null)
             return new Border
             {
-                Padding = new Thickness(14, 12), CornerRadius = new CornerRadius(4), BorderBrush = HubLook.Edge, BorderThickness = new Thickness(1),
+                Padding = new Thickness(14, 12), CornerRadius = new CornerRadius(10), BorderBrush = HubLook.Edge, BorderThickness = new Thickness(1),
                 Child = noPath ? Ui.Text(I18n.T("v16.bridge.noPath"), "small muted", wrap: true)
                     : Ui.Row(10, new ProgressBar { IsIndeterminate = true, Width = 80, VerticalAlignment = VerticalAlignment.Center }, Ui.Text(I18n.T("v16.bridge.scanning"), "small muted")),
             };
@@ -30,7 +30,8 @@ public sealed partial class CreatorPage
             : I18n.T("v16.bridge.files");
         var head = new WrapPanel();
         foreach (var part in new Control[] { Ui.Icon(Icons.Layers, 16, HubLook.Cyan), Ui.Text(I18n.T("v16.bridge.title"), "strong"),
-            Gx.Tag(r.Title, Ui.Res("Surface3")), Gx.Tag(route, color is ISolidColorBrush c ? new SolidColorBrush(Color.FromArgb(40, c.Color.R, c.Color.G, c.Color.B)) : null, color) })
+            // 26.0: общие ярлыки хаба: движок — тихим, путь — с точкой цвета состояния (были скошенные Gx.Tag).
+            HubLook.Badge(r.Title), HubLook.BadgeDot(route, color) })
         {
             part.Margin = new Thickness(0, 0, 8, 4);
             part.VerticalAlignment = VerticalAlignment.Center;
@@ -41,7 +42,7 @@ public sealed partial class CreatorPage
         var clues = new WrapPanel();
         foreach (var e in r.Evidence.Take(6))
         {
-            var t = new Border { CornerRadius = new CornerRadius(3), Padding = new Thickness(6, 2), Margin = new Thickness(0, 0, 6, 6), Background = Ui.Res("Surface2"), Child = HubLook.MonoText(e, 10.5) };
+            var t = new Border { CornerRadius = new CornerRadius(6), Padding = new Thickness(6, 2), Margin = new Thickness(0, 0, 6, 6), Background = HubLook.Raised, Child = HubLook.MonoText(e, 10.5) };
             clues.Children.Add(t);
         }
         var dot = Ui.Dot(r.LoaderReady ? Ui.Res("Good") : Ui.Res("Warn"));
@@ -51,7 +52,8 @@ public sealed partial class CreatorPage
         var col = Ui.Col(10, head, sure, clues);
         if (r.Code) col.Children.Add(loader);
         if (r.Hint is { } hint) col.Children.Add(Ui.Text(BridgeHint(r), "small muted", wrap: true));
-        return new Border { Padding = new Thickness(14, 12), CornerRadius = new CornerRadius(4), BorderBrush = HubLook.Edge, BorderThickness = new Thickness(1), Background = HubLook.Raised, Child = col };
+        // 26.0: лист хаба (фон листа, радиус 10) — улики на поднятом фоне теперь видны (раньше фон карточки был тем же).
+        return new Border { Padding = new Thickness(14, 12), CornerRadius = new CornerRadius(10), BorderBrush = HubLook.Edge, BorderThickness = new Thickness(1), Background = HubLook.Panel, Child = col };
     }
 
     /// <summary>Подсказка моста по-русски (у ModScript X консольного — по-английски, здесь — из строк программы).</summary>

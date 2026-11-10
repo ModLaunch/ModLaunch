@@ -170,7 +170,7 @@ public sealed partial class CreatorPage
                 var json = content.ToJsonString(MsPretty).Split('\n');
                 parts.Children.Add(new Border
                 {
-                    Background = HubLook.Raised, CornerRadius = new CornerRadius(3), Padding = new Thickness(10, 8), MaxHeight = 320,
+                    Background = HubLook.Raised, CornerRadius = new CornerRadius(8), Padding = new Thickness(10, 8), MaxHeight = 320,
                     Child = new ScrollViewer
                     {
                         Content = new SelectableTextBlock { Text = string.Join("\n", json.Take(160)) + (json.Length > 160 ? "\n…" : ""), FontFamily = mono, FontSize = 11.5 },
@@ -188,10 +188,12 @@ public sealed partial class CreatorPage
 
     Control Commands()
     {
-        var search = new TextBox { Watermark = I18n.T("v13.ms.search"), Text = _filter, Width = 360, HorizontalAlignment = HorizontalAlignment.Left };
+        // 26.0: поиск хаба — с лупой и тонкой рамкой.
+        var search = HubLook.Search(I18n.T("v13.ms.search"), _filter);
         var chips = new WrapPanel();
         // Две колонки, высота — по паре карточек (а не по самой длинной команде, как у UniformGrid).
-        var grid = new StackPanel();
+        // 26.0: поле −12 справа съедает отступ правой карточки — край сетки ровно по краю шапки и счётчика.
+        var grid = new StackPanel { Margin = new Thickness(0, 0, -12, 0) };
         var count = Ui.Text("", "small muted");
 
         void Fill()
@@ -245,7 +247,8 @@ public sealed partial class CreatorPage
     {
         var syntax = ModScriptCommands.Syntax(c).Replace("\\n", "\n");
         var name = Ui.Row(8, HubLook.MonoText(c.Name, 14, HubLook.Violet));
-        if (c.New) name.Children.Add(new Border { Background = HubLook.Signature(), CornerRadius = new CornerRadius(3), Padding = new Thickness(5, 1), VerticalAlignment = VerticalAlignment.Center, Child = HubLook.MonoText("13.0", 9.5, Brushes.White) });
+        // 26.0: пометка «новое» — общим ярлыком хаба (мягкий янтарь), а не белым текстом на янтаре.
+        if (c.New) name.Children.Add(HubLook.Badge("13.0", "accent"));
         var copy = Ui.Button("", () => { MainWindow.Current?.Clipboard?.SetTextAsync(syntax); MainWindow.Current?.Toast(I18n.T("ctx.copied")); }, "icon ghost", Icons.Copy, I18n.T("v13.ms.copy"));
         var send = Ui.Button("", () =>
         {
@@ -253,14 +256,27 @@ public sealed partial class CreatorPage
             _ms = "console";
             Build();
         }, "icon ghost", Icons.Play, I18n.T("v13.ms.send"));
+        // Кнопки тише названия команды: значок 15 в квадрате 30.
+        foreach (var (b, icon) in new[] { (copy, Icons.Copy), (send, Icons.Play) })
+        {
+            b.Content = Ui.Icon(icon, 15, Ui.Res("Muted"));
+            b.Width = b.Height = 30;
+            b.Padding = new Thickness(0);
+            b.HorizontalContentAlignment = HorizontalAlignment.Center;
+            b.VerticalContentAlignment = VerticalAlignment.Center;
+        }
         var tools = Ui.Row(2, copy, send);
         var top = new DockPanel();
         DockPanel.SetDock(tools, Dock.Right);
         top.Children.Add(tools);
         top.Children.Add(name);
-        var body = Ui.Col(6, top,
-            new SelectableTextBlock { Text = syntax, FontFamily = HubLook.Mono, FontSize = 12.5, Foreground = Ui.Res("Brand2"), TextWrapping = TextWrapping.Wrap },
-            Ui.Text(ModScriptCommands.Doc(c), "small muted", wrap: true));
+        // 26.0: пример — блоком кода (как в «Скриптах в игре»), цветом текста: синий цвет темы был вторым акцентом на карточке.
+        var example = new Border
+        {
+            Background = HubLook.Raised, CornerRadius = new CornerRadius(6), Padding = new Thickness(8, 4), HorizontalAlignment = HorizontalAlignment.Left,
+            Child = new SelectableTextBlock { Text = syntax, FontFamily = HubLook.Mono, FontSize = 12.5, Foreground = Ui.Res("Text"), TextWrapping = TextWrapping.Wrap },
+        };
+        var body = Ui.Col(8, top, example, Ui.Text(ModScriptCommands.Doc(c), "small muted", wrap: true));
         var frame = HubLook.Frame(body, new Thickness(14, 12));
         frame.Margin = new Thickness(0, 0, 12, 12);
         return frame;

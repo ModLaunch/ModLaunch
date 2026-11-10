@@ -60,7 +60,8 @@ public sealed partial class CreatorPage
             var sorts = new[] { "recent", "name", "game" };
             var sort = new ComboBox { Width = 190, ItemsSource = sorts.Select(s => I18n.T("v23.mine.sort." + s)).ToList(), SelectedIndex = Math.Max(0, Array.IndexOf(sorts, _mineSort)), VerticalAlignment = VerticalAlignment.Center };
             sort.SelectionChanged += (_, _) => { var v = sorts[Math.Max(0, sort.SelectedIndex)]; if (v != _mineSort) { _mineSort = v; Build(); } };
-            var tools = Ui.Row(10, sort, Ui.Button(I18n.T("v22.hub.new"), () => Go("form"), "primary", Icons.Plus));
+            // 26.0: «Новый мод» — в шапке раздела (как «Импортировать скрипт» у «Скриптов»): у вкладок одно место главной кнопки.
+            var tools = Ui.Row(10, sort);
             tools.VerticalAlignment = VerticalAlignment.Top;
             var bar = new DockPanel();
             DockPanel.SetDock(tools, Dock.Right);
@@ -110,7 +111,7 @@ public sealed partial class CreatorPage
     Control WorldCard(GameState g, string level, int objects, DateTime at)
     {
         var state = Ui.Row(6, Ui.Icon(Icons.Cube, 12, HubLook.Violet), Ui.Text(I18n.T("v23.dev.changes", ("n", objects)), "small"));
-        var card = Tile(Ui.GameImage(g.Def, 400), [Tag(I18n.T("v23.dev.map"), null, HorizontalAlignment.Right)],
+        var card = Tile(Cover(g.Def), [Tag(I18n.T("v23.dev.map"), null, HorizontalAlignment.Right)],
             level, g.Def.Name, state, Ui.Text(Ui.Ago(at), "small muted"),
             () => DevLaunch.Start(g), () => Actions.OpenFolder(DevMode.ConfigDir(g.Path!)), Ui.Hex("#2F7D6B"), launchText: I18n.T("v23.dev.open"));
         Ctx.Attach(card, () => Ctx.Menu(
@@ -119,12 +120,54 @@ public sealed partial class CreatorPage
         return card;
     }
 
+    /// <summary>
+    /// 26.0: сетка плиток — столбцов столько, сколько влезает плиток от 230 px (было всегда 4: на широком окне плитки
+    /// раздувались, на узком сжимались). Поле −16 справа съедает отступ последней плитки — край сетки ровно по краю шапки.
+    /// </summary>
     static UniformGrid Tiles(IEnumerable<Control> cards)
     {
-        var grid = new UniformGrid { Columns = 4 };
+        const double min = 230, gap = 16;
+        var grid = new UniformGrid { Columns = 4, Margin = new Thickness(0, 0, -gap, 0) };
         foreach (var c in cards) grid.Children.Add(c);
+        grid.SizeChanged += (_, e) =>
+        {
+            var cols = Math.Max(1, (int)(e.NewSize.Width / (min + gap)));
+            if (grid.Columns != cols) grid.Columns = cols;
+        };
         return grid;
     }
+
+    /// <summary>
+    /// 26.0: обложка плитки — фон игры без логотипа (hero). Шапка магазина с вшитым логотипом в низкой плитке
+    /// резалась («STARDEV VALLEY», «ETHAL COMPANY»), и ярлык мода ложился прямо на буквы.
+    /// </summary>
+    static Control Cover(GameDef game) => Ui.GameImage(game, 800, art: Images.Art.Hero);
+
+    /// <summary>Ярлык с названием мода цвета проекта — на обложке плитки и в карточке анкеты.</summary>
+    internal static Border Plate(TextBlock text, Color color, double margin = 10)
+    {
+        text.FontSize = 14;
+        text.FontWeight = FontWeight.SemiBold;
+        text.TextTrimming = TextTrimming.CharacterEllipsis;
+        text.Foreground = IsLightColor(color) ? HubLook.OnAmber : Brushes.White;
+        // 26.0: радиус 6 и без тени — затемнение низа обложки и так даёт контраст.
+        return new Border
+        {
+            Background = new SolidColorBrush(color), CornerRadius = new CornerRadius(6), Padding = new Thickness(8, 4),
+            Margin = new Thickness(margin), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Bottom, Child = text,
+        };
+    }
+
+    /// <summary>Затемнение к низу обложки: ярлык читается на любой картинке.</summary>
+    internal static Border Scrim() => new()
+    {
+        IsHitTestVisible = false,
+        Background = new LinearGradientBrush
+        {
+            StartPoint = new RelativePoint(0, 0.45, RelativeUnit.Relative), EndPoint = new RelativePoint(0, 1, RelativeUnit.Relative),
+            GradientStops = { new GradientStop(Color.FromArgb(0, 0, 0, 0), 0), new GradientStop(Color.FromArgb(150, 0, 0, 0), 1) },
+        },
+    };
 
     static Control Section(string title, Control? right = null)
     {
@@ -146,28 +189,8 @@ public sealed partial class CreatorPage
         IBrush? label = null, string? launchText = null, Action? click = null)
     {
         var plateColor = (label as ISolidColorBrush)?.Color ?? HubLook.AmberColor;
-        var plateText = new TextBlock
-        {
-            Text = title, FontSize = 15, FontWeight = FontWeight.Bold, TextTrimming = TextTrimming.CharacterEllipsis,
-            Foreground = IsLightColor(plateColor) ? HubLook.OnAmber : Brushes.White,
-        };
-        var plate = new Border
-        {
-            Background = new SolidColorBrush(plateColor), CornerRadius = new CornerRadius(4), Padding = new Thickness(9, 5),
-            Margin = new Thickness(10), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Bottom,
-            BoxShadow = new BoxShadows(new BoxShadow { OffsetY = 2, Blur = 6, Color = Color.FromArgb(110, 0, 0, 0) }), Child = plateText,
-        };
-        var top = new Panel { Children = { art } };
-        // Затемнение к низу обложки: ярлык читается на любой картинке.
-        top.Children.Add(new Border
-        {
-            IsHitTestVisible = false,
-            Background = new LinearGradientBrush
-            {
-                StartPoint = new RelativePoint(0, 0.45, RelativeUnit.Relative), EndPoint = new RelativePoint(0, 1, RelativeUnit.Relative),
-                GradientStops = { new GradientStop(Color.FromArgb(0, 0, 0, 0), 0), new GradientStop(Color.FromArgb(150, 0, 0, 0), 1) },
-            },
-        });
+        var plate = Plate(new TextBlock { Text = title }, plateColor);
+        var top = new Panel { Children = { art, Scrim() } };
         foreach (var t in tags) top.Children.Add(t);
         top.Children.Add(plate);
         var card = new Button
@@ -195,13 +218,16 @@ public sealed partial class CreatorPage
         return card;
     }
 
-    /// <summary>Пометка в правом верхнем углу обложки: версия, «Куплен», «Импорт».</summary>
-    static Border Tag(string text, IBrush? background, HorizontalAlignment h) => new()
+    /// <summary>Пометка в правом верхнем углу обложки: версия, «Куплен», «Импорт». 26.0: общий ярлык хаба (тёмный на картинке).</summary>
+    static Border Tag(string text, IBrush? background, HorizontalAlignment h)
     {
-        Background = background ?? new SolidColorBrush(Color.FromArgb(200, 0, 0, 0)), CornerRadius = new CornerRadius(4), Padding = new Thickness(6, 2),
-        Margin = new Thickness(8), HorizontalAlignment = h, VerticalAlignment = VerticalAlignment.Top,
-        Child = new TextBlock { Text = text, FontSize = 11, FontWeight = FontWeight.SemiBold, Foreground = Brushes.White },
-    };
+        var badge = HubLook.Badge(text, "onArt");
+        if (background is not null) badge.Background = background;
+        badge.Margin = new Thickness(8);
+        badge.HorizontalAlignment = h;
+        badge.VerticalAlignment = VerticalAlignment.Top;
+        return badge;
+    }
 
     static Control NoArt(string icon) => new Border { Background = HubLook.Raised, Child = Ui.Icon(icon, 30, Ui.Res("Faint")) };
 
@@ -220,7 +246,7 @@ public sealed partial class CreatorPage
         var hex = XProjects.Hex(p.Color);
         var sub = game?.Name ?? (p.GamePath is { } gp ? Path.GetFileName(gp.TrimEnd('\\', '/')) : I18n.T("v16.sum.noGame"));
         var when = Ui.Text(Ui.Ago(p.Updated), "small muted");
-        var card = Tile(game is not null ? Ui.GameImage(game, 400) : NoArt(Icons.Code),
+        var card = Tile(game is not null ? Cover(game) : NoArt(Icons.Code),
             [Tag("v" + p.Version, null, HorizontalAlignment.Right)],
             p.Name, sub, state, when,
             () => MainWindow.Current?.Navigate(() => new XStudio(p.Id)), () => MainWindow.Current?.Navigate(() => new XStudio(p.Id, "settings")), Ui.Hex(hex));
@@ -245,9 +271,9 @@ public sealed partial class CreatorPage
         var status = p.Meta().Status(p.Updated);
         var state = Ui.Row(6, Ui.Dot(StatusBrush(status), 8), Ui.Text(I18n.T($"v12.pj.st.{status}.short"), "small"));
         ToolTip.SetTip(state, I18n.T($"v12.pj.st.{status}"));
-        var card = Tile(game is not null ? Ui.GameImage(game, 400) : NoArt(Icons.Creator),
+        var card = Tile(game is not null ? Cover(game) : NoArt(Icons.Creator),
             [Tag(p.Version == "" ? "v—" : "v" + p.Version, null, HorizontalAlignment.Right)],
-            p.Name, game?.Name ?? p.Game, state, HubLook.MonoText(Ui.Ago(p.Updated), 10.5),
+            p.Name, game?.Name ?? p.Game, state, Ui.Text(Ui.Ago(p.Updated), "small muted"),
             () => OpenInStudio(p), () => OpenInStudio(p, "settings"));
         Ctx.Attach(card, () => ProjectMenu(p));
         return card;
@@ -260,12 +286,13 @@ public sealed partial class CreatorPage
     Control OwnedCard(InjectItem i)
     {
         var game = i.Game == "" ? null : GameCatalog.ById(i.Game);
-        var shield = Ui.Row(6, Ui.Icon(Icons.Lock, 12, HubLook.Cyan), HubLook.MonoText(I18n.T("v18.lib.sealed"), 10.5));
+        // 26.0: строка состояния — тем же шрифтом, что у своих модов («Новый», «В игре»), а не мелким моноширинным.
+        var shield = Ui.Row(6, Ui.Icon(Icons.Lock, 12, HubLook.Cyan), Ui.Text(I18n.T("v18.lib.sealed"), "small"));
         ToolTip.SetTip(shield, GuardLine(i));
         var sub = game?.Name ?? (i.Source == "market" ? I18n.T("v18.lib.from", ("seller", i.Seller)) : I18n.T("v18.lib.imported"));
-        var card = Tile(game is not null ? Ui.GameImage(game, 400) : NoArt(Icons.Lock),
+        var card = Tile(game is not null ? Cover(game) : NoArt(Icons.Lock),
             [Tag(I18n.T(i.Source == "market" ? "v18.lib.bought" : "v18.lib.import"), null, HorizontalAlignment.Right)],
-            i.Title, sub, shield, HubLook.MonoText(Ui.Ago(i.Added), 10.5),
+            i.Title, sub, shield, Ui.Text(Ui.Ago(i.Added), "small muted"),
             () => LaunchScript(i), () => ScriptSettings(i), Ui.Hex("#3B4252"), launchText: I18n.T("v18.hover.play"), click: () => ScriptSettings(i));
         if (!i.Enabled) card.Opacity = 0.6;
         return card;
@@ -329,8 +356,9 @@ public sealed partial class CreatorPage
     {
         var w = MainWindow.Current!;
         w.Dialog(I18n.T("ctx.delete"), Ui.Text(I18n.T("cr.deleteProject", ("name", p.Name)), "muted", wrap: true),
-            Ui.Button(I18n.T("common.cancel"), w.CloseDialog),
-            Ui.Button(I18n.T("ctx.delete"), () => { w.CloseDialog(); Projects.Delete(p); if (_open?.Id == p.Id) _open = null; Build(); }, "primary", Icons.Trash));
+            Ui.Button(I18n.T("common.cancel"), w.CloseDialog, "ghost"),
+            // 26.0: удаление — красным тоном «danger», а не янтарной главной кнопкой (она звала бы удалить).
+            Ui.Button(I18n.T("ctx.delete"), () => { w.CloseDialog(); Projects.Delete(p); if (_open?.Id == p.Id) _open = null; Build(); }, "danger", Icons.Trash));
     }
 }
 public sealed partial class CreatorPage

@@ -44,8 +44,9 @@ public sealed partial class CreatorPage
         var sealedOnes = all.Where(i => i.Sealed).ToList();
         var own = all.Where(i => !i.Sealed).ToList();
         var col = new StackPanel { Spacing = 16 };
-        // 22.0: что делает защита, сказано в строке под заголовком — отдельный баннер её повторял.
-        _ = sealedOnes;
+        // 22.0: что делает защита, сказано одной строкой — отдельный баннер её повторял. 26.0: строка — первой в списке,
+        // а не под заголовком страницы: там она была только у этой вкладки и сдвигала полоску вкладок.
+        col.Children.Add(new TextBlock { Text = I18n.T("v18.lib.lead"), FontSize = 13, Foreground = Ui.Res("Muted"), TextWrapping = TextWrapping.Wrap, MaxWidth = 760, HorizontalAlignment = HorizontalAlignment.Left });
 
         if (!Features.Inject.On)
         {
@@ -59,11 +60,12 @@ public sealed partial class CreatorPage
 
         if (all.Count == 0)
         {
-            col.Children.Add(HubLook.Frame(Ui.Col(12,
-                Ui.Text(_filter == "" ? I18n.T("v18.lib.none") : I18n.T("cr.lib.none"), "h3"),
-                Ui.Text(I18n.T("v18.lib.none.text"), "muted", wrap: true),
-                Ui.Row(10, Ui.Button(I18n.T("v18.lib.import.button"), () => _ = ImportScript(), "primary", Icons.Upload),
-                    Ui.Button(I18n.T("v18.lib.buy"), () => HubNav.Open("browse"), "ghost", Icons.Bag))), new Thickness(24, 20)));
+            // 26.0: пустое состояние хаба (значок, заголовок, пояснение, кнопки по центру); по поиску — без кнопок.
+            col.Children.Add(_filter != ""
+                ? HubLook.Empty(Icons.Search, I18n.T("cr.lib.none"), "")
+                : HubLook.Empty(Icons.Shield, I18n.T("v18.lib.none"), I18n.T("v18.lib.none.text"),
+                    Ui.Button(I18n.T("v18.lib.import.button"), () => _ = ImportScript(), "primary", Icons.Upload),
+                    Ui.Button(I18n.T("v18.lib.buy"), () => HubNav.Open("browse"), "ghost", Icons.Bag)));
             return col;
         }
         if (sealedOnes.Count > 0)
@@ -117,24 +119,27 @@ public sealed partial class CreatorPage
     {
         var game = i.Game == "" ? null : GameCatalog.ById(i.Game);
         Control icon = game is not null
-            ? new Border { Width = 34, Height = 46, CornerRadius = new CornerRadius(4), ClipToBounds = true, Child = Ui.GameImage(game, 96, art: Images.Art.Cover) }
-            : new Border { Width = 34, Height = 46, CornerRadius = new CornerRadius(4), Background = HubLook.Raised, Child = Ui.Icon(i.Sealed ? Icons.Lock : Icons.Code, 16, Ui.Res("Faint")) };
-        var tags = Ui.Row(6, StoreKit.Pill(I18n.T(i.Source switch { "market" => "v18.lib.bought", "import" => "v18.lib.import", _ => "v11.inj.own" }), onArt: false),
-            StoreKit.Pill(I18n.T("v11.inj.kind." + i.Kind), onArt: false));
-        if (!i.Enabled) tags.Children.Add(StoreKit.Pill(I18n.T("v18.lib.disabled"), onArt: false));
+            ? new Border { Width = 34, Height = 46, CornerRadius = new CornerRadius(6), ClipToBounds = true, Child = Ui.GameImage(game, 96, art: Images.Art.Cover) }
+            : new Border { Width = 34, Height = 46, CornerRadius = new CornerRadius(6), Background = HubLook.Raised, Child = Ui.Icon(i.Sealed ? Icons.Lock : Icons.Code, 16, Ui.Res("Faint")) };
+        // 26.0: откуда и какой это файл — в строке под названием; ярлыки — только состояния (выключен, предупреждения).
+        var tags = Ui.Row(6);
+        if (!i.Enabled) tags.Children.Add(HubLook.Badge(I18n.T("v18.lib.disabled")));
         var strikes = Moderation.Strikes(i.Id);
-        if (strikes > 0) tags.Children.Add(Gx.Tag(I18n.T("v11.inj.strikes", ("n", strikes)), Ui.Res("Warn"), Ui.Res("OnBrand"), 11));
+        if (strikes > 0) tags.Children.Add(HubLook.Badge(I18n.T("v11.inj.strikes", ("n", strikes)), "bad", Icons.Alert));
         var title = Ui.Text(i.Title, "h3");
         title.TextTrimming = TextTrimming.CharacterEllipsis;
         var from = i.Source switch { "market" => I18n.T("v18.lib.from", ("seller", i.Seller)), "import" => I18n.T("v18.lib.imported"), _ => I18n.T("v18.lib.yours") };
-        var words = Ui.Col(4, Ui.Row(8, title, tags), Ui.Text(from + " · " + (game?.Name ?? I18n.T("v18.lib.noGame")), "small muted"));
+        var head = Ui.Row(8, title);
+        if (tags.Children.Count > 0) head.Children.Add(tags);
+        var words = Ui.Col(4, head, Ui.Text(string.Join(" · ", from, I18n.T("v11.inj.kind." + i.Kind), game?.Name ?? I18n.T("v18.lib.noGame")), "small muted"));
+        words.VerticalAlignment = VerticalAlignment.Center;
         var guard = Ui.Row(6, Ui.Icon(i.Sealed ? Icons.Lock : Icons.Code, 13, i.Sealed ? HubLook.Cyan : Ui.Res("Faint")), HubLook.MonoText(GuardLine(i), 11, i.Sealed ? HubLook.Cyan : null));
         guard.VerticalAlignment = VerticalAlignment.Center;
         guard.Margin = new Thickness(0, 0, 18, 0);
 
         var row = new Border
         {
-            Background = HubLook.Panel, BorderBrush = HubLook.Edge, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(4), Padding = new Thickness(12, 10),
+            Background = HubLook.Panel, BorderBrush = HubLook.Edge, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(10), Padding = new Thickness(14, 12),
             Opacity = i.Enabled ? 1 : 0.65,
         };
         var actions = HoverActions.InRow(row, () => LaunchScript(i), () => ScriptSettings(i), I18n.T("v18.hover.play"));

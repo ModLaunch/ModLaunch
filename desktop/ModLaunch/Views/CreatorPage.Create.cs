@@ -18,7 +18,16 @@ namespace ModLaunch.Views;
 /// </summary>
 public sealed partial class CreatorPage
 {
-    Control CreateView() => Ui.Col(36, Form(), OtherWays());
+    /// <summary>
+    /// 26.0: «Другие способы начать» — внутри колонки анкеты (Form). Тому, у кого ещё нет ни одного мода, над анкетой —
+    /// мод из блоков одной кнопкой (KidStart): первый мод за минуту, без вопросов.
+    /// </summary>
+    Control CreateView() => FirstTime() && _form.Step == 0 ? Ui.Col(28, KidStart(), Form()) : Form();
+
+    /// <summary>Своих модов ещё нет (ни скриптов, ни проектов правок). Для снимков — DemoFirstTime.</summary>
+    internal static bool? DemoFirstTime;
+
+    static bool FirstTime() => DemoFirstTime ?? XProjects.List().Count + Projects.List().Count == 0;
 
     /// <summary>Значок слева, название и пояснение справа (пояснение переносится по ширине плитки).</summary>
     static Control WayContent(string icon, string key)
@@ -58,7 +67,8 @@ public sealed partial class CreatorPage
     /// <summary>Другие способы начать: шаблон или импорт папки / архива / старого проекта.</summary>
     Control OtherWays()
     {
-        var grid = new UniformGrid { Columns = 2, MaxWidth = 900, HorizontalAlignment = HorizontalAlignment.Left };
+        // 26.0: ровно в ширину колонки анкеты (была MaxWidth 900 — край не совпадал ни с анкетой, ни с карточкой справа).
+        var grid = new UniformGrid { Columns = 2, Margin = new Thickness(0, 0, -12, 0) };
         foreach (var (icon, key, run) in new (string, string, Action)[]
         {
             (Icons.Wand, "v18.other.template", () => Go("examples")),
@@ -67,7 +77,7 @@ public sealed partial class CreatorPage
         {
             var b = new Button
             {
-                Classes = { "tile" }, Margin = new Thickness(0, 0, 14, 0), Padding = new Thickness(16, 14),
+                Classes = { "tile" }, Margin = new Thickness(0, 0, 12, 0), Padding = new Thickness(16, 14),
                 HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalAlignment = VerticalAlignment.Stretch,
                 Content = WayContent(icon, key),
             };

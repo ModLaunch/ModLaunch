@@ -82,7 +82,7 @@ public sealed partial class XStudio
         col.Children.Add(Ui.Text(I18n.T("v22.docs.lead"), "small muted", wrap: true));
         col.Children.Add(new Border
         {
-            Background = HubLook.Raised, CornerRadius = new CornerRadius(4), Padding = new Thickness(10, 8),
+            Background = HubLook.Raised, CornerRadius = new CornerRadius(8), Padding = new Thickness(10, 8),
             Child = new SelectableTextBlock
             {
                 Text = "мод \"Много золота\"\n\nкогда игра началась\n    дай золото 1000\n    скажи У тебя {золото} золота\n\nкаждый кадр\n    если здоровье меньше 10\n        здоровье = 100",

@@ -1,0 +1,34 @@
+{
+  "ru": {
+    "v26.design.published.signin": "Войдите или создайте аккаунт в настройках — здесь появятся ваши моды в Hub, их загрузки и лайки.",
+    "v26.design.dg.ready": "Игра установлена — можно играть как разработчик"
+  },
+  "en": {
+    "v26.design.published.signin": "Sign in or create an account in Settings — your Hub mods, their downloads and likes will show up here.",
+    "v26.design.dg.ready": "Installed — ready to play as developer"
+  },
+  "uk": {
+    "v26.design.published.signin": "Увійдіть або створіть акаунт у налаштуваннях — тут з’являться ваші моди в Hub, їхні завантаження та вподобайки.",
+    "v26.design.dg.ready": "Гру встановлено — можна грати як розробник"
+  },
+  "es": {
+    "v26.design.published.signin": "Inicia sesión o crea una cuenta en Ajustes: aquí aparecerán tus mods de Hub, sus descargas y sus «me gusta».",
+    "v26.design.dg.ready": "Instalado: listo para jugar como desarrollador"
+  },
+  "de": {
+    "v26.design.published.signin": "Melde dich an oder lege in den Einstellungen ein Konto an – hier erscheinen deine Hub-Mods mit Downloads und Likes.",
+    "v26.design.dg.ready": "Installiert – bereit, als Entwickler zu spielen"
+  },
+  "fr": {
+    "v26.design.published.signin": "Connecte-toi ou crée un compte dans les paramètres : tes mods du Hub, leurs téléchargements et leurs j’aime apparaîtront ici.",
+    "v26.design.dg.ready": "Installé : prêt à jouer en développeur"
+  },
+  "pt-BR": {
+    "v26.design.published.signin": "Entre ou crie uma conta nas Configurações — aqui vão aparecer seus mods do Hub, com downloads e curtidas.",
+    "v26.design.dg.ready": "Instalado — pronto para jogar como desenvolvedor"
+  },
+  "zh-CN": {
+    "v26.design.published.signin": "在设置中登录或创建账户——你在 Hub 发布的模组及其下载量和点赞数会显示在这里。",
+    "v26.design.dg.ready": "已安装——可以以开发者身份游玩"
+  }
+}

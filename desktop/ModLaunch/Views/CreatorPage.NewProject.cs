@@ -102,7 +102,7 @@ public sealed partial class CreatorPage
             foreach (var (id, icon, key) in new[] { ("blank", Icons.FilePlus, "v12h2.np.src.blank"), ("template", Icons.Wand, "v12h2.np.src.template"), ("import", Icons.Folder, "v12h2.np.src.import") })
             {
                 var sid = id;
-                var words = Ui.Col(4, Ui.Row(8, Ui.Icon(icon, 16, Ui.Res("Brand2")), Ui.Text(I18n.T(key), "h3")),
+                var words = Ui.Col(4, Ui.Row(8, Ui.Icon(icon, 16, HubLook.Violet), Ui.Text(I18n.T(key), "h3")),
                     Ui.Text(I18n.T(key + ".text"), "small muted", wrap: true));
                 var tile = Choice(words, s.Source == id, () => { s.Source = sid; Render(); });
                 tile.Margin = new Thickness(tiles.Children.Count == 0 ? 0 : 5, 0, tiles.Children.Count == 2 ? 0 : 5, 0);
@@ -159,7 +159,7 @@ public sealed partial class CreatorPage
                 var facts = new List<string> { ProjectImport.KindTitle(m.Kind), I18n.T("v12h2.np.import.files", ("n", m.Files.Count)), GamePage.Size(m.Bytes) };
                 if (m.Needs.Count > 0) facts.Add(I18n.T("v12h2.np.import.needs", ("n", m.Needs.Count)));
                 var head = Ui.Row(12,
-                    new Border { Width = 38, Height = 38, CornerRadius = new CornerRadius(19), Background = Ui.Res("BrandSoft"), Child = Ui.Icon(Icons.Package, 18, Ui.Res("Brand2")) },
+                    new Border { Width = 38, Height = 38, CornerRadius = new CornerRadius(19), Background = HubLook.AmberSoft, Child = Ui.Icon(Icons.Package, 18, HubLook.Violet) },
                     Ui.Col(2, Ui.Text($"{m.Name} · {m.Version}", "h3"), Ui.Text(string.Join(" · ", facts), "small muted")));
                 var card = Ui.Col(8, head);
                 if (s.ImportPath is { } from)
@@ -267,7 +267,7 @@ public sealed partial class CreatorPage
             HorizontalAlignment = HorizontalAlignment.Stretch, VerticalAlignment = VerticalAlignment.Stretch, Content = content,
         };
         b.Click += (_, _) => click();
-        var box = new Border { CornerRadius = new CornerRadius(14), Child = b };
+        var box = new Border { CornerRadius = new CornerRadius(10), Child = b };
         Mark(box, selected);
         return box;
     }
@@ -275,7 +275,8 @@ public sealed partial class CreatorPage
     static void Mark(Border box, bool selected)
     {
         box.BorderThickness = new Thickness(selected ? 1.5 : 1);
-        box.BorderBrush = selected ? Ui.Res("Brand") : Ui.Res("Line");
-        box.Background = selected ? Ui.Res("BrandSoft") : Brushes.Transparent;
+        // 26.0: выбранное — янтарём хаба (мягкая заливка и янтарная линия), а не синим цветом темы.
+        box.BorderBrush = selected ? HubLook.Amber : Ui.Res("Line");
+        box.Background = selected ? HubLook.AmberSoft : Brushes.Transparent;
     }
 }

@@ -129,11 +129,13 @@ public static class HubLook
             Width = 56, Height = 56, CornerRadius = new CornerRadius(28), Background = Raised, BorderBrush = Edge, BorderThickness = new Thickness(1),
             HorizontalAlignment = HorizontalAlignment.Center, Child = Ui.Icon(icon, 24, Violet),
         };
-        var col = new StackPanel { Spacing = 10, MaxWidth = 460, HorizontalAlignment = HorizontalAlignment.Center };
+        // Колонка растянута (MaxWidth ставит её по центру), строки — во всю её ширину с выравниванием текста по центру:
+        // у строк «по центру» ширина бралась по самой длинной строке, и последняя буква обрезалась («создайте егс»).
+        var col = new StackPanel { Spacing = 10, MaxWidth = 460, HorizontalAlignment = HorizontalAlignment.Stretch };
         col.Children.Add(circle);
-        col.Children.Add(new TextBlock { Text = title, FontSize = 17, FontWeight = FontWeight.SemiBold, TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap, HorizontalAlignment = HorizontalAlignment.Center });
+        col.Children.Add(new TextBlock { Text = title, FontSize = 17, FontWeight = FontWeight.SemiBold, TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap });
         if (text != "")
-            col.Children.Add(new TextBlock { Text = text, FontSize = 13.5, Foreground = Ui.Res("Muted"), TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap, HorizontalAlignment = HorizontalAlignment.Center });
+            col.Children.Add(new TextBlock { Text = text, FontSize = 13.5, Foreground = Ui.Res("Muted"), TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap });
         var buttons = new List<Control>();
         if (secondary is not null) buttons.Add(secondary);
         if (primary is not null) buttons.Add(primary);
@@ -145,6 +147,61 @@ public static class HubLook
             col.Children.Add(row);
         }
         return Frame(col, new Thickness(32));
+    }
+
+    /// <summary>
+    /// 26.0: ярлык с цветной точкой (движок игры, вид работы): сам ярлык — тихий, цвет — только у точки, чтобы в сетке
+    /// не спорили пять ярких плашек и янтарь оставался за главной кнопкой.
+    /// </summary>
+    public static Border BadgeDot(string text, IBrush dot, string tone = "neutral")
+    {
+        var badge = Badge(text, tone);
+        if (badge.Child is TextBlock label)
+        {
+            badge.Child = null;
+            var mark = Ui.Dot(dot, 6);
+            badge.Child = Ui.Row(5, mark, label);
+        }
+        return badge;
+    }
+
+    /// <summary>
+    /// 26.0: пустое состояние с любым числом кнопок и строкой-подсказкой внизу (как у <see cref="Empty(string, string, string, Control?, Control?)"/>):
+    /// кнопки — по порядку, главная — последней.
+    /// </summary>
+    public static Control Empty(string icon, string title, string text, IReadOnlyList<Control> buttons, string? note = null)
+    {
+        var frame = (Border)Empty(icon, title, text);
+        if (frame.Child is not StackPanel col) return frame;
+        // Три кнопки в ряд шире колонки текста в 460 — колонка пошире, чтобы ряд не переносился.
+        if (buttons.Count > 2) col.MaxWidth = 600;
+        if (buttons.Count > 0)
+        {
+            var row = Ui.Row(10, buttons.ToArray());
+            row.HorizontalAlignment = HorizontalAlignment.Center;
+            row.Margin = new Thickness(0, 6, 0, 4);
+            col.Children.Add(row);
+        }
+        if (!string.IsNullOrEmpty(note))
+            col.Children.Add(new TextBlock { Text = note, FontSize = 12, Foreground = Ui.Res("Faint"), TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap });
+        return frame;
+    }
+
+    /// <summary>
+    /// 26.0: поле поиска хаба — лист с тонкой линией и значком лупы слева (раньше — голое поле фона Surface2, похожее
+    /// на недоделанное). В фокусе линия янтарная (правило <see cref="Scope"/>).
+    /// </summary>
+    public static TextBox Search(string watermark, string text = "", double width = 360)
+    {
+        var icon = Ui.Icon(Icons.Search, 15, Ui.Res("Muted"));
+        icon.Margin = new Thickness(12, 0, 0, 0);
+        icon.VerticalAlignment = VerticalAlignment.Center;
+        var box = new TextBox
+        {
+            Classes = { "store-search" }, Watermark = watermark, Text = text, Width = width, MinHeight = 40, HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalContentAlignment = VerticalAlignment.Center, InnerLeftContent = icon, Padding = new Thickness(8, 9, 12, 9),
+        };
+        return box;
     }
 
     /// <summary>Клавиша-подсказка: «F5» в рамке клавиши.</summary>
@@ -230,8 +287,12 @@ public static class HubLook
             (TemplatedControl.CornerRadiusProperty, new CornerRadius(10)), (Layoutable.MinHeightProperty, 44.0), (TemplatedControl.PaddingProperty, new Thickness(14, 0)));
         Add(x => x.OfType<Expander>().Template().OfType<ToggleButton>().Name("ExpanderHeader").Class(":pointerover").Template().OfType<Border>(),
             (Border.BackgroundProperty, Raised));
-        Add(x => x.OfType<Expander>().Template().OfType<Border>().Name("ExpanderContent"),
-            (Border.BackgroundProperty, Brushes.Transparent), (Border.BorderThicknessProperty, new Thickness(0)));
+        // 26.0: раскрытая часть — продолжение того же листа (фон листа, тонкая линия, низ скруглён), а не серая коробка
+        // Fluent. Ставится самому Expander: шаблон берёт фон, линию, радиус и поля через TemplateBinding, и правило
+        // на внутренний Border#ExpanderContent его не перебивало.
+        Add(x => x.OfType<Expander>(),
+            (TemplatedControl.BackgroundProperty, Panel), (TemplatedControl.BorderBrushProperty, Edge), (TemplatedControl.CornerRadiusProperty, new CornerRadius(10)),
+            (TemplatedControl.PaddingProperty, new Thickness(16, 14, 16, 16)));
         // Удаление: красным тоном, а не янтарной «главной» кнопкой и не серой по умолчанию.
         var badSoft = new SolidColorBrush(Color.FromArgb(36, 0xF8, 0x71, 0x71));
         Add(x => x.OfType<Button>().Class("danger"), (TemplatedControl.BackgroundProperty, badSoft), (TemplatedControl.ForegroundProperty, Ui.Res("Bad")));

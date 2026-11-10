@@ -31,7 +31,7 @@ public sealed partial class CreatorPage
             var rows = new StackPanel { Spacing = 10 };
             foreach (var cmd in group.Item2)
                 rows.Children.Add(Ui.Col(3,
-                    new SelectableTextBlock { Text = I18n.T($"cr.doc.{cmd}.syntax"), FontFamily = new FontFamily("Cascadia Mono, Consolas, monospace"), FontSize = 13, Foreground = Ui.Res("Brand2") },
+                    new SelectableTextBlock { Text = I18n.T($"cr.doc.{cmd}.syntax"), FontFamily = new FontFamily("Cascadia Mono, Consolas, monospace"), FontSize = 13, Foreground = HubLook.Violet },
                     Ui.Text(I18n.T($"cr.doc.{cmd}"), "small muted", wrap: true)));
             var card = Ui.Card(Ui.Col(12, Ui.Text(I18n.T(group.Item1), "h3"), rows), 20);
             sections.Children.Add(card);
@@ -53,7 +53,8 @@ public sealed partial class CreatorPage
     {
         var mono = new FontFamily("Cascadia Mono, Consolas, monospace");
         var list = new StackPanel { Spacing = 16 };
-        var search = new TextBox { Watermark = I18n.T("cr.lib.search"), Width = 360, HorizontalAlignment = HorizontalAlignment.Left };
+        // 26.0: поиск хаба — с лупой и тонкой рамкой.
+        var search = HubLook.Search(I18n.T("cr.lib.search"));
         var groups = ModScript.LibraryList.Select(f => f.Group).Distinct().ToList();
         string? group = null;
         var chips = new WrapPanel();
@@ -70,7 +71,8 @@ public sealed partial class CreatorPage
                 {
                     var names = string.Join("  ·  ", f.Names.Skip(1).Take(5));
                     var row = Ui.Col(2,
-                        new SelectableTextBlock { Text = f.Sig, FontFamily = mono, FontSize = 13, Foreground = Ui.Res("Brand2") },
+                        // 26.0: сигнатура — янтарём хаба, как имена команд в «Правках файлов» (был синий цвет темы).
+                        new SelectableTextBlock { Text = f.Sig, FontFamily = mono, FontSize = 13, Foreground = HubLook.Violet },
                         Ui.Text(f.Doc, "small", wrap: true));
                     if (names != "") row.Children.Add(new TextBlock { Text = I18n.T("cr.lib.alias") + " " + names, FontFamily = mono, FontSize = 11, Foreground = Ui.Res("Faint"), TextWrapping = TextWrapping.Wrap });
                     rows.Children.Add(row);

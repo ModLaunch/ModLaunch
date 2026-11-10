@@ -120,7 +120,7 @@ public sealed partial class CreatorPage
 
         if (Hub.Updates.Count > 0)
         {
-            var row = Ui.Row(8, Ui.Icon(Icons.Sparkles, 16, Ui.Res("Brand2")), Ui.Text(I18n.T("hub.followUpdates", ("n", Hub.Updates.Count)), "h3"));
+            var row = Ui.Row(8, Ui.Icon(Icons.Sparkles, 16, HubLook.Violet), Ui.Text(I18n.T("hub.followUpdates", ("n", Hub.Updates.Count)), "h3"));
             col.Children.Add(Ui.Card(Ui.Col(10, row, Grid3(Hub.Updates)), 18));
         }
 
@@ -144,35 +144,30 @@ public sealed partial class CreatorPage
         return b;
     }
 
-    /// <summary>Пустой Hub: модов пока 0 — зовём стать первым автором.</summary>
-    Control Welcome()
-    {
-        var art = new Border
-        {
-            Width = 120, Height = 120, CornerRadius = new CornerRadius(60), Background = Ui.Res("BrandSoft"),
-            Child = Ui.Icon(Icons.Sparkles, 54, Ui.Res("Brand2")), Classes = { "float" },
-            RenderTransform = new TranslateTransform(),
-        };
-        var text = Ui.Col(10,
-            new TextBlock { Text = I18n.T("hub.empty"), FontSize = 26, FontWeight = FontWeight.Bold, TextWrapping = TextWrapping.Wrap },
-            Ui.Text(I18n.T("hub.empty.text"), "muted", wrap: true),
-            Ui.Row(10,
-                Ui.Button(I18n.T("hub.upload"), PublishArchive, "primary", Icons.Upload),
-                Ui.Button(I18n.T("hub.empty.workshop"), () => { _tab = "mine"; Build(); }, "", Icons.Edit),
-                Ui.Button(I18n.T("cr.tab.examples"), () => { _tab = "examples"; Build(); }, "ghost", Icons.Wand)),
-            Ui.Text(I18n.T("hub.empty.how"), "small muted", wrap: true));
-        text.VerticalAlignment = VerticalAlignment.Center;
-        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*"), ColumnSpacing = 32 };
-        grid.Children.Add(art);
-        Grid.SetColumn(text, 1);
-        grid.Children.Add(text);
-        return new Border { Classes = { "card", "hero" }, Padding = new Thickness(36), Child = grid };
-    }
+    /// <summary>
+    /// Пустой Hub: модов пока 0 — зовём стать первым автором. 26.0: общее пустое состояние хаба (круг со значком янтарём,
+    /// кнопки по центру) вместо синего круга темы и заголовка-плаката.
+    /// </summary>
+    Control Welcome() => HubLook.Empty(Icons.Sparkles, I18n.T("hub.empty"), I18n.T("hub.empty.text"),
+        [
+            Ui.Button(I18n.T("cr.tab.examples"), () => { _tab = "examples"; Build(); }, "ghost", Icons.Wand),
+            Ui.Button(I18n.T("hub.empty.workshop"), () => { _tab = "mine"; Build(); }, "", Icons.Edit),
+            Ui.Button(I18n.T("hub.upload"), PublishArchive, "primary", Icons.Upload),
+        ], I18n.T("hub.empty.how"));
 
+    /// <summary>
+    /// Сетка карточек Hub. 26.0: столбцов — сколько влезает карточек от 280 px; поле −14 справа съедает отступ
+    /// последней карточки, и край сетки совпадает с краем шапки.
+    /// </summary>
     static Control Grid3(IEnumerable<HubMod> mods)
     {
-        var grid = new UniformGrid { Columns = 3 };
+        var grid = new UniformGrid { Columns = 3, Margin = new Thickness(0, 0, -14, 0) };
         foreach (var m in mods) grid.Children.Add(Card(m));
+        grid.SizeChanged += (_, e) =>
+        {
+            var cols = Math.Max(1, (int)(e.NewSize.Width / (280 + 14)));
+            if (grid.Columns != cols) grid.Columns = cols;
+        };
         return grid;
     }
 
@@ -187,27 +182,26 @@ public sealed partial class CreatorPage
                 Background = new LinearGradientBrush
                 {
                     StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
-                    GradientStops = { new GradientStop(Color.Parse(game?.Accent ?? "#7C5CFF"), 0), new GradientStop(Color.Parse("#141620"), 1) },
+                    // 26.0: без картинки — цвет игры, иначе спокойный графит (был фиолетовый #7C5CFF).
+                    GradientStops = { new GradientStop(Color.Parse(game?.Accent ?? "#3B4252"), 0), new GradientStop(Color.Parse("#141620"), 1) },
                 },
                 Child = Ui.Icon(m.IsPackage ? Icons.Package : Icons.Code, 34, Brushes.White),
             };
         if (cover is Border cb && m.Images.Count > 0) { cb.Width = double.NaN; cb.Height = double.NaN; }
-        var badge = new Border
-        {
-            Background = new SolidColorBrush(Color.FromArgb(200, 15, 17, 22)), CornerRadius = new CornerRadius(999), Padding = new Thickness(9, 3),
-            Margin = new Thickness(10), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top,
-            Child = new TextBlock { Text = (game?.ShortName ?? m.Game) + " · " + I18n.T("hub.kind." + m.Kind), FontSize = 11, Foreground = Brushes.White, FontWeight = FontWeight.SemiBold },
-        };
-        var top = new Border { Height = 118, ClipToBounds = true, CornerRadius = new CornerRadius(16, 16, 0, 0), Child = new Panel { Children = { cover, badge } } };
+        // 26.0: общий ярлык хаба (тёмный на картинке), радиус обложки — как у плитки (10).
+        var badge = HubLook.Badge((game?.ShortName ?? m.Game) + " · " + I18n.T("hub.kind." + m.Kind), "onArt");
+        badge.Margin = new Thickness(10);
+        badge.VerticalAlignment = VerticalAlignment.Top;
+        var top = new Border { Height = 118, ClipToBounds = true, CornerRadius = new CornerRadius(10, 10, 0, 0), Child = new Panel { Children = { cover, badge } } };
 
         var stats = Ui.Row(14,
-            Ui.Row(5, Ui.Icon(Icons.Download, 12, Ui.Res("Muted")), Ui.Text(I18n.Compact(m.Downloads), "small muted")),
-            Ui.Row(5, Ui.Icon(Icons.Heart, 12, Hub.Liked(m.Id) ? Ui.Res("Bad") : Ui.Res("Muted")), Ui.Text(I18n.Compact(m.Likes), "small muted")),
-            Ui.Row(5, Ui.Icon(Icons.Chat, 12, Ui.Res("Muted")), Ui.Text(I18n.Compact(m.Comments), "small muted")),
+            HubLook.Counter(Icons.Download, m.Downloads),
+            HubLook.Counter(Icons.Heart, m.Likes, Hub.Liked(m.Id) ? Ui.Res("Bad") : null),
+            HubLook.Counter(Icons.Chat, m.Comments),
             Ui.Text(Ui.Ago(m.Updated), "small muted"));
         var body = Ui.Col(5,
             Ui.Text(m.Name, "h3"),
-            Ui.Text(I18n.T("mod.by", ("author", m.Author)) + $" · {m.Version}", "small brand"),
+            Ui.Text(I18n.T("mod.by", ("author", m.Author)) + $" · {m.Version}", "small muted"),
             new TextBlock { Text = m.Summary, TextWrapping = TextWrapping.Wrap, MaxLines = 2, TextTrimming = TextTrimming.CharacterEllipsis, Foreground = Ui.Res("Muted"), FontSize = 13, Height = 36 },
             stats);
         body.Margin = new Thickness(14, 12, 14, 14);
@@ -246,27 +240,31 @@ public sealed partial class CreatorPage
     Control PublishedView()
     {
         var col = new StackPanel { Spacing = 16 };
+        // 26.0: пустые состояния — общие для хаба (значок в круге, текст и кнопка по центру).
         if (!Social.Account.SignedIn)
         {
-            col.Children.Add(Ui.Card(Ui.Col(10, Ui.Text(I18n.T("hub.mine.signin"), "h3"), Ui.Text(I18n.T("cr.publish.signin"), "muted", wrap: true),
-                Ui.Button(I18n.T("acc.title"), () => MainWindow.Current?.Navigate(() => new SettingsPage("accounts")), "primary", Icons.User)), 24));
+            col.Children.Add(HubLook.Empty(Icons.User, I18n.T("hub.mine.signin"), I18n.T("v26.design.published.signin"),
+                Ui.Button(I18n.T("acc.title"), () => MainWindow.Current?.Navigate(() => new SettingsPage("accounts")), "primary", Icons.User)));
             return col;
         }
         if (_hub is null && !_hubLoading && !Program.Screenshot) _ = LoadHub();
         var mine = (_hub ?? []).Where(m => m.Uid == Social.Account.Uid).OrderByDescending(m => m.Updated).ToList();
-        var head = new DockPanel();
-        var upload = Ui.Button(I18n.T("hub.upload"), PublishArchive, "primary", Icons.Upload);
-        DockPanel.SetDock(upload, Dock.Right);
-        head.Children.Add(upload);
-        head.Children.Add(Ui.Row(36,
-            Stat(mine.Count.ToString(), I18n.T("hub.stat.mods")),
-            Stat(I18n.Compact(mine.Sum(m => m.Downloads)), I18n.T("hub.stat.downloads")),
-            Stat(I18n.Compact(mine.Sum(m => m.Likes)), I18n.T("hub.stat.likes")),
-            Stat(I18n.Compact(mine.Sum(m => m.Comments)), I18n.T("hub.stat.comments"))));
-        col.Children.Add(head);
         if (_hubError is not null) col.Children.Add(Ui.Card(Ui.Text(_hubError, "muted", wrap: true), 20));
         if (mine.Count == 0 && _hubError is null)
-            col.Children.Add(Ui.Card(Ui.Col(6, Ui.Text(I18n.T("hub.mine.empty"), "h3"), Ui.Text(I18n.T("hub.mine.empty.text"), "small muted", wrap: true)), 22));
+        {
+            // «Опубликовать мод» — в шапке раздела; здесь — дорога к своим модам, которые можно выложить.
+            col.Children.Add(HubLook.Empty(Icons.Upload, I18n.T("hub.mine.empty"), I18n.T("hub.mine.empty.text"),
+                Ui.Button(I18n.T("hub.upload"), PublishArchive, "primary", Icons.Upload),
+                Ui.Button(I18n.T("v22.hub.mods"), () => { _minePart = "projects"; Build(); }, "ghost", Icons.Grid)));
+            return col;
+        }
+        // Итоги — когда есть что считать; «Опубликовать мод» — главная кнопка в шапке раздела (26.0).
+        if (mine.Count > 0)
+            col.Children.Add(Ui.Row(36,
+                Stat(mine.Count.ToString(), I18n.T("hub.stat.mods")),
+                Stat(I18n.Compact(mine.Sum(m => m.Downloads)), I18n.T("hub.stat.downloads")),
+                Stat(I18n.Compact(mine.Sum(m => m.Likes)), I18n.T("hub.stat.likes")),
+                Stat(I18n.Compact(mine.Sum(m => m.Comments)), I18n.T("hub.stat.comments"))));
         // 12.0: поиск на «Опубликованных» — по своим модам.
         foreach (var m in mine.Where(m => _filter == "" || m.Name.Contains(_filter, StringComparison.OrdinalIgnoreCase)))
         {
@@ -283,9 +281,8 @@ public sealed partial class CreatorPage
             row.Children.Add(Ui.Row(14, Ui.Thumb(m.Images.FirstOrDefault() ?? game?.ArtUrl, m.Name, 48, 10), Ui.Col(3,
                 Ui.Text($"{m.Name} · {m.Version}", "h3"),
                 Ui.Text($"{game?.Name ?? m.Game} · {I18n.T("hub.kind." + m.Kind)} · {I18n.T("cr.edited", ("when", Ui.Ago(m.Updated)))}", "small muted"),
-                Ui.Row(14,
-                    Ui.Text("↓ " + m.Downloads.ToString("N0"), "small"), Ui.Text("♥ " + m.Likes.ToString("N0"), "small"),
-                    Ui.Text("💬 " + m.Comments.ToString("N0"), "small")))));
+                // 26.0: счётчики значками, как на карточках Hub (было «↓ ♥ 💬» текстом и эмодзи).
+                Ui.Row(14, HubLook.Counter(Icons.Download, m.Downloads), HubLook.Counter(Icons.Heart, m.Likes), HubLook.Counter(Icons.Chat, m.Comments)))));
             col.Children.Add(Ui.Card(row, 14));
         }
         return col;
@@ -307,12 +304,13 @@ public sealed partial class CreatorPage
     {
         var w = MainWindow.Current!;
         w.Dialog(I18n.T("hub.delete"), Ui.Text(I18n.T("hub.delete.text", ("name", m.Name)), "muted", wrap: true),
-            Ui.Button(I18n.T("common.cancel"), w.CloseDialog),
+            Ui.Button(I18n.T("common.cancel"), w.CloseDialog, "ghost"),
+            // 26.0: удаление — «danger» (красным тоном), а не янтарной главной кнопкой.
             Ui.Button(I18n.T("hub.delete"), async () =>
             {
                 w.CloseDialog();
                 try { await Hub.Delete(m); w.Toast(I18n.T("hub.deleted")); _ = LoadHub(force: true); }
                 catch (Exception e) { w.Toast(Social.Firebase.Explain("creator", e), bad: true); }
-            }, "primary", Icons.Trash));
+            }, "danger", Icons.Trash));
     }
 }
