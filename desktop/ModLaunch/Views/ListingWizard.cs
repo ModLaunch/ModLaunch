@@ -1,10 +1,12 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Presenters;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
+using Avalonia.Styling;
 using Avalonia.Threading;
 using ModLaunch.Core;
 using ModLaunch.Creator;
@@ -43,7 +45,7 @@ public static class ListingWizard
         Control Field(string label, Control input, string? hint = null)
         {
             var col = Ui.Col(5, Ui.Text(label, "small muted"), input);
-            if (hint is not null) col.Children.Add(Ui.Text(hint, "small faint", wrap: true));
+            if (hint is not null) col.Children.Add(Ui.Text(hint, "small muted", wrap: true));
             return col;
         }
 
@@ -79,15 +81,15 @@ public static class ListingWizard
                 l?.Size ?? 0, "", 1, "", hidden.IsChecked == true ? "hidden" : "active", l?.Sales ?? 0, l?.Created, DateTime.UtcNow);
         }
         var pending = false;
+        void Render()
+        {
+            try { var card = MarketTiles.Card(Draft()); card.IsHitTestVisible = false; previewHost.Child = card; } catch { }
+        }
         void Refresh()
         {
             if (pending) return;
             pending = true;
-            DispatcherTimer.RunOnce(() =>
-            {
-                pending = false;
-                try { var card = MarketTiles.Card(Draft()); card.IsHitTestVisible = false; previewHost.Child = card; } catch { }
-            }, TimeSpan.FromMilliseconds(180));
+            DispatcherTimer.RunOnce(() => { pending = false; Render(); }, TimeSpan.FromMilliseconds(180));
         }
 
         // ---- шаг 1: что продаёте
@@ -100,7 +102,7 @@ public static class ListingWizard
             {
                 Classes = { "lw-kind" }, Margin = new Thickness(0, 0, 8, 0), HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Center,
                 Padding = new Thickness(6, 12),
-                Content = Ui.Col(6, Ui.Icon(MarketViews.KindIcon(k), 22, Ui.Res("Brand2")), new TextBlock { Text = I18n.T("mk.kind." + k), FontWeight = FontWeight.SemiBold, FontSize = 12.5, HorizontalAlignment = HorizontalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis }),
+                Content = Ui.Col(6, Ui.Icon(MarketViews.KindIcon(k), 22, HubLook.Violet), new TextBlock { Text = I18n.T("mk.kind." + k), FontWeight = FontWeight.SemiBold, FontSize = 12.5, HorizontalAlignment = HorizontalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis }),
             };
             if (b.Content is StackPanel sp) foreach (var c in sp.Children) c.HorizontalAlignment = HorizontalAlignment.Center;
             ToolTip.SetTip(b, I18n.T("lw.kind." + k));
@@ -134,7 +136,7 @@ public static class ListingWizard
         var drop = new Border
         {
             Classes = { "lw-drop" }, Padding = new Thickness(16, 14), CornerRadius = new CornerRadius(12), BorderThickness = new Thickness(1.5), BorderBrush = Ui.Res("Line"), Background = Ui.Res("Surface2"),
-            Child = Ui.Row(12, Ui.Icon(Icons.Upload, 22, Ui.Res("Brand2")), Ui.Col(2, fileName, Ui.Text(I18n.T("lw.file.hint", ("max", GamePage.Size(Market.MaxFile))), "small muted")), pick),
+            Child = Ui.Row(12, Ui.Icon(Icons.Upload, 22, HubLook.Violet), Ui.Col(2, fileName, Ui.Text(I18n.T("lw.file.hint", ("max", GamePage.Size(Market.MaxFile))), "small muted")), pick),
         };
         DragDrop.SetAllowDrop(drop, true);
         drop.AddHandler(DragDrop.DropEvent, (_, e) =>
@@ -157,7 +159,8 @@ public static class ListingWizard
         var step2 = Ui.Col(14,
             Field(I18n.T("mk.f.file"), drop),
             Field(I18n.T("mk.f.description"), description),
-            Field(I18n.T("hub.f.images"), images, I18n.T("lw.images.hint")),
+            // 26.0: картинки не обязательны, но с ними лот заметнее — говорим это прямо (без них — нарисованная обложка).
+            Field(I18n.T("hub.f.images"), images, I18n.T("v26.market.images.hint")),
             Field(I18n.T("hub.f.tags"), tags),
             Field(I18n.T("mk.f.preview"), preview, I18n.T("v11.lw.preview.sealed")));
 
@@ -172,16 +175,25 @@ public static class ListingWizard
             net.Text = Market.Money(p.Value - Market.Fee(p.Value));
             netText.Text = I18n.T("lw.net", ("fee", Market.FeePercent), ("feeSum", Market.Money(Market.Fee(p.Value))));
         }
-        price.TextChanged += (_, _) => { Net(); Refresh(); };
-        Net();
         var presets = Ui.Row(6);
+        var presetChips = new List<(long Cents, Button B)>();
+        // 26.0: готовая сумма, равная введённой цене, горит выбранным чипом — видно, что выбрано.
+        void MarkPreset()
+        {
+            var p = Market.ParseMoney(price.Text);
+            foreach (var (cents, b) in presetChips) b.Classes.Set("active", p == cents);
+        }
         foreach (var rub in new[] { 0, 99, 199, 499, 999 })
         {
             var v = rub;
             var chip = Ui.Button(v == 0 ? I18n.T("mk.free") : $"{v} {Market.Currency}", () => price.Text = v.ToString(I18n.Culture), "chip");
             chip.Padding = new Thickness(10, 4);
+            presetChips.Add((v * 100L, chip));
             presets.Children.Add(chip);
         }
+        price.TextChanged += (_, _) => { Net(); MarkPreset(); Refresh(); };
+        Net();
+        MarkPreset();
         var licenses = Ui.Col(6);
         var licenseButtons = new List<(string Id, Button B)>();
         foreach (var k in Market.Licenses)
@@ -203,7 +215,7 @@ public static class ListingWizard
             Child = Ui.Col(4, Ui.Text(I18n.T("lw.youGet"), "small muted"), net, netText),
         };
         var step3 = Ui.Col(14,
-            Field(I18n.T("mk.f.price", ("cur", Market.Currency)), Ui.Col(8, Ui.Row(10, price, Ui.Text(Market.Currency, "muted")), presets)),
+            Field(I18n.T("mk.f.price", ("cur", Market.Currency)), Ui.Col(8, Ui.Row(10, price, new TextBlock { Text = Market.Currency, Foreground = Ui.Res("Muted"), VerticalAlignment = VerticalAlignment.Center }), presets)),
             youGet,
             Field(I18n.T("mk.f.license"), licenses),
             Field(I18n.T("hub.f.version"), version, I18n.T("lw.version.hint")),
@@ -240,22 +252,26 @@ public static class ListingWizard
             step = s;
             stepsHost.Content = new ScrollViewer { Content = steps[s], Height = 440, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Padding = new Thickness(0, 0, 12, 0) };
             dots.Children.Clear();
+            // 26.0: шаги — как в анкете «Нового мода»: текущий — янтарём, пройденные — галочкой на поднятом фоне,
+            // будущие — контуром (раньше всё синим цветом темы, а страница за окном — янтарная).
             for (var i = 0; i < 3; i++)
             {
                 var done = i < s;
+                var now = i == s;
                 var circle = new Border
                 {
                     Width = 26, Height = 26, CornerRadius = new CornerRadius(13),
-                    Background = i <= s ? Ui.Res("Brand") : Ui.Res("Surface3"),
-                    Child = done ? Ui.Icon(Icons.Check, 13, Ui.Res("OnBrand"))
-                        : new TextBlock { Text = (i + 1).ToString(), FontWeight = FontWeight.Bold, FontSize = 12, Foreground = i <= s ? Ui.Res("OnBrand") : Ui.Res("Muted"), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
+                    Background = now ? HubLook.Amber : done ? HubLook.Raised : Brushes.Transparent,
+                    BorderBrush = now ? HubLook.Amber : HubLook.Edge, BorderThickness = new Thickness(done || now ? 0 : 1.5),
+                    Child = done ? Ui.Icon(Icons.Check, 13, Ui.Res("Text"))
+                        : new TextBlock { Text = (i + 1).ToString(), FontWeight = FontWeight.Bold, FontSize = 12, Foreground = now ? HubLook.OnAmber : Ui.Res("Faint"), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
                 };
-                var label = new TextBlock { Text = I18n.T(stepKeys[i]), FontWeight = i == s ? FontWeight.Bold : FontWeight.Normal, Foreground = i == s ? Ui.Res("Text") : Ui.Res("Muted"), VerticalAlignment = VerticalAlignment.Center };
+                var label = new TextBlock { Text = I18n.T(stepKeys[i]), FontWeight = now ? FontWeight.SemiBold : FontWeight.Normal, Foreground = now ? Ui.Res("Text") : done ? Ui.Res("Muted") : Ui.Res("Faint"), VerticalAlignment = VerticalAlignment.Center };
                 var item = Ui.Row(8, circle, label);
                 var target = i;
                 if (i < s) { item.Cursor = new Cursor(StandardCursorType.Hand); item.PointerReleased += (_, _) => Show(target); }
                 dots.Children.Add(item);
-                if (i < 2) dots.Children.Add(new Border { Width = 28, Height = 2, Background = i < s ? Ui.Res("Brand") : Ui.Res("Line"), VerticalAlignment = VerticalAlignment.Center });
+                if (i < 2) dots.Children.Add(new Border { Width = 28, Height = 1.5, Background = i < s ? HubLook.Amber : HubLook.Edge, Margin = new Thickness(2, 0), VerticalAlignment = VerticalAlignment.Center });
             }
             back.IsVisible = s > 0;
             nextButton.Content = Ui.Row(8, Ui.Icon(s == 2 ? Icons.Upload : Icons.Forward, 15),
@@ -319,14 +335,26 @@ public static class ListingWizard
         };
 
         var left = Ui.Col(14, dots, stepsHost, problems, bar);
-        var right = Ui.Col(10, Ui.Text(I18n.T("lw.preview"), "small muted"), previewHost, Ui.Text(I18n.T("lw.preview.text"), "small faint", wrap: true));
+        var right = Ui.Col(10, Ui.Text(I18n.T("lw.preview"), "small muted"), previewHost, Ui.Text(I18n.T("lw.preview.text"), "small muted", wrap: true));
         right.Width = 268;
         var body = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), ColumnSpacing = 22 };
         body.Children.Add(left);
         Grid.SetColumn(right, 1);
         body.Children.Add(right);
+        // 26.0: мастер — часть Creator Hub: его плитки, чипы и поля в янтаре хаба, откуда бы его ни открыли
+        // (из «Аккаунта» окно тоже открывается). Под курсором плитка вида — тихой рамкой, не синей.
+        HubLook.Scope(body);
+        body.Styles.Add(new Style(x => x.OfType<Button>().Class("lw-kind").Class(":pointerover").Template().OfType<ContentPresenter>())
+        {
+            Setters = { new Setter(ContentPresenter.BorderBrushProperty, HubLook.EdgeHi) },
+        });
+        body.Styles.Add(new Style(x => x.OfType<Button>().Class("lw-kind").Class("active").Class(":pointerover").Template().OfType<ContentPresenter>())
+        {
+            Setters = { new Setter(ContentPresenter.BorderBrushProperty, HubLook.Amber) },
+        });
         Show(step);
-        Refresh();
+        // 26.0: первая карточка превью — сразу, а не через паузу: окно открывается без пустого места справа.
+        Render();
         w.Dialog(l is null ? I18n.T("mk.new") : I18n.T("mk.edit"), body, 940, Ui.Button(I18n.T("common.cancel"), w.CloseDialog), back, nextButton);
     }
 }
