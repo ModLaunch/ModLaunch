@@ -192,9 +192,29 @@ public static class MarketTiles
 
     static bool Owned(Listing l) => l.Mine || Market.Owned.Contains(l.Id);
 
-    static Control PriceOrOwned(Listing l) => Owned(l)
-        ? Gx.Tag(I18n.T("v93.mk.owned"), new SolidColorBrush(Color.FromArgb(220, 30, 34, 44)), Brushes.White, 12)
-        : l.Free ? Gx.Price(MarketViews.PriceText(l), true) : Gx.Tag(MarketViews.PriceText(l), new SolidColorBrush(Color.FromArgb(230, 16, 17, 22)), Brushes.White, 12.5);
+    /// <summary>Зелёный текст «Бесплатно» на тёмной плашке поверх картинки: плашка тёмная в обеих темах.</summary>
+    static readonly IBrush FreeOnArt = new SolidColorBrush(Color.Parse("#6EE7B7"));
+
+    /// <summary>
+    /// 26.0: ярлык цены — тот же HubLook.Badge, что и везде в хабе (раньше — скошенный Gx.Tag и синяя «пилюля»).
+    /// На картинке — тёмная плашка, бесплатное — зелёным текстом; вне картинки — мягкий янтарь, бесплатное — зелёным тоном.
+    /// </summary>
+    public static Border PriceBadge(Listing l, bool onArt = true)
+    {
+        if (Owned(l)) return HubLook.Badge(I18n.T("v93.mk.owned"), onArt ? "onArt" : "neutral", Icons.Check);
+        if (!onArt) return HubLook.Badge(MarketViews.PriceText(l), l.Free ? "good" : "accent");
+        var b = HubLook.Badge(MarketViews.PriceText(l), "onArt");
+        if (l.Free && b.Child is TextBlock t) t.Foreground = FreeOnArt;
+        return b;
+    }
+
+    static Border FreeBadgeOnArt()
+    {
+        var b = HubLook.Badge(I18n.T("mk.free"), "onArt");
+        if (b.Child is TextBlock t) t.Foreground = FreeOnArt;
+        return b;
+    }
+
 
     /// <summary>
     /// Лот: size 0 — строка списка, 1 — карточка (картинка сверху), 2 — широкий баннер.
@@ -203,8 +223,9 @@ public static class MarketTiles
     public static Control Listing(Listing l, int size)
     {
         if (size == 0) return Row(l);
-        var kind = Gx.Tag(I18n.T("mk.kind." + l.Kind), null, null, 10.5);
+        var kind = HubLook.Badge(I18n.T("mk.kind." + l.Kind), "onArt");
         kind.Margin = new Thickness(10);
+        kind.VerticalAlignment = VerticalAlignment.Top;
         var wish = WishButton(l);
         wish.HorizontalAlignment = HorizontalAlignment.Right;
         wish.VerticalAlignment = VerticalAlignment.Top;
@@ -215,17 +236,17 @@ public static class MarketTiles
                 HubLook.Label(I18n.T("v93.mk.eyebrow"), Ui.Hex("#E6E7EE")),
                 Gx.Title(l.Title, 26, Brushes.White),
                 new TextBlock { Text = l.Summary, FontSize = 13.5, Foreground = Ui.Hex("#D0D3DC"), TextWrapping = TextWrapping.Wrap, MaxLines = 2, TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = 520, HorizontalAlignment = HorizontalAlignment.Left },
-                Ui.Row(8, StoreKit.Pill(I18n.T("mk.kind." + l.Kind)), StoreKit.Pill(GameName(l.Game)), StoreKit.Pill(I18n.T("mod.by", ("author", l.Author)))),
-                Ui.Row(12, PriceOrOwned(l), new TextBlock { Text = I18n.T("mk.sold", ("n", l.Sales)), FontSize = 12.5, Foreground = Ui.Hex("#C9CCD6"), VerticalAlignment = VerticalAlignment.Center }));
+                Ui.Row(8, HubLook.Badge(I18n.T("mk.kind." + l.Kind), "onArt"), HubLook.Badge(GameName(l.Game), "onArt"), HubLook.Badge(I18n.T("mod.by", ("author", l.Author)), "onArt")),
+                Ui.Row(12, PriceBadge(l), new TextBlock { Text = I18n.T("mk.sold", ("n", l.Sales)), FontSize = 12.5, Foreground = Ui.Hex("#C9CCD6"), VerticalAlignment = VerticalAlignment.Center }));
             words.VerticalAlignment = VerticalAlignment.Bottom;
             words.Margin = new Thickness(28, 0, 24, 24);
-            var layers = new Panel { Children = { Art(l, 1600), new Border { Background = Gx.ShadeLeft(0.85, 235) }, new Border { Background = Gx.ShadeUp(0.5, 150) }, Gx.Haze(true), words, wish } };
+            var layers = new Panel { Children = { Art(l, 1600), new Border { Background = Gx.ShadeLeft(0.85, 235) }, new Border { Background = Gx.ShadeUp(0.5, 150) }, words, wish } };
             var t = new Border { Classes = { "store-tile", "feed-tile", "hero" }, Child = layers };
             StoreKit.OnClick(t, () => Open(l));
             return t;
         }
         var top = new Panel { ClipToBounds = true, Children = { Art(l), kind, wish } };
-        var price = PriceOrOwned(l);
+        var price = PriceBadge(l);
         price.HorizontalAlignment = HorizontalAlignment.Right;
         price.VerticalAlignment = VerticalAlignment.Bottom;
         price.Margin = new Thickness(10);
@@ -262,19 +283,22 @@ public static class MarketTiles
     }
 
     /// <summary>Строка лота (списки «Лидеры продаж», желаемое, поиск).</summary>
-    public static Control Row(Listing l, int? rank = null, Control? right = null)
+    /// <param name="compact">26.0: для узкой колонки (похожие лоты): обложка меньше, цена — под названием вместо колонки справа.</param>
+    public static Control Row(Listing l, int? rank = null, Control? right = null, bool compact = false)
     {
-        var art = new Border { Width = 120, Height = 68, CornerRadius = new CornerRadius(6), ClipToBounds = true, Child = Art(l, 384, hero: false) };
+        var art = new Border { Width = compact ? 84 : 120, Height = compact ? 47 : 68, CornerRadius = new CornerRadius(6), ClipToBounds = true, Child = Art(l, 384, hero: false) };
+        Control third = compact ? PriceBadge(l, onArt: false) : new TextBlock { Text = I18n.T("mk.sold", ("n", l.Sales)), FontSize = 11.5, Foreground = Ui.Res("Faint") };
         var words = Ui.Col(3,
             new TextBlock { Text = l.Title, FontWeight = FontWeight.SemiBold, FontSize = 14, TextTrimming = TextTrimming.CharacterEllipsis },
             new TextBlock { Text = $"{I18n.T("mk.kind." + l.Kind)} · {GameName(l.Game)} · {l.Author}", FontSize = 12, Foreground = Ui.Res("Muted"), TextTrimming = TextTrimming.CharacterEllipsis },
-            new TextBlock { Text = I18n.T("mk.sold", ("n", l.Sales)), FontSize = 11.5, Foreground = Ui.Res("Faint") });
+            third);
         words.VerticalAlignment = VerticalAlignment.Center;
-        var price = right ?? PriceOrOwned(l);
+        // 26.0: строка стоит на фоне страницы, а не на картинке — цена мягким ярлыком хаба.
+        var price = right ?? (compact ? new Border() : PriceBadge(l, onArt: false));
         price.VerticalAlignment = VerticalAlignment.Center;
-        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,Auto,*,Auto"), ColumnSpacing = 12 };
+        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,Auto,*,Auto"), ColumnSpacing = compact ? 10 : 12 };
         if (rank is int r)
-            grid.Children.Add(new TextBlock { Text = r.ToString(), FontFamily = Gx.Display, FontSize = 20, FontWeight = FontWeight.Bold, Width = 30, Foreground = r == 1 ? Ui.Res("Brand2") : Ui.Res("Faint"), VerticalAlignment = VerticalAlignment.Center });
+            grid.Children.Add(new TextBlock { Text = r.ToString(), FontFamily = Gx.Display, FontSize = 20, FontWeight = FontWeight.Bold, Width = 30, Foreground = r == 1 ? HubLook.Violet : Ui.Res("Faint"), VerticalAlignment = VerticalAlignment.Center });
         Grid.SetColumn(art, 1);
         grid.Children.Add(art);
         Grid.SetColumn(words, 2);
@@ -287,19 +311,29 @@ public static class MarketTiles
         return row;
     }
 
+    /// <summary>26.0: высота подписи под картинкой карточки мода (название, автор и игра, счётчики) — для StoreKit.Tiles.</summary>
+    public const double WorkshopFoot = 78;
+
+    /// <summary>Скачивания и лайки значками (раньше — «↓ … ♥ …» одной строкой текста, которая обрезалась до «♥ …»).</summary>
+    static Control Counters(HubMod h)
+    {
+        var row = Ui.Row(12, HubLook.Counter(Icons.Download, h.Downloads), HubLook.Counter(Icons.Heart, h.Likes));
+        row.VerticalAlignment = VerticalAlignment.Center;
+        return row;
+    }
+
     /// <summary>Мод Мастерской: size 0 — строка, 1 — карточка, 2 — баннер.</summary>
     public static Control Workshop(HubMod h, int size)
     {
-        var counters = $"↓ {I18n.Compact(h.Downloads)}   ♥ {I18n.Compact(h.Likes)}";
         if (size == 0)
         {
             var art = new Border { Width = 120, Height = 68, CornerRadius = new CornerRadius(6), ClipToBounds = true, Child = Art(h, 384) };
             var words = Ui.Col(3,
                 new TextBlock { Text = h.Name, FontWeight = FontWeight.SemiBold, FontSize = 14, TextTrimming = TextTrimming.CharacterEllipsis },
                 new TextBlock { Text = $"{GameName(h.Game)} · {h.Author}", FontSize = 12, Foreground = Ui.Res("Muted"), TextTrimming = TextTrimming.CharacterEllipsis },
-                new TextBlock { Text = counters, FontSize = 11.5, Foreground = Ui.Res("Faint") });
+                Counters(h));
             words.VerticalAlignment = VerticalAlignment.Center;
-            var free = Gx.Price(I18n.T("mk.free"), true);
+            var free = HubLook.Badge(I18n.T("mk.free"), "good");
             free.VerticalAlignment = VerticalAlignment.Center;
             var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"), ColumnSpacing = 12 };
             grid.Children.Add(art);
@@ -309,29 +343,37 @@ public static class MarketTiles
             grid.Children.Add(free);
             var row = new Border { Classes = { "store-row" }, Padding = new Thickness(8, 6), Child = grid };
             StoreKit.OnClick(row, () => CreatorPage.OpenMod(h));
+            WorkshopMenu(row, h);
             return row;
         }
-        var tag = Gx.Tag(I18n.T("v93.mk.workshop"), new SolidColorBrush(Color.FromArgb(220, 22, 120, 72)), Brushes.White, 10.5);
-        tag.Margin = new Thickness(10);
         if (size == 2)
         {
+            // В смешанной ленте баннер помечен «Мастерская»; на вкладке «Моды сообщества» ярлык не нужен — там всё бесплатное.
+            var tag = HubLook.Badge(I18n.T("v93.mk.workshop"), "onArt");
+            tag.Margin = new Thickness(10);
+            tag.VerticalAlignment = VerticalAlignment.Top;
             var words = Ui.Col(10,
                 HubLook.Label(I18n.T("v93.mk.workshop.eyebrow"), Ui.Hex("#E6E7EE")),
                 Gx.Title(h.Name, 26, Brushes.White),
                 new TextBlock { Text = h.Summary, FontSize = 13.5, Foreground = Ui.Hex("#D0D3DC"), TextWrapping = TextWrapping.Wrap, MaxLines = 2, TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = 520, HorizontalAlignment = HorizontalAlignment.Left },
-                Ui.Row(8, StoreKit.Pill(GameName(h.Game)), StoreKit.Pill(I18n.T("mod.by", ("author", h.Author))), StoreKit.Pill(counters)),
-                Ui.Row(10, Gx.Price(I18n.T("mk.free"), true)));
+                Ui.Row(8, HubLook.Badge(GameName(h.Game), "onArt"), HubLook.Badge(I18n.T("mod.by", ("author", h.Author)), "onArt"),
+                    HubLook.Badge(I18n.Compact(h.Downloads), "onArt", Icons.Download), HubLook.Badge(I18n.Compact(h.Likes), "onArt", Icons.Heart)),
+                Ui.Row(10, FreeBadgeOnArt()));
             words.VerticalAlignment = VerticalAlignment.Bottom;
             words.Margin = new Thickness(28, 0, 24, 24);
             var layers = new Panel { Children = { Art(h, 1600), new Border { Background = Gx.ShadeLeft(0.85, 235) }, new Border { Background = Gx.ShadeUp(0.5, 150) }, words, tag } };
             var t = new Border { Classes = { "store-tile", "feed-tile", "hero" }, Child = layers };
             StoreKit.OnClick(t, () => CreatorPage.OpenMod(h));
+            WorkshopMenu(t, h);
             return t;
         }
-        var top = new Panel { ClipToBounds = true, Children = { Art(h), tag } };
-        var foot = Ui.Col(2,
+        // 26.0: карточка без ярлыка «Мастерская» (на вкладке модов сообщества он был у каждой карточки) и с подписью
+        // в две строки: «автор · игра» и счётчики значками.
+        var top = new Panel { ClipToBounds = true, Children = { Art(h) } };
+        var foot = Ui.Col(3,
             new TextBlock { Text = h.Name, FontWeight = FontWeight.SemiBold, FontSize = 14.5, TextTrimming = TextTrimming.CharacterEllipsis },
-            new TextBlock { Text = $"{h.Author} · {GameName(h.Game)} · {counters}", FontSize = 12, Foreground = Ui.Res("Muted"), TextTrimming = TextTrimming.CharacterEllipsis });
+            new TextBlock { Text = $"{h.Author} · {GameName(h.Game)}", FontSize = 12, Foreground = Ui.Res("Muted"), TextTrimming = TextTrimming.CharacterEllipsis },
+            Counters(h));
         foot.Margin = new Thickness(12, 10, 12, 12);
         var g2 = new Grid { RowDefinitions = new RowDefinitions("*,Auto") };
         g2.Children.Add(top);
@@ -339,14 +381,29 @@ public static class MarketTiles
         g2.Children.Add(foot);
         var tile = new Border { Classes = { "store-tile", "feed-tile" }, Child = g2 };
         StoreKit.OnClick(tile, () => CreatorPage.OpenMod(h));
+        WorkshopMenu(tile, h);
         return tile;
     }
+
+    /// <summary>26.0: меню мода сообщества — открыть, следить за обновлениями (попадут в «Обновления» на вкладке), скопировать.</summary>
+    static void WorkshopMenu(Control c, HubMod h) => Ctx.Attach(c, () =>
+    {
+        var info = Hub.ToModInfo(h);
+        var tracked = Features.Tracking.Has(h.Game, info);
+        return Ctx.Menu(
+            Ctx.Item(I18n.T("ctx.open"), Icons.Eye, () => CreatorPage.OpenMod(h)),
+            Ctx.Item(I18n.T(tracked ? "ctx.unfollow" : "ctx.follow"), Icons.Bell, () => Features.Tracking.Toggle(h.Game, info)),
+            Ctx.Item(I18n.T("v93.mk.author.open"), Icons.User, () => MainWindow.Current?.Navigate(() => new AuthorPage(h.Uid, h.Author))),
+            "-",
+            Ctx.Copy(I18n.T("ctx.copyName"), h.Name),
+            Ctx.Copy(I18n.T("ctx.copyId"), h.Id));
+    });
 
     public static Control WorkshopCard(HubMod h, double width = 268)
     {
         var c = Workshop(h, 1);
         c.Width = width;
-        c.Height = Math.Round(width * 9 / 16) + 62;
+        c.Height = Math.Round(width * 9 / 16) + WorkshopFoot;
         return c;
     }
 }

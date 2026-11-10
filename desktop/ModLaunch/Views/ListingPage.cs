@@ -17,7 +17,7 @@ namespace ModLaunch.Views;
 /// </summary>
 public sealed class ListingPage : Page
 {
-    readonly Listing _l;
+    Listing _l;
     bool? _owned;
     List<ListingReview>? _reviews;
     int _media;
@@ -30,15 +30,26 @@ public sealed class ListingPage : Page
         if (!Program.Screenshot) _ = Load();
         else { _owned = l.Mine || Market.Owned.Contains(l.Id); _reviews = DemoReviews(l); }
         MarketLocal.Changed += OnChanged;
-        DetachedFromVisualTree += (_, _) => MarketLocal.Changed -= OnChanged;
+        MarketData.Changed += OnData;
+        DetachedFromVisualTree += (_, _) => { MarketLocal.Changed -= OnChanged; MarketData.Changed -= OnData; };
     }
 
     void OnChanged() { if (MainWindow.Current?.CurrentPage == this) Build(); }
 
+    /// <summary>26.0: рынок перезагрузился (например, автор изменил свой лот кнопкой «Изменить») — показываем свежий лот.</summary>
+    void OnData()
+    {
+        if (MarketData.All.FirstOrDefault(x => x.Id == _l.Id) is { } fresh) _l = fresh;
+        OnChanged();
+    }
+
     public override string Title => _l.Title;
     public override string SearchHint => I18n.T("v93.mk.search");
     public override void Search(string text) => MainWindow.Current?.Navigate(() => new MarketPage("browse", text));
-    public override string? Accent => GameCatalog.ById(_l.Game)?.Accent;
+    // 26.0: страница лота — внутри Creator Hub: без цвета игры (он красил ссылки и рамки не в янтарь хаба)
+    // и без колонки рекламы справа, как остальные страницы хаба.
+    public override string? Accent => null;
+    public override bool Workspace => true;
 
     public override IEnumerable<(string Text, Action? Open)> Crumbs =>
     [
@@ -67,12 +78,12 @@ public sealed class ListingPage : Page
     public override void Build()
     {
         var l = _l;
-        var col = StoreKit.Column(spacing: 22, top: 22);
+        // 26.0: лот открывается внутри рамки хаба (HubNav.Frame): слева та же панель с «Рынком», сверху вкладки рынка,
+        // всё в янтаре хаба. Раньше страница выходила из хаба в синюю тему без боковой панели.
+        var col = Ui.Col(22);
 
-        // Заголовок: название крупно, рядом — тип, игра и автор.
-        var title = Gx.Title(l.Title, 32, Ui.Res("Text"));
-        var meta = Ui.Row(8, StoreKit.Pill(I18n.T("mk.kind." + l.Kind), onArt: false), StoreKit.Pill(MarketTiles.GameName(l.Game), onArt: false), StoreKit.Pill(I18n.T("mk.license." + l.License), onArt: false));
-        col.Children.Add(Ui.Col(10, HubLook.Label("Creator Hub · " + I18n.T("mk.kind." + l.Kind), Ui.Res("Brand2")), title, meta));
+        // Под названием (оно в шапке рамки) — вид, игра и лицензия ярлыками хаба.
+        col.Children.Add(Ui.Row(8, HubLook.Badge(I18n.T("mk.kind." + l.Kind), "accent", MarketTiles.KindIcon(l.Kind)), HubLook.Badge(MarketTiles.GameName(l.Game)), HubLook.Badge(I18n.T("mk.license." + l.License))));
 
         // Медиа слева, сведения справа.
         var top = new Grid { ColumnDefinitions = new ColumnDefinitions("2*,*"), ColumnSpacing = 18 };
@@ -103,7 +114,15 @@ public sealed class ListingPage : Page
         if (more.Count > 0)
             col.Children.Add(Ui.Col(14, StoreKit.Header(I18n.T("v93.mk.moreFrom", ("name", l.Author)), () => MainWindow.Current?.Navigate(() => new AuthorPage(l.Uid, l.Author))),
                 StoreKit.Shelf(more.Select(x => MarketTiles.Card(x, 248)))));
-        Content = new ScrollViewer { Content = col, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+        // Главная кнопка лота — покупка в блоке ниже; в шапке — тихая кнопка: свой лот — «Изменить», чужой — «Продать работу».
+        var action = l.Mine
+            ? Ui.Button(I18n.T("mk.edit"), () => MarketViews.Editor(l, MarketData.Reload), "", Icons.Edit)
+            : Ui.Button(I18n.T("mk.sell"), () => ListingWizard.Show(null, MarketData.Reload), "", Icons.Upload);
+        // Перестройка (загрузились отзывы, выбрана миниатюра) не должна прокручивать страницу наверх.
+        var keep = MarketPage.HubScroller(Content as Control)?.Offset;
+        Content = HubNav.Frame("store", "shop", l.Title, col, sold: MarketData.Reload, action: action);
+        if (keep is { Y: > 0 } offset)
+            Dispatcher.UIThread.Post(() => { if (MarketPage.HubScroller(Content as Control) is { } sv) sv.Offset = offset; }, DispatcherPriority.Loaded);
     }
 
     static Control Section(string title) => Ui.Col(6, HubLook.Label(title, Ui.Res("Text"), 12), new Border { Height = 1, Background = Ui.Res("Line") });
@@ -115,6 +134,22 @@ public sealed class ListingPage : Page
         Classes = { "card" }, Padding = new Thickness(16, 14), MaxHeight = 320,
         Child = new ScrollViewer { HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, Content = new SelectableTextBlock { Text = text, FontFamily = Mono, FontSize = 12.5, LineHeight = 19 } },
     };
+
+    /// <summary>
+    /// 26.0: большая картинка лота без своих картинок — арт игры только приглушённым фоном, по центру — значок вида
+    /// в стеклянном круге. Раньше во весь кадр стоял арт игры, и лот выглядел как картинка самой игры.
+    /// </summary>
+    static Control Stage(Listing l)
+    {
+        if (GameCatalog.ById(l.Game) is not { } game) return MarketTiles.Art(l, 1280);
+        var mark = new Border
+        {
+            Width = 88, Height = 88, CornerRadius = new CornerRadius(44), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+            Background = new SolidColorBrush(Color.FromArgb(60, 255, 255, 255)), BorderBrush = new SolidColorBrush(Color.FromArgb(90, 255, 255, 255)), BorderThickness = new Thickness(1),
+            Child = Ui.Icon(MarketTiles.KindIcon(l.Kind), 36, Brushes.White),
+        };
+        return new Panel { Children = { Ui.GameImage(game, 1600, art: Images.Art.Hero), new Border { Background = new SolidColorBrush(Color.FromArgb(185, 8, 8, 12)) }, mark } };
+    }
 
     /// <summary>Большая картинка и полоска миниатюр (картинки лота и «Код», если есть превью).</summary>
     Control Media(Listing l)
@@ -129,9 +164,10 @@ public sealed class ListingPage : Page
         {
             "image" => StoreKit.UrlImage(url, 1600),
             "code" => new Border { Background = Ui.Res("Surface2"), Padding = new Thickness(22, 18), Child = new TextBlock { Text = l.Preview, FontFamily = Mono, FontSize = 13, LineHeight = 20, Foreground = Ui.Res("Text"), TextWrapping = TextWrapping.NoWrap } },
-            _ => MarketTiles.Art(l, 1600),
+            _ => Stage(l),
         };
-        var stage = new Border { Classes = { "store-tile", "hero" }, Height = 392, Cursor = null, Child = new Panel { Children = { main, kind == "code" ? new Border() : Gx.Haze(true) } } };
+        // 26.0: без «неоновой» дымки цвета темы по краю (в хабе она была синей или красной поверх картинки).
+        var stage = new Border { Classes = { "store-tile", "hero" }, Height = 392, Cursor = null, Child = main };
         if (items.Count == 1) return stage;
         var strip = Ui.Row(8);
         for (var i = 0; i < items.Count; i++)
@@ -141,14 +177,14 @@ public sealed class ListingPage : Page
             Control thumb = k switch
             {
                 "image" => StoreKit.UrlImage(u, 256),
-                "code" => new Border { Background = Ui.Res("Surface2"), Child = Ui.Col(2, Ui.Icon(Icons.Code, 18, Ui.Res("Brand2")), new TextBlock { Text = I18n.T("v93.mk.code"), FontSize = 11, HorizontalAlignment = HorizontalAlignment.Center }) },
+                "code" => new Border { Background = Ui.Res("Surface2"), Child = Ui.Col(2, Ui.Icon(Icons.Code, 18, HubLook.Violet), new TextBlock { Text = I18n.T("v93.mk.code"), FontSize = 11, HorizontalAlignment = HorizontalAlignment.Center }) },
                 _ => MarketTiles.Art(l, 256),
             };
             if (thumb is Border { Child: StackPanel sp }) { sp.HorizontalAlignment = HorizontalAlignment.Center; sp.VerticalAlignment = VerticalAlignment.Center; }
             var b = new Border
             {
                 Width = 112, Height = 63, CornerRadius = new CornerRadius(6), ClipToBounds = true, Child = thumb, Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand),
-                BorderThickness = new Thickness(2), BorderBrush = i == _media ? Ui.Res("Brand") : Brushes.Transparent, Opacity = i == _media ? 1 : 0.7,
+                BorderThickness = new Thickness(2), BorderBrush = i == _media ? HubLook.Amber : Brushes.Transparent, Opacity = i == _media ? 1 : 0.7,
             };
             StoreKit.OnClick(b, () => { _media = index; Build(); });
             strip.Children.Add(b);
@@ -162,8 +198,9 @@ public sealed class ListingPage : Page
         var capsule = new Border { Height = 150, CornerRadius = new CornerRadius(8), ClipToBounds = true, Child = MarketTiles.Art(l, 768, hero: false) };
         Control Line(string label, Control value)
         {
+            // 26.0: подпись обычным регистром — в хабе нет подписей капсом.
             var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("110,*") };
-            var t = new TextBlock { Text = label.ToUpper(I18n.Culture), FontSize = 10.5, FontWeight = FontWeight.Bold, LetterSpacing = 1, Foreground = Ui.Res("Faint"), VerticalAlignment = VerticalAlignment.Center };
+            var t = new TextBlock { Text = label, FontSize = 12, Foreground = Ui.Res("Muted"), VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
             grid.Children.Add(t);
             Grid.SetColumn(value, 1);
             grid.Children.Add(value);
@@ -173,13 +210,18 @@ public sealed class ListingPage : Page
         var (verdict, tone) = MarketLocal.Verdict(reviews.Count == 0 ? 0 : reviews.Average(r => r.Stars), reviews.Count);
         var toneBrush = tone switch { "good" => Ui.Res("Good"), "warn" => Ui.Res("Warn"), "bad" => Ui.Res("Bad"), _ => Ui.Res("Muted") };
         var reviewText = _reviews is null ? I18n.T("common.loading") : reviews.Count == 0 ? I18n.T(verdict) : $"{I18n.T(verdict)} ({reviews.Count})";
-        var author = new TextBlock { Text = l.Author, FontWeight = FontWeight.SemiBold, Foreground = Ui.Res("Brand2"), Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand), TextTrimming = TextTrimming.CharacterEllipsis };
+        var author = new TextBlock { Text = l.Author, FontWeight = FontWeight.SemiBold, Foreground = HubLook.Violet, Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand), TextTrimming = TextTrimming.CharacterEllipsis };
         StoreKit.OnClick(author, () => MainWindow.Current?.Navigate(() => new AuthorPage(l.Uid, l.Author)));
+        // 26.0: метки — ярлыками хаба, и они работают: щелчок открывает рынок с поиском по этой метке
+        // (раньше курсор-рука был, а щелчок ничего не делал).
         var tags = new WrapPanel();
         foreach (var t in l.Tags)
         {
-            var tag = t;
-            var chip = new Border { Background = Ui.Res("Surface2"), CornerRadius = new CornerRadius(4), Padding = new Thickness(8, 3), Margin = new Thickness(0, 0, 6, 6), Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand), Child = new TextBlock { Text = I18n.T("hub.tag." + t), FontSize = 11.5, Foreground = Ui.Res("Muted") } };
+            var label = I18n.T("hub.tag." + t);
+            var chip = HubLook.Badge("#" + label);
+            chip.Margin = new Thickness(0, 0, 6, 6);
+            chip.Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand);
+            StoreKit.OnClick(chip, () => MainWindow.Current?.Navigate(() => new MarketPage("store", label)));
             tags.Children.Add(chip);
         }
         var col = Ui.Col(14,
@@ -206,8 +248,9 @@ public sealed class ListingPage : Page
         var wished = MarketLocal.Wished(l.Id);
         var wish = Ui.Button(I18n.T(wished ? "v93.mk.wish.in" : "v93.mk.wish.add"), () => MarketLocal.ToggleWish(l.Id), "", Icons.Heart);
         if (wished) wish.Foreground = Ui.Res("Bad");
-        var price = Owned ? Gx.Tag(I18n.T("v93.mk.owned"), Ui.Res("Surface3"), Ui.Res("Text"), 15) : Gx.Price(MarketViews.PriceText(l), l.Free);
-        if (price is Border pb) pb.Padding = new Thickness(14, 7);
+        // 26.0: цена — крупным текстом (бесплатное — зелёным), купленное — ярлыком хаба; без скошенной синей плашки.
+        Control price = Owned ? HubLook.Badge(I18n.T("v93.mk.owned"), "good", Icons.Check)
+            : new TextBlock { Text = MarketViews.PriceText(l), FontFamily = Look.Display, FontSize = 22, FontWeight = FontWeight.Bold, Foreground = l.Free ? Ui.Res("Good") : Ui.Res("Text") };
         price.VerticalAlignment = VerticalAlignment.Center;
         var right = Ui.Row(12, wish, price, main);
         right.VerticalAlignment = VerticalAlignment.Center;
@@ -217,8 +260,8 @@ public sealed class ListingPage : Page
         DockPanel.SetDock(right, Dock.Right);
         dock.Children.Add(right);
         dock.Children.Add(words);
-        var card = new Border { Classes = { "card", "buy-box" }, Padding = new Thickness(22, 18), Child = dock, BorderBrush = Ui.Res("Brand"), BoxShadow = Gx.Glow(60, 30, -6) };
-        return card;
+        // Рамка и тень — от листа хаба (HubLook.Scope), без синей рамки со свечением.
+        return new Border { Classes = { "card", "buy-box" }, Padding = new Thickness(22, 18), Child = dock };
     }
 
     async void Buy()
@@ -288,8 +331,19 @@ public sealed class ListingPage : Page
             .Take(4).ToList();
         if (list.Count == 0) return new Border();
         var rows = Ui.Col(4);
-        foreach (var x in list) rows.Children.Add(MarketTiles.Row(x));
+        // Узкая колонка: компактные строки (цена — под названием), чтобы название не обрезалось до первого слова.
+        foreach (var x in list) rows.Children.Add(MarketTiles.Row(x, compact: true));
         return Ui.Col(10, HubLook.Label(I18n.T("v93.mk.similar"), Ui.Res("Text"), 11), rows);
+    }
+
+    /// <summary>26.0: полоса доли отзывов — янтарём хаба на поднятой дорожке (общий Gx.Bar красил её синим цветом темы).</summary>
+    static Control StarBar(int part, int rest)
+    {
+        var bar = new Grid { Height = 6, ColumnDefinitions = new ColumnDefinitions($"{part}*,{rest}*") };
+        bar.Children.Add(new Border { CornerRadius = new CornerRadius(3), Background = HubLook.Raised });
+        Grid.SetColumnSpan(bar.Children[0], 2);
+        if (part > 0) bar.Children.Add(new Border { CornerRadius = new CornerRadius(3), Background = HubLook.Amber });
+        return bar;
     }
 
     /// <summary>Отзывы: сводка как в Steam (полоса по звёздам), список и форма для купивших.</summary>
@@ -309,7 +363,7 @@ public sealed class ListingPage : Page
                 var n = list.Count(r => r.Stars == s);
                 var line = new Grid { ColumnDefinitions = new ColumnDefinitions("26,*,34"), ColumnSpacing = 8 };
                 line.Children.Add(Ui.Text(s + "★", "small muted"));
-                var bar = Gx.Bar(n / (double)list.Count, 6);
+                var bar = StarBar(n, list.Count - n);
                 bar.VerticalAlignment = VerticalAlignment.Center;
                 Grid.SetColumn(bar, 1);
                 line.Children.Add(bar);
@@ -430,7 +484,8 @@ public sealed class AuthorPage : Page
         col.Children.Add(pills);
         var cards = _part == "items" ? items.Select(l => MarketTiles.Listing(l, 1)).ToList() : mods.Select(m => MarketTiles.Workshop(m, 1)).ToList();
         if (cards.Count == 0) col.Children.Add(Ui.Card(Ui.Text(I18n.T("v93.mk.author.empty"), "muted"), 22));
-        else col.Children.Add(StoreKit.Tiles(cards, 260));
+        // 26.0: у карточки мода сообщества подпись в две строки (автор · игра и счётчики) — ей нужна высота повыше.
+        else col.Children.Add(StoreKit.Tiles(cards, 260, _part == "items" ? 62 : MarketTiles.WorkshopFoot));
         Content = new ScrollViewer { Content = col, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
     }
 }

@@ -1,0 +1,98 @@
+{
+  "ru": {
+    "v26.market.tags.all": "Показать все метки",
+    "v26.market.tags.less": "Свернуть метки",
+    "v26.market.wish.browse": "Смотреть рынок",
+    "v26.market.images.hint": "Не обязательно, но рекомендуем: с картинкой лот заметнее на витрине. Ссылки https, по одной в строке — первая станет обложкой.",
+    "v26.market.ws.package": "Готовые моды",
+    "v26.market.ws.script": "Скрипты ModScript",
+    "v26.market.ws.search": "Название, описание, метка или автор",
+    "v26.market.ws.empty": "Выложите готовый мод или скрипт ModScript — его сразу увидят все, кто пользуется ModLaunch.",
+    "v26.market.updates.version": "Версия {version}",
+    "v26.market.updates.more": "Ещё {n} — в уведомлениях"
+  },
+  "en": {
+    "v26.market.tags.all": "Show all tags",
+    "v26.market.tags.less": "Collapse tags",
+    "v26.market.wish.browse": "Browse the market",
+    "v26.market.images.hint": "Optional, but recommended: listings with a picture stand out in the store. https links, one per line — the first becomes the cover.",
+    "v26.market.ws.package": "Ready-made mods",
+    "v26.market.ws.script": "ModScript scripts",
+    "v26.market.ws.search": "Name, description, tag or author",
+    "v26.market.ws.empty": "Upload a ready-made mod or a ModScript script — everyone using ModLaunch will see it right away.",
+    "v26.market.updates.version": "Version {version}",
+    "v26.market.updates.more": "{n} more in notifications"
+  },
+  "uk": {
+    "v26.market.tags.all": "Показати всі мітки",
+    "v26.market.tags.less": "Згорнути мітки",
+    "v26.market.wish.browse": "Переглянути ринок",
+    "v26.market.images.hint": "Не обов’язково, але радимо: із зображенням лот помітніший на вітрині. Посилання https, по одному в рядку — перше стане обкладинкою.",
+    "v26.market.ws.package": "Готові моди",
+    "v26.market.ws.script": "Скрипти ModScript",
+    "v26.market.ws.search": "Назва, опис, мітка або автор",
+    "v26.market.ws.empty": "Викладіть готовий мод або скрипт ModScript — його одразу побачать усі, хто користується ModLaunch.",
+    "v26.market.updates.version": "Версія {version}",
+    "v26.market.updates.more": "Ще {n} — у сповіщеннях"
+  },
+  "es": {
+    "v26.market.tags.all": "Mostrar todas las etiquetas",
+    "v26.market.tags.less": "Contraer etiquetas",
+    "v26.market.wish.browse": "Explorar el mercado",
+    "v26.market.images.hint": "Opcional, pero recomendado: con imagen el artículo destaca en la tienda. Enlaces https, uno por línea; el primero será la portada.",
+    "v26.market.ws.package": "Mods listos",
+    "v26.market.ws.script": "Scripts de ModScript",
+    "v26.market.ws.search": "Nombre, descripción, etiqueta o autor",
+    "v26.market.ws.empty": "Sube un mod listo o un script de ModScript: todos los que usan ModLaunch lo verán al instante.",
+    "v26.market.updates.version": "Versión {version}",
+    "v26.market.updates.more": "{n} más en las notificaciones"
+  },
+  "de": {
+    "v26.market.tags.all": "Alle Tags anzeigen",
+    "v26.market.tags.less": "Tags einklappen",
+    "v26.market.wish.browse": "Markt durchstöbern",
+    "v26.market.images.hint": "Optional, aber empfohlen: Mit Bild fällt das Angebot im Shop mehr auf. https-Links, einer pro Zeile – der erste wird zum Cover.",
+    "v26.market.ws.package": "Fertige Mods",
+    "v26.market.ws.script": "ModScript-Skripte",
+    "v26.market.ws.search": "Name, Beschreibung, Tag oder Autor",
+    "v26.market.ws.empty": "Lade einen fertigen Mod oder ein ModScript-Skript hoch – alle, die ModLaunch nutzen, sehen ihn sofort.",
+    "v26.market.updates.version": "Version {version}",
+    "v26.market.updates.more": "{n} weitere in den Benachrichtigungen"
+  },
+  "fr": {
+    "v26.market.tags.all": "Afficher tous les tags",
+    "v26.market.tags.less": "Replier les tags",
+    "v26.market.wish.browse": "Parcourir le marché",
+    "v26.market.images.hint": "Facultatif, mais conseillé : avec une image, l’annonce se remarque davantage dans la boutique. Liens https, un par ligne — le premier devient la couverture.",
+    "v26.market.ws.package": "Mods prêts à l’emploi",
+    "v26.market.ws.script": "Scripts ModScript",
+    "v26.market.ws.search": "Nom, description, tag ou auteur",
+    "v26.market.ws.empty": "Publiez un mod prêt à l’emploi ou un script ModScript : tous les utilisateurs de ModLaunch le verront aussitôt.",
+    "v26.market.updates.version": "Version {version}",
+    "v26.market.updates.more": "{n} de plus dans les notifications"
+  },
+  "pt-BR": {
+    "v26.market.tags.all": "Mostrar todas as tags",
+    "v26.market.tags.less": "Recolher tags",
+    "v26.market.wish.browse": "Explorar o mercado",
+    "v26.market.images.hint": "Opcional, mas recomendado: com imagem o item se destaca na loja. Links https, um por linha — o primeiro vira a capa.",
+    "v26.market.ws.package": "Mods prontos",
+    "v26.market.ws.script": "Scripts ModScript",
+    "v26.market.ws.search": "Nome, descrição, tag ou autor",
+    "v26.market.ws.empty": "Publique um mod pronto ou um script ModScript — todos que usam o ModLaunch vão vê-lo na hora.",
+    "v26.market.updates.version": "Versão {version}",
+    "v26.market.updates.more": "Mais {n} nas notificações"
+  },
+  "zh-CN": {
+    "v26.market.tags.all": "显示全部标签",
+    "v26.market.tags.less": "收起标签",
+    "v26.market.wish.browse": "浏览市场",
+    "v26.market.images.hint": "可选，但建议添加：有图片的商品在商店里更醒目。每行一个 https 链接，第一张将作为封面。",
+    "v26.market.ws.package": "成品模组",
+    "v26.market.ws.script": "ModScript 脚本",
+    "v26.market.ws.search": "名称、描述、标签或作者",
+    "v26.market.ws.empty": "上传成品模组或 ModScript 脚本——所有 ModLaunch 用户都能立即看到。",
+    "v26.market.updates.version": "版本 {version}",
+    "v26.market.updates.more": "另有 {n} 个在通知中"
+  }
+}

@@ -22,12 +22,6 @@ public static class MarketViews
 
     static readonly FontFamily Mono = new("Cascadia Mono, Consolas, JetBrains Mono, DejaVu Sans Mono, monospace");
 
-    static Border Pill(string text, IBrush? bg = null, IBrush? fg = null) => new()
-    {
-        Background = bg ?? new SolidColorBrush(Color.FromArgb(210, 15, 17, 22)), CornerRadius = new CornerRadius(999), Padding = new Thickness(9, 3),
-        Child = new TextBlock { Text = text, FontSize = 11, Foreground = fg ?? Brushes.White, FontWeight = FontWeight.SemiBold },
-    };
-
     public static string PriceText(Listing l) => l.Free ? I18n.T("mk.free") : Market.Money(l.Price);
 
     /// <summary>Карточка лота: обложка, тип, цена, автор, продажи.</summary>
@@ -46,18 +40,19 @@ public static class MarketViews
                 Child = Ui.Icon(KindIcon(l.Kind), 34, Brushes.White),
             };
         if (cover is Border cb && l.Images.Count > 0) { cb.Width = double.NaN; cb.Height = double.NaN; }
-        var kind = Pill(I18n.T("mk.kind." + l.Kind) + (game is null ? "" : " · " + game.ShortName));
+        // 26.0: ярлыки — HubLook.Badge, как на всём рынке (раньше — круглые «пилюли», цена — синим цветом темы).
+        var kind = HubLook.Badge(I18n.T("mk.kind." + l.Kind) + (game is null ? "" : " · " + game.ShortName), "onArt");
         kind.Margin = new Thickness(10);
         kind.HorizontalAlignment = HorizontalAlignment.Left;
         kind.VerticalAlignment = VerticalAlignment.Top;
-        var price = Pill(PriceText(l), l.Free ? Ui.Res("Good") : Ui.Res("Brand"));
+        var price = MarketTiles.PriceBadge(l);
         price.Margin = new Thickness(10);
         price.HorizontalAlignment = HorizontalAlignment.Right;
         price.VerticalAlignment = VerticalAlignment.Bottom;
         var top = new Border { Height = 118, ClipToBounds = true, CornerRadius = new CornerRadius(16, 16, 0, 0), Child = new Panel { Children = { cover, kind, price } } };
         var body = Ui.Col(5,
             Ui.Text(l.Title, "h3"),
-            Ui.Text(I18n.T("mod.by", ("author", l.Author)) + $" · {l.Version}", "small brand"),
+            Ui.Text(I18n.T("mod.by", ("author", l.Author)) + $" · {l.Version}", "small", color: HubLook.Violet),
             new TextBlock { Text = l.Summary, TextWrapping = TextWrapping.Wrap, MaxLines = 2, TextTrimming = TextTrimming.CharacterEllipsis, Foreground = Ui.Res("Muted"), FontSize = 13, Height = 36 },
             Ui.Row(14,
                 Ui.Row(5, Ui.Icon(Icons.Bag, 12, Ui.Res("Muted")), Ui.Text(I18n.Compact(l.Sales), "small muted")),
@@ -90,8 +85,9 @@ public static class MarketViews
         try { owned = await Market.Bought(l); } catch { }
 
         var info = Ui.Col(12);
-        info.Children.Add(Ui.Row(8, Pill(I18n.T("mk.kind." + l.Kind)), Pill(PriceText(l), l.Free ? Ui.Res("Good") : Ui.Res("Brand")),
-            Pill(I18n.T("mk.license." + l.License)), Pill(I18n.T("mk.sold", ("n", l.Sales)))));
+        // 26.0: цена — мягким янтарём (бесплатное — зелёным), остальное — тихими ярлыками хаба; не синим цветом темы.
+        info.Children.Add(Ui.Row(8, HubLook.Badge(I18n.T("mk.kind." + l.Kind)), MarketTiles.PriceBadge(l, onArt: false),
+            HubLook.Badge(I18n.T("mk.license." + l.License)), HubLook.Badge(I18n.T("mk.sold", ("n", l.Sales)))));
         info.Children.Add(Ui.Text(I18n.T("mod.by", ("author", l.Author)) + $" · v{l.Version} · {(l.Size > 0 ? GamePage.Size(l.Size) : "—")}" +
             (GameCatalog.ById(l.Game) is { } g ? " · " + g.Name : ""), "small muted"));
         if (l.Summary != "") info.Children.Add(Ui.Text(l.Summary, "", wrap: true));
@@ -131,7 +127,7 @@ public static class MarketViews
         try { list = await Market.Reviews(l); } catch { list = []; }
         box.Children.RemoveAt(1);
         if (list.Count > 0)
-            box.Children.Add(Ui.Text(I18n.T("mk.rating", ("avg", list.Average(r => r.Stars).ToString("0.0", I18n.Culture)), ("n", list.Count)), "small brand"));
+            box.Children.Add(Ui.Text(I18n.T("mk.rating", ("avg", list.Average(r => r.Stars).ToString("0.0", I18n.Culture)), ("n", list.Count)), "small", color: HubLook.Violet));
         foreach (var r in list.Take(10))
             box.Children.Add(Ui.Col(2, Ui.Text($"{new string('★', r.Stars)}{new string('☆', 5 - r.Stars)}  {r.Author} · {Ui.Ago(r.Created)}", "small muted"), Ui.Text(r.Text, "small", wrap: true)));
         if (list.Count == 0) box.Children.Add(Ui.Text(I18n.T("mk.noReviews"), "small muted"));
@@ -218,7 +214,7 @@ public static class MarketViews
     /// <summary>Вместо кода: «подключается инжектом» и что мод меняет в игре (по автомодерации).</summary>
     public static Control SealedNote(Listing l)
     {
-        var col = Ui.Col(8, Ui.Row(8, Ui.Icon(Icons.Shield, 16, Ui.Res("Brand2")), Ui.Text(I18n.T("v11.inj.sealedTitle"), "h3")),
+        var col = Ui.Col(8, Ui.Row(8, Ui.Icon(Icons.Shield, 16, HubLook.Violet), Ui.Text(I18n.T("v11.inj.sealedTitle"), "h3")),
             Ui.Text(I18n.T("v11.inj.sealedText"), "small muted", wrap: true));
         if (l.Preview.StartsWith(Moderation.Mark))
             col.Children.Add(Ui.Text(I18n.T("v11.inj.changes") + " " + l.Preview[Moderation.Mark.Length..], "small", wrap: true));
