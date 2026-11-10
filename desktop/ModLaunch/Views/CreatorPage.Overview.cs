@@ -53,7 +53,7 @@ public sealed partial class CreatorPage
             DockPanel.SetDock(rule, Dock.Left);
             kpis.Children.Add(new Border
             {
-                Background = HubLook.Panel, BorderBrush = HubLook.Edge, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(3), Padding = new Thickness(14, 12),
+                Background = HubLook.Panel, BorderBrush = HubLook.Edge, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(10), Padding = new Thickness(14, 12),
                 Margin = new Thickness(i == 0 ? 0 : 6, 0, i == 3 ? 0 : 6, 0), Child = dock,
             });
         }
@@ -71,7 +71,9 @@ public sealed partial class CreatorPage
             Kpi(I18n.T("v12.pj.k.install"), inst.Version, Dotted(GameCatalog.ById(inst.Game)?.Name ?? inst.Game, Since(inst.Time)));
         else Kpi(I18n.T("v12.pj.k.install"), "—", I18n.T("v12.pj.k.never"));
         if (stats?.Hub is { } hub)
-            Kpi("Hub", I18n.Compact(hub.Downloads) + " ↓", Dotted("♥ " + I18n.Compact(hub.Likes), "💬 " + I18n.Compact(hub.Comments), hub.Version));
+            // 26.0: подписи словами, без значков-эмодзи.
+            Kpi("Hub", I18n.Compact(hub.Downloads) + " " + I18n.T("hub.stat.downloads"),
+                Dotted(I18n.Compact(hub.Likes) + " " + I18n.T("hub.stat.likes"), I18n.Compact(hub.Comments) + " " + I18n.T("hub.stat.comments"), hub.Version));
         else
             Kpi(I18n.T("v12.pj.k.releases"), meta.Releases.Count.ToString(), meta.Releases.LastOrDefault() is { } r ? Dotted(r.Version, Since(r.Time)) : I18n.T("v12.pj.k.never"));
         col.Children.Add(kpis);
@@ -98,11 +100,11 @@ public sealed partial class CreatorPage
         Control art = game is not null
             ? Ui.GameImage(game, 200)
             : new Border { Background = Ui.Res("Surface3"), Child = Ui.Icon(Icons.Creator, 24, Ui.Res("Faint")) };
-        var pic = new Border { Width = 64, Height = 64, CornerRadius = new CornerRadius(3), ClipToBounds = true, Child = art, VerticalAlignment = VerticalAlignment.Center };
+        var pic = new Border { Width = 64, Height = 64, CornerRadius = new CornerRadius(8), ClipToBounds = true, Child = art, VerticalAlignment = VerticalAlignment.Center };
         var color = StatusBrush(status);
         var pill = new Border
         {
-            BorderBrush = HubLook.Edge, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(3), Padding = new Thickness(8, 3),
+            BorderBrush = HubLook.Edge, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(6), Padding = new Thickness(8, 3),
             Child = Ui.Row(7, Ui.Dot(color, 7), HubLook.MonoText(I18n.T($"v12.pj.st.{status}"), 10.5, Ui.Res("Text"))),
             VerticalAlignment = VerticalAlignment.Center,
         };
@@ -146,11 +148,7 @@ public sealed partial class CreatorPage
             DockPanel.SetDock(right, Dock.Right);
             row.Children.Add(right);
             var left = Ui.Row(8, Ui.Icon(Icons.Package, 14, latest ? HubLook.Violet : Ui.Res("Faint")), name);
-            if (latest) left.Children.Add(new Border
-            {
-                BorderBrush = HubLook.Edge, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(3), Padding = new Thickness(6, 1),
-                Child = Ui.Text(I18n.T("v12.pj.builds.latest"), "small muted"),
-            });
+            if (latest) left.Children.Add(HubLook.Badge(I18n.T("v12.pj.builds.latest")));
             row.Children.Add(left);
             Ctx.Attach(row, () => Ctx.Menu(Ctx.Folder(I18n.T("games.openFolder"), file.FullName)));
             list.Children.Add(row);
@@ -278,7 +276,8 @@ public sealed partial class CreatorPage
         "tested" => Ui.Res("Good"),
         "error" or "failed" => Ui.Res("Bad"),
         "changed" => Ui.Res("Warn"),
-        "built" => Ui.Res("Brand2"),
+        // 26.0: «собран» — янтарём хаба, а не синим цветом темы.
+        "built" => HubLook.Violet,
         _ => Ui.Res("Faint"),
     };
 

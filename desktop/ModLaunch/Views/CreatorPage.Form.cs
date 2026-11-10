@@ -144,14 +144,17 @@ public sealed partial class CreatorPage
             "does" => (I18n.T("v16.form.q3"), I18n.T("v23.form.q.does.text"), DoesStep(facts)),
             _ => (I18n.T("v23.form.q.name"), I18n.T("v23.form.q.name.text"), NameStep()),
         };
+        // 26.0: вопрос — второй уровень под заголовком страницы (20, полужирный, шрифт программы), а не второй «плакат» 24 Display.
         var question = Ui.Col(6,
-            new TextBlock { Text = title, FontFamily = Look.Display, FontSize = 24, FontWeight = FontWeight.Bold, TextWrapping = TextWrapping.Wrap },
+            new TextBlock { Text = title, FontSize = 20, FontWeight = FontWeight.SemiBold, TextWrapping = TextWrapping.Wrap },
             new TextBlock { Text = hint, FontSize = 13.5, Foreground = Ui.Res("Muted"), TextWrapping = TextWrapping.Wrap, MaxWidth = 640, HorizontalAlignment = HorizontalAlignment.Left });
 
-        // Назад / Дальше (на последнем шаге — «Создать»).
+        // Назад / Дальше (на последнем шаге — «Создать»). 26.0: под карточкой справа — она всегда в первом экране; внизу
+        // левой колонки «Дальше» на шаге с играми уходил за край окна, и его закрывали уведомления. На первом шаге кнопки
+        // нет: выбор карточки сам ведёт дальше.
         var last = f.Step == steps.Length - 1;
         var canGo = step != "game" || facts.GameReady(f.What);
-        Button next;
+        Button? next = null;
         if (last)
         {
             next = f.What == "world"
@@ -159,25 +162,37 @@ public sealed partial class CreatorPage
                 : Ui.Button(f.Busy ? I18n.T("v16.form.creating") : I18n.T("v23.form.create"), () => Create(facts), "primary", Icons.Check);
             next.IsEnabled = !f.Busy && facts.GameReady(f.What);
         }
-        else
+        else if (step != "what")
         {
-            next = Ui.Button(I18n.T("v23.form.next"), () => { f.Step++; Build(); }, "primary", Icons.ChevronRight);
+            // «Дальше ›» — стрелка после слова, как у кнопки, ведущей вперёд.
+            next = Ui.Button(I18n.T("v23.form.next"), () => { f.Step++; Build(); }, "primary");
+            next.Content = Ui.Row(8, new TextBlock { Text = I18n.T("v23.form.next"), VerticalAlignment = VerticalAlignment.Center }, Ui.Icon(Icons.ChevronRight, 16));
             next.IsEnabled = canGo;
         }
-        next.Padding = new Thickness(20, 10);
-        var nav = new DockPanel();
-        DockPanel.SetDock(next, Dock.Right);
-        nav.Children.Add(next);
-        if (f.Step > 0)
+        Control? nav = null;
+        if (next is not null)
         {
-            var back = Ui.Button(I18n.T("v23.form.back"), () => { f.Step--; Build(); }, "ghost", Icons.ChevronLeft);
-            back.HorizontalAlignment = HorizontalAlignment.Left;
-            nav.Children.Add(back);
+            // Главная — во всю ширину карточки (длинные «Играть как разработчик», «Jouer en développeur» не режутся),
+            // «Назад» — тихой кнопкой под ней.
+            next.Padding = new Thickness(20, 10);
+            next.HorizontalAlignment = HorizontalAlignment.Stretch;
+            next.HorizontalContentAlignment = HorizontalAlignment.Center;
+            var col = Ui.Col(4, next);
+            col.Margin = new Thickness(0, 6, 0, 0);
+            if (f.Step > 0)
+            {
+                var back = Ui.Button(I18n.T("v23.form.back"), () => { f.Step--; Build(); }, "ghost", Icons.ChevronLeft);
+                back.HorizontalAlignment = HorizontalAlignment.Stretch;
+                back.HorizontalContentAlignment = HorizontalAlignment.Center;
+                col.Children.Add(back);
+            }
+            nav = col;
         }
-        else nav.Children.Add(new Border());
 
-        var left = Ui.Col(22, Stepper(steps), question, body, new Border { Height = 1, Background = HubLook.Edge }, nav);
-        var right = Preview(facts);
+        // 26.0: «Другие способы начать» — на первом шаге и в ширину колонки анкеты (была своя сетка шире неё).
+        var left = Ui.Col(22, Stepper(steps), question, body);
+        if (step == "what") left.Children.Add(OtherWays());
+        var right = Preview(facts, nav);
         var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,300"), ColumnSpacing = 32 };
         grid.Children.Add(left);
         Grid.SetColumn(right, 1);
@@ -247,13 +262,24 @@ public sealed partial class CreatorPage
         return b;
     }
 
+    /// <summary>
+    /// 26.0: пять вариантов в две колонки оставляли «Сборку модов» одну с пустой клеткой. Теперь первый — главный путь
+    /// («Мод с кодом») — на всю ширину, остальные четыре — два ряда по два. Поле −12 съедает отступ последних карточек.
+    /// </summary>
     Control WhatStep()
     {
-        var grid = new UniformGrid { Columns = 2 };
-        foreach (var (id, icon) in Whats)
+        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,*"), Margin = new Thickness(0, 0, -12, -12) };
+        for (var i = 0; i < Whats.Length; i++)
         {
+            var (id, icon) = Whats[i];
             var what = id;
-            grid.Children.Add(Choice(icon, I18n.T("v23.what." + id), I18n.T($"v23.what.{id}.text"), _form.What == id, () => { _form.What = what; _form.Step = 1; Build(); }));
+            var card = Choice(icon, I18n.T("v23.what." + id), I18n.T($"v23.what.{id}.text"), _form.What == id, () => { _form.What = what; _form.Step = 1; Build(); });
+            var row = i == 0 ? 0 : (i + 1) / 2;
+            while (grid.RowDefinitions.Count <= row) grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+            Grid.SetRow(card, row);
+            if (i == 0) Grid.SetColumnSpan(card, 2);
+            else Grid.SetColumn(card, (i - 1) % 2);
+            grid.Children.Add(card);
         }
         return grid;
     }
@@ -340,7 +366,8 @@ public sealed partial class CreatorPage
     Control DoesStep(FormFacts facts)
     {
         var f = _form;
-        var kinds = new UniformGrid { Columns = 3 };
+        // 26.0: две колонки — в три описания переносились по слову в строку и карточки выходили разной высоты.
+        var kinds = new UniformGrid { Columns = 2, Margin = new Thickness(0, 0, -12, -12) };
         foreach (var k in XProjects.Kinds)
         {
             var kind = k;
@@ -355,13 +382,16 @@ public sealed partial class CreatorPage
         {
             var ev = e;
             var can = facts.Target is null || facts.Target.Events.Contains(e);
+            // 26.0: включённое событие — мягким янтарём с галочкой (правило HubLook.Scope), а не сплошной заливкой главной кнопки.
+            var check = Ui.Icon(Icons.Check, 13, HubLook.Violet);
             var chip = new ToggleButton
             {
                 Classes = { "chip" }, IsChecked = can && f.Events.Contains(e), IsEnabled = can, Margin = new Thickness(0, 0, 8, 8),
-                Content = I18n.T($"v16.event.{e}"), Padding = new Thickness(14, 7),
+                Content = Ui.Row(6, check, new TextBlock { Text = I18n.T($"v16.event.{e}"), VerticalAlignment = VerticalAlignment.Center }), Padding = new Thickness(14, 7),
             };
+            check.IsVisible = chip.IsChecked == true;
             ToolTip.SetTip(chip, can ? I18n.T($"v16.event.{e}.tip") : I18n.T("v16.event.missing", ("engine", facts.Target?.Title ?? "")));
-            chip.IsCheckedChanged += (_, _) => { if (chip.IsChecked == true) f.Events.Add(ev); else f.Events.Remove(ev); };
+            chip.IsCheckedChanged += (_, _) => { check.IsVisible = chip.IsChecked == true; if (chip.IsChecked == true) f.Events.Add(ev); else f.Events.Remove(ev); };
             events.Children.Add(chip);
         }
         col.Children.Add(Ui.Col(10, new TextBlock { Text = I18n.T("v16.form.q4"), FontSize = 15, FontWeight = FontWeight.SemiBold }, events));
@@ -412,45 +442,50 @@ public sealed partial class CreatorPage
     static Control Labeled(string label, Control c) => Ui.Col(6, Ui.Text(label, "small muted"), c);
 
     /// <summary>Карточка будущего мода — такой же она встанет в «Мои моды»: обложка игры и ярлык с названием.</summary>
-    Control Preview(FormFacts facts)
+    Control Preview(FormFacts facts, Control? nav = null)
     {
         var f = _form;
         var color = Color.Parse(XProjects.Hex(f.Color));
-        string Title() => f.Name.Trim() == "" ? I18n.T("v23.form.name.hint." + f.What) : f.Name.Trim();
-        var plateText = new TextBlock { Text = Title(), FontSize = 15, FontWeight = FontWeight.Bold, TextTrimming = TextTrimming.CharacterEllipsis, Foreground = IsLightColor(color) ? HubLook.OnAmber : Brushes.White };
-        NameChanged += () => plateText.Text = Title();
-        var plate = new Border
-        {
-            Background = new SolidColorBrush(color), CornerRadius = new CornerRadius(4), Padding = new Thickness(9, 5), Margin = new Thickness(12),
-            HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Bottom, Child = plateText,
-            BoxShadow = new BoxShadows(new BoxShadow { OffsetY = 2, Blur = 6, Color = Color.FromArgb(110, 0, 0, 0) }),
-        };
+        // 26.0: без названия ярлык честно говорит «Без названия» и бледнее — раньше в нём стоял пример из подсказки
+        // («Например, Золото за волны») тем же жирным, что и настоящее имя.
+        // У карты из конструктора имени в анкете нет (его даёт уровень в игре) — там ярлык «Новая карта» как есть.
+        var named = FormSteps(f.What).Contains("name");
+        bool Untitled() => named && f.Name.Trim() == "";
+        string Title() => !named ? I18n.T("v23.form.name.hint." + f.What) : Untitled() ? I18n.T("lw.untitled") : f.Name.Trim();
+        var plateText = new TextBlock { Text = Title() };
+        var plate = Plate(plateText, color, 12);
+        plate.Opacity = Untitled() ? 0.7 : 1;
+        NameChanged += () => { plateText.Text = Title(); plate.Opacity = Untitled() ? 0.7 : 1; };
         var whatIcon = Whats.First(w => w.Id == f.What).Icon;
-        Control art = facts.Def is not null ? Ui.GameImage(facts.Def, 600) : new Border { Background = HubLook.Raised, Child = Ui.Icon(whatIcon, 34, Ui.Res("Faint")) };
-        var scrim = new Border
-        {
-            IsHitTestVisible = false,
-            Background = new LinearGradientBrush
-            {
-                StartPoint = new RelativePoint(0, 0.45, RelativeUnit.Relative), EndPoint = new RelativePoint(0, 1, RelativeUnit.Relative),
-                GradientStops = { new GradientStop(Color.FromArgb(0, 0, 0, 0), 0), new GradientStop(Color.FromArgb(150, 0, 0, 0), 1) },
-            },
-        };
-        var top = new Border { Height = 170, ClipToBounds = true, Child = new Panel { Children = { art, scrim, plate } } };
-        var game = facts.Def?.Name ?? (f.Folder is { } fd ? Path.GetFileName(fd.TrimEnd('\\', '/')) : I18n.T("v16.sum.noGame"));
+        Control art = facts.Def is not null ? Ui.GameImage(facts.Def, 800, art: Images.Art.Hero) : new Border { Background = HubLook.Raised, Child = Ui.Icon(whatIcon, 34, Ui.Res("Faint")) };
+        var top = new Border { Height = 170, ClipToBounds = true, Child = new Panel { Children = { art, Scrim(), plate } } };
+        var noGame = facts.Def is null && f.Folder is null;
+        var game = facts.Def?.Name ?? (f.Folder is { } fd ? Path.GetFileName(fd.TrimEnd('\\', '/')) : Capital(I18n.T("v16.sum.noGame")));
         var what = I18n.T("v23.what." + f.What);
         if (f.What == "code" && FormSteps(f.What).ToList().IndexOf("does") <= f.Step) what += ", " + I18n.T($"v16.kind.{f.Kind}").ToLowerInvariant();
+        // Версия и автор через точку; автор по умолчанию («Я») не показывается — это не подпись, а заглушка.
+        var version = "v" + (f.Version.Trim() == "" ? "1.0.0" : f.Version.Trim());
+        var author = f.Author.Trim();
+        var meta = author == "" || author == Templates.DefaultAuthor() ? version : version + " · " + author;
         var foot = Ui.Col(3,
-            new TextBlock { Text = game, FontSize = 13, FontWeight = FontWeight.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis },
+            new TextBlock
+            {
+                Text = game, FontSize = 13, TextTrimming = TextTrimming.CharacterEllipsis,
+                FontWeight = noGame ? FontWeight.Normal : FontWeight.SemiBold, Foreground = noGame ? Ui.Res("Muted") : Ui.Res("Text"),
+            },
             new TextBlock { Text = what, FontSize = 12, Foreground = Ui.Res("Muted"), TextWrapping = TextWrapping.Wrap },
-            new TextBlock { Text = "v" + (f.Version.Trim() == "" ? "1.0.0" : f.Version.Trim()) + "  " + (f.Author.Trim() == "" ? "" : f.Author.Trim()), FontSize = 12, Foreground = Ui.Res("Faint") });
+            new TextBlock { Text = meta, FontSize = 12, Foreground = Ui.Res("Faint") });
         foot.Margin = new Thickness(14, 12, 14, 14);
         var card = new Border { Background = HubLook.Panel, BorderBrush = HubLook.Edge, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(10), ClipToBounds = true, Child = Ui.Col(0, top, foot) };
         var note = new TextBlock { Text = I18n.T("v23.form.preview"), FontSize = 12, Foreground = Ui.Res("Faint"), TextWrapping = TextWrapping.Wrap };
         var col = Ui.Col(10, card, note);
+        if (nav is not null) col.Children.Add(nav);
         col.VerticalAlignment = VerticalAlignment.Top;
         return col;
     }
+
+    /// <summary>Первая буква — заглавной (строка «без игры» стоит отдельной строкой карточки).</summary>
+    static string Capital(string s) => s.Length == 0 ? s : char.ToUpper(s[0], I18n.Culture) + s[1..];
 
     async Task PickFolder()
     {

@@ -28,7 +28,7 @@ public sealed partial class CreatorPage
     string _dgKind = "all";
     string _dgQuery = "";
     int _dgShown = 60;
-    WrapPanel? _dgGrid;
+    StackPanel? _dgGrid;
     TextBlock? _dgCount;
     static List<DevGame>? _dgScanned;
     static bool _dgScanning;
@@ -141,19 +141,24 @@ public sealed partial class CreatorPage
         if (steamMore > 0) Chip("auto", I18n.T("v23.dg.k.auto"), steamMore);
         root.Children.Add(chips);
 
-        var search = new TextBox { Watermark = I18n.T("v23.dg.search2"), Text = _dgQuery, Width = 360, HorizontalAlignment = HorizontalAlignment.Left };
+        // 26.0: поиск хаба — с лупой и тонкой рамкой (было голое поле, похожее на недоделанное).
+        var search = HubLook.Search(I18n.T("v23.dg.search2"), _dgQuery);
         _dgCount = new TextBlock { Classes = { "muted" }, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(16, 0, 0, 0) };
         search.TextChanged += (_, _) => { _dgQuery = search.Text ?? ""; _dgShown = 60; Fill(known, knownIds, steamMore); };
         var row = Ui.Row(0, search, _dgCount);
         if (_dgScanning) row.Children.Add(new TextBlock { Text = I18n.T("v23.dg.scanning"), Classes = { "small", "muted" }, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(16, 0, 0, 0) });
         root.Children.Add(row);
 
-        _dgGrid = new WrapPanel();
+        _dgGrid = new StackPanel { Spacing = 4 };
         root.Children.Add(_dgGrid);
         Fill(known, knownIds, steamMore);
         return root;
     }
 
+    /// <summary>
+    /// Сетка игр. 26.0: столбцы подстраиваются под ширину (StoreKit.Tiles, плитка от 240 px) и сетка доходит до правого
+    /// края — раньше карточки были по 252 px в WrapPanel, и справа оставалась пустая полоса. «Показать ещё» — под сеткой.
+    /// </summary>
     void Fill(List<DevGame> known, HashSet<int> knownIds, int steamMore)
     {
         if (_dgGrid is null) return;
@@ -170,61 +175,128 @@ public sealed partial class CreatorPage
         }
         if (_dgCount is not null) _dgCount.Text = I18n.T("v23.dg.count", ("n", total.ToString("N0", I18n.Culture)));
         _dgGrid.Children.Clear();
-        foreach (var g in list.Take(_dgShown)) _dgGrid.Children.Add(DevCard(g));
+        var shown = list.Take(_dgShown).ToList();
+        // extra меньше высоты подписи (~118): обложка выходит около 2:1 — шапка Steam (460×215) почти не режется по бокам.
+        if (shown.Count > 0) _dgGrid.Children.Add(StoreKit.Tiles(shown.Select(DevCard), 240, extra: 100));
         if (total > _dgShown)
         {
             var more = Ui.Button(I18n.T("v23.dg.more", ("n", (total - _dgShown).ToString("N0", I18n.Culture))), () => { _dgShown += 60; Fill(known, knownIds, steamMore); }, "ghost", Icons.ChevronDown);
-            more.Margin = new Thickness(0, 10, 0, 0);
+            more.HorizontalAlignment = HorizontalAlignment.Center;
             _dgGrid.Children.Add(more);
         }
-        if (list.Count == 0) _dgGrid.Children.Add(Ui.Text(I18n.T("v23.dg.none"), "muted"));
+        if (list.Count == 0) _dgGrid.Children.Add(HubLook.Empty(Icons.Search, I18n.T("v23.dg.none"), ""));
     }
 
-    static (string Bg, string Fg) KindColor(string kind) => kind switch
+    /// <summary>
+    /// Цвет движка — 26.0: только точкой у тихого ярлыка (раньше — пять ярких плашек на сетке, а Unity был янтарным,
+    /// как выбранный фильтр и главная кнопка).
+    /// </summary>
+    static string KindDot(string kind) => kind switch
     {
-        "unity" => ("#3A2A0E", "#F0B429"),
-        "il2cpp" => ("#1E1A3A", "#A99BFF"),
-        "unreal" => ("#10283A", "#5BB8F5"),
-        "re" => ("#3A1414", "#F27A6B"),
-        "creation" => ("#123A26", "#5BD68F"),
-        "renpy" => ("#3A1630", "#FF7BC8"),
-        "rpgmaker" => ("#2A3412", "#B5E05B"),
-        "source" => ("#3A2412", "#FF9F4A"),
-        "auto" or "none" => ("#24262C", "#9AA3B2"),
-        _ => ("#3A3A10", "#E8E05B"),
+        "unity" => "#C9CED6",
+        "il2cpp" => "#A99BFF",
+        "unreal" => "#5BB8F5",
+        "re" => "#F27A6B",
+        "creation" => "#5BD68F",
+        "renpy" => "#FF7BC8",
+        "rpgmaker" => "#B5E05B",
+        "source" => "#FF9F4A",
+        "cyberpunk" => "#E8E05B",
+        _ => "#6B7280",
     };
 
-    /// <summary>Карточка игры: обложка, имя, движок и меню под игру, одна кнопка.</summary>
+    /// <summary>Обложки нет: спокойный градиент по названию и буквы игры — как у обложек игр без картинки, а не голый кубик.</summary>
+    static Control NoCover(string name)
+    {
+        var initials = string.Concat(name.Split(' ', '-', ':', '_').Where(w => w.Length > 0 && char.IsLetterOrDigit(w[0])).Take(2).Select(w => char.ToUpperInvariant(w[0])));
+        var hue = (int)(name.Aggregate(17u, (h, c) => h * 31 + c) % 360);
+        return new Border
+        {
+            Background = new LinearGradientBrush
+            {
+                StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
+                GradientStops = { new GradientStop(Ui.HslColor(hue, 0.32, 0.34), 0), new GradientStop(Ui.HslColor((hue + 40) % 360, 0.3, 0.18), 1) },
+            },
+            Child = new TextBlock
+            {
+                Text = initials == "" ? "?" : initials, FontSize = 30, FontWeight = FontWeight.Bold, Foreground = new SolidColorBrush(Color.FromArgb(215, 255, 255, 255)),
+                HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+            },
+        };
+    }
+
+    /// <summary>Почему пока нельзя — коротко: первая фраза причины (вся — в подсказке).</summary>
+    static string? WhyLine(DevGame g)
+    {
+        if (g.Why is null) return null;
+        // Общая причина «движок не поддерживается» у «Пока нельзя» уже сказана ярлыком — строку не повторяем.
+        if (g.Why == "v23.dev.no.engine") return g.Kind == "none" ? null : I18n.T("v23.dg.k.none");
+        var text = I18n.T(g.Why, ("ac", "")).Trim();
+        var end = text.IndexOfAny(['.', '!', '?', '。']);
+        return end > 0 && end < text.Length - 1 ? text[..(end + 1)] : text;
+    }
+
+    /// <summary>
+    /// Карточка игры: обложка, имя (точка — можно играть разработчиком), движок и меню под игру, одна кнопка.
+    /// 26.0: та же карточка, что у остальных листов хаба — фон листа, тонкая линия, радиус 10; ширина — от сетки.
+    /// </summary>
     Control DevCard(DevGame g)
     {
-        const double w = 252;
         var image = new Image { Stretch = Stretch.UniformToFill };
         var cover = new Border
         {
-            Width = w, Height = 118, CornerRadius = new CornerRadius(12, 12, 0, 0), ClipToBounds = true, Background = Ui.Res("Surface3"),
-            Child = new Panel { Children = { Ui.Icon(Icons.Cube, 28, Ui.Res("Faint")), image } },
+            CornerRadius = new CornerRadius(10, 10, 0, 0), ClipToBounds = true,
+            Child = new Panel { Children = { NoCover(g.Name), image } },
         };
         if (!string.IsNullOrEmpty(g.Art))
-            _ = Images.FromUrl(g.Art, 300).ContinueWith(t => { if (t.Result is Bitmap bmp) Avalonia.Threading.Dispatcher.UIThread.Post(() => image.Source = bmp); });
-        var (bg, fg) = KindColor(g.Kind);
+            _ = Images.FromUrl(g.Art, 400).ContinueWith(t => { if (t.Result is Bitmap bmp) Avalonia.Threading.Dispatcher.UIThread.Post(() => image.Source = bmp); });
+        var ready = g.Installed && g.Why is null;
         var text = new StackPanel { Spacing = 8, Margin = new Thickness(14, 11, 14, 14) };
-        text.Children.Add(new TextBlock { Text = g.Name, FontWeight = FontWeight.SemiBold, FontSize = 14, TextTrimming = TextTrimming.CharacterEllipsis });
-        var tags = new WrapPanel();
-        var kindTag = ModRow.Tag(I18n.T("v23.dg.k." + g.Kind), Ui.Soft(bg, fg), Ui.Ink(fg));
+        var name = new TextBlock { Text = g.Name, FontWeight = FontWeight.SemiBold, FontSize = 14, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center };
+        ToolTip.SetTip(name, g.Name);
+        var title = new DockPanel();
+        if (ready)
+        {
+            var dot = Ui.Dot(Ui.Res("Good"), 7);
+            dot.Margin = new Thickness(0, 0, 7, 0);
+            ToolTip.SetTip(dot, I18n.T("v26.design.dg.ready"));
+            DockPanel.SetDock(dot, Dock.Left);
+            title.Children.Add(dot);
+        }
+        title.Children.Add(name);
+        text.Children.Add(title);
+        // Ярлыки одной строкой: движок (с точкой его цвета) и, если уже известно, меню под эту игру (по меткам Steam).
+        var tags = new DockPanel { LastChildFill = true };
+        var kindTag = HubLook.BadgeDot(I18n.T("v23.dg.k." + g.Kind), Ui.Hex(KindDot(g.Kind)));
         kindTag.Margin = new Thickness(0, 0, 6, 0);
         ToolTip.SetTip(kindTag, I18n.T("v23.dg.w." + g.Kind));
+        DockPanel.SetDock(kindTag, Dock.Left);
         tags.Children.Add(kindTag);
-        // Меню под эту игру (по меткам Steam) — если уже известно.
         if (g.Kind == "unity" && g.SteamAppId > 0 && GameProfile.Cached(g.SteamAppId) is { } profile)
         {
-            var menu = ModRow.Tag(I18n.T("v23.gp." + profile.Preset), Ui.Soft("#1F2229", profile.Accent), Ui.Ink(profile.Accent));
+            var menu = HubLook.Badge(I18n.T("v23.gp." + profile.Preset));
             ToolTip.SetTip(menu, I18n.T("v23.gp.tip"));
             tags.Children.Add(menu);
         }
+        else tags.Children.Add(new Border());
         text.Children.Add(tags);
         Control action;
         if (g.Why is not null)
-            action = new TextBlock { Text = I18n.T(g.Why, ("ac", "")), Classes = { "small" }, Foreground = Ui.Res("Faint"), TextWrapping = TextWrapping.Wrap, MaxHeight = 34 };
+        {
+            var line = WhyLine(g);
+            var why = new DockPanel { MinHeight = 34, Background = Brushes.Transparent };
+            ToolTip.SetTip(why, I18n.T(g.Why, ("ac", "")));
+            if (line is not null)
+            {
+                var info = Ui.Icon(Icons.Info, 13, Ui.Res("Faint"));
+                info.Margin = new Thickness(0, 2, 7, 0);
+                info.VerticalAlignment = VerticalAlignment.Top;
+                DockPanel.SetDock(info, Dock.Left);
+                why.Children.Add(info);
+                why.Children.Add(new TextBlock { Text = line, Classes = { "small" }, Foreground = Ui.Res("Faint"), TextWrapping = TextWrapping.Wrap, MaxLines = 2, TextTrimming = TextTrimming.CharacterEllipsis });
+            }
+            action = why;
+        }
         else if (g.State is { Status: Detect.Found } st) action = Wide(Ui.Button(I18n.T("v23.dev.play"), () => DevLaunch.Start(st), "primary", Icons.Play));
         else if (g.Found is { } found)
             action = Wide(Ui.Button(I18n.T("v23.dev.play"), async () =>
@@ -240,13 +312,17 @@ public sealed partial class CreatorPage
                 try { Process.Start(new ProcessStartInfo($"steam://install/{g.SteamAppId}") { UseShellExecute = true }); }
                 catch (Exception e) when (e is InvalidOperationException or System.ComponentModel.Win32Exception) { }
             }, "ghost", Icons.Download));
-        else action = new TextBlock { Text = I18n.T("v23.dg.notInstalled"), Classes = { "small" }, Foreground = Ui.Res("Faint") };
+        else action = new TextBlock { Text = I18n.T("v23.dg.notInstalled"), Classes = { "small" }, Foreground = Ui.Res("Faint"), MinHeight = 34, Padding = new Thickness(0, 9, 0, 0) };
         text.Children.Add(action);
+        // Текст — снизу по своей высоте, обложка забирает остальное (высоту карточки задаёт сетка).
+        var body = new DockPanel();
+        DockPanel.SetDock(text, Dock.Bottom);
+        body.Children.Add(text);
+        body.Children.Add(cover);
         return new Border
         {
-            Width = w, Margin = new Thickness(0, 0, 14, 14), CornerRadius = new CornerRadius(12), Background = Ui.Res("Surface2"),
-            BorderBrush = g.Installed && g.Why is null ? new SolidColorBrush(Color.Parse(fg), 0.55) : Ui.Res("Line"), BorderThickness = new Thickness(1),
-            Child = new StackPanel { Children = { cover, text } },
+            CornerRadius = new CornerRadius(10), Background = HubLook.Panel, BorderBrush = HubLook.Edge, BorderThickness = new Thickness(1), ClipToBounds = true,
+            Child = body,
         };
     }
 

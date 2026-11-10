@@ -68,7 +68,7 @@ public sealed partial class CreatorPage
             {
                 var mm = m;
                 items.Add(new ShelfItem(m.Name, m.Author, m.Game, "script",
-                    $"↓ {I18n.Compact(m.Downloads)}   ♥ {I18n.Compact(m.Likes)}", m.Images.FirstOrDefault(), m.Updated, true, () => OpenMod(mm)));
+                    $"{I18n.Compact(m.Downloads)} {I18n.T("hub.stat.downloads")} · {I18n.Compact(m.Likes)} {I18n.T("hub.stat.likes")}", m.Images.FirstOrDefault(), m.Updated, true, () => OpenMod(mm)));
             }
         if (source is "all" or "market")
             foreach (var l in (_market ?? []).Where(l => (codes ? CodeKinds : ModelKinds).Contains(l.Kind)))
@@ -83,9 +83,8 @@ public sealed partial class CreatorPage
 
         if (items.Count == 0)
         {
-            col.Children.Add(Ui.Card(Ui.Col(10,
-                Ui.Row(12, new Border { Width = 44, Height = 44, CornerRadius = new CornerRadius(22), Background = Ui.Res("BrandSoft"), Child = Ui.Icon(codes ? Icons.Code : Icons.Cube, 20, Ui.Res("Brand2")) },
-                    Ui.Text(I18n.T(codes ? "v91.cr.codes.empty" : "v91.cr.models.empty"), "h3", wrap: true))), 24));
+            // 26.0: общее пустое состояние хаба (значок янтарём в круге), а не синий круг темы.
+            col.Children.Add(HubLook.Empty(codes ? Icons.Code : Icons.Cube, I18n.T(codes ? "v91.cr.codes.empty" : "v91.cr.models.empty"), ""));
             if (_marketError is not null) col.Children.Add(Ui.Text(_marketError, "small muted", wrap: true));
             return col;
         }
@@ -113,21 +112,18 @@ public sealed partial class CreatorPage
                 Background = new LinearGradientBrush
                 {
                     StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
-                    GradientStops = { new GradientStop(Color.Parse(game?.Accent ?? "#7C5CFF"), 0), new GradientStop(Color.Parse("#141620"), 1) },
+                    GradientStops = { new GradientStop(Color.Parse(game?.Accent ?? "#3B4252"), 0), new GradientStop(Color.Parse("#141620"), 1) },
                 },
                 Child = Ui.Icon(item.FromHub ? Icons.Code : MarketViews.KindIcon(item.Kind), 22, Brushes.White),
             };
         var kind = item.FromHub ? I18n.T("hub.kind.script") : I18n.T("mk.kind." + item.Kind);
-        var source = new Border
-        {
-            Background = item.FromHub ? Ui.Res("BrandSoft") : Ui.Res("Surface3"), CornerRadius = new CornerRadius(6), Padding = new Thickness(7, 2), VerticalAlignment = VerticalAlignment.Center,
-            Child = new TextBlock { Text = item.FromHub ? "Hub" : I18n.T("mk.tab"), FontSize = 11, FontWeight = FontWeight.SemiBold, Foreground = item.FromHub ? Ui.Res("Brand2") : Ui.Res("Muted") },
-        };
+        // 26.0: общий ярлык хаба: Hub — мягким янтарём, рынок — тихим (были синие цвета темы).
+        var source = HubLook.Badge(item.FromHub ? "Hub" : I18n.T("mk.tab"), item.FromHub ? "accent" : "neutral");
         var words = Ui.Col(3,
             Ui.Row(8, Ui.Text(item.Title, "h3"), source),
             Ui.Text(string.Join(" · ", new[] { item.Author, game?.Name ?? item.Game, kind }.Where(s => !string.IsNullOrEmpty(s))), "small muted"));
         words.VerticalAlignment = VerticalAlignment.Center;
-        var meta = Ui.Text(item.Meta, "small", color: item.FromHub ? Ui.Res("Muted") : Ui.Res("Brand2"));
+        var meta = Ui.Text(item.Meta, "small", color: item.FromHub ? Ui.Res("Muted") : HubLook.Violet);
         meta.VerticalAlignment = VerticalAlignment.Center;
         meta.FontWeight = FontWeight.SemiBold;
         var open = Ui.Button(I18n.T("v91.cr.open"), item.Open, "", Icons.Forward);

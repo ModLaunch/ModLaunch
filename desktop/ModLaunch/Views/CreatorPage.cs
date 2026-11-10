@@ -231,14 +231,29 @@ public sealed partial class CreatorPage : Page
         // в консоли ModScript — «Консоль · Команды · Функции».
         var sub = editing ? PaneTabs() : _tab is "home" or "mine" or "scripts" ? MineTabs() : _tab == "x" ? MsTabs() : null;
         Content = HubNav.Frame(HubTabOf(_tab), HubNav.RailOf(_tab, creator: true), editing ? _open!.Name : HubTitle(), body, sold: () => _ = LoadMarket(force: true), local: Rail, sub: sub,
-            action: _tab == "team" ? TeamAction() : _tab == "scripts" ? ImportAction() : null, lead: Lead());
+            action: _tab == "team" ? TeamAction() : _tab == "scripts" ? ImportAction() : editing ? null : MineAction(), lead: Lead());
     }
 
-    /// <summary>Строка под названием раздела — там, где без неё непонятно, что делать.</summary>
+    /// <summary>
+    /// 26.0: главная кнопка вкладок «Моих модов» — в шапке, на одном месте у всех трёх вкладок: «Новый мод» у проектов
+    /// (если они уже есть — у пустой полки своя кнопка), «Опубликовать мод» у опубликованных (нужен вход).
+    /// </summary>
+    Control? MineAction()
+    {
+        if (_tab is not ("home" or "mine")) return null;
+        if (_minePart == "published")
+            return Social.Account.SignedIn ? Ui.Button(I18n.T("hub.upload"), PublishArchive, "primary", Icons.Upload) : null;
+        var any = XProjects.List().Count + Projects.List().Count > 0 || Features.Inject.All().Any(i => i.Sealed);
+        return any ? Ui.Button(I18n.T("v22.hub.new"), () => Go("form"), "primary", Icons.Plus) : null;
+    }
+
+    /// <summary>
+    /// Строка под названием раздела — там, где без неё непонятно, что делать. 26.0: у «Скриптов» её нет — она вставала
+    /// только на одной вкладке «Моих модов» и сдвигала полоску вкладок; пояснение — первой строкой самого списка.
+    /// </summary>
     string? Lead() => _tab switch
     {
         "form" => null,
-        "scripts" => I18n.T("v18.lib.lead"),
         "x" => I18n.T("v22.guide.lead"),
         _ => null,
     };

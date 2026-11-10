@@ -28,7 +28,8 @@ public sealed partial class CreatorPage
             if (_exCategory == c) chip.Classes.Add("active");
             chips.Children.Add(chip);
         }
-        var grid = new UniformGrid { Columns = 2 };
+        // 26.0: поле −14 справа съедает отступ правой карточки — край сетки ровно по краю шапки.
+        var grid = new UniformGrid { Columns = 2, Margin = new Thickness(0, 0, -14, 0) };
         foreach (var t in Templates.All.Where(t => _exCategory == "all" || Templates.Category(t) == _exCategory))
         {
             var title = I18n.T($"cr.ex.{t.Id}");
@@ -66,8 +67,9 @@ public sealed partial class CreatorPage
             Content = Ui.Col(10,
                 Ui.Row(10, Ui.Thumb(game?.ArtUrl, game?.Name ?? t.Game, 36, 9), Ui.Col(2, Ui.Text(I18n.T($"cr.ex.{t.Id}"), "h3"), Ui.Text(game?.Name ?? t.Game, "small muted"))),
                 Ui.Text(I18n.T($"cr.ex.{t.Id}.text"), "small muted", wrap: true),
-                new Border { Background = Ui.Res("Surface2"), CornerRadius = new CornerRadius(10), Padding = new Thickness(12, 10), Child = preview },
-                Ui.Row(6, Ui.Icon(Icons.Wand, 14, Ui.Res("Brand2")), Ui.Text(I18n.T("cr.ex.try"), "small brand"))),
+                new Border { Background = HubLook.Raised, CornerRadius = new CornerRadius(8), Padding = new Thickness(12, 10), Child = preview },
+                // 26.0: «Попробовать» — янтарём хаба, а не синим цветом темы.
+                Ui.Row(6, Ui.Icon(Icons.Wand, 14, HubLook.Violet), Ui.Text(I18n.T("cr.ex.try"), "small", color: HubLook.Violet))),
         };
         card.Click += (_, _) => TryTemplate(t);
         return card;

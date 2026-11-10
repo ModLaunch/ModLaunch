@@ -24,7 +24,8 @@ public sealed partial class CreatorPage
     /// <summary>Карточка быстрого старта над анкетой: заголовок, что это, и плитки идей.</summary>
     static Control KidStart()
     {
-        var tiles = new UniformGrid { Columns = 4 };
+        // 26.0: поле −12 справа съедает отступ последней плитки — ряд ровно по краю карточки.
+        var tiles = new UniformGrid { Columns = 4, Margin = new Thickness(0, 0, -12, 0) };
         foreach (var (id, icon, hex) in Ideas)
         {
             var idea = id;
@@ -45,7 +46,8 @@ public sealed partial class CreatorPage
             b.Click += (_, _) => QuickStart(idea);
             tiles.Children.Add(b);
         }
-        var title = new TextBlock { Text = I18n.T("v21.kids.title"), FontFamily = Look.Display, FontSize = 20, FontWeight = FontWeight.Bold };
+        // 26.0: заголовок блока — как у остальных листов хаба (17, полужирный), без второго «плаката» Display под заголовком страницы.
+        var title = new TextBlock { Text = I18n.T("v21.kids.title"), FontSize = 17, FontWeight = FontWeight.SemiBold, TextWrapping = TextWrapping.Wrap };
         var steps = new WrapPanel();
         foreach (var (n, key) in new[] { ("1", "v21.kids.step1"), ("2", "v21.kids.step2"), ("3", "v21.kids.step3") })
             steps.Children.Add(new Border
