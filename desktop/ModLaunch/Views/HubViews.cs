@@ -288,16 +288,31 @@ public sealed partial class CreatorPage
         return col;
     }
 
+    /// <summary>
+    /// Новая версия выложенного мода. 26.0: код — из проекта на этом компьютере (main.mls как он сохранён сейчас,
+    /// пакет — из его папки), а не прошлый код из Hub; проекта нет — честное окно: тот же код или готовый архив.
+    /// </summary>
     void NewVersion(HubMod m)
     {
-        var parts = m.Version.Split('.').Select(p => int.TryParse(p, out var n) ? n : 0).ToArray();
-        var next = parts.Length == 3 ? $"{parts[0]}.{parts[1]}.{parts[2] + 1}" : "1.0.1";
-        var project = Projects.List().FirstOrDefault(p => p.Name == m.Name);
-        HubPublish.Show(new HubDraft
+        var draft = new HubDraft
         {
-            Name = m.Name, Summary = m.Summary, Description = m.Description, Game = m.Game, Version = next, Code = m.Code,
-            Tags = [.. m.Tags], Images = [.. m.Images],
-        }, fromProject: m.Kind == "script" && project is not null, pack: null, done: () => _ = LoadHub(force: true), lockName: true);
+            Id = m.Id, Name = m.Name, Summary = m.Summary, Description = m.Description, Game = m.Game, Version = Hub.NextVersion(m.Version),
+            Code = m.Code, Tags = [.. m.Tags], Images = [.. m.Images],
+        };
+        void Done() { _ = LoadHub(force: true); }
+        var project = Hub.ProjectFor(m, Projects.List(), p => p.Meta().HubId);
+        if (project is null) { HubPublish.ShowVersion(draft, m, Done); return; }
+        var b = ModScript.Compile(File.ReadAllText(project.Script));
+        if (!b.Ok)
+        {
+            // Выложить можно только то, что собирается: открываем проект с ошибками.
+            MainWindow.Current?.Toast(I18n.T("cr.build.hasErrors"), bad: true);
+            OpenProject(project);
+            return;
+        }
+        draft.Version = Hub.SuggestVersion(b.Version, m.Version);
+        draft.Changelog = b.Changelog.FirstOrDefault(c => c.Version == draft.Version).Text ?? "";
+        HubPublish.ShowProject(draft, project, m, Done, lockName: true);
     }
 
     void DeleteMod(HubMod m)

@@ -1,7 +1,10 @@
+using System.Globalization;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using ModLaunch.Core;
+using ModLaunch.Games;
 using ModLaunch.Social;
 
 namespace ModLaunch.Creator;
@@ -37,6 +40,11 @@ public sealed class HubDraft
     public List<string> Images = [];
     /// <summary>Архив для публикации (null — только скрипт).</summary>
     public string? Archive;
+    /// <summary>
+    /// 26.0: id карточки, если мод уже выложен (новая версия из «Опубликованных», проект с hubId). Пусто — id по имени.
+    /// После публикации здесь id, под которым карточка записана.
+    /// </summary>
+    public string? Id;
 }
 
 /// <summary>
@@ -187,10 +195,122 @@ public static partial class Hub
 
     // ---------------------------------------------------------------- публикация
 
-    public static string DocId(string uid, string name)
+    /// <summary>
+    /// id карточки по автору и имени. 26.0: раньше от имени оставался только транслит — китайские, японские,
+    /// корейские имена и эмодзи стирались до «mymod», и разные моды одного автора делили один документ.
+    /// Теперь, если от имени что-то теряется, к id добавляется устойчивый хвост из хэша полного имени
+    /// (латиница и русский дают тот же id, что и раньше; é, ü, ñ — без значков, «cafe»).
+    /// </summary>
+    public static string DocId(string uid, string name) => DocId(uid, name, false);
+
+    static string DocId(string uid, string name, bool hashed)
+    {
+        var (slug, lossy) = Slug(name);
+        if (lossy || hashed)
+        {
+            var full = name.Trim().Normalize(NormalizationForm.FormC).ToLowerInvariant();
+            var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(full)))[..8].ToLowerInvariant();
+            // Правила: после «uid_» — до 60 знаков [a-z0-9_]; хвост «_» + 8 — значит, начало не длиннее 51.
+            slug = (slug == "" ? "mod" : slug.Length > 51 ? slug[..51].TrimEnd('_') : slug) + "_" + hash;
+        }
+        var id = $"{uid.ToLowerInvariant()}_{slug.ToLowerInvariant()}";
+        return id.Length > 120 ? id[..120] : id;
+    }
+
+    /// <summary>id до 26.0 (только транслит, пусто — «mymod»): под ним лежат моды, выложенные раньше.</summary>
+    public static string LegacyDocId(string uid, string name)
     {
         var id = $"{uid.ToLowerInvariant()}_{Projects.PackageName(name).ToLowerInvariant()}";
         return id.Length > 120 ? id[..120] : id;
+    }
+
+    /// <summary>Имя латиницей для id и потеряно ли что-то из имени (иероглифы, эмодзи, ß…).</summary>
+    static (string Slug, bool Lossy) Slug(string name)
+    {
+        // Значки над латиницей (é, ü, ñ) снимаем; кириллицу не трогаем — «й» и «ё» переводит Translit.
+        var plain = new StringBuilder();
+        foreach (var c in name.Trim())
+        {
+            if (c is >= 'À' and < 'ɐ')
+            {
+                var bare = c.ToString().Normalize(NormalizationForm.FormD).Where(x => x < 128).ToArray();
+                if (bare.Length > 0) { plain.Append(bare); continue; }
+            }
+            plain.Append(c);
+        }
+        var t = CustomGames.Translit(plain.ToString());
+        // «№» в русских именах был всегда и id не ломал; остальные знаки-символы (★, ♥) различают моды.
+        var lossy = t.Any(c => c >= 128 && c != '№' && (char.IsLetterOrDigit(c) || char.IsSurrogate(c) || char.GetUnicodeCategory(c) == UnicodeCategory.OtherSymbol));
+        var s = Regex.Replace(t, @"[^A-Za-z0-9_]+", "_").Trim('_');
+        if (s.Length > 60) s = s[..60];
+        return (s, lossy || s == "");
+    }
+
+    /// <summary>
+    /// 26.0: куда писать карточку. Явный id (новая версия выложенного мода) — туда; иначе id по имени. Мод, выложенный
+    /// до 26.0 под старым id с тем же именем, остаётся на своём месте — новая версия не плодит второй карточки.
+    /// </summary>
+    static async Task<(string Id, HubMod? Existing)> Target(string uid, HubDraft d, CancellationToken ct)
+    {
+        var prefix = uid.ToLowerInvariant() + "_";
+        if (d.Id is { Length: > 0 } own && own.StartsWith(prefix, StringComparison.Ordinal) && await Get(own, ct) is { } mine && mine.Uid == uid)
+            return (own, mine);
+        var id = DocId(uid, d.Name);
+        var legacy = LegacyDocId(uid, d.Name);
+        if (legacy != id && await Get(legacy, ct) is { } old && old.Uid == uid && SameMod(old.Name, d.Name))
+            return (legacy, old);
+        var existing = await Get(id, ct);
+        // Под этим id — другой мод (старое имя из иероглифов стёрлось до того же): свою карточку — с хвостом из хэша.
+        if (existing is not null && !SameMod(existing.Name, d.Name))
+        {
+            id = DocId(uid, d.Name, hashed: true);
+            existing = await Get(id, ct);
+            if (existing is not null && !SameMod(existing.Name, d.Name)) throw new ServiceError("NAME_TAKEN", existing.Name);
+        }
+        return (id, existing);
+    }
+
+    /// <summary>
+    /// 26.0: своя карточка в Hub для проекта (по hubId из project.json, иначе по имени) — чтобы новый выпуск не стёр
+    /// описание, теги и картинки. Не вошли, нет сети, карточки нет — null.
+    /// </summary>
+    public static async Task<HubMod?> FindMine(string? hubId, string name, CancellationToken ct = default)
+    {
+        if (!Account.SignedIn || Account.Uid is not { Length: > 0 } uid || Clip(name, 60) == "") return null;
+        try { return (await Target(uid, new HubDraft { Id = hubId, Name = name }, ct)).Existing; }
+        catch { return null; }
+    }
+
+    /// <summary>Тот же мод: имя совпадает без учёта регистра, или оба имени целиком латиницей/кириллицей (тогда id = имя).</summary>
+    internal static bool SameMod(string a, string b) =>
+        string.Equals(Clip(a, 60), Clip(b, 60), StringComparison.OrdinalIgnoreCase) || (!Slug(a).Lossy && !Slug(b).Lossy && Slug(a).Slug.Equals(Slug(b).Slug, StringComparison.OrdinalIgnoreCase));
+
+    // ---------------------------------------------------------------- версии
+
+    /// <summary>26.0: сравнить версии x.y.z по числам (1.10.0 новее 1.9.9). Не версия — считается 0.0.0.</summary>
+    public static int CompareVersions(string a, string b)
+    {
+        var x = VersionParts(a);
+        var y = VersionParts(b);
+        for (var i = 0; i < 3; i++)
+            if (x[i] != y[i]) return x[i].CompareTo(y[i]);
+        return 0;
+    }
+
+    static long[] VersionParts(string v)
+    {
+        var parts = (v ?? "").Trim().TrimStart('v', 'V').Split('.');
+        var r = new long[3];
+        for (var i = 0; i < 3 && i < parts.Length; i++)
+            r[i] = long.TryParse(Regex.Match(parts[i], @"^\d+").Value, out var n) ? n : 0;
+        return r;
+    }
+
+    /// <summary>Следующая версия после данной: +1 к последнему числу (1.2.3 → 1.2.4).</summary>
+    public static string NextVersion(string v)
+    {
+        var p = VersionParts(v);
+        return $"{p[0]}.{p[1]}.{p[2] + 1}";
     }
 
     static string BlobId(string docId, string version, int n) => $"{docId}__{version}__{n}";
@@ -209,9 +329,9 @@ public static partial class Hub
         if (Clip(d.Name, 60) == "") throw new ServiceError("INVALID", "name");
         if (!Regex.IsMatch(d.Version, @"^\d+\.\d+\.\d+$")) throw new ServiceError("INVALID", "version");
         if (d.Code.Length > MaxCode) throw new ServiceError("TOO_BIG");
-        var id = DocId(uid, d.Name);
-        var existing = await Get(id, ct);
-        if (existing is not null && existing.Version == d.Version) throw new ServiceError("SAME_VERSION");
+        var (id, existing) = await Target(uid, d, ct);
+        // 26.0: версия только растёт — иначе у подписчиков «обновление» на старую. В сообщении — текущая версия.
+        if (existing is not null && CompareVersions(d.Version, existing.Version) <= 0) throw new ServiceError("OLD_VERSION", existing.Version);
 
         long size = 0;
         string sha = "", fileName = "";
@@ -310,6 +430,7 @@ public static partial class Hub
         catch { }
         Invalidate();
         Follow(id, d.Version);
+        d.Id = id;
         return id;
     }
 
