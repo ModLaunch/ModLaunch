@@ -25,6 +25,7 @@ public sealed partial class CreatorPage
     {
         var col = new StackPanel { Spacing = 18 };
         if (_minePart == "published") { col.Children.Add(PublishedView()); return col; }
+        if (_minePart == "stats") { col.Children.Add(StatsView()); return col; }
 
         // Проверка в игре закончится, пока смотрим список, — точка статуса обновится сама.
         HookTest();
@@ -80,13 +81,9 @@ public sealed partial class CreatorPage
 
         if (mods.Count + owned.Count == 0)
         {
-            var empty = Ui.Col(10,
-                Ui.Text(_filter == "" ? I18n.T("v22.mods.empty") : I18n.T("cr.lib.none"), "h3"),
-                Ui.Text(_filter == "" ? I18n.T("v22.mods.empty.text") : I18n.T("v18.av.empty"), "muted", wrap: true));
-            if (_filter == "") empty.Children.Add(Ui.Row(10, Ui.Button(I18n.T("v22.hub.new"), () => Go("form"), "primary", Icons.Plus)));
-            empty.MaxWidth = 560;
-            empty.HorizontalAlignment = HorizontalAlignment.Left;
-            col.Children.Add(empty);
+            // 26.0: пустая полка — общее пустое состояние хаба, «Путь автора» и примеры для своих игр (раньше — строка и кнопка).
+            if (_filter == "") EmptyMine(col);
+            else col.Children.Add(HubLook.Empty(Icons.Search, I18n.T("cr.lib.none"), I18n.T("v18.av.empty")));
             return col;
         }
         if (mods.Count > 0) col.Children.Add(Tiles(mods));
@@ -314,7 +311,8 @@ public sealed partial class CreatorPage
     List<Control> MineTabs()
     {
         var tabs = new List<Control>();
-        foreach (var (id, key) in new[] { ("projects", "cr.mine.projects"), ("scripts", "v18.hub.scripts"), ("published", "cr.mine.published") })
+        // 26.0: четвёртая вкладка — «Статистика» автора (CreatorPage.Stats.cs).
+        foreach (var (id, key) in new[] { ("projects", "cr.mine.projects"), ("scripts", "v18.hub.scripts"), ("published", "cr.mine.published"), ("stats", "v26.features.stats.tab") })
         {
             var part = id;
             var b = Ui.Button(I18n.T(key), () =>
