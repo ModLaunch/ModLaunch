@@ -3,6 +3,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Styling;
 using ModLaunch.Core;
 using ModLaunch.Creator;
 using ModLaunch.Games;
@@ -164,6 +165,14 @@ public static class HubPublish
 
         var bar = new ProgressBar { Minimum = 0, Maximum = 1, IsVisible = false };
         var status = Ui.Text("", "small muted", wrap: true);
+        // 26.0: ошибка и ход загрузки — под формой, у кнопок: в конце длинной формы их не было видно без прокрутки.
+        status.IsVisible = false;
+        void Say(string text, IBrush color)
+        {
+            status.Text = text;
+            status.Foreground = color;
+            status.IsVisible = text != "";
+        }
         // Версия не выше выложенной: подсказка и кнопка «Поставить 1.2.4».
         string? suggested = null;
         Button? fix = null;
@@ -172,14 +181,13 @@ public static class HubPublish
             if (suggested is null) return;
             version.Text = suggested;
             fix!.IsVisible = false;
-            status.Text = "";
+            Say("", Ui.Res("Muted"));
         }, "chip");
         fix.IsVisible = false;
         fix.HorizontalAlignment = HorizontalAlignment.Left;
         void Problem(string text, string? next = null)
         {
-            status.Text = text;
-            status.Foreground = Ui.Res("Bad");
+            Say(text, Ui.Res("Bad"));
             suggested = next;
             fix.IsVisible = next is not null;
             if (next is not null) fix.Content = I18n.T("v26.bugs.version.use", ("next", next));
@@ -201,15 +209,14 @@ public static class HubPublish
             Background = Ui.Res("Surface2"), CornerRadius = new CornerRadius(10), Padding = new Thickness(12),
             Child = Ui.Row(10, Ui.Icon(Icons.Shield, 16, Ui.Res("Muted")), Ui.Text(I18n.T("hub.f.rules"), "small muted", wrap: true)),
         });
-        form.Children.Add(bar);
-        form.Children.Add(status);
-        form.Children.Add(fix);
-        var scroller = new ScrollViewer { Content = form, MaxHeight = 520, HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled };
+        var scroller = new ScrollViewer { Content = form, MaxHeight = 480, HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled };
+        var body = Ui.Col(10, scroller, bar, status, fix);
+        AmberRadios(body);
 
         Button? go = null;
         go = Ui.Button(I18n.T("cr.publish"), async () =>
         {
-            status.Foreground = Ui.Res("Muted");
+            Say("", Ui.Res("Muted"));
             fix.IsVisible = false;
             d.Name = name.Text ?? "";
             d.Summary = summary.Text ?? "";
@@ -263,7 +270,7 @@ public static class HubPublish
                 };
                 if (kind == "file") d.Code = "";
                 if (kind == "stored") d.Code = from.Existing!.Code;
-                status.Text = I18n.T("hub.f.uploading");
+                Say(I18n.T("hub.f.uploading"), Ui.Res("Muted"));
                 await Hub.Publish(d, new Progress<double>(r => bar.Value = r));
                 if (project is not null) Released(project, d, original);
                 w.CloseDialog();
@@ -292,7 +299,28 @@ public static class HubPublish
         // Игра из кода незнакома — выкладывать нечего, пока строку game не исправят.
         go.IsEnabled = !unknownGame;
         LastGo = go;
-        w.Dialog(I18n.T(lockName ? "hub.newVersion" : "hub.publish.title"), scroller, Ui.Button(I18n.T("common.cancel"), w.CloseDialog), go);
+        w.Dialog(I18n.T(lockName ? "hub.newVersion" : "hub.publish.title"), body, Ui.Button(I18n.T("common.cancel"), w.CloseDialog), go);
+    }
+
+    /// <summary>
+    /// 26.0: выбор «что выкладываем» — янтарём хаба, а не синим акцентом темы (HubLook.Scope красит флажки, но не радио).
+    /// </summary>
+    static void AmberRadios(Control root)
+    {
+        foreach (var hover in new[] { false, true })
+        {
+            Selector Part(string name)
+            {
+                var s = Selectors.OfType(null, typeof(RadioButton)).Class(":checked");
+                if (hover) s = s.Class(":pointerover");
+                return s.Template().OfType<Avalonia.Controls.Shapes.Ellipse>().Name(name);
+            }
+            root.Styles.Add(new Style(_ => Part("CheckOuterEllipse"))
+            {
+                Setters = { new Setter(Avalonia.Controls.Shapes.Shape.FillProperty, HubLook.Amber), new Setter(Avalonia.Controls.Shapes.Shape.StrokeProperty, HubLook.Amber) },
+            });
+            root.Styles.Add(new Style(_ => Part("CheckGlyph")) { Setters = { new Setter(Avalonia.Controls.Shapes.Shape.FillProperty, HubLook.OnAmber) } });
+        }
     }
 
     /// <summary>

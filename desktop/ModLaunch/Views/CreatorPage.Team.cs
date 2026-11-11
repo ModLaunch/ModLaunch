@@ -311,9 +311,22 @@ public sealed partial class CreatorPage
             Ui.Text(I18n.T("v26.bugs.team.pull.text", ("name", p.Name), ("who", p.ByName), ("version", p.Version == "" ? "—" : "v" + p.Version),
                 ("added", added), ("removed", removed)), "muted", wrap: true),
             new Border { Background = HubLook.Raised, BorderBrush = HubLook.Edge, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(8), Padding = new Thickness(12, 10), Child = lines },
-            Ui.Row(8, Ui.Icon(Icons.Clock, 14, Ui.Res("Muted")), Ui.Text(I18n.T("v26.bugs.team.pull.backup"), "small muted", wrap: true)));
+            IconNote(Icons.Clock, I18n.T("v26.bugs.team.pull.backup")));
         body.MaxWidth = 540;
         return body;
+    }
+
+    /// <summary>Строка-пояснение со значком слева; текст переносится (в Ui.Row он уходил за край окна).</summary>
+    internal static Control IconNote(string icon, string text)
+    {
+        var mark = Ui.Icon(icon, 14, Ui.Res("Muted"));
+        mark.VerticalAlignment = VerticalAlignment.Top;
+        mark.Margin = new Thickness(0, 1, 8, 0);
+        var dock = new DockPanel();
+        DockPanel.SetDock(mark, Dock.Left);
+        dock.Children.Add(mark);
+        dock.Children.Add(Ui.Text(text, "small muted", wrap: true));
+        return dock;
     }
 
     /// <summary>Для снимков: вопрос «Обновить у себя» для своего проекта, который ушёл вперёд от версии команды.</summary>

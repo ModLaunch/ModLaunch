@@ -358,6 +358,9 @@ public sealed partial class CreatorPage
         HubPublish.ShowProject(draft, project, m, Done, lockName: true);
     }
 
+    /// <summary>Для снимков: «Новая версия» выложенного мода (с проектом на этом компьютере или без).</summary>
+    internal void DemoNewVersion(HubMod m) => NewVersion(m);
+
     void DeleteMod(HubMod m)
     {
         var w = MainWindow.Current!;

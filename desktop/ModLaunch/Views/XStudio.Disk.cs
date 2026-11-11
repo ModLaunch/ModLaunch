@@ -67,7 +67,7 @@ public sealed partial class XStudio
         var (added, removed) = XHistory.Count(disk, mine);
         var body = Ui.Col(10,
             Ui.Text(I18n.T("v26.bugs.disk.text", ("added", added), ("removed", removed)), "muted", wrap: true),
-            Ui.Row(8, Ui.Icon(Icons.Clock, 14, Ui.Res("Muted")), Ui.Text(I18n.T("v26.bugs.disk.history"), "small muted", wrap: true)));
+            CreatorPage.IconNote(Icons.Clock, I18n.T("v26.bugs.disk.history")));
         body.MaxWidth = 520;
         void Next()
         {
