@@ -1,0 +1,66 @@
+{
+  "ru": {
+    "new.v26.subtitle": "Моды находятся с первого раза, Creator Hub стал чище и удобнее, а рынок — проще",
+    "new.v26.search": "Умный поиск: пишите как говорите — «рандомные враги» находит Enemy Randomizer. ModLaunch понимает русские и украинские слова, формы слов и ищет по каждому слову, если фраза целиком не нашлась.",
+    "new.v26.sources": "Все источники сразу: каталог игры ищет в Thunderstore, Nexus, ModLinks и ModLaunch Hub одним списком — мод больше не теряется из-за того, что лежит на другом сайте.",
+    "new.v26.games": "Новые игры: ATLYSS, Monster Hunter: World и классика Bethesda — Oblivion, Fallout 3, New Vegas и Skyrim LE. Устаревшие моды в подборках заменены живыми.",
+    "new.v26.hub": "Обновлённый Creator Hub: единый стиль, аккуратные плитки, понятный мастер нового мода, ярлыки и пустые экраны с подсказкой, что делать дальше.",
+    "new.v26.market": "Рынок и моды сообщества: фильтры в две строки, игры — чипами, поиск по меткам и словам, страницы лота и автора прямо внутри хаба."
+  },
+  "en": {
+    "new.v26.subtitle": "Mods turn up on the first try, Creator Hub got cleaner and easier, and the market got simpler",
+    "new.v26.search": "Smart search: type it the way you say it — «random enemies» finds Enemy Randomizer. ModLaunch understands Russian and Ukrainian words and word forms, and searches word by word when the whole phrase finds nothing.",
+    "new.v26.sources": "All sources at once: a game's catalog searches Thunderstore, Nexus, ModLinks and ModLaunch Hub as one list — a mod no longer goes missing just because it lives on another site.",
+    "new.v26.games": "New games: ATLYSS, Monster Hunter: World and the Bethesda classics — Oblivion, Fallout 3, New Vegas and Skyrim LE. Outdated mods in the picks were replaced with live ones.",
+    "new.v26.hub": "Redesigned Creator Hub: one consistent style, tidy tiles, a clearer new-mod wizard, badges, and empty screens that tell you what to do next.",
+    "new.v26.market": "Market and community mods: filters in two rows, games as chips, search by tags and words, listing and author pages right inside the hub."
+  },
+  "uk": {
+    "new.v26.subtitle": "Моди знаходяться з першого разу, Creator Hub став чистішим і зручнішим, а ринок — простішим",
+    "new.v26.search": "Розумний пошук: пишіть як говорите — «рандомні вороги» знаходить Enemy Randomizer. ModLaunch розуміє українські та російські слова, форми слів і шукає за кожним словом, якщо вся фраза нічого не дала.",
+    "new.v26.sources": "Усі джерела одразу: каталог гри шукає в Thunderstore, Nexus, ModLinks і ModLaunch Hub одним списком — мод більше не губиться через те, що лежить на іншому сайті.",
+    "new.v26.games": "Нові ігри: ATLYSS, Monster Hunter: World і класика Bethesda — Oblivion, Fallout 3, New Vegas і Skyrim LE. Застарілі моди в добірках замінено живими.",
+    "new.v26.hub": "Оновлений Creator Hub: єдиний стиль, охайні плитки, зрозуміліший майстер нового мода, ярлики й порожні екрани з підказкою, що робити далі.",
+    "new.v26.market": "Ринок і моди спільноти: фільтри у два рядки, ігри — чипами, пошук за мітками й словами, сторінки лота й автора просто всередині хаба."
+  },
+  "es": {
+    "new.v26.subtitle": "Los mods aparecen a la primera, Creator Hub es más limpio y cómodo, y el mercado más sencillo",
+    "new.v26.search": "Búsqueda inteligente: escribe como hablas — «enemigos aleatorios» encuentra Enemy Randomizer. ModLaunch entiende palabras en ruso y ucraniano, sus formas, y busca palabra por palabra si la frase entera no da resultados.",
+    "new.v26.sources": "Todas las fuentes a la vez: el catálogo del juego busca en Thunderstore, Nexus, ModLinks y ModLaunch Hub en una sola lista — un mod ya no se pierde por estar en otro sitio.",
+    "new.v26.games": "Juegos nuevos: ATLYSS, Monster Hunter: World y los clásicos de Bethesda — Oblivion, Fallout 3, New Vegas y Skyrim LE. Los mods obsoletos de las selecciones se cambiaron por otros activos.",
+    "new.v26.hub": "Creator Hub renovado: un estilo uniforme, mosaicos ordenados, un asistente de nuevo mod más claro, etiquetas y pantallas vacías que indican qué hacer después.",
+    "new.v26.market": "Mercado y mods de la comunidad: filtros en dos filas, juegos como chips, búsqueda por etiquetas y palabras, páginas de producto y de autor dentro del hub."
+  },
+  "de": {
+    "new.v26.subtitle": "Mods werden auf Anhieb gefunden, der Creator Hub ist aufgeräumter und der Marktplatz einfacher",
+    "new.v26.search": "Intelligente Suche: Schreib, wie du sprichst — «zufällige Gegner» findet Enemy Randomizer. ModLaunch versteht russische und ukrainische Wörter samt Wortformen und sucht Wort für Wort, wenn die ganze Phrase nichts findet.",
+    "new.v26.sources": "Alle Quellen auf einmal: Der Katalog eines Spiels durchsucht Thunderstore, Nexus, ModLinks und ModLaunch Hub in einer Liste — ein Mod geht nicht mehr verloren, nur weil er auf einer anderen Seite liegt.",
+    "new.v26.games": "Neue Spiele: ATLYSS, Monster Hunter: World und die Bethesda-Klassiker — Oblivion, Fallout 3, New Vegas und Skyrim LE. Veraltete Mods in den Empfehlungen wurden durch aktive ersetzt.",
+    "new.v26.hub": "Überarbeiteter Creator Hub: ein einheitlicher Stil, saubere Kacheln, ein klarerer Assistent für neue Mods, Labels und leere Ansichten mit einem Hinweis, was als Nächstes kommt.",
+    "new.v26.market": "Marktplatz und Community-Mods: Filter in zwei Zeilen, Spiele als Chips, Suche nach Tags und Wörtern, Angebots- und Autorenseiten direkt im Hub."
+  },
+  "fr": {
+    "new.v26.subtitle": "Les mods se trouvent du premier coup, le Creator Hub est plus net et plus pratique, le marché plus simple",
+    "new.v26.search": "Recherche intelligente : écrivez comme vous parlez — «ennemis aléatoires» trouve Enemy Randomizer. ModLaunch comprend les mots russes et ukrainiens et leurs formes, et cherche mot par mot si la phrase entière ne donne rien.",
+    "new.v26.sources": "Toutes les sources à la fois : le catalogue du jeu cherche dans Thunderstore, Nexus, ModLinks et ModLaunch Hub en une seule liste — un mod ne se perd plus parce qu'il est sur un autre site.",
+    "new.v26.games": "Nouveaux jeux : ATLYSS, Monster Hunter: World et les classiques de Bethesda — Oblivion, Fallout 3, New Vegas et Skyrim LE. Les mods obsolètes des sélections ont été remplacés par des mods actifs.",
+    "new.v26.hub": "Creator Hub repensé : un style unique, des tuiles soignées, un assistant de nouveau mod plus clair, des étiquettes et des écrans vides qui indiquent quoi faire ensuite.",
+    "new.v26.market": "Marché et mods de la communauté : filtres sur deux lignes, jeux en puces, recherche par tags et par mots, pages d'offre et d'auteur directement dans le hub."
+  },
+  "pt-BR": {
+    "new.v26.subtitle": "Os mods aparecem de primeira, o Creator Hub ficou mais limpo e prático, e o mercado mais simples",
+    "new.v26.search": "Busca inteligente: escreva como você fala — «inimigos aleatórios» encontra o Enemy Randomizer. O ModLaunch entende palavras em russo e ucraniano e suas formas, e busca palavra por palavra quando a frase inteira não encontra nada.",
+    "new.v26.sources": "Todas as fontes de uma vez: o catálogo do jogo busca no Thunderstore, Nexus, ModLinks e ModLaunch Hub numa lista só — um mod não some mais só porque está em outro site.",
+    "new.v26.games": "Jogos novos: ATLYSS, Monster Hunter: World e os clássicos da Bethesda — Oblivion, Fallout 3, New Vegas e Skyrim LE. Mods desatualizados nas seleções foram trocados por mods ativos.",
+    "new.v26.hub": "Creator Hub renovado: um estilo único, blocos organizados, um assistente de novo mod mais claro, etiquetas e telas vazias que dizem o que fazer em seguida.",
+    "new.v26.market": "Mercado e mods da comunidade: filtros em duas linhas, jogos como chips, busca por tags e palavras, páginas do item e do autor dentro do hub."
+  },
+  "zh-CN": {
+    "new.v26.subtitle": "模组一搜就到，Creator Hub 更整洁好用，市场也更简单",
+    "new.v26.search": "智能搜索：怎么说就怎么搜——「随机敌人」也能找到 Enemy Randomizer。ModLaunch 能理解俄语和乌克兰语词汇及其词形；整句搜不到时会按每个词分别搜索。",
+    "new.v26.sources": "所有来源一起搜：游戏目录在一个列表里同时搜索 Thunderstore、Nexus、ModLinks 和 ModLaunch Hub——模组不会再因为放在别的网站而找不到。",
+    "new.v26.games": "新游戏：ATLYSS、Monster Hunter: World 以及 Bethesda 经典作品——Oblivion、Fallout 3、New Vegas 和 Skyrim LE。精选中的过时模组已换成仍在更新的模组。",
+    "new.v26.hub": "全新 Creator Hub：统一的风格、整齐的卡片、更清晰的新建模组向导、标签，以及会提示下一步做什么的空白页。",
+    "new.v26.market": "市场与社区模组：两行筛选、游戏用标签切换、按标签和关键词搜索，商品页和作者页直接在 Hub 内打开。"
+  }
+}
