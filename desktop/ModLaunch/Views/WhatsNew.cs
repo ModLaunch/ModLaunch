@@ -12,11 +12,16 @@ public static class WhatsNew
 {
     static readonly (string Icon, string Key, Func<Page>? Open)[] Items =
     [
-        // 26.0: умный поиск и «Все источники», новые игры, обновлённый Creator Hub и рынок.
+        // 26.0: умный поиск и «Все источники», новые игры, обновлённый Creator Hub (статистика, путь автора, ремикс, публикация) и рынок.
         (Icons.Search, "new.v26.search", () => new SearchPage()),
         (Icons.Layers, "new.v26.sources", null),
         (Icons.Gamepad, "new.v26.games", () => new AddGamePage()),
         (Icons.Grid, "new.v26.hub", () => new CreatorPage("home")),
+        (Icons.Chart, "new.v26.stats", () => new CreatorPage("stats")),
+        (Icons.Flag, "new.v26.path", () => new CreatorPage("mine")),
+        (Icons.Bell, "new.v26.bell", () => new CreatorPage("stats")),
+        (Icons.Code, "new.v26.remix", null),
+        (Icons.Shield, "new.v26.publish", () => new CreatorPage("published")),
         (Icons.Bag, "new.v26.market", () => new MarketPage()),
         // 25.0 (юбилейная): Premium, кошельки, «Найти виновника», «Сообщить о проблеме», юбилейные награды.
         (Icons.Sparkles, "new.v25.premium", () => new AccountPage("premium")),

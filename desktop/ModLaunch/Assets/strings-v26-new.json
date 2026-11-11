@@ -5,7 +5,12 @@
     "new.v26.sources": "Все источники сразу: каталог игры ищет в Thunderstore, Nexus, ModLinks и ModLaunch Hub одним списком — мод больше не теряется из-за того, что лежит на другом сайте.",
     "new.v26.games": "Новые игры: ATLYSS, Monster Hunter: World и классика Bethesda — Oblivion, Fallout 3, New Vegas и Skyrim LE. Устаревшие моды в подборках заменены живыми.",
     "new.v26.hub": "Обновлённый Creator Hub: единый стиль, аккуратные плитки, понятный мастер нового мода, ярлыки и пустые экраны с подсказкой, что делать дальше.",
-    "new.v26.market": "Рынок и моды сообщества: фильтры в две строки, игры — чипами, поиск по меткам и словам, страницы лота и автора прямо внутри хаба."
+    "new.v26.market": "Рынок и моды сообщества: фильтры в две строки, игры — чипами, поиск по меткам и словам, страницы лота и автора прямо внутри хаба.",
+    "new.v26.stats": "Статистика автора: в «Моих модах» — скачивания, лайки, комментарии и продажи, график роста за 14 или 30 дней, таблица модов с изменениями за неделю и свежие комментарии.",
+    "new.v26.bell": "Новости для автора в колокольчике: сколько добавилось скачиваний, лайков, комментариев и продаж с прошлого визита.",
+    "new.v26.path": "Путь автора: четыре шага от идеи до первых игроков — создать мод, запустить в игре, опубликовать и поделиться ссылкой. Плюс готовые шаблоны для ваших игр.",
+    "new.v26.remix": "Ремикс в ModScript: скриптовый мод из Hub можно открыть своей копией в студии — с указанием оригинала и автора.",
+    "new.v26.publish": "Публикация без сюрпризов: новая версия берёт код из вашего проекта, описание и картинки мода больше не стираются, версия только растёт, а редактор не перезаписывает файлы, изменённые на диске."
   },
   "en": {
     "new.v26.subtitle": "Mods turn up on the first try, Creator Hub got cleaner and easier, and the market got simpler",
@@ -13,7 +18,12 @@
     "new.v26.sources": "All sources at once: a game's catalog searches Thunderstore, Nexus, ModLinks and ModLaunch Hub as one list — a mod no longer goes missing just because it lives on another site.",
     "new.v26.games": "New games: ATLYSS, Monster Hunter: World and the Bethesda classics — Oblivion, Fallout 3, New Vegas and Skyrim LE. Outdated mods in the picks were replaced with live ones.",
     "new.v26.hub": "Redesigned Creator Hub: one consistent style, tidy tiles, a clearer new-mod wizard, badges, and empty screens that tell you what to do next.",
-    "new.v26.market": "Market and community mods: filters in two rows, games as chips, search by tags and words, listing and author pages right inside the hub."
+    "new.v26.market": "Market and community mods: filters in two rows, games as chips, search by tags and words, listing and author pages right inside the hub.",
+    "new.v26.stats": "Creator statistics: My mods now shows downloads, likes, comments and sales, a 14 or 30 day growth chart, a per-mod table with weekly changes and the latest comments.",
+    "new.v26.bell": "Creator news in the bell: how many downloads, likes, comments and sales you got since your last visit.",
+    "new.v26.path": "Creator path: four steps from an idea to your first players — create a mod, run it in the game, publish it and share the link. Plus ready templates for your games.",
+    "new.v26.remix": "Remix in ModScript: open your own copy of a Hub script mod in the studio, with the original and its author credited.",
+    "new.v26.publish": "Publishing without surprises: a new version takes the code from your project, the mod's description and images are no longer wiped, versions only go up, and the editor no longer overwrites files changed on disk."
   },
   "uk": {
     "new.v26.subtitle": "Моди знаходяться з першого разу, Creator Hub став чистішим і зручнішим, а ринок — простішим",
@@ -21,7 +31,12 @@
     "new.v26.sources": "Усі джерела одразу: каталог гри шукає в Thunderstore, Nexus, ModLinks і ModLaunch Hub одним списком — мод більше не губиться через те, що лежить на іншому сайті.",
     "new.v26.games": "Нові ігри: ATLYSS, Monster Hunter: World і класика Bethesda — Oblivion, Fallout 3, New Vegas і Skyrim LE. Застарілі моди в добірках замінено живими.",
     "new.v26.hub": "Оновлений Creator Hub: єдиний стиль, охайні плитки, зрозуміліший майстер нового мода, ярлики й порожні екрани з підказкою, що робити далі.",
-    "new.v26.market": "Ринок і моди спільноти: фільтри у два рядки, ігри — чипами, пошук за мітками й словами, сторінки лота й автора просто всередині хаба."
+    "new.v26.market": "Ринок і моди спільноти: фільтри у два рядки, ігри — чипами, пошук за мітками й словами, сторінки лота й автора просто всередині хаба.",
+    "new.v26.stats": "Статистика автора: у «Моїх модах» — завантаження, вподобання, коментарі й продажі, графік зростання за 14 або 30 днів, таблиця модів зі змінами за тиждень і свіжі коментарі.",
+    "new.v26.bell": "Новини для автора в дзвіночку: скільки додалося завантажень, вподобань, коментарів і продажів з минулого візиту.",
+    "new.v26.path": "Шлях автора: чотири кроки від ідеї до перших гравців — створити мод, запустити в грі, опублікувати й поділитися посиланням. А ще готові шаблони для ваших ігор.",
+    "new.v26.remix": "Ремікс у ModScript: скриптовий мод із Hub можна відкрити власною копією в студії — із зазначенням оригіналу та автора.",
+    "new.v26.publish": "Публікація без сюрпризів: нова версія бере код із вашого проєкту, опис і картинки мода більше не стираються, версія лише зростає, а редактор не перезаписує файли, змінені на диску."
   },
   "es": {
     "new.v26.subtitle": "Los mods aparecen a la primera, Creator Hub es más limpio y cómodo, y el mercado más sencillo",
@@ -29,7 +44,12 @@
     "new.v26.sources": "Todas las fuentes a la vez: el catálogo del juego busca en Thunderstore, Nexus, ModLinks y ModLaunch Hub en una sola lista — un mod ya no se pierde por estar en otro sitio.",
     "new.v26.games": "Juegos nuevos: ATLYSS, Monster Hunter: World y los clásicos de Bethesda — Oblivion, Fallout 3, New Vegas y Skyrim LE. Los mods obsoletos de las selecciones se cambiaron por otros activos.",
     "new.v26.hub": "Creator Hub renovado: un estilo uniforme, mosaicos ordenados, un asistente de nuevo mod más claro, etiquetas y pantallas vacías que indican qué hacer después.",
-    "new.v26.market": "Mercado y mods de la comunidad: filtros en dos filas, juegos como chips, búsqueda por etiquetas y palabras, páginas de producto y de autor dentro del hub."
+    "new.v26.market": "Mercado y mods de la comunidad: filtros en dos filas, juegos como chips, búsqueda por etiquetas y palabras, páginas de producto y de autor dentro del hub.",
+    "new.v26.stats": "Estadísticas de creador: en Mis mods verás descargas, me gusta, comentarios y ventas, un gráfico de crecimiento de 14 o 30 días, una tabla de mods con los cambios de la semana y los últimos comentarios.",
+    "new.v26.bell": "Novedades para creadores en la campana: cuántas descargas, me gusta, comentarios y ventas sumaste desde tu última visita.",
+    "new.v26.path": "Ruta del creador: cuatro pasos de la idea a tus primeros jugadores — crear un mod, probarlo en el juego, publicarlo y compartir el enlace. Además, plantillas listas para tus juegos.",
+    "new.v26.remix": "Remix en ModScript: abre en el estudio tu propia copia de un mod de script de Hub, con el original y su autor citados.",
+    "new.v26.publish": "Publicar sin sorpresas: una nueva versión toma el código de tu proyecto, la descripción y las imágenes del mod ya no se borran, la versión solo sube y el editor ya no sobrescribe archivos cambiados en el disco."
   },
   "de": {
     "new.v26.subtitle": "Mods werden auf Anhieb gefunden, der Creator Hub ist aufgeräumter und der Marktplatz einfacher",
@@ -37,7 +57,12 @@
     "new.v26.sources": "Alle Quellen auf einmal: Der Katalog eines Spiels durchsucht Thunderstore, Nexus, ModLinks und ModLaunch Hub in einer Liste — ein Mod geht nicht mehr verloren, nur weil er auf einer anderen Seite liegt.",
     "new.v26.games": "Neue Spiele: ATLYSS, Monster Hunter: World und die Bethesda-Klassiker — Oblivion, Fallout 3, New Vegas und Skyrim LE. Veraltete Mods in den Empfehlungen wurden durch aktive ersetzt.",
     "new.v26.hub": "Überarbeiteter Creator Hub: ein einheitlicher Stil, saubere Kacheln, ein klarerer Assistent für neue Mods, Labels und leere Ansichten mit einem Hinweis, was als Nächstes kommt.",
-    "new.v26.market": "Marktplatz und Community-Mods: Filter in zwei Zeilen, Spiele als Chips, Suche nach Tags und Wörtern, Angebots- und Autorenseiten direkt im Hub."
+    "new.v26.market": "Marktplatz und Community-Mods: Filter in zwei Zeilen, Spiele als Chips, Suche nach Tags und Wörtern, Angebots- und Autorenseiten direkt im Hub.",
+    "new.v26.stats": "Creator-Statistik: Unter „Meine Mods“ siehst du Downloads, Likes, Kommentare und Verkäufe, ein Wachstumsdiagramm über 14 oder 30 Tage, eine Mod-Tabelle mit den Änderungen der Woche und die neuesten Kommentare.",
+    "new.v26.bell": "Creator-News in der Glocke: wie viele Downloads, Likes, Kommentare und Verkäufe seit deinem letzten Besuch dazugekommen sind.",
+    "new.v26.path": "Creator-Pfad: vier Schritte von der Idee zu den ersten Spielern — Mod erstellen, im Spiel starten, veröffentlichen und den Link teilen. Dazu fertige Vorlagen für deine Spiele.",
+    "new.v26.remix": "Remix in ModScript: Öffne eine eigene Kopie eines Hub-Skript-Mods im Studio, mit Nennung des Originals und seines Autors.",
+    "new.v26.publish": "Veröffentlichen ohne Überraschungen: Eine neue Version nimmt den Code aus deinem Projekt, Beschreibung und Bilder des Mods werden nicht mehr gelöscht, Versionen steigen nur noch, und der Editor überschreibt keine auf der Festplatte geänderten Dateien mehr."
   },
   "fr": {
     "new.v26.subtitle": "Les mods se trouvent du premier coup, le Creator Hub est plus net et plus pratique, le marché plus simple",
@@ -45,7 +70,12 @@
     "new.v26.sources": "Toutes les sources à la fois : le catalogue du jeu cherche dans Thunderstore, Nexus, ModLinks et ModLaunch Hub en une seule liste — un mod ne se perd plus parce qu'il est sur un autre site.",
     "new.v26.games": "Nouveaux jeux : ATLYSS, Monster Hunter: World et les classiques de Bethesda — Oblivion, Fallout 3, New Vegas et Skyrim LE. Les mods obsolètes des sélections ont été remplacés par des mods actifs.",
     "new.v26.hub": "Creator Hub repensé : un style unique, des tuiles soignées, un assistant de nouveau mod plus clair, des étiquettes et des écrans vides qui indiquent quoi faire ensuite.",
-    "new.v26.market": "Marché et mods de la communauté : filtres sur deux lignes, jeux en puces, recherche par tags et par mots, pages d'offre et d'auteur directement dans le hub."
+    "new.v26.market": "Marché et mods de la communauté : filtres sur deux lignes, jeux en puces, recherche par tags et par mots, pages d'offre et d'auteur directement dans le hub.",
+    "new.v26.stats": "Statistiques de créateur : Mes mods affiche les téléchargements, j'aime, commentaires et ventes, un graphique de croissance sur 14 ou 30 jours, un tableau des mods avec les variations de la semaine et les derniers commentaires.",
+    "new.v26.bell": "Nouvelles pour les créateurs dans la cloche : combien de téléchargements, j'aime, commentaires et ventes depuis votre dernière visite.",
+    "new.v26.path": "Parcours du créateur : quatre étapes de l'idée aux premiers joueurs — créer un mod, le lancer en jeu, le publier et partager le lien. Avec des modèles prêts pour vos jeux.",
+    "new.v26.remix": "Remix dans ModScript : ouvrez dans le studio votre propre copie d'un mod de script du Hub, avec l'original et son auteur crédités.",
+    "new.v26.publish": "Publier sans surprises : une nouvelle version prend le code de votre projet, la description et les images du mod ne sont plus effacées, la version ne fait que monter et l'éditeur n'écrase plus les fichiers modifiés sur le disque."
   },
   "pt-BR": {
     "new.v26.subtitle": "Os mods aparecem de primeira, o Creator Hub ficou mais limpo e prático, e o mercado mais simples",
@@ -53,7 +83,12 @@
     "new.v26.sources": "Todas as fontes de uma vez: o catálogo do jogo busca no Thunderstore, Nexus, ModLinks e ModLaunch Hub numa lista só — um mod não some mais só porque está em outro site.",
     "new.v26.games": "Jogos novos: ATLYSS, Monster Hunter: World e os clássicos da Bethesda — Oblivion, Fallout 3, New Vegas e Skyrim LE. Mods desatualizados nas seleções foram trocados por mods ativos.",
     "new.v26.hub": "Creator Hub renovado: um estilo único, blocos organizados, um assistente de novo mod mais claro, etiquetas e telas vazias que dizem o que fazer em seguida.",
-    "new.v26.market": "Mercado e mods da comunidade: filtros em duas linhas, jogos como chips, busca por tags e palavras, páginas do item e do autor dentro do hub."
+    "new.v26.market": "Mercado e mods da comunidade: filtros em duas linhas, jogos como chips, busca por tags e palavras, páginas do item e do autor dentro do hub.",
+    "new.v26.stats": "Estatísticas do criador: em Meus mods você vê downloads, curtidas, comentários e vendas, um gráfico de crescimento de 14 ou 30 dias, uma tabela de mods com as mudanças da semana e os comentários mais recentes.",
+    "new.v26.bell": "Novidades para criadores no sino: quantos downloads, curtidas, comentários e vendas você ganhou desde a última visita.",
+    "new.v26.path": "Caminho do criador: quatro passos da ideia aos primeiros jogadores — criar um mod, rodar no jogo, publicar e compartilhar o link. E modelos prontos para os seus jogos.",
+    "new.v26.remix": "Remix no ModScript: abra no estúdio sua própria cópia de um mod de script do Hub, com o original e o autor creditados.",
+    "new.v26.publish": "Publicar sem surpresas: uma nova versão usa o código do seu projeto, a descrição e as imagens do mod não são mais apagadas, a versão só sobe e o editor não sobrescreve mais arquivos alterados no disco."
   },
   "zh-CN": {
     "new.v26.subtitle": "模组一搜就到，Creator Hub 更整洁好用，市场也更简单",
@@ -61,6 +96,11 @@
     "new.v26.sources": "所有来源一起搜：游戏目录在一个列表里同时搜索 Thunderstore、Nexus、ModLinks 和 ModLaunch Hub——模组不会再因为放在别的网站而找不到。",
     "new.v26.games": "新游戏：ATLYSS、Monster Hunter: World 以及 Bethesda 经典作品——Oblivion、Fallout 3、New Vegas 和 Skyrim LE。精选中的过时模组已换成仍在更新的模组。",
     "new.v26.hub": "全新 Creator Hub：统一的风格、整齐的卡片、更清晰的新建模组向导、标签，以及会提示下一步做什么的空白页。",
-    "new.v26.market": "市场与社区模组：两行筛选、游戏用标签切换、按标签和关键词搜索，商品页和作者页直接在 Hub 内打开。"
+    "new.v26.market": "市场与社区模组：两行筛选、游戏用标签切换、按标签和关键词搜索，商品页和作者页直接在 Hub 内打开。",
+    "new.v26.stats": "作者统计：在「我的模组」中查看下载、点赞、评论和销量，14 天或 30 天增长曲线，每个模组本周的变化，以及最新评论。",
+    "new.v26.bell": "铃铛里的作者动态：自上次查看以来新增了多少下载、点赞、评论和销量。",
+    "new.v26.path": "作者之路：从想法到第一批玩家的四步——创建模组、在游戏中运行、发布并分享链接。另有适合你已安装游戏的现成模板。",
+    "new.v26.remix": "在 ModScript 中二创：把 Hub 上的脚本模组复制一份在工作室中打开，并注明原作和作者。",
+    "new.v26.publish": "发布不再出意外：新版本使用你项目中的代码，模组的描述和图片不再被清空，版本号只会增加，编辑器也不会再覆盖磁盘上已更改的文件。"
   }
 }
