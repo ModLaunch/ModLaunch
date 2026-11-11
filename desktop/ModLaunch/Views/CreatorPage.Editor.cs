@@ -232,7 +232,8 @@ public sealed partial class CreatorPage
         if (!Settings.Data.Bool("confirmRemove", true)) { Projects.Delete(p); _open = null; _dirty = false; Build(); return; }
         w.Dialog(I18n.T("cr.delete"), Ui.Text(I18n.T("cr.delete.text", ("name", p.Name)), "muted", wrap: true),
             Ui.Button(I18n.T("common.cancel"), w.CloseDialog),
-            Ui.Button(I18n.T("cr.delete"), () => { w.CloseDialog(); Projects.Delete(p); _open = null; _dirty = false; Build(); }, "primary", Icons.Trash));
+            // 26.0: удаление — красным тоном «danger», а не янтарной главной кнопкой.
+            Ui.Button(I18n.T("cr.delete"), () => { w.CloseDialog(); Projects.Delete(p); _open = null; _dirty = false; Build(); }, "danger", Icons.Trash));
     }
 
     // ---------------------------------------------------------------- собрать и проверить
@@ -476,10 +477,15 @@ public sealed partial class CreatorPage
         w.Dialog(I18n.T("cr.export.title", ("name", Path.GetFileName(r.Packed.Zip))), body, buttons.ToArray());
     }
 
-    void Publish()
+    /// <summary>
+    /// Выложить проект в Hub. 26.0: если мод уже выложен — сначала его карточка из Hub: описание, теги и картинки
+    /// остаются (раньше каждый выпуск из редактора затирал их строкой about), версия — не ниже следующей.
+    /// Куда выложен и выпуск в историю (project.json) пишет само окно публикации.
+    /// </summary>
+    async void Publish()
     {
         Save(quiet: true);
-        var code = _code.Text;
+        var code = _code.Text ?? "";
         var b = ModScript.Compile(code);
         if (!b.Ok) { MainWindow.Current?.Toast(I18n.T("cr.build.hasErrors"), bad: true); return; }
         var p = _open!;
@@ -488,11 +494,13 @@ public sealed partial class CreatorPage
             Name = b.Name, Summary = b.About, Game = b.Game, Version = b.Version, Code = code,
             Description = b.About,
         };
-        HubPublish.Show(draft, fromProject: true, pack: async () => (await Projects.Pack(b, p.Dir)).Zip, done: () =>
+        var existing = await Hub.FindMine(p.Meta().HubId, b.Name);
+        if (existing is not null) Hub.Merge(draft, existing);
+        draft.Changelog = b.Changelog.FirstOrDefault(c => c.Version == draft.Version).Text ?? "";
+        HubPublish.ShowProject(draft, p, existing, done: () =>
         {
-            // 12.0: запомнить, куда выложен проект (id в Hub выводится из автора и имени), и выпуск — в историю.
-            if (Social.Account.Uid is { } uid)
-                ProjectMeta.Update(p.Dir, m => { m.HubId = Hub.DocId(uid, draft.Name); m.NoteRelease(draft.Version, "hub", DateTime.UtcNow); });
+            // Версия в main.mls стала выложенной — редактор показывает файл как он есть.
+            if (_open?.Id == p.Id && File.Exists(p.Script)) { _code.Text = File.ReadAllText(p.Script); _dirty = false; }
             ForgetStats(p.Id);
             _tab = "mine"; _minePart = "published"; Build();
         });
