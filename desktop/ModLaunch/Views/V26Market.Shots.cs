@@ -98,6 +98,11 @@ public static class V26MarketShots
         V23Shots.Scroll(s, 0.6);
         s.Save("v26-m8-listing-lower");
 
+        // Профиль автора: тоже внутри рамки хаба — карточка с аватаром и числами вместо цветного баннера.
+        w.Navigate(() => new AuthorPage(lot.Uid, lot.Author));
+        s.Pump(1100);
+        s.Save("v26-m16-author");
+
         // Окно лота (с вкладки рынка) — ярлыки хаба вместо синей «пилюли» цены.
         w.Navigate(() => new MarketPage());
         s.Pump(900);

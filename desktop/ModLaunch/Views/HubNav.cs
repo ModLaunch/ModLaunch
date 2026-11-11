@@ -67,7 +67,7 @@ public static class HubNav
         Main.Append(MarketRail).Concat(Sections).Select(s => (s.Id, s.Key, s.Icon)).Concat(ShopTabs.Select(t => (t.Id, t.Key, Icons.Bag))).Concat(ShopMore);
 
     /// <summary>Страница Creator Hub (рынок, мастерская или среда ModScript X): между ними — без въезда всей страницы.</summary>
-    public static bool IsHub(Page? page) => page is MarketPage or CreatorPage or XStudio;
+    public static bool IsHub(Page? page) => page is MarketPage or CreatorPage or XStudio or ListingPage or AuthorPage;
 
     /// <summary>Последняя вкладка магазина (на сеанс): «Магазин» слева ведёт туда, где ушли.</summary>
     static string? _lastShop;

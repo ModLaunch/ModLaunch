@@ -315,11 +315,11 @@ public sealed partial class MarketPage : Page
     Control Pick(Listing l)
     {
         var art = new Border { CornerRadius = new CornerRadius(8), ClipToBounds = true, Child = MarketTiles.Art(l, 1280) };
-        // 26.0: высота картинки — от её ширины (16:9 в разумных пределах), а сведения справа стоят по центру. Раньше
+        // 26.0: высота картинки — от её ширины (невысокая: под ней на экране должен помещаться ряд товаров), а сведения справа стоят по центру. Раньше
         // карточка была фиксированной высоты, кнопки прижимались к низу, и между автором и «Купить» зияла пустота.
         art.SizeChanged += (_, e) =>
         {
-            var h = Math.Clamp(Math.Round(e.NewSize.Width * 9 / 16), 220, 340);
+            var h = Math.Clamp(Math.Round(e.NewSize.Width * 0.44), 200, 270);
             if (Math.Abs(art.MinHeight - h) > 1) art.MinHeight = h;
         };
         StoreKit.OnClick(art, () => MarketTiles.Open(l));

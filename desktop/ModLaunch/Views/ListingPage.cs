@@ -50,6 +50,7 @@ public sealed class ListingPage : Page
     // и без колонки рекламы справа, как остальные страницы хаба.
     public override string? Accent => null;
     public override bool Workspace => true;
+    public override bool SameScreenAs(Page? previous) => HubNav.IsHub(previous);
 
     public override IEnumerable<(string Text, Action? Open)> Crumbs =>
     [
@@ -435,57 +436,60 @@ public sealed class AuthorPage : Page
         (_name, null),
     ];
 
+    // 26.0: профиль автора — внутри Creator Hub, как рынок и лот: без колонки рекламы и без въезда всей страницы.
+    public override bool Workspace => true;
+    public override bool SameScreenAs(Page? previous) => HubNav.IsHub(previous);
+
     public override void Build()
     {
         var items = MarketData.All.Where(l => l.Uid == _uid && l.Active).OrderByDescending(l => l.Sales).ToList();
         var mods = MarketData.Mods.Where(m => m.Uid == _uid).OrderByDescending(m => m.Downloads).ToList();
         var a = MarketLocal.Authors(items, mods).FirstOrDefault() ?? new MarketLocal.Author(_uid, _name, 0, 0, 0, 0, 0, null, []);
-        var col = StoreKit.Column(spacing: 22, top: 22);
+        var col = Ui.Col(18);
 
-        // Баннер профиля: цвет — из имени (у каждого автора свой), сетка HUD и аватар.
-        var hue = (int)(_name.Aggregate(17u, (h, c) => h * 31 + c) % 360);
-        var banner = new Border
-        {
-            Height = 190,
-            Background = new LinearGradientBrush
-            {
-                StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
-                GradientStops = { new GradientStop(Ui.HslColor(hue, 0.6, 0.45), 0), new GradientStop(Ui.HslColor((hue + 70) % 360, 0.55, 0.2), 0.7), new GradientStop(Color.Parse("#0B0B10"), 1) },
-            },
-        };
-        var avatar = new Border
-        {
-            Width = 112, Height = 112, CornerRadius = new CornerRadius(56), BorderThickness = new Thickness(4), BorderBrush = Ui.Res("Layer"), BoxShadow = Gx.Glow(120, 26),
-            Child = Ui.Thumb(null, _name, 104, 52, person: true), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(32, 0, 0, -56),
-        };
-        var stage = new Border { Classes = { "store-tile", "hero" }, Cursor = null, ClipToBounds = false, Child = new Panel { Children = { new Border { CornerRadius = new CornerRadius(10), ClipToBounds = true, Child = new Panel { Children = { banner, Gx.Scanlines(), Gx.Haze(true) } } }, avatar } } };
-        col.Children.Add(stage);
-
-        var since = a.Since is DateTime d ? I18n.T("v93.mk.author.since", ("date", d.ToLocalTime().ToString("MMMM yyyy", I18n.Culture))) : I18n.T("v93.mk.author");
-        var who = Ui.Col(4, Gx.Title(_name, 30, Ui.Res("Text"), 1), Ui.Text(since, "muted"));
+        // 26.0: шапка профиля — карточка хаба: аватар и четыре числа; имя и «автор с …» — в шапке рамки. Раньше тут был
+        // цветной баннер со «сканлайнами» и свечением из старого игрового стиля, а сама страница выходила из хаба.
+        var avatar = new Border { Width = 64, Height = 64, CornerRadius = new CornerRadius(32), ClipToBounds = true, Child = Ui.Thumb(null, _name, 64, 32, person: true), VerticalAlignment = VerticalAlignment.Center };
         var stats = Ui.Row(34,
-            HubLook.Stat(a.Items.ToString(), I18n.T("v93.mk.items.short")),
-            HubLook.Stat(I18n.Compact(a.Sales), I18n.T("st.sales")),
-            HubLook.Stat(a.Workshop.ToString(), I18n.T("v93.mk.workshop")),
-            HubLook.Stat(I18n.Compact(a.Downloads), I18n.T("hub.stat.downloads")));
-        var follow = MarketPage.FollowButton(_uid, _name);
-        follow.VerticalAlignment = VerticalAlignment.Center;
-        var right = Ui.Row(30, stats, follow);
-        var head = new DockPanel { Margin = new Thickness(160, 6, 0, 0) };
-        DockPanel.SetDock(right, Dock.Right);
-        head.Children.Add(right);
-        head.Children.Add(who);
-        col.Children.Add(head);
+            HubLook.Stat(a.Items.ToString(), I18n.T("v93.mk.items.short"), size: 22),
+            HubLook.Stat(I18n.Compact(a.Sales), I18n.T("st.sales"), size: 22),
+            HubLook.Stat(a.Workshop.ToString(), I18n.T("v93.mk.workshop"), size: 22),
+            HubLook.Stat(I18n.Compact(a.Downloads), I18n.T("hub.stat.downloads"), size: 22));
+        stats.VerticalAlignment = VerticalAlignment.Center;
+        stats.Margin = new Thickness(22, 0, 0, 0);
+        var head = new DockPanel();
+        DockPanel.SetDock(avatar, Dock.Left);
+        head.Children.Add(avatar);
+        head.Children.Add(stats);
+        col.Children.Add(new Border { Classes = { "card" }, Padding = new Thickness(20, 16), Child = head });
 
-        var pills = Ui.Row(6,
-            Ui.Button(I18n.T("v93.mk.author.items", ("n", items.Count)), () => { _part = "items"; Build(); }, _part == "items" ? "chip active" : "chip", Icons.Bag),
-            Ui.Button(I18n.T("v93.mk.author.workshop", ("n", mods.Count)), () => { _part = "workshop"; Build(); }, _part == "workshop" ? "chip active" : "chip", Icons.Globe));
-        pills.Margin = new Thickness(0, 14, 0, 0);
-        col.Children.Add(pills);
+        var tabs = new WrapPanel();
+        void Tab(string id, string text)
+        {
+            var b = new Button { Content = text, Classes = { "pivot" }, Margin = new Thickness(0, 0, 4, 0) };
+            if (_part == id) b.Classes.Add("active");
+            b.Click += (_, _) => { _part = id; Build(); };
+            tabs.Children.Add(b);
+        }
+        Tab("items", I18n.T("v93.mk.author.items", ("n", items.Count)));
+        Tab("workshop", I18n.T("v93.mk.author.workshop", ("n", mods.Count)));
+        col.Children.Add(tabs);
+
         var cards = _part == "items" ? items.Select(l => MarketTiles.Listing(l, 1)).ToList() : mods.Select(m => MarketTiles.Workshop(m, 1)).ToList();
-        if (cards.Count == 0) col.Children.Add(Ui.Card(Ui.Text(I18n.T("v93.mk.author.empty"), "muted"), 22));
+        if (cards.Count == 0) col.Children.Add(HubLook.Empty(_part == "items" ? Icons.Bag : Icons.Globe, I18n.T("v93.mk.author.empty"), ""));
         // 26.0: у карточки мода сообщества подпись в две строки (автор · игра и счётчики) — ей нужна высота повыше.
         else col.Children.Add(StoreKit.Tiles(cards, 260, _part == "items" ? 62 : MarketTiles.WorkshopFoot));
-        Content = new ScrollViewer { Content = col, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+
+        var since = a.Since is DateTime d ? I18n.T("v93.mk.author.since", ("date", MonthYear(d.ToLocalTime()))) : I18n.T("v93.mk.author");
+        Content = HubNav.Frame("store", "shop", _name, col, sold: MarketData.Reload, action: MarketPage.FollowButton(_uid, _name), lead: since);
+    }
+
+    // «с сентября 2026», а не «с сентябрь 2026»: в ru/uk месяц после предлога — в родительном падеже.
+    // Остальные языки берут свой обычный вид «месяц год» («September 2026», «septiembre de 2026», «2026年9月»).
+    internal static string MonthYear(DateTime d)
+    {
+        var f = I18n.Culture.DateTimeFormat;
+        var gen = f.MonthGenitiveNames[d.Month - 1];
+        return gen.Length > 0 && gen != f.MonthNames[d.Month - 1] ? $"{gen} {d.Year}" : d.ToString("Y", I18n.Culture);
     }
 }
