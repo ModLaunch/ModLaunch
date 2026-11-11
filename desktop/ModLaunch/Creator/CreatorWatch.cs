@@ -19,6 +19,9 @@ public static class CreatorWatch
     /// <summary>Новое с прошлого просмотра статистики — для колокольчика (пусто, если не вошли).</summary>
     public static IReadOnlyList<CreatorNote> Notes => Account.SignedIn && _notesUid == Account.Uid || Program.Demo && _notesUid == "demo" ? _notes : [];
 
+    /// <summary>Когда уведомления пересчитаны в последний раз (UTC) — статистика перечитывается, если они новее неё.</summary>
+    public static DateTime NotesAt { get; private set; }
+
     /// <summary>Уведомления автора изменились — перерисовать колокольчик.</summary>
     public static event Action? Changed;
 
@@ -100,6 +103,7 @@ public static class CreatorWatch
             _notes = CreatorStats.Notes(CreatorStats.ReadMods(seen["mods"] as JsonObject), counts, nameMap, seen.Long("sales"), nowSales);
         }
         _notesUid = uid;
+        NotesAt = DateTime.UtcNow;
         Settings.Save();
         Changed?.Invoke();
         return _notes;
@@ -142,14 +146,50 @@ public static class CreatorWatch
     public static async Task Check(bool force = false)
     {
         if (Program.Demo || !Account.SignedIn || Account.Uid is not { } uid) return;
-        List<HubMod> all;
-        try { all = await Hub.All(force); }
+        List<HubMod> mine;
+        try
+        {
+            var (mods, complete) = await Mine(uid, force);
+            if (!complete) return;
+            mine = mods;
+        }
         catch { return; }
-        var mine = all.Where(m => m.Uid == uid).ToList();
         long? sales = null;
         try { sales = (await Market.Mine()).Where(l => !l.Free).Sum(l => l.Sales); }
         catch { }
         Dispatcher.UIThread.Post(() => { if (Account.Uid == uid) Observe(uid, mine, sales); });
+    }
+
+    /// <summary>Id модов из последнего снимка этого аккаунта (читать на потоке интерфейса).</summary>
+    static List<string> KnownIds(string uid) =>
+        (Find(uid)?["days"] as JsonObject)?.OrderBy(kv => kv.Key, StringComparer.Ordinal).LastOrDefault().Value is JsonObject day ? day.Select(kv => kv.Key).ToList() : [];
+
+    /// <summary>
+    /// Все ли моды из последнего снимка есть в списке (общий список Hub — до 300 свежих: старый мод автора мог из него
+    /// выпасть, и итог снимка «упал» бы). Нет — снимок по этому списку не пишем, его допишет проверка с Mine.
+    /// </summary>
+    public static bool Covers(string uid, IEnumerable<HubMod> list)
+    {
+        var have = list.Select(m => m.Id).ToHashSet(StringComparer.Ordinal);
+        return KnownIds(uid).All(have.Contains);
+    }
+
+    /// <summary>
+    /// Свои моды Hub: из общего списка (кэш на минуту), а те, что были в прошлом снимке, но в список не попали
+    /// (он — до 300 свежих), — по одному запросу на мод; удалённые (нет на сервере) из снимка уходят.
+    /// Complete = false — какой-то мод не дочитался (сеть): такой список показывать можно, а записывать в снимок нельзя.
+    /// </summary>
+    public static async Task<(List<HubMod> Mods, bool Complete)> Mine(string uid, bool force = false)
+    {
+        var mine = (await Hub.All(force)).Where(m => m.Uid == uid).ToList();
+        var known = await Dispatcher.UIThread.InvokeAsync(() => KnownIds(uid));
+        var complete = true;
+        foreach (var id in known.Where(id => mine.All(m => m.Id != id)).Take(30))
+        {
+            try { if (await Hub.Get(id) is { } m && m.Uid == uid) mine.Add(m); }
+            catch { complete = false; }
+        }
+        return (mine, complete);
     }
 
     /// <summary>Для снимков: уведомления автора без сети.</summary>

@@ -47,7 +47,9 @@ public sealed partial class CreatorPage
         List<Listing> listings = [];
         long? sales = null, revenue = null;
         var comments = new List<(HubMod, HubComment)>();
-        try { mods = (await Hub.All(force)).Where(m => m.Uid == uid).ToList(); }
+        // Не дочитали какой-то старый мод (сеть) — показываем, что есть, но в историю такой неполный итог не пишем.
+        var complete = false;
+        try { (mods, complete) = await CreatorWatch.Mine(uid, force); }
         catch (Exception e) { error = Hub.LastError ?? Firebase.Explain("creator", e); }
         try
         {
@@ -69,7 +71,7 @@ public sealed partial class CreatorPage
             _statsLoading = false;
             if (Account.Uid != uid) { RebuildCurrent(); return; }
             IReadOnlyList<CreatorNote> fresh = [];
-            if (error is null)
+            if (error is null && complete)
             {
                 // Что прибавилось с прошлого просмотра — полоской сверху; раз статистику открыли, колокольчик гаснет.
                 fresh = CreatorWatch.Observe(uid, mods, sales, revenue).ToList();
@@ -101,7 +103,11 @@ public sealed partial class CreatorPage
         }
         else
         {
-            if ((_stats is null || _stats.Uid != uid) && !_statsLoading) _ = LoadStats();
+            // Перечитать, если данных нет, они чужие, устарели (10 минут) или в колокольчике есть новое, которого тут ещё нет;
+            // пока читаются — на экране прежние.
+            var stale = _stats is null || _stats.Uid != uid || DateTime.UtcNow - _stats.At > TimeSpan.FromMinutes(10)
+                || CreatorWatch.Notes.Count > 0 && CreatorWatch.NotesAt > _stats.At;
+            if (stale && !_statsLoading) _ = LoadStats();
             data = _stats?.Uid == uid ? _stats : null;
         }
         if (data is null)

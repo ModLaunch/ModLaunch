@@ -25,7 +25,9 @@ public sealed partial class MainWindow
         MarketData.Changed += () =>
         {
             if (Program.Demo || !Social.Account.SignedIn || Social.Account.Uid is not { } uid || MarketData.Workshop is not { } hub) return;
-            CreatorWatch.Observe(uid, hub.Where(m => m.Uid == uid));
+            // Список — до 300 свежих модов: если старый свой мод в него не попал, снимок допишет полная проверка.
+            var mine = hub.Where(m => m.Uid == uid).ToList();
+            if (CreatorWatch.Covers(uid, mine)) CreatorWatch.Observe(uid, mine);
         };
     }
 
