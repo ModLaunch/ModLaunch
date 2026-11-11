@@ -61,6 +61,8 @@ public sealed partial class CreatorPage : Page
         };
         _ms = tab switch { "docs" or "commands" => "commands", "functions" => "functions", "console" => "console", "guide" => "scripts", _ => _ms };
         if (tab == "published") { _tab = "home"; _minePart = "published"; }
+        // 26.0: «Статистика» автора — вкладка «Моих модов» (из колокольчика и ссылок открывается сразу она).
+        if (tab == "stats") { _tab = "home"; _minePart = "stats"; }
         if (project is not null) { _tab = "mine"; Open(Projects.Get(project)); }
         _code.TextChanged += () =>
         {
@@ -243,6 +245,9 @@ public sealed partial class CreatorPage : Page
         if (_tab is not ("home" or "mine")) return null;
         if (_minePart == "published")
             return Social.Account.SignedIn ? Ui.Button(I18n.T("hub.upload"), PublishArchive, "primary", Icons.Upload) : null;
+        // 26.0: у «Статистики» в шапке — «Обновить» (счётчики Hub кэшируются на минуту, продажи — на сеанс).
+        if (_minePart == "stats")
+            return Social.Account.SignedIn && !Program.Screenshot || Program.Screenshot && DemoStats is not null ? Ui.Button(I18n.T("cr.refresh"), ReloadStats, "", Icons.Refresh) : null;
         var any = XProjects.List().Count + Projects.List().Count > 0 || Features.Inject.All().Any(i => i.Sealed);
         return any ? Ui.Button(I18n.T("v22.hub.new"), () => Go("form"), "primary", Icons.Plus) : null;
     }

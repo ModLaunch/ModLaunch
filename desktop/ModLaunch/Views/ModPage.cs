@@ -137,6 +137,8 @@ public sealed partial class ModPage : Page
         action.Padding = new Thickness(28, 12);
         var buttons = Ui.Row(8, action);
         if (mod.Url is not null) buttons.Children.Add(Ui.Button(I18n.T("aside.openOn", ("site", Views.Aside.SourceName(mod.Source))), () => Ui.OpenUrl(mod.Url), "", Icons.External));
+        // 26.0: скрипт Hub с исходником — «Ремикс в ModScript» (своя копия с указанием автора).
+        if (mod.Source == "hub" && Creator.Remix.Can(_hubMod)) buttons.Children.Add(RemixButton());
         buttons.Children.Add(ActionRow(mod, installed));
 
         var info = Ui.Col(10,

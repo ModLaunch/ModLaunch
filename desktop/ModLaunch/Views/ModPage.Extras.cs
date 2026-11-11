@@ -36,6 +36,8 @@ public sealed partial class ModPage
                 new("1.3.0", DateTime.UtcNow.AddDays(-47), 61230, "", null, 0, 2_300_000, null),
             ];
             _byAuthor = [];
+            // 26.0: у демо-мода Hub — его карточка с кодом (для снимка «Ремикс в ModScript»).
+            if (_brief.Source == "hub" && DemoHubMod?.Id == _brief.Id) _hubMod = DemoHubMod;
             _comments = _brief.Source == "hub"
                 ? [new("c1", "u2", "Kira", "Отличный мод, поставил за минуту через ModLaunch!", DateTime.UtcNow.AddHours(-5)), new("c2", "u1", _brief.Author, "Спасибо! В следующей версии будет больше скинов.", DateTime.UtcNow.AddHours(-3))]
                 : [];
@@ -114,6 +116,8 @@ public sealed partial class ModPage
             {
                 var url = $"https://modlaunch.github.io/ModLaunch/hub.html#mod={Uri.EscapeDataString(mod.Id)}";
                 if (TopLevel.GetTopLevel(this)?.Clipboard is { } clip) await clip.SetTextAsync(url);
+                // 26.0: ссылка на свой мод — шаг «Поделитесь ссылкой» в «Пути автора».
+                if (_hubMod?.Mine == true) CreatorWatch.MarkShared();
                 MainWindow.Current?.Toast(I18n.T("hub.shared"));
             });
             if (_hubMod is { IsPackage: true, Sha256.Length: 64 } pkg)
@@ -129,6 +133,23 @@ public sealed partial class ModPage
         if (tracked) row.Children.Add(new TextBlock { Text = "🔔", VerticalAlignment = VerticalAlignment.Center, Opacity = 0.8 });
         return row;
     }
+
+    /// <summary>Для снимков: карточка мода Hub (с кодом), которую страница покажет без сети.</summary>
+    internal static HubMod? DemoHubMod;
+
+    /// <summary>
+    /// 26.0: «Ремикс в ModScript» у скриптов Hub с исходником: своя копия кода — проект с шапкой, чей это мод
+    /// (Creator/Remix.cs), — и сразу в среду ModScript. У готовых архивов кода нет — кнопки тоже.
+    /// </summary>
+    Button RemixButton() => Ui.Button(I18n.T("v26.features.remix"), () =>
+    {
+        if (_hubMod is not { } m || !Remix.Can(m)) return;
+        Creator.Project p;
+        try { p = Remix.Create(m); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { MainWindow.Current?.Toast(e.Message, bad: true); return; }
+        MainWindow.Current?.Toast(I18n.T("v26.features.remix.done"));
+        CreatorPage.OpenInStudio(p);
+    }, "", Icons.Shuffle, I18n.T("v26.features.remix.tip"));
 
     // ---------------------------------------------------------------- файлы и версии
 
