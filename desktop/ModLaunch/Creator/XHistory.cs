@@ -91,6 +91,39 @@ public static class XHistory
         return result;
     }
 
+    /// <summary>26.0: открытый файл против диска: тот же, перечитать (правок нет), спор (есть свои правки), файла нет.</summary>
+    public enum DiskChange { Same, Reload, Conflict, Gone }
+
+    /// <summary>
+    /// 26.0: что делать с файлом, открытым в среде, если его поменяли мимо неё («Обновить у себя» в команде, другой
+    /// редактор). disk — текст на диске (null — не прочитать), saved — что среда считала сохранённым, current — что
+    /// в редакторе. Раньше среда держала старый текст и при выходе записывала его поверх нового.
+    /// </summary>
+    public static DiskChange Compare(string? disk, string saved, string current) =>
+        disk is null ? DiskChange.Gone
+        : disk == saved ? DiskChange.Same
+        : disk == current || current == saved ? DiskChange.Reload
+        : DiskChange.Conflict;
+
+    /// <summary>Сколько строк добавлено и убрано из a → b (для «+12 −3 строк»).</summary>
+    public static (int Added, int Removed) Count(string a, string b)
+    {
+        var diff = Diff(a, b);
+        return (diff.Count(x => x.Op == '+'), diff.Count(x => x.Op == '-'));
+    }
+
+    [SelfTest]
+    static string XHistorySeesDiskChanges()
+    {
+        if (Compare("a", "a", "a b") != DiskChange.Same) throw new Exception("same");
+        if (Compare("team", "old", "old") != DiskChange.Reload) throw new Exception("clean doc must reload");
+        if (Compare("team", "old", "team") != DiskChange.Reload) throw new Exception("already equal");
+        if (Compare("team", "old", "mine") != DiskChange.Conflict) throw new Exception("dirty doc must ask");
+        if (Compare(null, "old", "mine") != DiskChange.Gone) throw new Exception("gone");
+        if (Count("a\nb\nc", "a\nB\nc\nd") != (2, 1)) throw new Exception("count " + Count("a\nb\nc", "a\nB\nc\nd"));
+        return "clean → reload, edited → ask, counts +2 −1";
+    }
+
     [SelfTest]
     static string XHistoryKeepsVersions()
     {

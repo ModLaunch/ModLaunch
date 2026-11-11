@@ -97,11 +97,17 @@ public sealed partial class XStudio : Page
         if (view is not null) _s.View = view;
         if (_p is not null)
         {
+            // 26.0: открытые раньше файлы могли поменять на диске (команда, другой редактор) — сверить до показа.
             if (_s.Docs.Count == 0) Open(_p.Main, focus: false);
+            else SyncFromDisk(_s.Docs);
             Settings.Data["xLast"] = projectId;
         }
         AddHandler(KeyDownEvent, OnKey, RoutingStrategies.Tunnel);
-        AttachedToVisualTree += (_, _) => _live = this;
+        AttachedToVisualTree += (_, _) =>
+        {
+            _live = this;
+            if (_changedOnDisk.Count > 0) Dispatcher.UIThread.Post(AskDiskConflicts, DispatcherPriority.Background);
+        };
         DetachedFromVisualTree += (_, _) =>
         {
             if (_live == this) _live = null;
@@ -798,6 +804,12 @@ public sealed partial class XStudio : Page
             catch (Exception e) when (e is IOException or UnauthorizedAccessException) { MainWindow.Current?.Toast(e.Message, bad: true); return; }
             doc = Add(full, System.IO.Path.GetFileName(full), text, text);
         }
+        else
+        {
+            // 26.0: уже открытый файл — сверить с диском (могли поменять, пока среда была закрыта).
+            SyncFromDisk([doc]);
+            if (_changedOnDisk.Contains(doc) && _live == this) Dispatcher.UIThread.Post(AskDiskConflicts, DispatcherPriority.Background);
+        }
         _s.Active = doc;
         if (focus) Activate(doc);
     }
@@ -837,6 +849,9 @@ public sealed partial class XStudio : Page
         {
             // 19.0: история файла — до первого сохранения кладём и то, что было на диске.
             if (d.Saved != "" && XHistory.List(d.Path).Count == 0) XHistory.Snap(d.Path, d.Saved, File.Exists(d.Path) ? File.GetLastWriteTimeUtc(d.Path) : null);
+            // 26.0: файл поменяли мимо среды (команда, другой редактор) — та версия не пропадает: сначала в историю.
+            if (ReadDisk(d.Path) is { } disk && disk != d.Saved && disk != (d.Editor.Text ?? ""))
+                XHistory.Snap(d.Path, disk, File.GetLastWriteTimeUtc(d.Path));
             File.WriteAllText(d.Path, d.Editor.Text ?? "");
             d.Saved = d.Editor.Text ?? "";
             XHistory.Snap(d.Path, d.Saved);
