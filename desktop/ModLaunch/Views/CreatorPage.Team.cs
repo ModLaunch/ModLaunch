@@ -224,11 +224,100 @@ public sealed partial class CreatorPage
         return HubLook.Frame(Ui.Col(0, stripe, dock), new Thickness(22, 20));
     }
 
+    /// <summary>Подтверждение удалить группу, выйти из неё, убрать участника. 26.0: кнопка — «danger», а не янтарная главная.</summary>
     static void Confirm(string title, string text, Action yes)
     {
         var w = MainWindow.Current!;
-        w.Dialog(title, Ui.Text(text, "muted", wrap: true), Ui.Button(I18n.T("common.cancel"), w.CloseDialog), Ui.Button(title, () => { w.CloseDialog(); yes(); }, "primary"));
+        w.Dialog(title, Ui.Text(text, "muted", wrap: true), Ui.Button(I18n.T("common.cancel"), w.CloseDialog), Ui.Button(title, () => { w.CloseDialog(); yes(); }, "danger"));
     }
+
+    /// <summary>
+    /// 26.0: «Обновить у себя» — сначала спросить: чья версия, сколько строк изменится и какие, и что своя версия
+    /// останется в истории файла (снимок до замены). Раньше main.mls заменялся сразу и без возврата — даже если
+    /// у себя проект ушёл вперёд с тех пор, как его выложили.
+    /// </summary>
+    void PullFromTeam(TeamProject p)
+    {
+        var w = MainWindow.Current!;
+        var mine = Projects.List().FirstOrDefault(x => Teams.ProjectId(x) == p.Id);
+        if (mine is null)
+        {
+            var taken = Teams.Take(p);
+            w.Toast(I18n.T("v13.team.taken", ("name", p.Name)));
+            OpenProject(taken);
+            return;
+        }
+        string local;
+        try { local = File.ReadAllText(mine.Script); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { local = ""; }
+        if (local.Replace("\r\n", "\n") == p.Script.Replace("\r\n", "\n"))
+        {
+            w.Toast(I18n.T("v26.bugs.team.pull.same", ("name", p.Name)));
+            OpenProject(mine);
+            return;
+        }
+        w.Dialog(I18n.T("v26.bugs.team.pull.title"), PullSummary(p, local), Ui.Button(I18n.T("common.cancel"), w.CloseDialog),
+            Ui.Button(I18n.T("v26.bugs.team.pull.go"), () =>
+            {
+                w.CloseDialog();
+                var after = PullNow(mine, local, p);
+                w.Toast(I18n.T("v13.team.pulled", ("name", p.Name)));
+                OpenProject(after);
+            }, "danger", Icons.Refresh));
+    }
+
+    /// <summary>Своя версия — в историю файла (её вернёт «История» в среде ModScript), потом замена версией команды.</summary>
+    internal static Project PullNow(Project mine, string local, TeamProject p)
+    {
+        XHistory.Snap(mine.Script, local, File.Exists(mine.Script) ? File.GetLastWriteTimeUtc(mine.Script) : null);
+        var after = Teams.Take(p);
+        XHistory.Snap(after.Script, p.Script);
+        return after;
+    }
+
+    [SelfTest]
+    static string TeamPullKeepsMyVersion()
+    {
+        var p = Projects.Create("Pull check " + Guid.NewGuid().ToString("N")[..6], "mod \"Arena\"\ngame valheim\nversion 1.0.0\n# mine\n");
+        try
+        {
+            var team = new TeamProject(Teams.ProjectId(p), "Arena", "valheim", "1.0.0", "u2", "Kira", "mod \"Arena\"\ngame valheim\nversion 1.0.0\n# team\n", DateTime.UtcNow);
+            var local = File.ReadAllText(p.Script);
+            if (XHistory.Count(local, team.Script) != (1, 1)) throw new Exception("summary " + XHistory.Count(local, team.Script));
+            var after = PullNow(p, local, team);
+            if (after.Id != p.Id || File.ReadAllText(after.Script) != team.Script) throw new Exception("not replaced");
+            var history = XHistory.List(after.Script).Select(XHistory.Read).ToList();
+            if (!history.Contains(local) || !history.Contains(team.Script)) throw new Exception("history: " + history.Count);
+            return "team version in place, own version kept in the file history, +1 −1 summary";
+        }
+        finally { Projects.Delete(p); }
+    }
+
+    /// <summary>Что заменится: чья версия, +/− строк и первые изменённые строки (зелёные — придут, красные — уйдут).</summary>
+    static Control PullSummary(TeamProject p, string local)
+    {
+        var changes = XHistory.Diff(local, p.Script).Where(x => x.Op != ' ').ToList();
+        var added = changes.Count(x => x.Op == '+');
+        var removed = changes.Count(x => x.Op == '-');
+        var lines = Ui.Col(2);
+        foreach (var (op, text) in changes.Take(8))
+            lines.Children.Add(new TextBlock
+            {
+                Text = (op == '+' ? "+ " : "− ") + text, FontFamily = HubLook.Mono, FontSize = 11.5, TextTrimming = TextTrimming.CharacterEllipsis,
+                Foreground = op == '+' ? Ui.Res("Good") : Ui.Res("Bad"),
+            });
+        if (changes.Count > 8) lines.Children.Add(Ui.Text(I18n.T("v26.bugs.team.pull.more", ("n", changes.Count - 8)), "small muted"));
+        var body = Ui.Col(12,
+            Ui.Text(I18n.T("v26.bugs.team.pull.text", ("name", p.Name), ("who", p.ByName), ("version", p.Version == "" ? "—" : "v" + p.Version),
+                ("added", added), ("removed", removed)), "muted", wrap: true),
+            new Border { Background = HubLook.Raised, BorderBrush = HubLook.Edge, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(8), Padding = new Thickness(12, 10), Child = lines },
+            Ui.Row(8, Ui.Icon(Icons.Clock, 14, Ui.Res("Muted")), Ui.Text(I18n.T("v26.bugs.team.pull.backup"), "small muted", wrap: true)));
+        body.MaxWidth = 540;
+        return body;
+    }
+
+    /// <summary>Для снимков: вопрос «Обновить у себя» для своего проекта, который ушёл вперёд от версии команды.</summary>
+    internal void DemoPull(TeamProject p) => PullFromTeam(p);
 
     /// <summary>Проекты команды: выложенные участниками; «Выложить проект» — свой проект в команду.</summary>
     Control TeamProjects(Team t)
@@ -261,8 +350,9 @@ public sealed partial class CreatorPage
             var have = mineIds.Contains(p.Id);
             var take = Ui.Button(I18n.T(have ? "v13.team.pull" : "v13.team.take"), () =>
             {
+                if (have) { PullFromTeam(project); return; }
                 var local = Teams.Take(project);
-                MainWindow.Current?.Toast(I18n.T(have ? "v13.team.pulled" : "v13.team.taken", ("name", project.Name)));
+                MainWindow.Current?.Toast(I18n.T("v13.team.taken", ("name", project.Name)));
                 OpenProject(local);
             }, have ? "ghost" : "", have ? Icons.Refresh : Icons.Download);
             ToolTip.SetTip(take, I18n.T(have ? "v13.team.pull.tip" : "v13.team.take.tip"));
