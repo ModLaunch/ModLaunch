@@ -181,6 +181,9 @@ public static class CreatorWatch
     /// </summary>
     public static async Task<(List<HubMod> Mods, bool Complete)> Mine(string uid, bool force = false)
     {
+        // 26.0: сначала — запрос «моды автора» (Hub.Mine, все моды без окна в 300); не вышло — как раньше, общий список и добор по id.
+        try { return (await Hub.Mine(uid, force), true); }
+        catch { }
         var mine = (await Hub.All(force)).Where(m => m.Uid == uid).ToList();
         var known = await Dispatcher.UIThread.InvokeAsync(() => KnownIds(uid));
         var complete = true;

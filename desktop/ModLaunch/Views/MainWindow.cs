@@ -869,7 +869,9 @@ public sealed partial class MainWindow : Window
             RenderBell();
         }, "ghost", Icons.Check);
         var center = Ui.Button(I18n.T("mc.open"), () => { _bellPanel.IsVisible = false; Navigate(() => new ModsCenterPage()); }, "ghost", Icons.Package);
-        _bellList.Children.Add(Ui.Row(6, clear, center));
+        // 26.0: две кнопки в одну строку не влезали в 400 px («Центр модов» обрезался, по-немецки — тем более): переносим.
+        clear.Margin = new Thickness(0, 0, 6, 0);
+        _bellList.Children.Add(new WrapPanel { Children = { clear, center } });
     }
 
     public void RefreshFriendsDock() => _friendsDock?.Render();
