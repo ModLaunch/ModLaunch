@@ -68,6 +68,18 @@ public static class V26FeaturesShots
         CreatorPage.DemoStats = null;
         CreatorPage.DemoJourney = null;
         CreatorWatch.Demo([]);
+
+        // Страница скрипта Hub: «Ремикс в ModScript»; после нажатия — проект с шапкой об оригинале в среде ModScript.
+        // В конце: ремикс создаёт проект, и «Мои моды» перестают быть пустыми.
+        var now = DateTime.UtcNow;
+        var demo = new HubMod("kira_comfy_build", "u-kira", "Kira", "Удобная стройка", "Больше места для построек и быстрый ремонт",
+            "## Что умеет\n- Больше места для построек\n- Быстрый ремонт\n\nСтавится в один клик через ModLaunch.", "valheim", "1.3.0", "script",
+            Templates.ById("valheim-qol")!.Code, ["qol", "tweaks"], [], 0, "", 0, "", "Быстрее ремонт", 1210, 18400, 64, now.AddDays(-40), now.AddDays(-2));
+        ModPage.DemoHubMod = demo;
+        Shot(s, "v26f-11-modpage-remix", () => new ModPage("valheim", Hub.ToModInfo(demo)), 1800);
+        var remix = Remix.Create(demo);
+        Shot(s, "v26f-12-remix-studio", () => new XStudio(XProjects.Adopt(remix).Id, "files", "problems", "code"), 1800);
+        ModPage.DemoHubMod = null;
     }
 }
 
