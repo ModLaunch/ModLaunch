@@ -94,7 +94,10 @@ public static class CreatorWatch
         else
         {
             var nameMap = names.Select(kv => kv.Key).ToDictionary(k => k, k => names.Str(k) ?? k, StringComparer.Ordinal);
-            _notes = CreatorStats.Notes(CreatorStats.ReadMods(seen["mods"] as JsonObject), counts, nameMap, seen.Long("sales"), sales ?? seen.Long("sales"));
+            // Продажи не узнавали (данные пришли с рынка или Hub без лотов) — последнее известное число, а не «уже видел»:
+            // иначе уведомление о продажах с запуска пропадало бы при следующей загрузке Hub.
+            var nowSales = sales ?? LastMarket(uid)?.Sales ?? seen.Long("sales");
+            _notes = CreatorStats.Notes(CreatorStats.ReadMods(seen["mods"] as JsonObject), counts, nameMap, seen.Long("sales"), nowSales);
         }
         _notesUid = uid;
         Settings.Save();

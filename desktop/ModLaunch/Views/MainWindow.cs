@@ -176,6 +176,8 @@ public sealed partial class MainWindow : Window
             Child = Ui.Col(12, Ui.Text(I18n.T("nx.notify"), "h3"), new ScrollViewer { Content = _bellList, MaxHeight = 460 }),
         };
         Features.Tracking.Changed += () => Dispatcher.UIThread.Post(() => { RenderBell(); });
+        // 26.0: уведомления автора (MainWindow.Creator.cs).
+        WatchCreator();
 
         _downloadsPanel = new Border
         {
@@ -816,14 +818,17 @@ public sealed partial class MainWindow : Window
     {
         var updates = Features.Tracking.Updates;
         var hub = Creator.Hub.Updates.Where(h => !updates.Any(u => u.Item.Source == "hub" && u.Item.Id == h.Id)).ToList();
-        _bellBadge.IsVisible = updates.Count + hub.Count > 0;
+        // 26.0: и что нового у своих модов (раздел «Автору»).
+        var creator = Creator.CreatorWatch.Notes;
+        _bellBadge.IsVisible = updates.Count + hub.Count + creator.Count > 0;
         _bell.IsVisible = _bellBadge.IsVisible || _bellPanel.IsVisible;
         _bellList.Children.Clear();
-        if (updates.Count + hub.Count == 0)
+        if (updates.Count + hub.Count + creator.Count == 0)
         {
             _bellList.Children.Add(Ui.Col(6, Ui.Text(I18n.T("nx.notify.empty"), "h3"), Ui.Text(I18n.T("nx.notify.empty.text"), "muted small", wrap: true)));
             return;
         }
+        RenderCreatorBell(creator);
         foreach (var u in updates)
         {
             var uu = u;
@@ -860,6 +865,7 @@ public sealed partial class MainWindow : Window
         {
             foreach (var u in Features.Tracking.Updates.ToList()) Features.Tracking.Seen(u);
             foreach (var h in Creator.Hub.Updates.ToList()) Creator.Hub.MarkSeen(h);
+            if (Creator.CreatorWatch.Notes.Count > 0) Creator.CreatorWatch.MarkSeen();
             RenderBell();
         }, "ghost", Icons.Check);
         var center = Ui.Button(I18n.T("mc.open"), () => { _bellPanel.IsVisible = false; Navigate(() => new ModsCenterPage()); }, "ghost", Icons.Package);
@@ -973,6 +979,8 @@ public sealed partial class MainWindow : Window
         {
             try { await Features.Tracking.Check(); } catch { }
             try { await Creator.Hub.All(); } catch { }
+            // 26.0: свои моды в том же списке — снимок дня и уведомления автора (скачивания, комментарии, продажи).
+            try { await Creator.CreatorWatch.Check(); } catch { }
             // 25.0: Premium куплен на другом ПК или до переустановки — узнаём по покупке.
             try { await Features.Premium.Refresh(); } catch { }
             // 25.0: владельцу — сколько заявок на пополнение и вывод ждут подтверждения (пока не подтвердить, деньги не придут).

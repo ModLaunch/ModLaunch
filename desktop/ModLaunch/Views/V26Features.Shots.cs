@@ -42,6 +42,15 @@ public static class V26FeaturesShots
         CreatorPage.DemoStatsFill(1, fresh: false);
         Shot(s, "v26f-06-stats-new", () => CreatorPage.DemoStatsView("downloads", 30));
 
+        // Колокольчик: раздел «Автору» — новые комментарии, продажи, скачивания и лайки с прошлого просмотра статистики.
+        CreatorWatch.Demo([new("comments", 3, "demo_night", "Ночь с друзьями"), new("sales", 2), new("downloads", 412), new("likes", 37)]);
+        s.Window.Navigate(() => new CreatorPage("home"));
+        s.Pump(900);
+        s.Window.DemoOpenBell();
+        s.Pump(600);
+        s.Save("v26f-09-bell");
+        s.Window.DemoCloseBell();
+
         var was = Settings.Data.Str("theme") ?? "store";
         Look.SetTheme("light");
         try
@@ -50,10 +59,15 @@ public static class V26FeaturesShots
             Shot(s, "v26f-07-light-stats", () => CreatorPage.DemoStatsView("downloads", 30));
             CreatorPage.DemoJourney = null;
             Shot(s, "v26f-08-light-mine-empty", () => new CreatorPage("home"));
+            s.Window.DemoOpenBell();
+            s.Pump(600);
+            s.Save("v26f-10-light-bell");
+            s.Window.DemoCloseBell();
         }
         finally { Look.SetTheme(was); }
         CreatorPage.DemoStats = null;
         CreatorPage.DemoJourney = null;
+        CreatorWatch.Demo([]);
     }
 }
 
