@@ -260,9 +260,13 @@ public sealed partial class CreatorPage
         if (series.Count(p => p.Real) >= 2 && known.Count >= 2)
         {
             var gain = known[^1].Value!.Value - known[0].Value!.Value;
+            // Подпись — по нижнему краю крупного числа (по центру она висела выше строки).
+            var period = Ui.Text(I18n.T("v26.features.stats.gain"), "muted");
+            period.VerticalAlignment = VerticalAlignment.Bottom;
+            period.Margin = new Thickness(0, 0, 0, 3);
             body.Children.Add(Ui.Row(12,
                 new TextBlock { Text = (gain >= 0 ? "+" : "−") + Math.Abs(gain).ToString("N0", I18n.Culture), FontFamily = Look.Display, FontSize = 22, FontWeight = FontWeight.Bold, Foreground = HubLook.Violet },
-                Ui.Text(I18n.T("v26.features.stats.gain"), "muted")));
+                period));
             body.Children.Add(LineChart(series));
         }
         else
