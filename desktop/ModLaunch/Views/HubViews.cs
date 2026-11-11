@@ -233,9 +233,33 @@ public sealed partial class CreatorPage
     }
 
     void PublishArchive() => HubPublish.Show(new HubDraft { Game = _hubGame ?? AppState.Games.FirstOrDefault(g => g.Status == Detect.Found)?.Def.Id ?? "" },
-        fromProject: false, pack: null, done: () => { _tab = "mine"; _minePart = "published"; _ = LoadHub(force: true); });
+        fromProject: false, pack: null, done: () => { _tab = "mine"; _minePart = "published"; ReloadPublished(); });
 
     // ---------------------------------------------------------------- мои публикации
+
+    // 26.0: свои моды — отдельным запросом по автору (Hub.Mine), а не выборкой из 300 свежих модов Hub.
+    static List<HubMod>? _mineHub;
+    static string? _mineHubUid, _mineHubError;
+    static bool _mineHubLoading;
+
+    async Task LoadMine(bool force = false)
+    {
+        if (_mineHubLoading || Social.Account.Uid is not { Length: > 0 } uid) return;
+        _mineHubLoading = true;
+        _mineHubError = null;
+        try { _mineHub = await Hub.Mine(uid, force); }
+        catch { _mineHub = []; _mineHubError = Hub.LastError; }
+        _mineHubUid = uid;
+        _mineHubLoading = false;
+        RebuildCurrent();
+    }
+
+    /// <summary>Выложили, удалили, новая версия — обновить и общий Hub, и свои.</summary>
+    void ReloadPublished()
+    {
+        _ = LoadHub(force: true);
+        _ = LoadMine(force: true);
+    }
 
     Control PublishedView()
     {
@@ -247,10 +271,29 @@ public sealed partial class CreatorPage
                 Ui.Button(I18n.T("acc.title"), () => MainWindow.Current?.Navigate(() => new SettingsPage("accounts")), "primary", Icons.User)));
             return col;
         }
-        if (_hub is null && !_hubLoading && !Program.Screenshot) _ = LoadHub();
-        var mine = (_hub ?? []).Where(m => m.Uid == Social.Account.Uid).OrderByDescending(m => m.Updated).ToList();
-        if (_hubError is not null) col.Children.Add(Ui.Card(Ui.Text(_hubError, "muted", wrap: true), 20));
-        if (mine.Count == 0 && _hubError is null)
+        var uid = Social.Account.Uid;
+        List<HubMod> mine;
+        string? error;
+        if (Program.Screenshot)
+        {
+            // Снимки: свои моды — из готового демо-списка, без сети.
+            mine = (_hub ?? []).Where(m => m.Uid == uid).OrderByDescending(m => m.Updated).ToList();
+            error = _hubError;
+        }
+        else
+        {
+            if ((_mineHub is null || _mineHubUid != uid) && !_mineHubLoading) _ = LoadMine();
+            if (_mineHubUid != uid || _mineHub is null)
+            {
+                // Первая загрузка: две «пустые» строки вместо приглашения выложить мод, которое мигнуло бы зря.
+                for (var i = 0; i < 2; i++) col.Children.Add(new Border { Classes = { "card", "skeleton" }, Height = 78 });
+                return col;
+            }
+            mine = _mineHub;
+            error = _mineHubError;
+        }
+        if (error is not null) col.Children.Add(Ui.Card(Ui.Text(error, "muted", wrap: true), 20));
+        if (mine.Count == 0 && error is null)
         {
             // «Опубликовать мод» — в шапке раздела; здесь — дорога к своим модам, которые можно выложить.
             col.Children.Add(HubLook.Empty(Icons.Upload, I18n.T("hub.mine.empty"), I18n.T("hub.mine.empty.text"),
@@ -299,7 +342,7 @@ public sealed partial class CreatorPage
             Id = m.Id, Name = m.Name, Summary = m.Summary, Description = m.Description, Game = m.Game, Version = Hub.NextVersion(m.Version),
             Code = m.Code, Tags = [.. m.Tags], Images = [.. m.Images],
         };
-        void Done() { _ = LoadHub(force: true); }
+        void Done() => ReloadPublished();
         var project = Hub.ProjectFor(m, Projects.List(), p => p.Meta().HubId);
         if (project is null) { HubPublish.ShowVersion(draft, m, Done); return; }
         var b = ModScript.Compile(File.ReadAllText(project.Script));
@@ -324,7 +367,7 @@ public sealed partial class CreatorPage
             Ui.Button(I18n.T("hub.delete"), async () =>
             {
                 w.CloseDialog();
-                try { await Hub.Delete(m); w.Toast(I18n.T("hub.deleted")); _ = LoadHub(force: true); }
+                try { await Hub.Delete(m); w.Toast(I18n.T("hub.deleted")); ReloadPublished(); }
                 catch (Exception e) { w.Toast(Social.Firebase.Explain("creator", e), bad: true); }
             }, "danger", Icons.Trash));
     }

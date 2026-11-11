@@ -121,8 +121,9 @@ service cloud.firestore {
     function hubValid(data) {
       return data.keys().hasOnly(['uid', 'author', 'name', 'summary', 'description', 'game', 'version', 'kind', 'code',
                                   'tags', 'images', 'size', 'sha256', 'chunks', 'fileName', 'changelog', 'app',
-                                  'likes', 'downloads', 'comments', 'created', 'updated'])
+                                  'likes', 'downloads', 'comments', 'lastComment', 'created', 'updated'])
         && data.uid == request.auth.uid
+        && hubText(data.get('lastComment', ''), 40)
         && hubText(data.author, 32) && data.author.size() > 0
         && hubText(data.name, 60) && data.name.size() > 0
         && hubText(data.summary, 200)
@@ -143,6 +144,15 @@ service cloud.firestore {
     }
     function hubCounters(field) {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly([field]);
+    }
+    function hubComment(id, comment) {
+      return /databases/$(database)/documents/creations/$(id)/comments/$(comment);
+    }
+    // 26.0: счётчик комментариев сдвинулся на ±1 этой же записью и указывает на этот комментарий (для правил самого
+    // комментария): в одной записи — ровно один комментарий на одну единицу счётчика.
+    function hubCommentsMoved(id, comment, by) {
+      return getAfter(hubDoc(id)).data.comments == get(hubDoc(id)).data.comments + by
+        && getAfter(hubDoc(id)).data.get('lastComment', '') == comment;
     }
 
     match /creations/{id} {
@@ -174,10 +184,19 @@ service cloud.firestore {
             || (request.resource.data.likes == resource.data.likes - 1
                 && !existsAfter(/databases/$(database)/documents/creations/$(id)/likes/$(request.auth.uid))
                 && exists(/databases/$(database)/documents/creations/$(id)/likes/$(request.auth.uid)))))
-        // Комментарии: ±1 вместе с комментарием.
-        || (hubMember() && hubCounters('comments')
-          && (request.resource.data.comments == resource.data.comments + 1
-            || request.resource.data.comments == resource.data.comments - 1));
+        // Комментарии (26.0): ±1 только вместе с созданием или удалением комментария, id которого записан в lastComment
+        // той же записью, — как у лайков. Раньше счётчик двигал кто угодно без комментария (накрутка «В тренде»).
+        || (hubMember()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['comments', 'lastComment'])
+          && request.resource.data.get('lastComment', '') is string
+          && request.resource.data.get('lastComment', '').size() > 0
+          && request.resource.data.get('lastComment', '').size() <= 40
+          && ((request.resource.data.comments == resource.data.comments + 1
+                && existsAfter(hubComment(id, request.resource.data.lastComment))
+                && !exists(hubComment(id, request.resource.data.lastComment)))
+            || (request.resource.data.comments == resource.data.comments - 1
+                && !existsAfter(hubComment(id, request.resource.data.lastComment))
+                && exists(hubComment(id, request.resource.data.lastComment)))));
       allow delete: if hubMember() && resource.data.uid == request.auth.uid;
 
       match /versions/{version} {
@@ -199,15 +218,19 @@ service cloud.firestore {
 
       match /comments/{comment} {
         allow get, list: if true;
+        // 26.0: комментарий и счётчик — одной записью в обе стороны: без +1 комментарий не создаётся, без −1 не удаляется
+        // (иначе «удалить комментарий, созданный мимо счётчика» уводило бы чужой счётчик в минус).
         allow create: if hubMember()
           && request.resource.data.keys().hasOnly(['uid', 'author', 'text', 'created'])
           && request.resource.data.uid == request.auth.uid
           && hubText(request.resource.data.author, 32)
           && hubText(request.resource.data.text, 1000) && request.resource.data.text.size() > 0
-          && request.resource.data.created == request.time;
+          && request.resource.data.created == request.time
+          && hubCommentsMoved(id, comment, 1);
         // Удалить может автор комментария или автор мода.
         allow delete: if hubMember()
-          && (resource.data.uid == request.auth.uid || get(hubDoc(id)).data.uid == request.auth.uid);
+          && (resource.data.uid == request.auth.uid || get(hubDoc(id)).data.uid == request.auth.uid)
+          && hubCommentsMoved(id, comment, -1);
       }
     }
 

@@ -61,7 +61,8 @@ public sealed partial class AccountPage
             Load("earnings", async () =>
             {
                 var mine = await Market.Mine();
-                var mods = (await Hub.All()).Where(m => m.Mine).ToList();
+                // 26.0: свои моды — запросом по автору, а не из 300 свежих модов Hub (давние выпадали из счёта загрузок).
+                var mods = Social.Account.Uid is { Length: > 0 } uid ? await Hub.Mine(uid) : [];
                 _earn = new EarnData(mine, await Market.AllSales(mine), await Market.MyWallet(claim: true), mods);
             });
         if (_earn is null) return Card(I18n.T("v20.acc.earnings"), null, Loading());

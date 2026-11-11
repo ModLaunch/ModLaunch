@@ -35,6 +35,37 @@ public static partial class Hub
     }
 
     [SelfTest]
+    static string HubMineQueryNeedsNoIndex()
+    {
+        // Свои моды — по автору, а не из окна 300 свежих: одно равенство, без сортировки (иначе нужен составной индекс).
+        var q = MineQuery("u1");
+        if (q["orderBy"] is not null) throw new Exception("orderBy needs a composite index");
+        var f = q["where"]?["fieldFilter"];
+        if (f?["field"]?["fieldPath"]?.ToString() != "uid" || f["op"]?.ToString() != "EQUAL" || f["value"]?["stringValue"]?.ToString() != "u1") throw new Exception(q.ToJsonString());
+        if ((int?)q["limit"] is not > 300) throw new Exception("limit");
+        return "where uid == author, no orderBy, limit " + q["limit"];
+    }
+
+    [SelfTest]
+    static string HubCommentCounterNamesTheComment()
+    {
+        // Счётчик меняет только lastComment и comments: по новым правилам ±1 — лишь вместе с этим комментарием.
+        var w = CommentCounter("u_mod", "c123", -1);
+        var mask = w["updateMask"]?["fieldPaths"]?.AsArray().Select(n => n?.ToString()).ToList() ?? [];
+        if (mask is not ["lastComment"]) throw new Exception("mask " + string.Join(",", mask));
+        if (w["update"]?["fields"]?["lastComment"]?["stringValue"]?.ToString() != "c123") throw new Exception("lastComment");
+        var t = w["updateTransforms"]?[0];
+        if (t?["fieldPath"]?.ToString() != "comments" || t["increment"]?["integerValue"]?.ToString() != "-1") throw new Exception("increment");
+        if (w["currentDocument"]?["exists"]?.GetValue<bool>() != true) throw new Exception("exists");
+        // Правила в программе (Настройки → Сервисы копирует их владельцу) связывают счётчик с комментарием.
+        using var stream = Avalonia.Platform.AssetLoader.Open(new Uri("avares://ModLaunch/Assets/firestore.rules"));
+        var rules = new StreamReader(stream).ReadToEnd();
+        foreach (var need in new[] { "existsAfter(hubComment(id, request.resource.data.lastComment))", "hubCommentsMoved(id, comment, 1)", "hubCommentsMoved(id, comment, -1)", "'lastComment'" })
+            if (!rules.Contains(need)) throw new Exception("rules miss " + need);
+        return "comment counter carries lastComment; rules tie ±1 to the comment both ways";
+    }
+
+    [SelfTest]
     static string HubVersionsOnlyGoUp()
     {
         if (CompareVersions("1.10.0", "1.9.9") <= 0) throw new Exception("1.10.0 vs 1.9.9");

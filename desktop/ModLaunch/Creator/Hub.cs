@@ -148,7 +148,42 @@ public static partial class Hub
         catch (Exception e) { LastError = Firebase.Explain("creator", e); throw; }
     }
 
-    public static void Invalidate() => _cache = null;
+    public static void Invalidate() { _cache = null; _mine = null; }
+
+    static (string Uid, List<HubMod> List, DateTime At)? _mine;
+
+    /// <summary>
+    /// 26.0: все моды автора — запрос «uid == автор» (фильтр по одному полю, без сортировки — составной индекс не нужен).
+    /// Раньше «Опубликованные» и заработок выбирали своё из 300 свежих модов All(): при большом Hub давние моды автора
+    /// пропадали из списка, а их загрузки — из заработка. Кэш на минуту, свежие сверху.
+    /// </summary>
+    public static async Task<List<HubMod>> Mine(string uid, bool force = false, CancellationToken ct = default)
+    {
+        if (!force && _mine is { } c && c.Uid == uid && DateTime.UtcNow - c.At < TimeSpan.FromMinutes(1)) return c.List;
+        try
+        {
+            var rows = await Call(Firebase.Url(":runQuery"), HttpMethod.Post, new JsonObject { ["structuredQuery"] = MineQuery(uid) }, null);
+            var list = (rows as JsonArray ?? []).Select(r => r?["document"] as JsonObject).OfType<JsonObject>().Select(FromDoc)
+                .Where(m => m.Uid == uid).OrderByDescending(m => m.Updated).ToList();
+            _mine = (uid, list, DateTime.UtcNow);
+            return list;
+        }
+        catch (Exception e) { LastError = Firebase.Explain("creator", e); throw; }
+    }
+
+    /// <summary>Запрос «моды автора»: одно условие на равенство, без orderBy — Firestore обходится без составного индекса.</summary>
+    internal static JsonObject MineQuery(string uid) => new()
+    {
+        ["from"] = new JsonArray(new JsonObject { ["collectionId"] = "creations" }),
+        ["where"] = new JsonObject
+        {
+            ["fieldFilter"] = new JsonObject
+            {
+                ["field"] = new JsonObject { ["fieldPath"] = "uid" }, ["op"] = "EQUAL", ["value"] = new JsonObject { ["stringValue"] = uid },
+            },
+        },
+        ["limit"] = 500,
+    };
 
     public static IEnumerable<HubMod> Sort(IEnumerable<HubMod> list, string sort) => sort switch
     {
@@ -516,29 +551,49 @@ public static partial class Hub
         text = Clip(text, 1000, multiline: true);
         if (text == "") return;
         var cid = Guid.NewGuid().ToString("N")[..20];
-        await Commit(new JsonArray(
-            new JsonObject
+        JsonObject Comment() => new()
+        {
+            ["update"] = new JsonObject
             {
-                ["update"] = new JsonObject
-                {
-                    ["name"] = Firebase.Doc($"creations/{mod.Id}/comments/{cid}"),
-                    ["fields"] = Firebase.ToFields(new Dictionary<string, object?> { ["uid"] = uid, ["author"] = author, ["text"] = text }),
-                },
-                ["currentDocument"] = new JsonObject { ["exists"] = false },
-                ["updateTransforms"] = new JsonArray(ServerTime("created")),
+                ["name"] = Firebase.Doc($"creations/{mod.Id}/comments/{cid}"),
+                ["fields"] = Firebase.ToFields(new Dictionary<string, object?> { ["uid"] = uid, ["author"] = author, ["text"] = text }),
             },
-            Increment($"creations/{mod.Id}", "comments", 1)), token);
+            ["currentDocument"] = new JsonObject { ["exists"] = false },
+            ["updateTransforms"] = new JsonArray(ServerTime("created")),
+        };
+        await CommitComment(Comment, mod.Id, cid, 1, token);
         Invalidate();
     }
 
     public static async Task DeleteComment(HubMod mod, HubComment c)
     {
         var (_, token, _) = await Member();
-        await Commit(new JsonArray(
-            new JsonObject { ["delete"] = Firebase.Doc($"creations/{mod.Id}/comments/{c.Id}") },
-            Increment($"creations/{mod.Id}", "comments", -1)), token);
+        await CommitComment(() => new JsonObject { ["delete"] = Firebase.Doc($"creations/{mod.Id}/comments/{c.Id}") }, mod.Id, c.Id, -1, token);
         Invalidate();
     }
+
+    /// <summary>
+    /// 26.0: комментарий и счётчик — одной записью, и в счётчике — id этого комментария (lastComment): по новым правилам
+    /// без него счётчик не сдвинуть, и накрутить «комментарии» без комментариев нельзя. Правила до 26.0 поля lastComment
+    /// не знают и отказывают — тогда пишем как раньше, одним счётчиком (правила владелец ставит вручную).
+    /// </summary>
+    static async Task CommitComment(Func<JsonObject> comment, string modId, string cid, int by, string token)
+    {
+        try { await Commit(new JsonArray(comment(), CommentCounter(modId, cid, by)), token); }
+        catch (ServiceError e) when (e.Code == "DENIED") { await Commit(new JsonArray(comment(), Increment($"creations/{modId}", "comments", by)), token); }
+    }
+
+    internal static JsonObject CommentCounter(string modId, string cid, int by) => new()
+    {
+        ["update"] = new JsonObject
+        {
+            ["name"] = Firebase.Doc($"creations/{modId}"),
+            ["fields"] = Firebase.ToFields(new Dictionary<string, object?> { ["lastComment"] = cid }),
+        },
+        ["updateMask"] = new JsonObject { ["fieldPaths"] = new JsonArray("lastComment") },
+        ["updateTransforms"] = new JsonArray(new JsonObject { ["fieldPath"] = "comments", ["increment"] = new JsonObject { ["integerValue"] = by.ToString() } }),
+        ["currentDocument"] = new JsonObject { ["exists"] = true },
+    };
 
     public static async Task Report(HubMod mod, string reason)
     {

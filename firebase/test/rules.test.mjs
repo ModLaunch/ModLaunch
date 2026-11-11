@@ -329,6 +329,54 @@ test('Hub: карточку создаёт автор со своим префи
   await assertFails(setDoc(doc(db(BUYER), 'creations', `${OTHER.uid}_mod`), c));
 });
 
+test('Hub: счётчик комментариев — только вместе со своим комментарием (26.0)', async () => {
+  const id = `${SELLER.uid}_talk`;
+  await raw(async (d) => setDoc(doc(d, 'creations', id), { uid: SELLER.uid, author: 'Seller', name: 'Talk', summary: '', description: '',
+    game: 'subnautica', version: '1.0.0', kind: 'script', code: '', tags: [], images: [], size: 0, sha256: '', chunks: 0, fileName: '',
+    changelog: '', app: '26.0.0', likes: 0, downloads: 0, comments: 0, created: new Date(), updated: new Date() }));
+  const comment = (who) => ({ uid: who.uid, author: 'Me', text: 'hi', created: serverTimestamp() });
+  const o = db(OTHER);
+  // Накрутка: +1 без комментария, комментарий без +1 — нельзя (раньше счётчик двигал кто угодно).
+  await assertFails(updateDoc(doc(o, 'creations', id), { comments: increment(1) }));
+  await assertFails(updateDoc(doc(o, 'creations', id), { comments: increment(1), lastComment: 'ghost' }));
+  await assertFails(setDoc(doc(o, 'creations', id, 'comments', 'c0'), comment(OTHER)));
+  // +1 вместе со своим новым комментарием и его id в lastComment — можно.
+  let b = writeBatch(o);
+  b.set(doc(o, 'creations', id, 'comments', 'c1'), comment(OTHER));
+  b.update(doc(o, 'creations', id), { comments: increment(1), lastComment: 'c1' });
+  await assertSucceeds(b.commit());
+  // Два комментария на одну единицу и +2 — нельзя.
+  b = writeBatch(o);
+  b.set(doc(o, 'creations', id, 'comments', 'c2'), comment(OTHER));
+  b.set(doc(o, 'creations', id, 'comments', 'c3'), comment(OTHER));
+  b.update(doc(o, 'creations', id), { comments: increment(1), lastComment: 'c2' });
+  await assertFails(b.commit());
+  b = writeBatch(o);
+  b.set(doc(o, 'creations', id, 'comments', 'c4'), comment(OTHER));
+  b.update(doc(o, 'creations', id), { comments: increment(2), lastComment: 'c4' });
+  await assertFails(b.commit());
+  // −1 без удаления и удаление без −1 — нельзя; удалить свой вместе с −1 — можно.
+  await assertFails(updateDoc(doc(o, 'creations', id), { comments: increment(-1), lastComment: 'c1' }));
+  await assertFails(deleteDoc(doc(o, 'creations', id, 'comments', 'c1')));
+  b = writeBatch(o);
+  b.delete(doc(o, 'creations', id, 'comments', 'c1'));
+  b.update(doc(o, 'creations', id), { comments: increment(-1), lastComment: 'c1' });
+  await assertSucceeds(b.commit());
+  // Автор мода убирает чужой комментарий вместе с −1.
+  b = writeBatch(o);
+  b.set(doc(o, 'creations', id, 'comments', 'c5'), comment(OTHER));
+  b.update(doc(o, 'creations', id), { comments: increment(1), lastComment: 'c5' });
+  await assertSucceeds(b.commit());
+  const s = db(SELLER);
+  b = writeBatch(s);
+  b.delete(doc(s, 'creations', id, 'comments', 'c5'));
+  b.update(doc(s, 'creations', id), { comments: increment(-1), lastComment: 'c5' });
+  await assertSucceeds(b.commit());
+  let after = null;
+  await raw(async (d) => { after = (await getDoc(doc(d, 'creations', id))).data(); });
+  if (after.comments !== 0) throw new Error('comments ' + after.comments);
+});
+
 test('лоты: продавец создаёт свой; чужое и «продажи +1» без продажи — нельзя', async () => {
   const l = { ...listing(1000), created: serverTimestamp(), updated: serverTimestamp() };
   await assertSucceeds(setDoc(doc(db(SELLER), 'market', `${SELLER.uid}_new`), l));
