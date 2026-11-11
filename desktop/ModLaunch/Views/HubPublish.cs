@@ -270,6 +270,8 @@ public static class HubPublish
                 };
                 if (kind == "file") d.Code = "";
                 if (kind == "stored") d.Code = from.Existing!.Code;
+                // Версия в коде исходника = версия выпуска: у игроков мод ставится с ней, и «обновление» не висит вечно.
+                if (kind is "script" or "stored" && d.Code != "") d.Code = Hub.SetCodeVersion(d.Code, d.Version);
                 Say(I18n.T("hub.f.uploading"), Ui.Res("Muted"));
                 await Hub.Publish(d, new Progress<double>(r => bar.Value = r));
                 if (project is not null) Released(project, d, original);
