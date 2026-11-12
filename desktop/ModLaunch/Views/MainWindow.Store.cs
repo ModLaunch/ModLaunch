@@ -462,7 +462,7 @@ public sealed partial class MainWindow
         // без них их место занимает «Панель», и она подсвечена на страницах библиотеки и модов.
         // 15.0: «Панель» ушла в настройки — «Игры» и «Моды» на панели всегда.
         _libraryButton.IsVisible = true;
-        SetNav(_libraryButton, _current is LibraryPage or AddGamePage or GamePage or MinecraftPage or ModsCenterPage || _current is ModPage);
+        SetNav(_libraryButton, _current is LibraryPage or AllGamesPage or AddGamePage or GamePage or MinecraftPage or ModsCenterPage || _current is ModPage);
         SetNav(_creatorButton, _current is MarketPage or CreatorPage or XStudio or ListingPage or AuthorPage);
 
 

@@ -79,7 +79,9 @@ public sealed partial class LibraryPage : Page
             Build();
         };
         var add = Ui.Button(I18n.T("add.title"), () => MainWindow.Current?.Navigate(() => new AddGamePage()), "", Icons.Plus);
-        var tools = Ui.Row(10, sort, add);
+        // 27.0: единая библиотека — все игры всех лаунчеров, и без модов тоже.
+        var everything = Ui.Button(I18n.T("v27.lib.link"), () => MainWindow.Current?.Navigate(() => new AllGamesPage()), "", Icons.Grid, I18n.T("v27.lib.link.hint"));
+        var tools = Ui.Row(10, sort, everything, add);
         tools.VerticalAlignment = VerticalAlignment.Top;
         var head = new DockPanel();
         DockPanel.SetDock(tools, Dock.Right);

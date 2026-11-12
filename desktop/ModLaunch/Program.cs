@@ -46,6 +46,8 @@ public static class Program
         // 23.1: собрать конструктор в игру (и самопроверку в игре) из командной строки.
         if (args.Contains("--dev-prepare")) { StartHeadless(); return Features.DevMode.Cli(args); }
         if (args.Contains("--selftest")) { Hooks.PrepareSelfTest(); StartHeadless(); return Hooks.SelfTest(); }
+        // 27.0: что нашла единая библиотека на этом ПК — для поддержки («у меня не видно игру из Xbox»).
+        if (args.Contains("--list-games")) return Games.AllGames.Cli();
         var shot = Array.IndexOf(args, "--screenshot");
         if (shot >= 0 && shot + 1 < args.Length) return Screenshots(args[shot + 1], args.Contains("--only"));
 

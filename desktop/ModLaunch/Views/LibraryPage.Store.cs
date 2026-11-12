@@ -36,10 +36,13 @@ public sealed partial class LibraryPage
 
         // Заголовок страницы и «Добавить игру».
         var add = Ui.Button(I18n.T("add.title"), () => MainWindow.Current?.Navigate(() => new AddGamePage()), "primary", Icons.Plus);
+        // 27.0: единая библиотека — все игры всех лаунчеров, и без модов тоже.
+        var everything = Ui.Button(I18n.T("v27.lib.link"), () => MainWindow.Current?.Navigate(() => new AllGamesPage()), "", Icons.Grid, I18n.T("v27.lib.link.hint"));
+        var actions = Ui.Row(10, everything, add);
         var head = new DockPanel();
-        DockPanel.SetDock(add, Dock.Right);
-        add.VerticalAlignment = VerticalAlignment.Center;
-        head.Children.Add(add);
+        DockPanel.SetDock(actions, Dock.Right);
+        actions.VerticalAlignment = VerticalAlignment.Center;
+        head.Children.Add(actions);
         head.Children.Add(Ui.Col(2, Ui.Text(I18n.T("v92.lib.title"), "h1"), Ui.Text(I18n.T("v151.lib.sub", ("found", all.Count(g => g.Status == Detect.Found)), ("all", Supported().ToString("N0", I18n.Culture))), "muted")));
         col.Children.Add(head);
 
