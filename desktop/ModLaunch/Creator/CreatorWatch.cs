@@ -170,6 +170,9 @@ public static class CreatorWatch
     /// </summary>
     public static bool Covers(string uid, IEnumerable<HubMod> list)
     {
+        // Самый первый снимок («уже видел») — только по полному списку автора: по неполному старые моды потом пришли бы
+        // уведомлением «+все скачивания за всё время».
+        if (Find(uid)?["seen"] is not JsonObject) return false;
         var have = list.Select(m => m.Id).ToHashSet(StringComparer.Ordinal);
         return KnownIds(uid).All(have.Contains);
     }
