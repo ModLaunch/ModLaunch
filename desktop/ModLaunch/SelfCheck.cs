@@ -332,8 +332,9 @@ public static class SelfCheck
             // Hollow Knight, Below Zero, ROUNDS, Dyson Sphere Program, GTFO и Outward: на всех сайтах вместе меньше 1000 модов — больше просто нет.
             // ULTRAKILL и Content Warning — ровно около 1000, число гуляет на пару модов.
             // 23.3: у части AAA на Nexus тоже меньше 1000 (Satisfactory и Deep Rock Galactic живут на ficsit.app и mod.io, Hitman — на своих сайтах).
+            // 26.0: ATLYSS — около 600 на Thunderstore и пара десятков на Nexus.
             var unexpected = small.Where(id => id is not ("hollow-knight" or "subnautica-below-zero" or "rounds" or "dyson-sphere-program" or "gtfo" or "outward" or "ultrakill" or "content-warning"
-                or "resident-evil-village" or "resident-evil-3" or "black-myth-wukong" or "silent-hill-2" or "satisfactory" or "deep-rock-galactic" or "hitman-3")).ToList();
+                or "resident-evil-village" or "resident-evil-3" or "black-myth-wukong" or "silent-hill-2" or "satisfactory" or "deep-rock-galactic" or "hitman-3" or "atlyss")).ToList();
             if (unexpected.Count > 0) throw new Exception("under 1000: " + string.Join(", ", unexpected) + " | " + string.Join("; ", lines));
             return string.Join("; ", lines);
         });

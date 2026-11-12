@@ -58,8 +58,14 @@ public static partial class Hub
         if (t?["fieldPath"]?.ToString() != "comments" || t["increment"]?["integerValue"]?.ToString() != "-1") throw new Exception("increment");
         if (w["currentDocument"]?["exists"]?.GetValue<bool>() != true) throw new Exception("exists");
         // Правила в программе (Настройки → Сервисы копирует их владельцу) связывают счётчик с комментарием.
-        using var stream = Avalonia.Platform.AssetLoader.Open(new Uri("avares://ModLaunch/Assets/firestore.rules"));
-        var rules = new StreamReader(stream).ReadToEnd();
+        // Без окна программы (самопроверка на CI) ресурсов Avalonia нет — тогда сверяем только саму запись.
+        string rules;
+        try
+        {
+            using var stream = Avalonia.Platform.AssetLoader.Open(new Uri("avares://ModLaunch/Assets/firestore.rules"));
+            rules = new StreamReader(stream).ReadToEnd();
+        }
+        catch (InvalidOperationException) { return "comment counter carries lastComment (rules text not checked: no app assets in a headless run)"; }
         foreach (var need in new[] { "existsAfter(hubComment(id, request.resource.data.lastComment))", "hubCommentsMoved(id, comment, 1)", "hubCommentsMoved(id, comment, -1)", "'lastComment'" })
             if (!rules.Contains(need)) throw new Exception("rules miss " + need);
         return "comment counter carries lastComment; rules tie ±1 to the comment both ways";

@@ -64,7 +64,9 @@ public static partial class Remix
         var code = Remix.Code(m, "Me");
         var lines = code.Split('\n');
         if (!lines.Take(3).All(l => l.StartsWith("# ", StringComparison.Ordinal))) throw new Exception("header is not a comment: " + string.Join(" | ", lines.Take(3)));
-        if (!lines[0].Contains("Farmer") || !lines[0].Contains("Cheap seeds") || !lines[1].Contains("u1_seeds")) throw new Exception("credit: " + lines[0] + " | " + lines[1]);
+        // Без загруженных строк (самопроверка на CI, без окна программы) в шапке — ключи: имя и автора проверяем только с текстами.
+        var strings = I18n.T("v26.features.remix.header") != "v26.features.remix.header";
+        if (strings && (!lines[0].Contains("Farmer") || !lines[0].Contains("Cheap seeds") || !lines[1].Contains("u1_seeds"))) throw new Exception("credit: " + lines[0] + " | " + lines[1]);
         if (lines.Count(l => l.StartsWith("mod ", StringComparison.Ordinal)) != 1) throw new Exception("one mod line: " + code);
         var modLine = lines.First(l => l.StartsWith("mod ", StringComparison.Ordinal));
         if (!modLine.Contains(Templates.Text(Remix.Name(m)))) throw new Exception("renamed: " + modLine);
