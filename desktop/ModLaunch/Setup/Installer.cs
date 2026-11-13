@@ -138,50 +138,37 @@ public static class Installer
     }
 
     /// <summary>
-    /// Установка «с запасным выходом»: новая копия сначала целиком ложится рядом и проверяется,
-    /// потом папки меняются местами. Если что-то сорвалось — старая версия возвращается на место,
-    /// и у человека всегда остаётся рабочий ModLaunch.
+    /// Установка «с запасным выходом»: новый exe сначала целиком ложится рядом со старым и проверяется,
+    /// потом встаёт на его место. Если что-то сорвалось — старая версия возвращается, и у человека всегда
+    /// остаётся рабочий ModLaunch.
+    /// 27.0: раньше менялась вся папка (ModLaunch → ModLaunch.old). Это срывалось с «файлы заняты», если папку
+    /// кто-то держал (открытый в ней терминал, проводник, редактор), а когда получалось — стирало вместе со
+    /// старой версией всё, что человек положил рядом (резервные копии и т. п.). Теперь меняется только exe и отметка.
     /// </summary>
-    public static async Task<Result> Install(string targetInput, bool desktop, IProgress<(string Step, double Ratio)> progress, bool autostart = false)
+    public static async Task<Result> Install(string targetInput, bool desktop, IProgress<(string Step, double Ratio)> progress, bool autostart = false, string? sourceExe = null, bool integrate = true)
     {
         var dir = Normalize(targetInput);
-        var source = Environment.ProcessPath ?? throw new InvalidOperationException("no exe");
+        var source = sourceExe ?? Environment.ProcessPath ?? throw new InvalidOperationException("no exe");
         if (Inside(source, dir)) throw new SetupError("SETUP_TARGET_SELF");
         var (kind, version) = Inspect(dir);
         if (kind == TargetKind.Foreign) throw new SetupError("SETUP_TARGET_FOREIGN");
         Log($"install {Http.Version} to {dir} (was {kind} {version})");
         CheckSpace(dir, new FileInfo(source).Length);
 
-        var staging = dir + ".new";
-        var backup = dir + ".old";
-        var swapped = false;
+        // Старая версия на Electron (3.x) — целая папка ненужных теперь файлов: её по-прежнему меняем целиком.
+        var electron = kind == TargetKind.Ours && File.Exists(Path.Combine(dir, "resources", "app.asar"));
         try
         {
             progress.Report(("close", 0));
             await Task.Run(() => CloseRunning(dir));
 
-            progress.Report(("copy", 0));
-            if (Directory.Exists(staging)) await Retry(() => Directory.Delete(staging, true));
-            Directory.CreateDirectory(staging);
-            File.WriteAllText(Path.Combine(staging, Marker), new JsonObject { ["version"] = Http.Version, ["installedAt"] = DateTime.UtcNow.ToString("o") }.ToJsonString());
-            var stagedExe = Path.Combine(staging, ExeName);
-            await CopyWithProgress(source, stagedExe, r => progress.Report(("copy", r)));
-
-            progress.Report(("verify", 1));
-            if (!await Task.Run(() => SameFile(source, stagedExe))) throw new SetupError("SETUP_VERIFY");
-
-            progress.Report(("clean", 1));
-            if (Directory.Exists(backup)) await Retry(() => Directory.Delete(backup, true));
-            var hadOld = Directory.Exists(dir);
-            if (hadOld) await Retry(() => Directory.Move(dir, backup));
-            try { await Retry(() => Directory.Move(staging, dir)); swapped = true; }
-            catch { if (hadOld) try { Directory.Move(backup, dir); } catch { } throw; }
+            var swap = (electron ? await SwapFolder(dir, source, progress) : null) ?? await SwapExe(dir, source, progress);
 
             progress.Report(("integrate", 1));
             var exe = Path.Combine(dir, ExeName);
             try
             {
-                if (OperatingSystem.IsWindows() && Environment.GetEnvironmentVariable("MODLAUNCH_SETUP_TEST") != "1") // проверки установщика не трогают реестр и ярлыки
+                if (integrate && OperatingSystem.IsWindows() && Environment.GetEnvironmentVariable("MODLAUNCH_SETUP_TEST") != "1") // проверки установщика не трогают реестр и ярлыки
                 {
                     Register(dir, exe, (int)(new FileInfo(exe).Length / 1024));
                     Shortcuts(exe, dir, desktop);
@@ -190,11 +177,11 @@ public static class Installer
             }
             catch
             {
-                // Ярлыки или реестр не записались — возвращаем прежнюю версию целиком.
-                if (hadOld) { try { Directory.Delete(dir, true); Directory.Move(backup, dir); } catch { } }
+                // Ярлыки или реестр не записались — возвращаем прежнюю версию.
+                swap.Undo();
                 throw;
             }
-            if (Directory.Exists(backup)) { try { await Retry(() => Directory.Delete(backup, true)); } catch { Log("old copy left at " + backup); } }
+            await swap.Commit();
             Log("done");
             progress.Report(("done", 1));
             return new Result(dir, exe, kind == TargetKind.Ours, version);
@@ -202,10 +189,108 @@ public static class Installer
         catch (SetupError e) { Log("error " + e.Code); throw; }
         catch (IOException e) { Log("io error " + e.Message); throw new SetupError("SETUP_BUSY"); }
         catch (UnauthorizedAccessException e) { Log("access error " + e.Message); throw new SetupError("SETUP_ACCESS"); }
-        finally
+    }
+
+    /// <summary>Как вернуть прежнюю версию, если дальше что-то сорвалось, и как убрать её, когда всё получилось.</summary>
+    sealed record Swap(Action Undo, Func<Task> Commit);
+
+    static void WriteMarker(string dir) =>
+        File.WriteAllText(Path.Combine(dir, Marker), new JsonObject { ["version"] = Http.Version, ["installedAt"] = DateTime.UtcNow.ToString("o") }.ToJsonString());
+
+    /// <summary>
+    /// Замена на месте: новый exe ложится в ту же папку под временным именем и сверяется, старый переименовывается
+    /// (это Windows разрешает, даже когда папку держит другая программа), новый встаёт на его место.
+    /// Всё остальное в папке не трогаем.
+    /// </summary>
+    static async Task<Swap> SwapExe(string dir, string source, IProgress<(string Step, double Ratio)> progress)
+    {
+        Directory.CreateDirectory(dir);
+        ClearLeftovers(dir);
+        var exe = Path.Combine(dir, ExeName);
+        var staged = $"{exe}.{Environment.ProcessId}.new";
+        var old = $"{exe}.{Environment.ProcessId}.old";
+        var marker = Path.Combine(dir, Marker);
+        var oldMarker = File.Exists(marker) ? await File.ReadAllTextAsync(marker) : null;
+        var hadOld = File.Exists(exe);
+        try
         {
-            if (!swapped) try { if (Directory.Exists(staging)) Directory.Delete(staging, true); } catch { }
+            progress.Report(("copy", 0));
+            await CopyWithProgress(source, staged, r => progress.Report(("copy", r)));
+
+            progress.Report(("verify", 1));
+            if (!await Task.Run(() => SameFile(source, staged))) throw new SetupError("SETUP_VERIFY");
+
+            progress.Report(("clean", 1));
+            if (hadOld) await Retry(() => File.Move(exe, old));
+            void Undo()
+            {
+                try
+                {
+                    if (hadOld) File.Move(old, exe, overwrite: true);
+                    else File.Delete(exe);
+                    if (oldMarker is null) File.Delete(marker);
+                    else File.WriteAllText(marker, oldMarker);
+                }
+                catch (Exception e) { Log("rollback failed: " + e.Message); }
+            }
+            try
+            {
+                await Retry(() => File.Move(staged, exe));
+                WriteMarker(dir);
+            }
+            catch { Undo(); throw; }
+            return new Swap(Undo, async () =>
+            {
+                if (!hadOld) return;
+                try { await Retry(() => File.Delete(old)); } catch { Log("old exe left at " + old); }
+            });
         }
+        finally { try { File.Delete(staged); } catch { } }
+    }
+
+    /// <summary>Хвосты прошлых сорвавшихся установок (ModLaunch.exe.1234.new / .old). Занятые пропускаем.</summary>
+    static void ClearLeftovers(string dir)
+    {
+        foreach (var file in Directory.EnumerateFiles(dir))
+            if (System.Text.RegularExpressions.Regex.IsMatch(Path.GetFileName(file), @"^ModLaunch\.exe\.\d+\.(new|old)$", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                try { File.Delete(file); } catch { }
+    }
+
+    /// <summary>
+    /// Старая версия на Electron: новая папка рядом, потом папки меняются местами, старая удаляется целиком.
+    /// Папку держит другая программа — null: тогда просто ставим новый exe рядом со старыми файлами.
+    /// </summary>
+    static async Task<Swap?> SwapFolder(string dir, string source, IProgress<(string Step, double Ratio)> progress)
+    {
+        var staging = dir + ".new";
+        var backup = dir + ".old";
+        try
+        {
+            progress.Report(("copy", 0));
+            if (Directory.Exists(staging)) await Retry(() => Directory.Delete(staging, true));
+            Directory.CreateDirectory(staging);
+            WriteMarker(staging);
+            var stagedExe = Path.Combine(staging, ExeName);
+            await CopyWithProgress(source, stagedExe, r => progress.Report(("copy", r)));
+
+            progress.Report(("verify", 1));
+            if (!await Task.Run(() => SameFile(source, stagedExe))) throw new SetupError("SETUP_VERIFY");
+
+            progress.Report(("clean", 1));
+            if (Directory.Exists(backup)) await Retry(() => Directory.Delete(backup, true));
+            try { await Retry(() => Directory.Move(dir, backup)); }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                Log("old folder is busy, replacing the exe only: " + e.Message);
+                return null;
+            }
+            try { await Retry(() => Directory.Move(staging, dir)); }
+            catch { try { Directory.Move(backup, dir); } catch { } throw; }
+            return new Swap(
+                () => { try { Directory.Delete(dir, true); Directory.Move(backup, dir); } catch (Exception e) { Log("rollback failed: " + e.Message); } },
+                async () => { try { await Retry(() => Directory.Delete(backup, true)); } catch { Log("old copy left at " + backup); } });
+        }
+        finally { try { if (Directory.Exists(staging)) Directory.Delete(staging, true); } catch { } }
     }
 
     /// <summary>Установка без окна, для скриптов и администраторов: --silent [--dir путь] [--no-desktop] [--no-launch] [--autostart]; с --uninstall — удаление (--wipe — вместе с данными).</summary>
@@ -374,6 +459,51 @@ static class InstallerChecks
             return "identical copy passes; flipped byte and truncated copy are caught";
         }
         finally { try { Directory.Delete(dir, true); } catch { } }
+    }
+
+    /// <summary>
+    /// 27.0: обновление поверх, когда папку программы кто-то держит (в ней открыт терминал, файл, редактор),
+    /// а рядом с exe лежат чужие файлы. Раньше установщик переносил всю папку и падал с «файлы заняты»,
+    /// а если перенос удавался — стирал вместе со старой версией всё, что лежало рядом.
+    /// </summary>
+    [SelfTest]
+    static string UpdateWithBusyFolderKeepsOtherFiles()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "modlaunch-installer-busy");
+        try { Directory.Delete(root, true); } catch { }
+        var dir = Path.Combine(root, "ModLaunch");
+        var v1 = Path.Combine(root, "v1.exe");
+        var v2 = Path.Combine(root, "v2.exe");
+        var quiet = new Progress<(string, double)>(_ => { });
+        // Самотесты идут в потоке окна: ждать установку прямо в нём — взаимная блокировка, поэтому через пул потоков.
+        static Installer.Result Run(Func<Task<Installer.Result>> install) => Task.Run(install).GetAwaiter().GetResult();
+        try
+        {
+            Directory.CreateDirectory(root);
+            File.WriteAllBytes(v1, [1, 2, 3]);
+            File.WriteAllBytes(v2, [4, 5, 6, 7]);
+            var first = Run(() => Installer.Install(dir, false, quiet, sourceExe: v1, integrate: false));
+            if (first.Updated) throw new Exception("fresh install reported as update");
+
+            var bak = Path.Combine(dir, "ModLaunch-25.0.0.exe.bak");
+            var own = Path.Combine(dir, ".claude", "settings.json");
+            File.WriteAllText(bak, "backup");
+            Directory.CreateDirectory(Path.GetDirectoryName(own)!);
+            File.WriteAllText(own, "{}");
+            Installer.Result second;
+            using (new FileStream(own, FileMode.Open, FileAccess.Read, FileShare.Read)) // папку держат — как терминал, открытый в ней
+                second = Run(() => Installer.Install(dir, false, quiet, sourceExe: v2, integrate: false));
+
+            if (!second.Updated) throw new Exception("second install should be an update");
+            if (!File.ReadAllBytes(second.Exe).AsSpan().SequenceEqual(new byte[] { 4, 5, 6, 7 })) throw new Exception("exe not replaced");
+            if (!File.Exists(bak) || !File.Exists(own)) throw new Exception("files next to the exe were lost");
+            var left = Directory.EnumerateFileSystemEntries(root).Select(Path.GetFileName).Where(n => n is not ("ModLaunch" or "v1.exe" or "v2.exe"))
+                .Concat(Directory.EnumerateFiles(dir).Select(Path.GetFileName).Where(n => n!.StartsWith(Installer.ExeName + ".", StringComparison.OrdinalIgnoreCase))).ToList();
+            if (left.Count > 0) throw new Exception("leftovers: " + string.Join(", ", left));
+            if (Installer.Inspect(dir) is not (Installer.TargetKind.Ours, var version) || version != Http.Version) throw new Exception("marker not updated");
+            return "exe replaced in place while the folder is held open; backups and other files next to it kept, no leftovers";
+        }
+        finally { try { Directory.Delete(root, true); } catch { } }
     }
 
     [SelfTest]
