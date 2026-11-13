@@ -78,7 +78,13 @@
     "v27.tip.k.platform": "Поддержка ModLaunch",
     "v27.tip.k.sent": "Поддержка автора",
     "v27.tip.k.got": "Поддержка от игрока",
-    "v27.tip.fees": "Ещё с поддержек: {n} шт. — {sum} (комиссия с поддержек авторов и поддержка ModLaunch целиком)."
+    "v27.tip.fees": "Ещё с поддержек: {n} шт. — {sum} (комиссия с поддержек авторов и поддержка ModLaunch целиком).",
+    "new.v27.subtitle": "Все игры со всех лаунчеров в одном месте, моды больше не теряются, а авторов можно поддержать",
+    "new.v27.library": "Все игры: Steam, Epic, GOG, Xbox, EA app, Ubisoft Connect, Battle.net и ваши репаки — в одном списке, с обложками, часами и последним запуском. «Играть» запускает игру через её лаунчер, а если для неё стоят моды — через ModLaunch с модами. Ctrl+Shift+L.",
+    "new.v27.safe": "Сейф модов: старые версии и удалённые моды больше не стираются насовсем, а убираются в сейф. «Вернуть как было» ставит их обратно без интернета — ровно те файлы, с вашими правками, даже если версии уже нет на сайте.",
+    "new.v27.log": "Журнал обновлений: какие моды обновились, с какой версии на какую, сами или по кнопке, — и что написал автор об изменениях. На вкладке модов игры и в настройках обновлений.",
+    "new.v27.support": "Поддержать автора и ModLaunch: на странице автора в Creator Hub и в «Деньгах на чай» — с баланса ModLaunch. Автор видит поддержку в кошельке и может вывести её.",
+    "new.v27.profiles": "Профили модов: переключение из меню у кнопки «Играть» теперь тоже запоминает, как было, переключает пресет ReShade и предлагает докачать недостающие моды."
   },
   "en": {
     "v27.lib.title": "All games",
@@ -159,7 +165,13 @@
     "v27.tip.k.platform": "Support for ModLaunch",
     "v27.tip.k.sent": "Support for an author",
     "v27.tip.k.got": "Support from a player",
-    "v27.tip.fees": "Plus from support: {n} — {sum} (fee on author support and ModLaunch support in full)."
+    "v27.tip.fees": "Plus from support: {n} — {sum} (fee on author support and ModLaunch support in full).",
+    "new.v27.subtitle": "All games from every launcher in one place, mods no longer get lost, and you can support authors",
+    "new.v27.library": "All games: Steam, Epic, GOG, Xbox, EA app, Ubisoft Connect, Battle.net and your repacks in one list, with covers, hours and last played. \"Play\" starts the game through its launcher — or through ModLaunch with mods if it has any. Ctrl+Shift+L.",
+    "new.v27.safe": "Mod safe: old versions and removed mods are no longer erased for good — they go to the safe. \"Restore\" puts them back without internet: the exact files, with your edits, even if the version is gone from the site.",
+    "new.v27.log": "Update log: which mods updated, from which version to which, on their own or by button — and what the author wrote about the changes. On the game's mods tab and in update settings.",
+    "new.v27.support": "Support authors and ModLaunch: on an author's Creator Hub page and in \"Tip jar\" — from your ModLaunch balance. Authors see support in their wallet and can withdraw it.",
+    "new.v27.profiles": "Mod profiles: switching from the Play button menu now also remembers how things were, switches the ReShade preset and offers to fetch missing mods."
   },
   "uk": {
     "v27.lib.title": "Усі ігри",
@@ -240,7 +252,13 @@
     "v27.tip.k.platform": "Підтримка ModLaunch",
     "v27.tip.k.sent": "Підтримка автора",
     "v27.tip.k.got": "Підтримка від гравця",
-    "v27.tip.fees": "Ще з підтримок: {n} шт. — {sum} (комісія з підтримок авторів і підтримка ModLaunch повністю)."
+    "v27.tip.fees": "Ще з підтримок: {n} шт. — {sum} (комісія з підтримок авторів і підтримка ModLaunch повністю).",
+    "new.v27.subtitle": "Усі ігри з усіх лаунчерів в одному місці, моди більше не губляться, а авторів можна підтримати",
+    "new.v27.library": "Усі ігри: Steam, Epic, GOG, Xbox, EA app, Ubisoft Connect, Battle.net і ваші репаки — в одному списку, з обкладинками, годинами й останнім запуском. «Грати» запускає гру через її лаунчер, а якщо для неї стоять моди — через ModLaunch з модами. Ctrl+Shift+L.",
+    "new.v27.safe": "Сейф модів: старі версії та видалені моди більше не стираються назавжди, а прибираються в сейф. «Повернути як було» ставить їх назад без інтернету — саме ті файли, з вашими правками, навіть якщо версії вже немає на сайті.",
+    "new.v27.log": "Журнал оновлень: які моди оновилися, з якої версії на яку, самі чи кнопкою, — і що написав автор про зміни. На вкладці модів гри та в налаштуваннях оновлень.",
+    "new.v27.support": "Підтримати автора й ModLaunch: на сторінці автора в Creator Hub і в «Грошах на чай» — з балансу ModLaunch. Автор бачить підтримку в гаманці й може її вивести.",
+    "new.v27.profiles": "Профілі модів: перемикання з меню біля кнопки «Грати» тепер теж запам'ятовує, як було, перемикає пресет ReShade і пропонує докачати відсутні моди."
   },
   "es": {
     "v27.lib.title": "Todos los juegos",
@@ -321,7 +339,13 @@
     "v27.tip.k.platform": "Apoyo a ModLaunch",
     "v27.tip.k.sent": "Apoyo a un autor",
     "v27.tip.k.got": "Apoyo de un jugador",
-    "v27.tip.fees": "Además, de apoyos: {n} — {sum} (comisión de apoyos a autores y apoyos a ModLaunch completos)."
+    "v27.tip.fees": "Además, de apoyos: {n} — {sum} (comisión de apoyos a autores y apoyos a ModLaunch completos).",
+    "new.v27.subtitle": "Todos los juegos de todos los launchers en un sitio, los mods ya no se pierden y puedes apoyar a los autores",
+    "new.v27.library": "Todos los juegos: Steam, Epic, GOG, Xbox, EA app, Ubisoft Connect, Battle.net y tus repacks en una lista, con portadas, horas y última partida. «Jugar» abre el juego con su launcher, o con ModLaunch y mods si los tiene. Ctrl+Shift+L.",
+    "new.v27.safe": "Caja fuerte de mods: las versiones antiguas y los mods eliminados ya no se borran para siempre, van a la caja fuerte. «Restaurar» los devuelve sin internet: los mismos archivos, con tus cambios, aunque la versión ya no esté en la web.",
+    "new.v27.log": "Registro de actualizaciones: qué mods se actualizaron, de qué versión a cuál, solos o con el botón, y qué escribió el autor sobre los cambios. En la pestaña de mods del juego y en los ajustes de actualizaciones.",
+    "new.v27.support": "Apoya a los autores y a ModLaunch: en la página del autor en Creator Hub y en «Propina», con tu saldo de ModLaunch. El autor ve el apoyo en su monedero y puede retirarlo.",
+    "new.v27.profiles": "Perfiles de mods: cambiar desde el menú del botón «Jugar» ahora también guarda cómo estaba todo, cambia el preset de ReShade y ofrece descargar los mods que faltan."
   },
   "de": {
     "v27.lib.title": "Alle Spiele",
@@ -402,7 +426,13 @@
     "v27.tip.k.platform": "Unterstützung für ModLaunch",
     "v27.tip.k.sent": "Unterstützung für einen Autor",
     "v27.tip.k.got": "Unterstützung von einem Spieler",
-    "v27.tip.fees": "Dazu aus Unterstützungen: {n} – {sum} (Gebühr auf Autoren-Unterstützung und ModLaunch-Unterstützung vollständig)."
+    "v27.tip.fees": "Dazu aus Unterstützungen: {n} – {sum} (Gebühr auf Autoren-Unterstützung und ModLaunch-Unterstützung vollständig).",
+    "new.v27.subtitle": "Alle Spiele aller Launcher an einem Ort, Mods gehen nicht mehr verloren, und du kannst Autoren unterstützen",
+    "new.v27.library": "Alle Spiele: Steam, Epic, GOG, Xbox, EA app, Ubisoft Connect, Battle.net und deine Repacks in einer Liste, mit Covern, Stunden und letztem Start. „Spielen“ startet das Spiel über seinen Launcher – oder über ModLaunch mit Mods, wenn welche installiert sind. Strg+Umschalt+L.",
+    "new.v27.safe": "Mod-Tresor: Alte Versionen und entfernte Mods werden nicht mehr endgültig gelöscht, sondern im Tresor abgelegt. „Zurückholen“ stellt sie ohne Internet wieder her – genau dieselben Dateien, mit deinen Änderungen, auch wenn die Version nicht mehr auf der Seite ist.",
+    "new.v27.log": "Update-Verlauf: welche Mods aktualisiert wurden, von welcher auf welche Version, automatisch oder per Knopf – und was der Autor zu den Änderungen schreibt. Im Mods-Tab des Spiels und in den Update-Einstellungen.",
+    "new.v27.support": "Autoren und ModLaunch unterstützen: auf der Autorenseite im Creator Hub und unter „Trinkgeld“ – mit deinem ModLaunch-Guthaben. Autoren sehen die Unterstützung in ihrer Geldbörse und können sie auszahlen lassen.",
+    "new.v27.profiles": "Mod-Profile: Der Wechsel über das Menü am „Spielen“-Knopf merkt sich jetzt auch den alten Stand, wechselt das ReShade-Preset und bietet an, fehlende Mods zu laden."
   },
   "fr": {
     "v27.lib.title": "Tous les jeux",
@@ -483,7 +513,13 @@
     "v27.tip.k.platform": "Soutien à ModLaunch",
     "v27.tip.k.sent": "Soutien à un auteur",
     "v27.tip.k.got": "Soutien d'un joueur",
-    "v27.tip.fees": "En plus, des soutiens : {n} — {sum} (commission sur les soutiens aux auteurs et soutiens à ModLaunch en entier)."
+    "v27.tip.fees": "En plus, des soutiens : {n} — {sum} (commission sur les soutiens aux auteurs et soutiens à ModLaunch en entier).",
+    "new.v27.subtitle": "Tous les jeux de tous les launchers au même endroit, les mods ne se perdent plus et vous pouvez soutenir les auteurs",
+    "new.v27.library": "Tous les jeux : Steam, Epic, GOG, Xbox, EA app, Ubisoft Connect, Battle.net et vos repacks dans une seule liste, avec jaquettes, heures et dernier lancement. « Jouer » lance le jeu via son launcher, ou via ModLaunch avec les mods s'il en a. Ctrl+Maj+L.",
+    "new.v27.safe": "Coffre de mods : les anciennes versions et les mods supprimés ne sont plus effacés définitivement, ils vont au coffre. « Restaurer » les remet sans internet — mêmes fichiers, avec vos modifications, même si la version n'est plus sur le site.",
+    "new.v27.log": "Journal des mises à jour : quels mods ont été mis à jour, de quelle version à quelle version, tout seuls ou par bouton — et ce que l'auteur a écrit sur les changements. Dans l'onglet des mods du jeu et dans les réglages des mises à jour.",
+    "new.v27.support": "Soutenir les auteurs et ModLaunch : sur la page de l'auteur dans Creator Hub et dans « Pourboire », avec votre solde ModLaunch. L'auteur voit le soutien dans son portefeuille et peut le retirer.",
+    "new.v27.profiles": "Profils de mods : changer depuis le menu du bouton « Jouer » mémorise aussi l'état précédent, change le preset ReShade et propose de télécharger les mods manquants."
   },
   "pt-BR": {
     "v27.lib.title": "Todos os jogos",
@@ -564,7 +600,13 @@
     "v27.tip.k.platform": "Apoio ao ModLaunch",
     "v27.tip.k.sent": "Apoio a um autor",
     "v27.tip.k.got": "Apoio de um jogador",
-    "v27.tip.fees": "Mais, de apoios: {n} — {sum} (taxa dos apoios a autores e apoios ao ModLaunch por inteiro)."
+    "v27.tip.fees": "Mais, de apoios: {n} — {sum} (taxa dos apoios a autores e apoios ao ModLaunch por inteiro).",
+    "new.v27.subtitle": "Todos os jogos de todos os launchers em um só lugar, mods não se perdem mais e você pode apoiar os autores",
+    "new.v27.library": "Todos os jogos: Steam, Epic, GOG, Xbox, EA app, Ubisoft Connect, Battle.net e seus repacks em uma lista, com capas, horas e último acesso. \"Jogar\" abre o jogo pelo launcher dele — ou pelo ModLaunch com mods, se houver. Ctrl+Shift+L.",
+    "new.v27.safe": "Cofre de mods: versões antigas e mods removidos não são mais apagados de vez — vão para o cofre. \"Restaurar\" os devolve sem internet: os mesmos arquivos, com suas edições, mesmo que a versão não esteja mais no site.",
+    "new.v27.log": "Histórico de atualizações: quais mods foram atualizados, de qual versão para qual, sozinhos ou pelo botão — e o que o autor escreveu sobre as mudanças. Na aba de mods do jogo e nas configurações de atualização.",
+    "new.v27.support": "Apoie autores e o ModLaunch: na página do autor no Creator Hub e em \"Gorjeta\", com seu saldo ModLaunch. O autor vê o apoio na carteira e pode sacá-lo.",
+    "new.v27.profiles": "Perfis de mods: trocar pelo menu do botão \"Jogar\" agora também guarda como estava, troca o preset do ReShade e oferece baixar os mods que faltam."
   },
   "zh-CN": {
     "v27.lib.title": "全部游戏",
@@ -645,6 +687,12 @@
     "v27.tip.k.platform": "支持 ModLaunch",
     "v27.tip.k.sent": "支持作者",
     "v27.tip.k.got": "来自玩家的支持",
-    "v27.tip.fees": "另有支持收入：{n} 笔，{sum}（作者支持的手续费及对 ModLaunch 的全部支持）。"
+    "v27.tip.fees": "另有支持收入：{n} 笔，{sum}（作者支持的手续费及对 ModLaunch 的全部支持）。",
+    "new.v27.subtitle": "所有启动器的游戏集中在一处，模组不再丢失，还可以支持作者",
+    "new.v27.library": "全部游戏：Steam、Epic、GOG、Xbox、EA app、Ubisoft Connect、Battle.net 以及你的重打包游戏汇成一个列表，带封面、游玩时长和最近游玩时间。“开始游戏”会通过对应启动器启动；如果装了模组，则通过 ModLaunch 带模组启动。Ctrl+Shift+L。",
+    "new.v27.safe": "模组保险箱：旧版本和已删除的模组不再被永久抹掉，而是放进保险箱。“恢复原样”可以离线放回——同样的文件，连同你的修改，即使网站上已没有该版本。",
+    "new.v27.log": "更新记录：哪些模组更新了、从哪个版本到哪个版本、自动还是手动，以及作者写的更新说明。在游戏的模组页和更新设置中查看。",
+    "new.v27.support": "支持作者和 ModLaunch：在 Creator Hub 的作者页面和“打赏”页面中，用 ModLaunch 余额支持。作者会在钱包中看到并可提现。",
+    "new.v27.profiles": "模组配置：从“开始游戏”按钮菜单切换配置时，现在同样会记住原状态、切换 ReShade 预设，并提示下载缺失的模组。"
   }
 }
