@@ -8,6 +8,7 @@ using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using ModLaunch.Core;
 using ModLaunch.Features;
+using ModLaunch.Games;
 
 namespace ModLaunch.Views;
 
@@ -24,6 +25,11 @@ public sealed class BigPictureWindow : Window
     readonly Gamepad _pad = new();
     readonly DispatcherTimer _timer;
     readonly List<GameState> _games;
+    // 28.0: и остальные установленные игры со всех лаунчеров (единая библиотека) — после игр с модами.
+    List<LibGame> _lib = [];
+    TextBlock? _empty;
+    int Count => _games.Count + _lib.Count;
+    LibGame? SelectedLib => _game >= _games.Count && _game < Count ? _lib[_game - _games.Count] : null;
     readonly Panel _heroHost = new() { ClipToBounds = true };
     int _shownGame = -1;
     readonly Panel _heroFallback = new();
@@ -67,6 +73,19 @@ public sealed class BigPictureWindow : Window
 
         _games = AppState.Games.Where(g => g.Status == Detect.Found)
             .OrderByDescending(g => Features.NewGames.Recent(g)).ToList();
+        _lib = LibraryOnly();
+        void Library() => Dispatcher.UIThread.Post(() =>
+        {
+            var fresh = LibraryOnly();
+            if (fresh.Select(g => g.Key).SequenceEqual(_lib.Select(g => g.Key))) return;
+            _lib = fresh;
+            BuildCarousel();
+            if (_empty is not null) _empty.IsVisible = Count == 0;
+            Select(_game);
+        });
+        AllGames.Changed += Library;
+        Closed += (_, _) => AllGames.Changed -= Library;
+        if (AllGames.Current is null || AllGames.Stale) _ = AllGames.Refresh();
 
         _carouselScroll = new ScrollViewer
         {
@@ -137,9 +156,9 @@ public sealed class BigPictureWindow : Window
         _clock.Text = DateTime.Now.ToString("t", I18n.Culture);
         DispatcherTimer.Run(() => { _clock.Text = DateTime.Now.ToString("t", I18n.Culture); return IsVisible; }, TimeSpan.FromSeconds(10));
 
-        var empty = new TextBlock
+        var empty = _empty = new TextBlock
         {
-            Text = I18n.T("bp.empty"), FontSize = 22, Foreground = Ui.Hex("#C9CFDB"), IsVisible = _games.Count == 0,
+            Text = I18n.T("bp.empty"), FontSize = 22, Foreground = Ui.Hex("#C9CFDB"), IsVisible = Count == 0,
             HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
         };
 
@@ -199,20 +218,42 @@ public sealed class BigPictureWindow : Window
             card.Click += (_, _) => { if (_game == index) Activate(0); else { _zone = Zone.Games; Select(index); } };
             _carousel.Children.Add(card);
         }
+        for (var i = 0; i < _lib.Count; i++)
+        {
+            var index = _games.Count + i;
+            var g = _lib[i];
+            var art = g.SteamAppId > 0 ? HomePage.WebArt(SteamLibrary.Cover(g.SteamAppId), GameDef.SteamArt(g.SteamAppId), g.Name, 400) : HomePage.WebArt("", null, g.Name, 400);
+            var card = new Button
+            {
+                Classes = { "bp-cover" }, Padding = new Thickness(0), Width = 180, Height = 270,
+                Content = new Border { CornerRadius = new CornerRadius(12), ClipToBounds = true, Child = art },
+            };
+            card.Click += (_, _) => { if (_game == index) Activate(0); else { _zone = Zone.Games; Select(index); } };
+            _carousel.Children.Add(card);
+        }
+    }
+
+    /// <summary>Установленные игры из всех лаунчеров, которых нет среди игр ModLaunch: недавние — первыми.</summary>
+    List<LibGame> LibraryOnly()
+    {
+        var managed = _games.Select(g => g.Def.Id).ToHashSet();
+        return (AllGames.Current ?? []).Where(g => g.Installed && (g.ManagedId is null || !managed.Contains(g.ManagedId)))
+            .OrderByDescending(g => AllGames.Played(g).Last).ThenBy(g => g.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
     }
 
     // ---------------------------------------------------------------- выбор игры
 
-    GameState? Selected => _games.Count == 0 ? null : _games[Math.Clamp(_game, 0, _games.Count - 1)];
+    GameState? Selected => _game >= 0 && _game < _games.Count ? _games[_game] : null;
 
     void Select(int index)
     {
-        if (_games.Count == 0) { RenderActions(); return; }
-        _game = (index % _games.Count + _games.Count) % _games.Count;
+        if (Count == 0) { RenderActions(); return; }
+        _game = (index % Count + Count) % Count;
         for (var i = 0; i < _carousel.Children.Count; i++)
             _carousel.Children[i].Classes.Set("selected", i == _game);
-        if (_carousel.Children[_game] is Control c) c.BringIntoView();
+        if (_game < _carousel.Children.Count && _carousel.Children[_game] is Control c) c.BringIntoView();
 
+        if (SelectedLib is { } lib) { SelectLibrary(lib); return; }
         var g = _games[_game];
         var changed = _shownGame != _game;
         _shownGame = _game;
@@ -245,6 +286,49 @@ public sealed class BigPictureWindow : Window
         if (changed)
         {
             // Логотип, строка фактов и кнопки въезжают слева лесенкой.
+            Animate.From(_title, "translateX(-40px)", 420, 0, new Avalonia.Animation.Easings.BackEaseOut());
+            Animate.From(_facts, "translateX(-30px)", 380, 60);
+            Animate.From(_actions, "translateX(-24px)", 380, 110);
+        }
+    }
+
+    /// <summary>28.0: игра не из ModLaunch — фон и логотип из Steam (если есть номер), часы, лаунчер.</summary>
+    void SelectLibrary(LibGame g)
+    {
+        var changed = _shownGame != _game;
+        _shownGame = _game;
+        if (changed)
+        {
+            _heroFallback.Background = Ui.Hex("#1B2838");
+            // Фон прошлой игры не оставляем: пока грузится (или если не загрузится) — ровный фон.
+            _heroHost.Children.Clear();
+            if (g.SteamAppId > 0)
+            {
+                var key = g.Key;
+                _ = GameArt.Steam(g.SteamAppId, Images.Art.Hero, 1920).ContinueWith(t =>
+                {
+                    if (t.Result is Bitmap b) Dispatcher.UIThread.Post(() => { if (SelectedLib?.Key == key) SetHero(b); });
+                });
+                _ = GameArt.Steam(g.SteamAppId, Images.Art.Logo, 900).ContinueWith(t =>
+                {
+                    if (t.Result is Bitmap b) Dispatcher.UIThread.Post(() =>
+                    {
+                        if (SelectedLib?.Key == key) _title.Content = new Image { Source = b, MaxHeight = 170, MaxWidth = 560, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Left };
+                    });
+                });
+            }
+        }
+        _title.Content = new TextBlock { Text = g.Name, FontSize = 54, FontWeight = FontWeight.Bold, Foreground = Brushes.White, TextWrapping = TextWrapping.Wrap, MaxWidth = 900 };
+        var (last, minutes) = AllGames.Played(g);
+        var facts = new List<string>();
+        if (AllGames.IsRunning(g)) facts.Add(I18n.T("time.running"));
+        else if (last > 0) facts.Add(I18n.T("time.last", ("when", Ui.Ago(DateTimeOffset.FromUnixTimeSeconds(last).UtcDateTime))));
+        if (minutes > 0) facts.Add(AllGamesPage.Hours(minutes));
+        facts.Add(Stores.Title(g.Store));
+        _facts.Text = string.Join("  ·  ", facts);
+        RenderActions();
+        if (changed)
+        {
             Animate.From(_title, "translateX(-40px)", 420, 0, new Avalonia.Animation.Easings.BackEaseOut());
             Animate.From(_facts, "translateX(-30px)", 380, 60);
             Animate.From(_actions, "translateX(-24px)", 380, 110);
@@ -294,6 +378,17 @@ public sealed class BigPictureWindow : Window
             else list.Add((I18n.T("games.installLoader", ("loader", g.Def.LoaderName)), Icons.Download, () => { Actions.InstallLoader(g); }, true));
             list.Add((I18n.T("bp.mods", ("n", g.ModCount)), Icons.Layers, () => OpenMods(g), false));
             list.Add((I18n.T("bp.openInApp"), Icons.External, () => { var id = g.Def.Id; Close(); MainWindow.Current?.Navigate(() => new GamePage(id)); }, false));
+        }
+        else if (SelectedLib is { } lib)
+        {
+            if (AllGames.IsRunning(lib)) list.Add((I18n.T("v27.lib.running"), Icons.Play, () => { }, true));
+            else list.Add((I18n.T("games.play"), Icons.Play, () =>
+            {
+                AllGamesPage.Play(lib);
+                Toast(I18n.T("bp.starting", ("game", lib.Name)));
+                DispatcherTimer.RunOnce(() => Select(_game), TimeSpan.FromSeconds(3));
+            }, true));
+            list.Add((I18n.T("bp.openInApp"), Icons.External, () => { var key = lib.Key; Close(); MainWindow.Current?.Navigate(() => new AllGamesPage(key)); }, false));
         }
         list.Add((I18n.T("bp.pc"), Icons.Mouse, TogglePc, false));
         return list;
@@ -541,7 +636,7 @@ public sealed class BigPictureWindow : Window
                 RenderModal();
                 break;
             case Zone.Games:
-                if (dy < 0 && _games.Count > 0) { _zone = Zone.Actions; _action = 0; RenderActions(); }
+                if (dy < 0 && Count > 0) { _zone = Zone.Actions; _action = 0; RenderActions(); }
                 else if (dx != 0) Select(_game + dx);
                 break;
             case Zone.Actions:
@@ -616,4 +711,7 @@ public sealed class BigPictureWindow : Window
 
     /// <summary>Для снимков экрана: показать меню модов первой игры.</summary>
     public void DemoMods() { if (Selected is { } g) OpenMods(g); }
+
+    /// <summary>Снимки 28.0: выбрать первую игру не из ModLaunch.</summary>
+    public void DemoSelectLibrary() { if (_lib.Count > 0) Select(_games.Count); }
 }

@@ -101,6 +101,24 @@ public static class V28Shots
         }
     }
 
+    /// <summary>MODLAUNCH_SHOTS=V28BigPicture: Big Picture с играми из всех лаунчеров (выбрана игра не из ModLaunch).</summary>
+    [DemoShots]
+    static void V28BigPicture(Shots s)
+    {
+        s.Pump(4500);
+        Games.AllGames.Refresh();
+        s.Pump(2000);
+        var big = new BigPictureWindow(windowed: true);
+        big.Show();
+        s.Pump(1500);
+        big.DemoSelectLibrary();
+        s.Pump(2500);
+        Avalonia.Headless.HeadlessWindowExtensions.CaptureRenderedFrame(big)?.Save(Path.Combine(s.OutDir, "v28-11-bigpicture-library.png"));
+        Console.WriteLine("saved v28-11-bigpicture-library");
+        big.Close();
+        s.Pump(500);
+    }
+
     /// <summary>MODLAUNCH_SHOTS=V28Cloud: облачные сохранения на вкладке «Сохранения» и спор «какую копию оставить».</summary>
     [DemoShots]
     static void V28Cloud(Shots s)
