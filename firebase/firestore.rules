@@ -100,6 +100,52 @@ service cloud.firestore {
         && request.resource.data.updated == request.time;
       allow delete: if friendsMember() && request.auth.uid in resource.data.users;
     }
+
+    // 28.0: чат друзей. Сообщения — chats/{pair}/messages/{ms_uid}, pair — та же пара, что у дружбы;
+    // писать и читать могут только двое из принятой дружбы. Менять и удалять сообщения нельзя.
+    function chatFriendship(pair) {
+      return get(/databases/$(database)/documents/friendships/$(pair)).data;
+    }
+    function chatAllowed(pair) {
+      return friendsMember() && chatFriendship(pair).status == 'accepted' && request.auth.uid in chatFriendship(pair).users;
+    }
+    function chatPair(a, b) {
+      return a < b ? a + '_' + b : b + '_' + a;
+    }
+    match /chats/{pair}/messages/{mid} {
+      allow get, list: if chatAllowed(pair);
+      allow create: if chatAllowed(pair)
+        && mid.matches('^[0-9]{13}_' + request.auth.uid + '$')
+        && request.resource.data.keys().hasOnly(['from', 'text', 'kind', 'game', 'gameName', 'at'])
+        && request.resource.data.from == request.auth.uid
+        && request.resource.data.kind in ['text', 'invite']
+        && request.resource.data.text is string && request.resource.data.text.size() <= 1000
+        && (request.resource.data.kind == 'invite' || request.resource.data.text.size() > 0)
+        && request.resource.data.game is string && request.resource.data.game.size() <= 40
+        && request.resource.data.gameName is string && request.resource.data.gameName.size() <= 60
+        && request.resource.data.at == request.time;
+    }
+    // Почтовый ящик: одна запись на человека, в ней по полю на каждого друга — когда он написал последним
+    // и начало сообщения. Пишет друг только своё поле; читает (и очищает) хозяин. Так фоном читается один документ.
+    function inboxEntryOk(e) {
+      return e is map && e.keys().hasOnly(['at', 'text', 'name', 'kind'])
+        && e.at == request.time
+        && e.text is string && e.text.size() <= 120
+        && friendsName(e.name)
+        && e.kind in ['text', 'invite'];
+    }
+    match /inbox/{uid} {
+      allow get: if friendsMember() && request.auth.uid == uid;
+      allow create: if friendsMember() && request.auth.uid != uid
+        && chatAllowed(chatPair(request.auth.uid, uid))
+        && request.resource.data.keys().hasOnly([request.auth.uid])
+        && inboxEntryOk(request.resource.data[request.auth.uid]);
+      allow update: if friendsMember() && request.auth.uid != uid
+        && chatAllowed(chatPair(request.auth.uid, uid))
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([request.auth.uid])
+        && inboxEntryOk(request.resource.data[request.auth.uid]);
+      allow delete: if friendsMember() && request.auth.uid == uid;
+    }
     // ── конец правил друзей ──────────────────────────────────────────────
 
     // ── ModLaunch Hub (Creator Hub 5.5) ──────────────────────────────────

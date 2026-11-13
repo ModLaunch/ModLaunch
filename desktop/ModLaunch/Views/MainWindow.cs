@@ -179,6 +179,8 @@ public sealed partial class MainWindow : Window
         // 28.0: скидки из «Желаемого» — в колокольчик; цены проверяются раз в шесть часов.
         Features.Wishlist.Changed += () => Dispatcher.UIThread.Post(RenderBell);
         Features.Wishlist.StartWatch();
+        // 28.0: чат друзей — свой ящик фоном раз в две минуты.
+        Social.Friends.Chat.Start();
         // 26.0: уведомления автора (MainWindow.Creator.cs).
         WatchCreator();
 
@@ -898,6 +900,9 @@ public sealed partial class MainWindow : Window
     }
 
     public void RefreshFriendsDock() => _friendsDock?.Render();
+
+    /// <summary>28.0: открыть разговор с другом в панели «Друзья».</summary>
+    public void OpenChat(Social.Friend f) => _friendsDock?.OpenChat(f);
 
     /// <summary>n-я игра для Ctrl+1…9: найденные, как на боковой панели — недавно запущенные сверху.</summary>
     static GameState? QuickGame(int n) => OrderedGames()

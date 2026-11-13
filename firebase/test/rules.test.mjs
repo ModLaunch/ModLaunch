@@ -674,3 +674,57 @@ test('поддержка: видят дарящий, автор и админ; �
   await assertSucceeds(takeTipFee(tid));
   await assertSucceeds(claimTip(tid));
 });
+
+// ── 28.0: чат друзей и почтовый ящик ───────────────────────────────────
+const pairOf = (a, b) => (a < b ? `${a}_${b}` : `${b}_${a}`);
+async function befriend(a, b, status = 'accepted') {
+  await raw((f) => setDoc(doc(f, 'friendships', pairOf(a.uid, b.uid)), {
+    users: [a.uid, b.uid].sort(), from: a.uid, to: b.uid, fromName: 'A', toName: 'B', status, created: new Date(), updated: new Date(),
+  }));
+}
+let msgSeq = 0;
+const msgId = (who) => `${1760000000000 + (++msgSeq)}_${who.uid}`;
+const message = (who, extra = {}) => ({ from: who.uid, text: 'привет', kind: 'text', game: '', gameName: '', at: serverTimestamp(), ...extra });
+const entry = (extra = {}) => ({ at: serverTimestamp(), text: 'привет', name: 'Me', kind: 'text', ...extra });
+
+test('чат: пишут и читают только двое друзей, менять и удалять нельзя', async () => {
+  await befriend(BUYER, SELLER);
+  const pair = pairOf(BUYER.uid, SELLER.uid);
+  const first = msgId(BUYER);
+  await assertSucceeds(setDoc(doc(db(BUYER), 'chats', pair, 'messages', first), message(BUYER)));
+  await assertSucceeds(getDocs(collection(db(SELLER), 'chats', pair, 'messages')));
+  await assertFails(getDocs(collection(db(OTHER), 'chats', pair, 'messages')));
+  await assertFails(setDoc(doc(db(OTHER), 'chats', pair, 'messages', msgId(OTHER)), message(OTHER)));
+  await assertFails(setDoc(doc(db(BUYER), 'chats', pair, 'messages', msgId(SELLER)), message(BUYER)));
+  await assertFails(setDoc(doc(db(BUYER), 'chats', pair, 'messages', msgId(BUYER) + 'x'), message(BUYER)));
+  await assertFails(setDoc(doc(db(BUYER), 'chats', pair, 'messages', msgId(BUYER)), message(BUYER, { from: SELLER.uid })));
+  await assertFails(setDoc(doc(db(BUYER), 'chats', pair, 'messages', msgId(BUYER)), message(BUYER, { text: '' })));
+  await assertFails(setDoc(doc(db(BUYER), 'chats', pair, 'messages', msgId(BUYER)), message(BUYER, { at: new Date() })));
+  await assertFails(setDoc(doc(db(BUYER), 'chats', pair, 'messages', msgId(BUYER)), message(BUYER, { extra: 1 })));
+  await assertSucceeds(setDoc(doc(db(BUYER), 'chats', pair, 'messages', msgId(BUYER)), message(BUYER, { kind: 'invite', text: '', game: 'steam:730', gameName: 'Counter-Strike 2' })));
+  await assertFails(updateDoc(doc(db(BUYER), 'chats', pair, 'messages', first), { text: 'исправил' }));
+  await assertFails(deleteDoc(doc(db(BUYER), 'chats', pair, 'messages', first)));
+  await assertFails(getDocs(collection(anon('anon3'), 'chats', pair, 'messages')));
+});
+
+test('чат: пока дружба не принята — ни писать, ни читать', async () => {
+  await befriend(BUYER, SELLER, 'pending');
+  const pair = pairOf(BUYER.uid, SELLER.uid);
+  await assertFails(setDoc(doc(db(BUYER), 'chats', pair, 'messages', msgId(BUYER)), message(BUYER)));
+  await assertFails(getDocs(collection(db(SELLER), 'chats', pair, 'messages')));
+  await assertFails(setDoc(doc(db(BUYER), 'inbox', SELLER.uid), { [BUYER.uid]: entry() }));
+});
+
+test('почтовый ящик: друг пишет только своё поле, читает только хозяин', async () => {
+  await befriend(BUYER, SELLER);
+  await assertSucceeds(setDoc(doc(db(SELLER), 'inbox', BUYER.uid), { [SELLER.uid]: entry() }));
+  await assertSucceeds(updateDoc(doc(db(SELLER), 'inbox', BUYER.uid), { [SELLER.uid]: entry({ text: 'ещё', kind: 'invite' }) }));
+  await assertFails(updateDoc(doc(db(SELLER), 'inbox', BUYER.uid), { [BUYER.uid]: entry() }));
+  await assertFails(updateDoc(doc(db(SELLER), 'inbox', BUYER.uid), { [SELLER.uid]: entry({ at: new Date() }) }));
+  await assertFails(updateDoc(doc(db(SELLER), 'inbox', BUYER.uid), { [SELLER.uid]: entry({ text: 'x'.repeat(121) }) }));
+  await assertFails(setDoc(doc(db(OTHER), 'inbox', BUYER.uid), { [OTHER.uid]: entry() }));
+  await assertFails(setDoc(doc(db(BUYER), 'inbox', BUYER.uid), { [BUYER.uid]: entry() }));
+  await assertSucceeds(getDoc(doc(db(BUYER), 'inbox', BUYER.uid)));
+  await assertFails(getDoc(doc(db(SELLER), 'inbox', BUYER.uid)));
+  await assertSucceeds(deleteDoc(doc(db(BUYER), 'inbox', BUYER.uid)));
+});

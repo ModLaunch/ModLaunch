@@ -20,6 +20,9 @@ public sealed class FriendsDock : Panel
     readonly Border _panel;
     readonly StackPanel _list = new() { Spacing = 2 };
     readonly TextBox _add = new() { Watermark = I18n.T("friends.add.placeholder") };
+    // 28.0: разговор с другом открывается на месте списка.
+    readonly DockPanel _listView;
+    readonly ContentControl _chatHost = new() { IsVisible = false };
     string _filter = "";
     bool _open;
 
@@ -51,12 +54,19 @@ public sealed class FriendsDock : Panel
         {
             Classes = { "card" }, Width = 360, Height = 520, Padding = new Thickness(14), Margin = new Thickness(0, 0, 0, 56), IsVisible = false,
             BoxShadow = BoxShadows.Parse("0 24 60 0 #90000000"), HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom,
-            Child = new DockPanel
+            Child = new Panel
             {
                 Children =
                 {
-                    Top(head), Top(search), Bottom(addRow),
-                    new ScrollViewer { Content = _list, Margin = new Thickness(-6, 8, -6, 8), HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled },
+                    (_listView = new DockPanel
+                    {
+                        Children =
+                        {
+                            Top(head), Top(search), Bottom(addRow),
+                            new ScrollViewer { Content = _list, Margin = new Thickness(-6, 8, -6, 8), HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled },
+                        },
+                    }),
+                    _chatHost,
                 },
             },
         };
@@ -67,6 +77,7 @@ public sealed class FriendsDock : Panel
         I18n.Changed += () => Dispatcher.UIThread.Post(Render);
         Friends.Changed += () => Dispatcher.UIThread.Post(Render);
         Account.Changed += () => Dispatcher.UIThread.Post(Render);
+        Friends.Chat.Changed += _ => Dispatcher.UIThread.Post(Render);
         Render();
     }
 
@@ -79,13 +90,31 @@ public sealed class FriendsDock : Panel
     {
         _open = open ?? !_open;
         _panel.IsVisible = _open;
-        if (!_open) Render();
+        if (!_open) { CloseChat(); Render(); }
         if (_open)
         {
             Animate.Pop(_panel);
             RenderList();
             if (Account.SignedIn && !Program.Demo) _ = Task.Run(async () => { try { await Friends.Refresh(); } catch { } });
         }
+    }
+
+    /// <summary>28.0: открыть разговор с другом (панель откроется, если закрыта).</summary>
+    public void OpenChat(Friend f)
+    {
+        if (!_open) Toggle(true);
+        _chatHost.Content = new ChatPanel(f, CloseChat);
+        _chatHost.IsVisible = true;
+        _listView.IsVisible = false;
+    }
+
+    void CloseChat()
+    {
+        if (_chatHost.Content is null) return;
+        _chatHost.Content = null;
+        _chatHost.IsVisible = false;
+        _listView.IsVisible = true;
+        if (_open) RenderList();
     }
 
     public void Render()
@@ -95,7 +124,8 @@ public sealed class FriendsDock : Panel
         // 9.4: кнопка в углу — только когда есть что показать (кто-то в сети, заявка) или панель открыта.
         // Иначе она лежала поверх страниц и закрывала кнопки; «Друзья» есть на боковой панели.
         var railHasFriends = !Settings.Data.Bool("railHidden") && Settings.Data.Bool("railFriends", true);
-        var worth = view.SignedIn && (online.Count > 0 || view.Incoming.Count > 0);
+        var unread = view.SignedIn ? Friends.Chat.UnreadTotal : 0;
+        var worth = view.SignedIn && (online.Count > 0 || view.Incoming.Count > 0 || unread > 0);
         IsVisible = Settings.Data.Bool("friendsDock", true) && (_open || worth || !railHasFriends);
         var faces = new Panel { Width = Math.Max(1, Math.Min(3, online.Count)) * 16 + 10, Height = 26 };
         for (var i = 0; i < Math.Min(3, online.Count); i++)
@@ -111,6 +141,9 @@ public sealed class FriendsDock : Panel
         var content = Ui.Row(10);
         content.Children.Add(online.Count > 0 ? faces : Ui.Icon(Icons.Users, 16));
         content.Children.Add(new TextBlock { Text = label, VerticalAlignment = VerticalAlignment.Center, FontWeight = FontWeight.SemiBold });
+        if (unread > 0)
+            content.Children.Add(new Border { Background = Ui.Res("Brand"), CornerRadius = new CornerRadius(999), Padding = new Thickness(7, 1), VerticalAlignment = VerticalAlignment.Center,
+                Child = Ui.Row(4, Ui.Icon(Icons.Chat, 11, Brushes.White), new TextBlock { Text = unread.ToString(), FontSize = 11, FontWeight = FontWeight.Bold, Foreground = Brushes.White }) });
         if (view.Incoming.Count > 0)
             content.Children.Add(new Border { Background = Ui.Res("Bad"), CornerRadius = new CornerRadius(999), Padding = new Thickness(7, 1), VerticalAlignment = VerticalAlignment.Center,
                 Child = new TextBlock { Text = view.Incoming.Count.ToString(), FontSize = 11, FontWeight = FontWeight.Bold, Foreground = Brushes.White } });
@@ -149,7 +182,18 @@ public sealed class FriendsDock : Panel
             foreach (var f in list)
             {
                 var (text, color) = line(f);
-                _list.Children.Add(Row(f.Name, text, color, null));
+                var ff = f;
+                // 28.0: щелчок по другу — разговор; непрочитанные — число справа.
+                var unread = Friends.Chat.Unread(f.Uid);
+                Control? badge = unread > 0
+                    ? new Border { Background = Ui.Res("Brand"), CornerRadius = new CornerRadius(999), Padding = new Thickness(7, 1), VerticalAlignment = VerticalAlignment.Center,
+                        Child = new TextBlock { Text = unread.ToString(), FontSize = 11, FontWeight = FontWeight.Bold, Foreground = Brushes.White } }
+                    : null;
+                var row = Row(f.Name, text, color, badge);
+                row.Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand);
+                ToolTip.SetTip(row, I18n.T("v28.chat.open", ("name", f.Name)));
+                row.PointerPressed += (_, _) => OpenChat(ff);
+                _list.Children.Add(row);
             }
         }
         Group(I18n.T("dock.inGame"), view.Friends.Where(f => f.State == "playing"), f => (f.GameName == "" ? I18n.T("aside.online") : f.GameName, Ui.Res("Good")));

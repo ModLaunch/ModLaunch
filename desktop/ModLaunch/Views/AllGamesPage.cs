@@ -227,7 +227,7 @@ public sealed class AllGamesPage : Page
 
     static GameState? Managed(LibGame g) => g.ManagedId is { } id ? AppState.Games.FirstOrDefault(x => x.Def.Id == id && x.Path is not null) : null;
 
-    static void Play(LibGame g)
+    internal static void Play(LibGame g)
     {
         if (Managed(g) is { } managed) { Actions.Play(managed); return; }
         if (!g.Installed) { SteamLibrary.Install(g.SteamAppId); return; }
