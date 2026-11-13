@@ -151,7 +151,8 @@ public sealed class ModRegistry
         foreach (var part in Parts(id)) Remove(part);
         if (Get(id) is not { } mod) return;
         var folder = FolderFor(mod);
-        if (Directory.Exists(folder)) Directory.Delete(folder, true);
+        // 27.0: удалённый мод не стирается, а уходит в сейф — снимок «как было» вернёт его без интернета.
+        if (Directory.Exists(folder)) Features.ModSafe.Remove(this, folder, mod, "remove");
         else if (mod.Str("kind") == "preset" && File.Exists(folder)) File.Delete(folder);
         Mods.Remove(id);
         Save();

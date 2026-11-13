@@ -186,7 +186,8 @@ public sealed partial class GamePage
     Control? HistoryCard()
     {
         var snaps = Snapshots.List(_g.Def.Id);
-        if (snaps.Count == 0) return null;
+        var (kept, keptBytes) = _g.Registry is { } reg ? ModSafe.Totals(reg) : (0, 0L);
+        if (snaps.Count == 0 && kept == 0) return null;
         var list = new StackPanel { Spacing = 6 };
         foreach (var s in snaps.Take(6))
         {
@@ -199,7 +200,34 @@ public sealed partial class GamePage
             info.VerticalAlignment = VerticalAlignment.Center;
             list.Children.Add(new Border { Background = Ui.Res("Surface2"), CornerRadius = new CornerRadius(12), Padding = new Thickness(14, 10), Child = new DockPanel { Children = { back, info } } });
         }
-        return Ui.Card(Ui.Col(14, Ui.Text(I18n.T("snap.title"), "h2"), Ui.Text(I18n.T("snap.hint"), "muted", wrap: true), list), 22);
+        var card = Ui.Col(14, Ui.Text(I18n.T("snap.title"), "h2"), Ui.Text(I18n.T("snap.hint"), "muted", wrap: true), list);
+        // 27.0: сейф модов — старые версии и удалённые моды, из которых «Вернуть» берёт файлы без интернета.
+        if (kept > 0)
+        {
+            var clear = Ui.Button(I18n.T("v27.safe.clear"), ConfirmClearSafe, "ghost", Icons.Trash);
+            clear.VerticalAlignment = VerticalAlignment.Center;
+            DockPanel.SetDock(clear, Dock.Right);
+            var info = Ui.Row(12, Ui.Icon(Icons.Shield, 18, Ui.Res("Muted")),
+                Ui.Col(2, Ui.Text(I18n.T("v27.safe.line", ("n", kept), ("size", Size(keptBytes))), "h3"), Ui.Text(I18n.T("v27.safe.hint"), "small muted", wrap: true)));
+            info.VerticalAlignment = VerticalAlignment.Center;
+            card.Children.Add(new DockPanel { Children = { clear, info } });
+        }
+        return Ui.Card(card, 22);
+    }
+
+    void ConfirmClearSafe()
+    {
+        var w = MainWindow.Current!;
+        w.Dialog(I18n.T("v27.safe.clear.confirm"), Ui.Text(I18n.T("v27.safe.clear.text"), "muted", wrap: true),
+            Ui.Button(I18n.T("common.cancel"), w.CloseDialog),
+            Ui.Button(I18n.T("v27.safe.clear"), () =>
+            {
+                w.CloseDialog();
+                if (_g.Registry is not { } registry) return;
+                var freed = ModSafe.Clear(registry);
+                w.Toast(I18n.T("v27.safe.cleared", ("size", Size(freed))));
+                Build();
+            }, "primary", Icons.Trash));
     }
 
     void ConfirmRestore(Snapshot snap)

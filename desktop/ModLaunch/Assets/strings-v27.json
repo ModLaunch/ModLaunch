@@ -28,7 +28,13 @@
     "v27.lib.cantStart": "Игра не запустилась: {error}",
     "v27.lib.link": "Все игры на компьютере",
     "v27.lib.link.hint": "Steam, Epic, GOG, Xbox, EA, Ubisoft, Battle.net — в одном списке, и без модов тоже",
-    "v27.lib.noMods.text": "В справочнике ModLaunch для этой игры модов не нашлось. Играть можно как обычно."
+    "v27.lib.noMods.text": "В справочнике ModLaunch для этой игры модов не нашлось. Играть можно как обычно.",
+    "v27.safe.line": "Сейф модов: {n} · {size}",
+    "v27.safe.hint": "Старые версии и удалённые моды ModLaunch не стирает, а убирает сюда. «Вернуть» поставит их обратно без интернета — ровно те файлы, с вашими правками.",
+    "v27.safe.clear": "Очистить сейф",
+    "v27.safe.clear.confirm": "Очистить сейф модов?",
+    "v27.safe.clear.text": "Старые версии модов удалятся насовсем. Вернуть снимок с ними получится, только если они ещё есть в каталоге или в архиве загрузок.",
+    "v27.safe.cleared": "Сейф очищен: освобождено {size}"
   },
   "en": {
     "v27.lib.title": "All games",
@@ -59,7 +65,13 @@
     "v27.lib.cantStart": "The game didn't start: {error}",
     "v27.lib.link": "All games on this PC",
     "v27.lib.link.hint": "Steam, Epic, GOG, Xbox, EA, Ubisoft, Battle.net — one list, games without mods too",
-    "v27.lib.noMods.text": "The ModLaunch directory has no mods for this game. You can play it as usual."
+    "v27.lib.noMods.text": "The ModLaunch directory has no mods for this game. You can play it as usual.",
+    "v27.safe.line": "Mod safe: {n} · {size}",
+    "v27.safe.hint": "ModLaunch doesn't erase old versions and removed mods — it moves them here. \"Restore\" puts them back without internet: the exact files, with your edits.",
+    "v27.safe.clear": "Empty the safe",
+    "v27.safe.clear.confirm": "Empty the mod safe?",
+    "v27.safe.clear.text": "Old mod versions will be deleted for good. Snapshots with them can then be restored only if they're still in the catalog or the download archive.",
+    "v27.safe.cleared": "Safe emptied: {size} freed"
   },
   "uk": {
     "v27.lib.title": "Усі ігри",
@@ -90,7 +102,13 @@
     "v27.lib.cantStart": "Гра не запустилася: {error}",
     "v27.lib.link": "Усі ігри на комп'ютері",
     "v27.lib.link.hint": "Steam, Epic, GOG, Xbox, EA, Ubisoft, Battle.net — в одному списку, і без модів теж",
-    "v27.lib.noMods.text": "У довіднику ModLaunch для цієї гри модів не знайшлося. Грати можна як зазвичай."
+    "v27.lib.noMods.text": "У довіднику ModLaunch для цієї гри модів не знайшлося. Грати можна як зазвичай.",
+    "v27.safe.line": "Сейф модів: {n} · {size}",
+    "v27.safe.hint": "Старі версії та видалені моди ModLaunch не стирає, а прибирає сюди. «Повернути» поставить їх назад без інтернету — саме ті файли, з вашими правками.",
+    "v27.safe.clear": "Очистити сейф",
+    "v27.safe.clear.confirm": "Очистити сейф модів?",
+    "v27.safe.clear.text": "Старі версії модів буде видалено назавжди. Повернути знімок із ними вийде, лише якщо вони ще є в каталозі або в архіві завантажень.",
+    "v27.safe.cleared": "Сейф очищено: звільнено {size}"
   },
   "es": {
     "v27.lib.title": "Todos los juegos",
@@ -121,7 +139,13 @@
     "v27.lib.cantStart": "El juego no se inició: {error}",
     "v27.lib.link": "Todos los juegos de este PC",
     "v27.lib.link.hint": "Steam, Epic, GOG, Xbox, EA, Ubisoft, Battle.net en una sola lista, también juegos sin mods",
-    "v27.lib.noMods.text": "El directorio de ModLaunch no tiene mods para este juego. Puedes jugar como siempre."
+    "v27.lib.noMods.text": "El directorio de ModLaunch no tiene mods para este juego. Puedes jugar como siempre.",
+    "v27.safe.line": "Caja fuerte de mods: {n} · {size}",
+    "v27.safe.hint": "ModLaunch no borra versiones antiguas ni mods eliminados: los guarda aquí. «Restaurar» los devuelve sin internet: los mismos archivos, con tus cambios.",
+    "v27.safe.clear": "Vaciar la caja fuerte",
+    "v27.safe.clear.confirm": "¿Vaciar la caja fuerte de mods?",
+    "v27.safe.clear.text": "Las versiones antiguas se borrarán para siempre. Las instantáneas con ellas solo podrán restaurarse si siguen en el catálogo o en el archivo de descargas.",
+    "v27.safe.cleared": "Caja fuerte vaciada: {size} liberados"
   },
   "de": {
     "v27.lib.title": "Alle Spiele",
@@ -152,7 +176,13 @@
     "v27.lib.cantStart": "Das Spiel ist nicht gestartet: {error}",
     "v27.lib.link": "Alle Spiele auf diesem PC",
     "v27.lib.link.hint": "Steam, Epic, GOG, Xbox, EA, Ubisoft, Battle.net – in einer Liste, auch Spiele ohne Mods",
-    "v27.lib.noMods.text": "Im ModLaunch-Verzeichnis gibt es für dieses Spiel keine Mods. Du kannst wie gewohnt spielen."
+    "v27.lib.noMods.text": "Im ModLaunch-Verzeichnis gibt es für dieses Spiel keine Mods. Du kannst wie gewohnt spielen.",
+    "v27.safe.line": "Mod-Tresor: {n} · {size}",
+    "v27.safe.hint": "Alte Versionen und entfernte Mods löscht ModLaunch nicht, sondern legt sie hier ab. „Zurückholen“ stellt sie ohne Internet wieder her – genau dieselben Dateien, mit deinen Änderungen.",
+    "v27.safe.clear": "Tresor leeren",
+    "v27.safe.clear.confirm": "Mod-Tresor leeren?",
+    "v27.safe.clear.text": "Alte Mod-Versionen werden endgültig gelöscht. Snapshots mit ihnen lassen sich dann nur wiederherstellen, wenn sie noch im Katalog oder im Download-Archiv sind.",
+    "v27.safe.cleared": "Tresor geleert: {size} frei"
   },
   "fr": {
     "v27.lib.title": "Tous les jeux",
@@ -183,7 +213,13 @@
     "v27.lib.cantStart": "Le jeu ne s'est pas lancé : {error}",
     "v27.lib.link": "Tous les jeux de ce PC",
     "v27.lib.link.hint": "Steam, Epic, GOG, Xbox, EA, Ubisoft, Battle.net dans une seule liste, jeux sans mods inclus",
-    "v27.lib.noMods.text": "Le répertoire ModLaunch n'a pas de mods pour ce jeu. Vous pouvez jouer comme d'habitude."
+    "v27.lib.noMods.text": "Le répertoire ModLaunch n'a pas de mods pour ce jeu. Vous pouvez jouer comme d'habitude.",
+    "v27.safe.line": "Coffre de mods : {n} · {size}",
+    "v27.safe.hint": "ModLaunch n'efface pas les anciennes versions ni les mods supprimés : il les range ici. « Restaurer » les remet sans internet, mêmes fichiers, avec vos modifications.",
+    "v27.safe.clear": "Vider le coffre",
+    "v27.safe.clear.confirm": "Vider le coffre de mods ?",
+    "v27.safe.clear.text": "Les anciennes versions seront supprimées définitivement. Les instantanés qui les utilisent ne pourront être restaurés que si elles sont encore dans le catalogue ou l'archive des téléchargements.",
+    "v27.safe.cleared": "Coffre vidé : {size} libérés"
   },
   "pt-BR": {
     "v27.lib.title": "Todos os jogos",
@@ -214,7 +250,13 @@
     "v27.lib.cantStart": "O jogo não iniciou: {error}",
     "v27.lib.link": "Todos os jogos deste PC",
     "v27.lib.link.hint": "Steam, Epic, GOG, Xbox, EA, Ubisoft, Battle.net em uma lista, inclusive jogos sem mods",
-    "v27.lib.noMods.text": "O catálogo do ModLaunch não tem mods para este jogo. Você pode jogar normalmente."
+    "v27.lib.noMods.text": "O catálogo do ModLaunch não tem mods para este jogo. Você pode jogar normalmente.",
+    "v27.safe.line": "Cofre de mods: {n} · {size}",
+    "v27.safe.hint": "O ModLaunch não apaga versões antigas nem mods removidos: guarda-os aqui. \"Restaurar\" os devolve sem internet — os mesmos arquivos, com suas edições.",
+    "v27.safe.clear": "Esvaziar o cofre",
+    "v27.safe.clear.confirm": "Esvaziar o cofre de mods?",
+    "v27.safe.clear.text": "As versões antigas serão apagadas de vez. Snapshots com elas só poderão ser restaurados se ainda estiverem no catálogo ou no arquivo de downloads.",
+    "v27.safe.cleared": "Cofre esvaziado: {size} liberados"
   },
   "zh-CN": {
     "v27.lib.title": "全部游戏",
@@ -245,6 +287,12 @@
     "v27.lib.cantStart": "游戏未能启动：{error}",
     "v27.lib.link": "这台电脑上的全部游戏",
     "v27.lib.link.hint": "Steam、Epic、GOG、Xbox、EA、Ubisoft、Battle.net 合为一个列表，没有模组的游戏也在内",
-    "v27.lib.noMods.text": "ModLaunch 目录中没有这个游戏的模组。可以照常游玩。"
+    "v27.lib.noMods.text": "ModLaunch 目录中没有这个游戏的模组。可以照常游玩。",
+    "v27.safe.line": "模组保险箱：{n} · {size}",
+    "v27.safe.hint": "ModLaunch 不会抹掉旧版本和已删除的模组，而是放到这里。“恢复”可以离线把它们放回去——同样的文件，连同你的修改。",
+    "v27.safe.clear": "清空保险箱",
+    "v27.safe.clear.confirm": "清空模组保险箱？",
+    "v27.safe.clear.text": "旧版本模组将被永久删除。之后只有当它们仍在目录或下载存档中时，才能恢复包含它们的快照。",
+    "v27.safe.cleared": "保险箱已清空：释放了 {size}"
   }
 }

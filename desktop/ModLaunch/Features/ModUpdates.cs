@@ -108,11 +108,13 @@ public static class ModUpdates
         var wasEnabled = old.Bool("enabled", true);
         if (!wasEnabled) registry.SetEnabled(recordId, true);
         var oldFolder = registry.OwnFolder(registry.Get(recordId)!);
+        // Запись прежней версии — для сейфа: после установки в списке уже новая.
+        var before = registry.Get(recordId)!.DeepClone().AsObject();
         try
         {
             await install();
             var fresh = registry.Get(recordId);
-            if (oldFolder is not null && fresh is not null && registry.FolderFor(fresh) != oldFolder && Directory.Exists(oldFolder)) Directory.Delete(oldFolder, true);
+            if (oldFolder is not null && fresh is not null && registry.FolderFor(fresh) != oldFolder && Directory.Exists(oldFolder)) ModSafe.Remove(registry, oldFolder, before, "update");
         }
         finally
         {

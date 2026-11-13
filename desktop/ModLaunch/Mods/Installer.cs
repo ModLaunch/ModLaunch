@@ -96,7 +96,7 @@ public static partial class Installer
                 }, progress, ct);
                 // Обновлённая зависимость могла лечь в папку с другим именем — старую убираем, чтобы не было двух версий.
                 if (stale && registry.OwnFolder(before!) is string old && registry.Get(entry.Id) is { } fresh && registry.FolderFor(fresh) != old && Directory.Exists(old))
-                    Directory.Delete(old, true);
+                    Features.ModSafe.Remove(registry, old, before, "update");
                 if (entry.Source == "thunderstore" && registry.Game.Loader == LoaderKind.Bepinex && IsModpack(entry)) ApplyPackConfig(registry.GamePath, file);
                 Features.DownloadArchive.Add(registry.Game.Id, entry.Id, entry.Version, file);
                 installed++;
@@ -210,7 +210,8 @@ public static partial class Installer
             var folder = Sanitize(generic ? metaName ?? metaId ?? rawName : rawName);
             if (folders.Contains(folder)) folder = Sanitize($"{folder} ({rawName})");
             var destination = Path.Combine(registry.ModsDir, folder);
-            if (Directory.Exists(destination)) Directory.Delete(destination, true);
+            // 27.0: прежняя версия (или мод, поставленный руками в ту же папку) — в сейф, а не в никуда.
+            Features.ModSafe.Remove(registry, destination, Owner(registry, destination), "replace");
             var files = Archive.Extract(archivePath, destination, root.Prefix, skip: skip);
             folders.Add(folder);
 
@@ -253,7 +254,7 @@ public static partial class Installer
             if (!BepInExLayout.IsRouted(part.Kind)) continue;
             var folder = Sanitize(primary.Str("folder") ?? name);
             var destination = Path.Combine(registry.GamePath, "BepInEx", part.Kind, folder);
-            if (Directory.Exists(destination)) Directory.Delete(destination, true);
+            Features.ModSafe.Remove(registry, destination, Owner(registry, destination), "replace");
             var files = Archive.Extract(archivePath, destination, part.Prefix, ignoreCase: true);
             registry.Add(new JsonObject
             {
@@ -305,6 +306,14 @@ public static partial class Installer
     }
 
     static void TryDelete(string file) { try { File.Delete(file); } catch { } }
+
+    /// <summary>Чья это папка: запись мода, которая в ней лежит (null — папка без записи, мод поставили руками).</summary>
+    static JsonObject? Owner(ModRegistry registry, string folder)
+    {
+        if (!Directory.Exists(folder)) return null;
+        var full = Path.GetFullPath(folder).TrimEnd('\\', '/');
+        return registry.List().FirstOrDefault(m => registry.OwnFolder(m) is { } f && string.Equals(Path.GetFullPath(f).TrimEnd('\\', '/'), full, StringComparison.OrdinalIgnoreCase));
+    }
 
     /// <summary>Зависимости, которых нет среди установленных модов.</summary>
     public static List<(string Mod, string Missing)> CheckDependencies(ModRegistry registry)

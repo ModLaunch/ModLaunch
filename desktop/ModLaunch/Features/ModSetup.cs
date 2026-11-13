@@ -186,10 +186,14 @@ public static class ModSetup
         return changed;
     }
 
-    /// <summary>Поставить нужную версию из архива загрузок (без интернета). false — такой версии в архиве нет.</summary>
+    /// <summary>
+    /// Поставить нужную версию без интернета: сначала из сейфа модов (ровно те файлы, что стояли, с правками человека,
+    /// и моды, поставленные руками), потом из архива загрузок. false — такой версии нет ни там, ни там.
+    /// </summary>
     public static async Task<bool> FromArchive(GameState g, SetupMod mod)
     {
         var registry = g.Registry!;
+        if (ModSafe.Find(registry, mod.Id, mod.Version) is { } kept && ModSafe.Restore(registry, kept)) return true;
         if (DownloadArchive.For(g.Def.Id, mod.Id).FirstOrDefault(f => Versions.Same(f.Version, mod.Version)) is not { } file) return false;
         var meta = new JsonObject { ["id"] = mod.Id, ["name"] = mod.Name, ["version"] = mod.Version, ["source"] = mod.Source };
         if (registry.Get(mod.Id) is { } old)

@@ -460,7 +460,7 @@ public static partial class Actions
             progress.Report(new InstallStep("install.extract", record.Str("name") ?? id));
             await Installer.InstallAny(registry, file.Path, meta, progress, ct);
             var fresh = registry.Get(id);
-            if (fresh is not null && registry.FolderFor(fresh) != oldFolder && Directory.Exists(oldFolder)) Directory.Delete(oldFolder, true);
+            if (fresh is not null && registry.FolderFor(fresh) != oldFolder && Directory.Exists(oldFolder)) ModSafe.Remove(registry, oldFolder, record, "replace");
             if (!wasEnabled) registry.SetEnabled(id, false);
             Dispatcher.UIThread.Post(() => W.Toast(I18n.T("v4.reinstalled")));
         });
