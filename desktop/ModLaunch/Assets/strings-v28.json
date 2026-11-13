@@ -116,7 +116,14 @@
     "v98.ach.cloud-saves": "Всё с собой",
     "v98.ach.cloud-saves.d": "Включить облачные сохранения для игры",
     "v98.ach.chat-first": "На связи",
-    "v98.ach.chat-first.d": "Написать другу в чат ModLaunch"
+    "v98.ach.chat-first.d": "Написать другу в чат ModLaunch",
+    "new.v28.subtitle": "Желаемое со скидками, отзывы только от игравших, чат с друзьями и облачные сохранения",
+    "new.v28.wish": "Желаемое: игры, которые хочется купить, с ценами Steam для вашей страны. ModLaunch сам скажет о скидке или когда цена дойдёт до заданной, а список можно забрать из Steam. Ctrl+Shift+W.",
+    "new.v28.reviews": "Отзывы игроков: у каждой игры во «Всех играх» — оценки и отзывы. Написать может только тот, кто наиграл в неё час и больше, — без накруток от тех, кто не играл.",
+    "new.v28.chat": "Чат с друзьями: щёлкните по другу в панели «Друзья» — разговор откроется прямо там. Кнопка с геймпадом зовёт в игру, а у друга появится «Играть».",
+    "new.v28.cloud": "Облачные сохранения: как Steam Cloud, только через ваш OneDrive, Google Диск, Dropbox или Яндекс Диск. Если сохранения поменялись на двух ПК, ModLaunch спросит, какие оставить, — вторые не пропадут. Вкладка «Сохранения» у игры.",
+    "new.v28.bigpicture": "Big Picture для всех игр: в режиме для геймпада теперь все установленные игры со всех лаунчеров, а не только игры с модами. F11.",
+    "new.v28.overlay": "Оверлей по Shift+Tab: как в Steam, выбирается в «Настройки → Оверлей». В играх Steam это сочетание у оверлея Steam, поэтому там оверлей ModLaunch откроется по Shift+F1."
   },
   "en": {
     "v28.wish.title": "Wishlist",
@@ -235,7 +242,14 @@
     "v98.ach.cloud-saves": "Take it with you",
     "v98.ach.cloud-saves.d": "Turn on cloud saves for a game",
     "v98.ach.chat-first": "Keeping in touch",
-    "v98.ach.chat-first.d": "Send a friend a message in ModLaunch chat"
+    "v98.ach.chat-first.d": "Send a friend a message in ModLaunch chat",
+    "new.v28.subtitle": "Wishlist with sale alerts, reviews only from players, chat with friends and cloud saves",
+    "new.v28.wish": "Wishlist: games you want to buy, with Steam prices for your country. ModLaunch tells you about a sale or when the price reaches your target, and you can import your Steam wishlist. Ctrl+Shift+W.",
+    "new.v28.reviews": "Player reviews: every game in All games has ratings and reviews. Only people who played it for an hour or more can write one — no ratings from people who never played.",
+    "new.v28.chat": "Chat with friends: click a friend in the Friends panel and the conversation opens right there. The gamepad button invites them to a game, and they get a Play button.",
+    "new.v28.cloud": "Cloud saves: like Steam Cloud, but through your OneDrive, Google Drive, Dropbox or Yandex Disk. If saves changed on two PCs, ModLaunch asks which to keep — the other copy isn't lost. A game's Saves tab.",
+    "new.v28.bigpicture": "Big Picture for every game: gamepad mode now shows all installed games from every launcher, not only modded ones. F11.",
+    "new.v28.overlay": "Overlay on Shift+Tab: like in Steam, pick it in Settings → Overlay. In Steam games that key belongs to the Steam overlay, so there the ModLaunch overlay opens with Shift+F1."
   },
   "uk": {
     "v28.wish.title": "Бажане",
@@ -354,7 +368,14 @@
     "v98.ach.cloud-saves": "Усе з собою",
     "v98.ach.cloud-saves.d": "Увімкнути хмарні збереження для гри",
     "v98.ach.chat-first": "На зв'язку",
-    "v98.ach.chat-first.d": "Написати другові в чат ModLaunch"
+    "v98.ach.chat-first.d": "Написати другові в чат ModLaunch",
+    "new.v28.subtitle": "Бажане зі знижками, відгуки лише від тих, хто грав, чат із друзями й хмарні збереження",
+    "new.v28.wish": "Бажане: ігри, які хочеться купити, з цінами Steam для вашої країни. ModLaunch сам скаже про знижку або коли ціна дійде до заданої, а список можна забрати зі Steam. Ctrl+Shift+W.",
+    "new.v28.reviews": "Відгуки гравців: у кожної гри в «Усіх іграх» — оцінки й відгуки. Написати може лише той, хто награв у неї годину й більше, — без накруток від тих, хто не грав.",
+    "new.v28.chat": "Чат із друзями: клацніть по другові в панелі «Друзі» — розмова відкриється просто там. Кнопка з геймпадом кличе в гру, а в друга з'явиться «Грати».",
+    "new.v28.cloud": "Хмарні збереження: як Steam Cloud, тільки через ваш OneDrive, Google Диск, Dropbox або Яндекс Диск. Якщо збереження змінилися на двох ПК, ModLaunch спитає, які залишити, — другі не пропадуть. Вкладка «Збереження» гри.",
+    "new.v28.bigpicture": "Big Picture для всіх ігор: у режимі для геймпада тепер усі встановлені ігри з усіх лаунчерів, а не лише ігри з модами. F11.",
+    "new.v28.overlay": "Оверлей за Shift+Tab: як у Steam, обирається в «Налаштування → Оверлей». В іграх Steam це поєднання в оверлея Steam, тож там оверлей ModLaunch відкриється за Shift+F1."
   },
   "es": {
     "v28.wish.title": "Deseados",
@@ -473,7 +494,14 @@
     "v98.ach.cloud-saves": "Todo contigo",
     "v98.ach.cloud-saves.d": "Activa las partidas en la nube de un juego",
     "v98.ach.chat-first": "En contacto",
-    "v98.ach.chat-first.d": "Escribe a un amigo en el chat de ModLaunch"
+    "v98.ach.chat-first.d": "Escribe a un amigo en el chat de ModLaunch",
+    "new.v28.subtitle": "Deseados con ofertas, reseñas solo de quien jugó, chat con amigos y partidas en la nube",
+    "new.v28.wish": "Deseados: juegos que quieres comprar, con precios de Steam para tu país. ModLaunch te avisa de las ofertas o cuando el precio llega a tu objetivo, y puedes importar tu lista de Steam. Ctrl+Shift+W.",
+    "new.v28.reviews": "Reseñas de jugadores: cada juego en Todos los juegos tiene valoraciones y reseñas. Solo puede escribir quien lo jugó una hora o más: sin valoraciones de quien no jugó.",
+    "new.v28.chat": "Chat con amigos: haz clic en un amigo del panel Amigos y la conversación se abre ahí mismo. El botón del mando le invita a jugar, y a tu amigo le aparece «Jugar».",
+    "new.v28.cloud": "Partidas en la nube: como Steam Cloud, pero con tu OneDrive, Google Drive, Dropbox o Yandex Disk. Si las partidas cambiaron en dos PC, ModLaunch pregunta cuáles conservar; las otras no se pierden. Pestaña Partidas del juego.",
+    "new.v28.bigpicture": "Big Picture para todos los juegos: el modo mando ahora muestra todos los juegos instalados de todos los launchers, no solo los que tienen mods. F11.",
+    "new.v28.overlay": "Overlay con Shift+Tab: como en Steam, elígelo en Ajustes → Overlay. En los juegos de Steam esa combinación es del overlay de Steam, así que allí el de ModLaunch se abre con Shift+F1."
   },
   "de": {
     "v28.wish.title": "Wunschliste",
@@ -592,7 +620,14 @@
     "v98.ach.cloud-saves": "Alles dabei",
     "v98.ach.cloud-saves.d": "Cloud-Spielstände für ein Spiel einschalten",
     "v98.ach.chat-first": "In Verbindung",
-    "v98.ach.chat-first.d": "Einem Freund im ModLaunch-Chat schreiben"
+    "v98.ach.chat-first.d": "Einem Freund im ModLaunch-Chat schreiben",
+    "new.v28.subtitle": "Wunschliste mit Angeboten, Bewertungen nur von Spielern, Chat mit Freunden und Cloud-Spielstände",
+    "new.v28.wish": "Wunschliste: Spiele, die du kaufen willst, mit Steam-Preisen für dein Land. ModLaunch meldet Angebote oder wenn dein Wunschpreis erreicht ist, und du kannst deine Steam-Wunschliste holen. Strg+Umschalt+W.",
+    "new.v28.reviews": "Spielerbewertungen: Jedes Spiel unter „Alle Spiele“ hat Bewertungen. Schreiben kann nur, wer es eine Stunde oder länger gespielt hat – keine Bewertungen von Leuten, die nie gespielt haben.",
+    "new.v28.chat": "Chat mit Freunden: Klick im Freunde-Panel auf einen Freund, und das Gespräch öffnet sich direkt dort. Der Gamepad-Knopf lädt zum Spielen ein, und dein Freund bekommt einen „Spielen“-Knopf.",
+    "new.v28.cloud": "Cloud-Spielstände: wie Steam Cloud, aber über dein OneDrive, Google Drive, Dropbox oder Yandex Disk. Haben sich Spielstände auf zwei PCs geändert, fragt ModLaunch, welche bleiben – die anderen gehen nicht verloren. Reiter Spielstände des Spiels.",
+    "new.v28.bigpicture": "Big Picture für alle Spiele: Der Gamepad-Modus zeigt jetzt alle installierten Spiele aller Launcher, nicht nur gemoddete. F11.",
+    "new.v28.overlay": "Overlay mit Umschalt+Tab: wie in Steam, wählbar unter Einstellungen → Overlay. In Steam-Spielen gehört diese Taste dem Steam-Overlay, dort öffnet sich das ModLaunch-Overlay mit Umschalt+F1."
   },
   "fr": {
     "v28.wish.title": "Liste de souhaits",
@@ -711,7 +746,14 @@
     "v98.ach.cloud-saves": "Tout avec soi",
     "v98.ach.cloud-saves.d": "Activer les sauvegardes dans le cloud pour un jeu",
     "v98.ach.chat-first": "En contact",
-    "v98.ach.chat-first.d": "Écrire à un ami dans le chat ModLaunch"
+    "v98.ach.chat-first.d": "Écrire à un ami dans le chat ModLaunch",
+    "new.v28.subtitle": "Liste de souhaits avec promos, avis uniquement de joueurs, chat entre amis et sauvegardes dans le cloud",
+    "new.v28.wish": "Liste de souhaits : les jeux que vous voulez acheter, avec les prix Steam de votre pays. ModLaunch signale les promos ou quand le prix atteint votre objectif, et vous pouvez importer votre liste Steam. Ctrl+Maj+W.",
+    "new.v28.reviews": "Avis des joueurs : chaque jeu de Tous les jeux a des notes et des avis. Seuls ceux qui y ont joué une heure ou plus peuvent en écrire — pas de notes de gens qui n'y ont pas joué.",
+    "new.v28.chat": "Chat entre amis : cliquez sur un ami dans le panneau Amis, la conversation s'ouvre directement là. Le bouton manette l'invite à jouer, et votre ami voit un bouton « Jouer ».",
+    "new.v28.cloud": "Sauvegardes dans le cloud : comme Steam Cloud, mais via votre OneDrive, Google Drive, Dropbox ou Yandex Disk. Si les sauvegardes ont changé sur deux PC, ModLaunch demande lesquelles garder — les autres ne sont pas perdues. Onglet Sauvegardes du jeu.",
+    "new.v28.bigpicture": "Big Picture pour tous les jeux : le mode manette affiche désormais tous les jeux installés de tous les launchers, pas seulement ceux avec des mods. F11.",
+    "new.v28.overlay": "Overlay avec Maj+Tab : comme dans Steam, à choisir dans Réglages → Overlay. Dans les jeux Steam, cette touche appartient à l'overlay Steam : là, l'overlay ModLaunch s'ouvre avec Maj+F1."
   },
   "pt-BR": {
     "v28.wish.title": "Lista de desejos",
@@ -830,7 +872,14 @@
     "v98.ach.cloud-saves": "Tudo com você",
     "v98.ach.cloud-saves.d": "Ative os saves na nuvem de um jogo",
     "v98.ach.chat-first": "Em contato",
-    "v98.ach.chat-first.d": "Mande uma mensagem a um amigo no chat do ModLaunch"
+    "v98.ach.chat-first.d": "Mande uma mensagem a um amigo no chat do ModLaunch",
+    "new.v28.subtitle": "Lista de desejos com promoções, avaliações só de quem jogou, chat com amigos e saves na nuvem",
+    "new.v28.wish": "Lista de desejos: jogos que você quer comprar, com preços da Steam do seu país. O ModLaunch avisa sobre promoções ou quando o preço chega ao seu alvo, e dá para importar sua lista da Steam. Ctrl+Shift+W.",
+    "new.v28.reviews": "Avaliações de jogadores: cada jogo em Todos os jogos tem notas e avaliações. Só pode escrever quem jogou uma hora ou mais — nada de notas de quem nunca jogou.",
+    "new.v28.chat": "Chat com amigos: clique em um amigo no painel Amigos e a conversa abre ali mesmo. O botão de controle chama para jogar, e seu amigo ganha um botão “Jogar”.",
+    "new.v28.cloud": "Saves na nuvem: como o Steam Cloud, mas pelo seu OneDrive, Google Drive, Dropbox ou Yandex Disk. Se os saves mudaram em dois PCs, o ModLaunch pergunta quais manter — os outros não se perdem. Aba Saves do jogo.",
+    "new.v28.bigpicture": "Big Picture para todos os jogos: o modo controle agora mostra todos os jogos instalados de todos os launchers, não só os com mods. F11.",
+    "new.v28.overlay": "Overlay no Shift+Tab: como na Steam, escolha em Configurações → Overlay. Nos jogos da Steam essa tecla é do overlay da Steam, então lá o do ModLaunch abre com Shift+F1."
   },
   "zh-CN": {
     "v28.wish.title": "愿望单",
@@ -949,6 +998,13 @@
     "v98.ach.cloud-saves": "随身携带",
     "v98.ach.cloud-saves.d": "为一款游戏开启云存档",
     "v98.ach.chat-first": "保持联系",
-    "v98.ach.chat-first.d": "在 ModLaunch 聊天中给好友发消息"
+    "v98.ach.chat-first.d": "在 ModLaunch 聊天中给好友发消息",
+    "new.v28.subtitle": "带折扣提醒的愿望单、只有玩过的人才能写的评价、好友聊天和云存档",
+    "new.v28.wish": "愿望单：想买的游戏，显示你所在地区的 Steam 价格。打折或降到你设定的价格时 ModLaunch 会提醒你，还能从 Steam 导入愿望单。Ctrl+Shift+W。",
+    "new.v28.reviews": "玩家评价：“全部游戏”里的每款游戏都有评分和评价。只有玩过一小时及以上的人才能写——没玩过的人无法刷分。",
+    "new.v28.chat": "好友聊天：在“好友”面板点击好友，对话就在那里打开。手柄按钮可以邀请对方一起玩，对方会看到“开始游戏”按钮。",
+    "new.v28.cloud": "云存档：类似 Steam 云，但通过你的 OneDrive、Google 云端硬盘、Dropbox 或 Yandex Disk。如果两台电脑上的存档都改动过，ModLaunch 会询问保留哪一份——另一份不会丢失。在游戏的“存档”标签页。",
+    "new.v28.bigpicture": "所有游戏的大屏模式：手柄模式现在显示所有启动器中已安装的全部游戏，而不仅是装了模组的游戏。F11。",
+    "new.v28.overlay": "Shift+Tab 打开覆盖层：和 Steam 一样，在“设置 → 覆盖层”中选择。在 Steam 游戏中这个组合键属于 Steam 覆盖层，因此那里 ModLaunch 覆盖层用 Shift+F1 打开。"
   }
 }
