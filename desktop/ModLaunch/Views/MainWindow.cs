@@ -1086,6 +1086,13 @@ public sealed partial class MainWindow : Window
         Features.DevMode.Leave(game.Path);
         // 23.0: защита прогресса — оставить новый прогресс или вернуть сохранения как было.
         AskProgress(game);
+        // 28.0: облачные сохранения — свежие сохранения сразу в облако.
+        if (Features.CloudSaves.Enabled(gameId) && game.Path is { } savesGame)
+            _ = Task.Run(() =>
+            {
+                try { if (Features.CloudSaves.AfterExit(game.Def, savesGame)) Dispatcher.UIThread.Post(() => Toast(I18n.T("v28.cs.pushed", ("game", game.Def.Name)))); }
+                catch (Exception e) { Dispatcher.UIThread.Post(() => Toast(I18n.T("v28.cs.pushFailed", ("error", Jobs.Explain(e))), bad: true)); }
+            });
         AppState.Notify();
         // Закрылась сама — возможно, вылет: смотрим логи. 24.0: и после долгой игры (вылет через час — тоже вылет);
         // окно появится, только если это правда вылет (код ошибки, файл о вылете или серьёзная причина в логе).

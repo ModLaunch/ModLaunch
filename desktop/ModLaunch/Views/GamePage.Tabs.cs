@@ -210,6 +210,8 @@ public sealed partial class GamePage
             info.Children.Add(Ui.Text(Backups.OnLaunch ? I18n.T("bak.auto.on", ("n", Backups.Keep)) : I18n.T("bak.auto.off"), "muted small", wrap: true));
         }
         col.Children.Add(Ui.Card(Ui.Col(12, head, info), 22));
+        // 28.0: облачные сохранения (GamePage.CloudSaves.cs).
+        if (savesDir is not null) col.Children.Add(CloudSavesCard());
 
         var items = Backups.List(_g.Def.Id);
         if (items.Count == 0)

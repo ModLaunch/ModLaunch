@@ -100,4 +100,43 @@ public static class V28Shots
             Social.Friends.DemoView = null;
         }
     }
+
+    /// <summary>MODLAUNCH_SHOTS=V28Cloud: облачные сохранения на вкладке «Сохранения» и спор «какую копию оставить».</summary>
+    [DemoShots]
+    static void V28Cloud(Shots s)
+    {
+        s.Pump(4500);
+        var root = Path.Combine(Path.GetTempPath(), "modlaunch-shots-cloud");
+        var onedrive = Directory.CreateDirectory(Path.Combine(root, "OneDrive", "ModLaunch Backups")).FullName;
+        Features.OneClickBackup.DemoTargets =
+        [
+            new("local", "local", "Документы", true, Path.Combine(root, "local")),
+            new("onedrive", "service", Core.I18n.T("v11.bk.dest.onedrive"), true, onedrive),
+            new("gdrive", "service", Core.I18n.T("v11.bk.dest.gdrive"), false, null),
+        ];
+        try
+        {
+            Features.CloudSaves.PlaceId = "onedrive";
+            Features.CloudSaves.SetEnabled("subnautica", true);
+            s.Window.Navigate(() => new GamePage("subnautica", "saves"));
+            s.Pump(2000);
+            s.Save("v28-09-cloud-saves");
+
+            if (AppState.Games.FirstOrDefault(g => g.Def.Id == "subnautica") is { } game)
+            {
+                var now = DateTime.UtcNow;
+                Actions.CloudConflict(game, new Features.SaveCheck("conflict",
+                    new Features.SaveSide("a", now.AddMinutes(-35), 18_400_000, 42, "DESKTOP-HOME"),
+                    new Features.SaveSide("b", now.AddHours(-20), 17_900_000, 41, "LAPTOP-MAX")), () => { });
+                s.Pump(1000);
+                s.Save("v28-10-cloud-conflict");
+                s.Window.CloseDialog();
+            }
+        }
+        finally
+        {
+            Features.CloudSaves.SetEnabled("subnautica", false);
+            Features.OneClickBackup.DemoTargets = null;
+        }
+    }
 }

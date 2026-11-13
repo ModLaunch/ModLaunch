@@ -318,7 +318,7 @@ public static partial class Actions
     /// «Играть»: экран запуска с шагами и галочками (если окно на виду и анимации включены),
     /// иначе — сразу запуск и короткое уведомление.
     /// </summary>
-    public static void Play(GameState g, bool animate = true, bool vanilla = false, bool skipCheck = false, bool skipUpdate = false)
+    public static void Play(GameState g, bool animate = true, bool vanilla = false, bool skipCheck = false, bool skipUpdate = false, bool skipCloud = false)
     {
         if (g.Path is null) return;
         // Minecraft играется через официальный лаунчер выбранной сборкой (загрузчик ставится сам).
@@ -337,6 +337,8 @@ public static partial class Actions
             PlayGate(g, blockers, animate);
             return;
         }
+        // 28.0: облачные сохранения — сверить до запуска (новее в облаке — взять, поменялись обе — спросить).
+        if (!skipCloud && !Program.Demo && CloudSaves.Enabled(g.Def.Id)) { _ = CloudThenPlay(g, animate, vanilla); return; }
         if (!animate || !Animate.On || !visible || Settings.Data.Str("launchFx") == "off")
         {
             _ = Quiet();
