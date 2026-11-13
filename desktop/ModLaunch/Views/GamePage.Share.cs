@@ -207,10 +207,13 @@ public sealed partial class GamePage
             var clear = Ui.Button(I18n.T("v27.safe.clear"), ConfirmClearSafe, "ghost", Icons.Trash);
             clear.VerticalAlignment = VerticalAlignment.Center;
             DockPanel.SetDock(clear, Dock.Right);
-            var info = Ui.Row(12, Ui.Icon(Icons.Shield, 18, Ui.Res("Muted")),
-                Ui.Col(2, Ui.Text(I18n.T("v27.safe.line", ("n", kept), ("size", Size(keptBytes))), "h3"), Ui.Text(I18n.T("v27.safe.hint"), "small muted", wrap: true)));
-            info.VerticalAlignment = VerticalAlignment.Center;
-            card.Children.Add(new DockPanel { Children = { clear, info } });
+            var icon = Ui.Icon(Icons.Shield, 18, Ui.Res("Muted"));
+            icon.Margin = new Thickness(0, 2, 12, 0);
+            icon.VerticalAlignment = VerticalAlignment.Top;
+            DockPanel.SetDock(icon, Dock.Left);
+            var text = Ui.Col(2, Ui.Text(I18n.T("v27.safe.line", ("n", kept), ("size", Size(keptBytes))), "h3"), Ui.Text(I18n.T("v27.safe.hint"), "small muted", wrap: true));
+            text.Margin = new Thickness(0, 0, 12, 0);
+            card.Children.Add(new DockPanel { Children = { clear, icon, text } });
         }
         return Ui.Card(card, 22);
     }

@@ -85,6 +85,9 @@ public sealed partial class GamePage
             col.Children.Add(notice);
         }
 
+        // 27.0: что обновилось за неделю — и что в этих версиях поменялось.
+        if (UpdateLogUi.RecentNotice(_g) is { } recentUpdates) col.Children.Add(recentUpdates);
+
         var mods = registry.List();
         if (UndoNotice() is { } undo) col.Children.Add(undo);
         if (mods.Count > 0) col.Children.Add(InstalledToolbar());

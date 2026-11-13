@@ -27,7 +27,7 @@ public static partial class Actions
     /// а в «Загрузках» одна понятная строка. Моды через браузер (Nexus без Premium) — в конце.
     /// Задача завершается, когда всё закончено.
     /// </summary>
-    public static Task UpdateMods(GameState g, IReadOnlyList<ModUpdate> updates)
+    public static Task UpdateMods(GameState g, IReadOnlyList<ModUpdate> updates, bool auto = false)
     {
         if (g.Registry is null) return Task.CompletedTask;
         var list = updates.Where(u => Updating.TryAdd(UpdateKey(g, u.RecordId), 0)).OrderBy(u => u.Manual).ToList();
@@ -56,12 +56,17 @@ public static partial class Actions
                     // Уже стоит, мод удалили или отметили «не обновлять», пока задача ждала, — пропускаем.
                     if (registry.Get(u.RecordId) is not { } record || record.Bool("hold") || ModUpdates.AlreadyDone(g, u)) { ModUpdates.Forget(g.Def.Id, u.RecordId); continue; }
                     var step = mine.Count > 1 ? new NumberedSteps(progress, i + 1, mine.Count, u.Name) : progress;
+                    var from = record.Str("version") ?? "";
                     try
                     {
                         if (u.Source == "nexus")
                             await ModUpdates.Replace(g, u.RecordId, () => InstallNexus(g, registry, u.CatalogId, u.Name, null, job, step, ct, withDeps: true));
                         else await ModUpdates.Update(g, u, step, ct);
                         Premium.Count("modsUpdated");
+                        // 27.0: журнал обновлений — было → стало, а что изменилось — догрузится в фоне.
+                        if (registry.Get(u.RecordId) is { } now && now.Str("version") is { } to
+                            && UpdateLog.Add(g.Def.Id, g.Def.Name, u.RecordId, now.Str("displayName") ?? u.Name, from, to, now.Str("source") ?? u.Source, auto, now.Str("url")) is { } logId)
+                            UpdateLog.FetchChangelog(g.Def, logId, u.CatalogId, g.Def.SourceOf(u.RecordId, now.Str("source")), from, to);
                     }
                     catch (Exception) when (mine.Count > 1 && !ct.IsCancellationRequested) { failed.Add(u.Name); }
                     finally
@@ -116,7 +121,7 @@ public static partial class Actions
             if (auto.Count > 0)
             {
                 W.Toast(I18n.T("upd.beforePlay.updating." + I18n.Plural(auto.Count, "one", "few", "many"), ("n", auto.Count)));
-                await UpdateMods(g, auto);
+                await UpdateMods(g, auto, auto: true);
             }
         }
         finally { PreparingPlay.Remove(g.Def.Id); }
@@ -131,7 +136,7 @@ public static partial class Actions
         {
             if (!ModUpdates.Found.TryGetValue(g.Def.Id, out var list)) continue;
             var auto = list.Where(u => !u.Manual).ToList();
-            if (auto.Count > 0 && !Launcher.IsRunning(g.Def.Id)) _ = UpdateMods(g, auto);
+            if (auto.Count > 0 && !Launcher.IsRunning(g.Def.Id)) _ = UpdateMods(g, auto, auto: true);
         }
     }
 

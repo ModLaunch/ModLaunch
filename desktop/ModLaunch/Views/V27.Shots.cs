@@ -1,4 +1,5 @@
 using ModLaunch.Core;
+using ModLaunch.Features;
 using ModLaunch.Games;
 
 namespace ModLaunch.Views;
@@ -43,5 +44,34 @@ public static class V27Shots
             s.Save("v27-05-light-xbox");
         }
         finally { Look.SetTheme(was); }
+    }
+
+    /// <summary>MODLAUNCH_SHOTS=V27Safety: журнал обновлений (плашка и окно) и сейф модов в «Как было».</summary>
+    [DemoShots]
+    static void V27Safety(Shots s)
+    {
+        s.Pump(4500);
+        Features.UpdateLog.DemoFill();
+        s.Window.Navigate(() => new GamePage("subnautica", "installed"));
+        s.Pump(1500);
+        s.Save("v27-06-updates-notice");
+        UpdateLogUi.Show("subnautica");
+        s.Pump(800);
+        s.Save("v27-07-update-log");
+        s.Window.CloseDialog();
+
+        // Сейф: старая версия мода и мод, поставленный руками, вместо удаления — в ModHub/safe.
+        var sn = AppState.Game("subnautica");
+        if (sn.Registry is { } registry)
+        {
+            var old = Directory.CreateDirectory(Path.Combine(registry.ModsDir, "OldMapMod")).FullName;
+            File.WriteAllBytes(Path.Combine(old, "MapMod.dll"), new byte[180_000]);
+            Features.ModSafe.Remove(registry, old, new System.Text.Json.Nodes.JsonObject { ["id"] = "MapMod", ["name"] = "Map", ["version"] = "1.4.3", ["folder"] = "OldMapMod" }, "update");
+        }
+        Snapshots.Take(sn, "update");
+        s.Window.Navigate(() => new GamePage("subnautica", "profiles"));
+        s.Pump(1500);
+        V23Shots.Scroll(s, 1);
+        s.Save("v27-08-mod-safe");
     }
 }

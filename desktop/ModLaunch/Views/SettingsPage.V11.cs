@@ -511,7 +511,7 @@ public sealed partial class SettingsPage
             Toggle(I18n.T("upd.onStart"), I18n.T("upd.onStart.hint"), ModUpdates.OnStart, v => Settings.Data["checkModUpdates"] = v),
             Toggle(I18n.T("upd.auto"), I18n.T("upd.auto.hint"), ModUpdates.Auto, v => Settings.Data["autoUpdateMods"] = v),
             Toggle(I18n.T("upd.beforePlay"), I18n.T("upd.beforePlay.hint"), ModUpdates.BeforePlay, v => Settings.Data["updateBeforePlay"] = v),
-            Ui.Button(I18n.T("upd.checkAll"), CheckAll, "", Icons.Refresh),
+            Ui.Row(10, Ui.Button(I18n.T("upd.checkAll"), CheckAll, "", Icons.Refresh), Ui.Button(I18n.T("v27.log.title"), () => UpdateLogUi.Show(), "", Icons.List)),
             list);
     }
 }
