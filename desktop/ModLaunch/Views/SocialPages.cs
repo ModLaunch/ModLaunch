@@ -263,18 +263,27 @@ public sealed class StatsPage : Page
     }
 }
 
-/// <summary>«Деньги на чай».</summary>
+/// <summary>
+/// «Поддержать ModLaunch». 27.0: вместо заглушки «кнопка появится позже» — настоящая поддержка с баланса ModLaunch
+/// (вся сумма — на развитие) и подсказка, что авторов модов можно поддержать на их странице в Creator Hub.
+/// </summary>
 public sealed class DonatePage : Page
 {
     public override string Title => I18n.T("nav.donate");
 
     public override void Build()
     {
+        var support = Ui.Button(I18n.T("v27.tip.platform.button"), () => TipUi.Show(Creator.Tips.Platform, "ModLaunch"), "primary big", Icons.Heart);
+        support.HorizontalAlignment = HorizontalAlignment.Center;
+        var authors = Ui.Button(I18n.T("v27.tip.authors"), () => MainWindow.Current?.Navigate(() => new MarketPage("authors")), "ghost", Icons.Users);
+        authors.HorizontalAlignment = HorizontalAlignment.Center;
         var col = Ui.Col(14,
             new Border { Width = 64, Height = 64, CornerRadius = new CornerRadius(20), Background = Ui.Res("BrandSoft"), Child = Ui.Icon(Icons.Heart, 30, Ui.Res("Brand2")), HorizontalAlignment = HorizontalAlignment.Center },
             new TextBlock { Text = I18n.T("donate.title"), FontSize = 28, FontWeight = FontWeight.Bold, HorizontalAlignment = HorizontalAlignment.Center },
             new TextBlock { Text = I18n.T("donate.text"), TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center, Foreground = Ui.Res("Muted") },
-            new TextBlock { Text = I18n.T("donate.soon"), TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center, Foreground = Ui.Res("Faint"), FontSize = 12 });
+            support,
+            new TextBlock { Text = I18n.T("v27.tip.platform.where"), TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center, Foreground = Ui.Res("Faint"), FontSize = 12 },
+            authors);
         Content = new Border { Classes = { "card" }, Padding = new Thickness(40), Margin = new Thickness(34, 40), MaxWidth = 560, VerticalAlignment = VerticalAlignment.Top, Child = col };
     }
 }

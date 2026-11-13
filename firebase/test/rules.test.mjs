@@ -42,8 +42,8 @@ async function walletOf(uid) {
 function next(prev, kind, amount) {
   const n = {
     balance: (prev.balance ?? 0) + amount,
-    earned: (prev.earned ?? 0) + (kind === 'sale' || kind === 'fee' ? amount : 0),
-    spent: (prev.spent ?? 0) + (kind === 'purchase' ? -amount : 0),
+    earned: (prev.earned ?? 0) + (kind === 'sale' || kind === 'fee' || kind === 'tip-in' ? amount : 0),
+    spent: (prev.spent ?? 0) + (kind === 'purchase' || kind === 'tip' ? -amount : 0),
     paidOut: (prev.paidOut ?? 0) + (kind === 'payout' || kind === 'payout-return' ? -amount : 0),
     toppedUp: (prev.toppedUp ?? 0) + (kind === 'topup' ? amount : 0),
     seq: (prev.seq ?? 0) + 1,
@@ -589,4 +589,88 @@ test('комиссия: все продажи разом видит только
   await assertSucceeds(getDocs(collectionGroup(db(ADMIN), 'sales')));
   await assertFails(getDocs(collectionGroup(db(SELLER), 'sales')));
   await assertFails(getDocs(collectionGroup(db(BUYER), 'sales')));
+});
+
+// ---------------------------------------------------------------- 27.0: поддержка автора и ModLaunch
+
+const TIP = 10000;
+let tipSeq = 0;
+const tipId = (who) => `t_${who.uid}_2026111300${String(10 + tipSeq++).padStart(4, '0')}`;
+
+/** Поддержка одной пачкой, как Creator/Tips.cs: документ tips/{tid} и списание «tip» на ту же сумму. */
+async function give(who = BUYER, { to = SELLER.uid, amount = TIP, debit = amount, feeValue, claimed, withWallet = true, tid = tipId(who) } = {}) {
+  const d = db(who);
+  const prev = await walletOf(who.uid);
+  const b = writeBatch(d);
+  const platform = to === '_platform';
+  b.set(doc(d, 'tips', tid), {
+    from: who.uid, fromName: 'Buyer', to, toName: platform ? 'ModLaunch' : 'Seller', amount,
+    fee: feeValue ?? (platform ? amount : fee(amount)), message: 'спасибо!', claimed: claimed ?? platform, feeTaken: false, created: serverTimestamp(),
+  });
+  if (withWallet) ledger(b, d, who.uid, prev, 'tip', -debit, { ref: tid, party: to, by: who.uid });
+  await b.commit();
+  return tid;
+}
+
+async function claimTip(tid, who = SELLER, { amount = TIP - fee(TIP), from = BUYER.uid } = {}) {
+  const d = db(who);
+  const prev = await walletOf(who.uid);
+  const b = writeBatch(d);
+  b.update(doc(d, 'tips', tid), { claimed: true });
+  ledger(b, d, who.uid, prev, 'tip-in', amount, { ref: tid, party: from, by: who.uid });
+  return b.commit();
+}
+
+async function takeTipFee(tid, who = ADMIN, amount = fee(TIP)) {
+  const d = db(who);
+  const prev = await walletOf(who.uid);
+  const b = writeBatch(d);
+  b.update(doc(d, 'tips', tid), { feeTaken: true });
+  ledger(b, d, who.uid, prev, 'fee', amount, { ref: tid, party: BUYER.uid, by: who.uid });
+  return b.commit();
+}
+
+test('поддержка: списание и поддержка одной пачкой; автор забирает без комиссии один раз', async () => {
+  const tid = await assertSucceeds(give());
+  const w = await walletOf(BUYER.uid);
+  if (w.balance !== 50000 - TIP || w.spent !== TIP || w.seq !== 2) throw new Error(JSON.stringify(w));
+  await assertFails(claimTip(tid, SELLER, { amount: TIP }));
+  await assertFails(claimTip(tid, OTHER));
+  await assertSucceeds(claimTip(tid));
+  const s = await walletOf(SELLER.uid);
+  if (s.balance !== TIP - fee(TIP) || s.earned !== TIP - fee(TIP)) throw new Error(JSON.stringify(s));
+  await assertFails(claimTip(tid));
+});
+
+test('поддержка: без списания, не та сумма, себе, меньше 10 ₽, не та комиссия, чужой id — отказ', async () => {
+  await assertFails(give(BUYER, { withWallet: false }));
+  await assertFails(give(BUYER, { debit: 100 }));
+  await assertFails(give(BUYER, { to: BUYER.uid }));
+  await assertFails(give(BUYER, { amount: 500 }));
+  await assertFails(give(BUYER, { feeValue: 0 }));
+  await assertFails(give(BUYER, { claimed: true }));
+  await assertFails(give(BUYER, { tid: tipId(OTHER) }));
+  await assertFails(give(BUYER, { amount: 90000 }));
+});
+
+test('поддержка ModLaunch: вся сумма — комиссия, её забирает только админ и один раз', async () => {
+  const tid = await assertSucceeds(give(BUYER, { to: '_platform' }));
+  await assertFails(claimTip(tid, SELLER, { amount: 0 }));
+  await assertFails(takeTipFee(tid, SELLER, TIP));
+  await assertFails(takeTipFee(tid, ADMIN, TIP - 1));
+  await assertSucceeds(takeTipFee(tid, ADMIN, TIP));
+  const a = await walletOf(ADMIN.uid);
+  if (a.balance !== TIP || a.earned !== TIP) throw new Error(JSON.stringify(a));
+  await assertFails(takeTipFee(tid, ADMIN, TIP));
+});
+
+test('поддержка: видят дарящий, автор и админ; комиссию с поддержки автора админ забирает отдельно', async () => {
+  const tid = await give();
+  await assertSucceeds(getDoc(doc(db(BUYER), 'tips', tid)));
+  await assertSucceeds(getDoc(doc(db(SELLER), 'tips', tid)));
+  await assertFails(getDoc(doc(db(OTHER), 'tips', tid)));
+  await assertSucceeds(getDocs(query(collection(db(SELLER), 'tips'), where('to', '==', SELLER.uid), where('claimed', '==', false))));
+  await assertFails(getDocs(collection(db(OTHER), 'tips')));
+  await assertSucceeds(takeTipFee(tid));
+  await assertSucceeds(claimTip(tid));
 });

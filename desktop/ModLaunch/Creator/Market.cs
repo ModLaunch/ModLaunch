@@ -279,7 +279,12 @@ public static class Market
     public static async Task<Wallet> MyWallet(bool claim = false)
     {
         var (uid, token, _) = await Hub.Member();
-        if (claim) { try { await ClaimSales(); } catch (ServiceError) { } }
+        if (claim)
+        {
+            try { await ClaimSales(); } catch (ServiceError) { }
+            // 27.0: и поддержки от игроков (пока правила с поддержкой не выложены — DENIED, молча).
+            try { await Tips.Claim(); } catch (ServiceError) { }
+        }
         return ToWallet(await Ledger.Read(uid, token));
     }
 

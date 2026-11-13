@@ -373,8 +373,8 @@ service cloud.firestore {
         && after.balance is int && after.balance >= 0
         && after.balance == before.get('balance', 0) + e.amount
         && e.balance == after.balance
-        && after.earned == before.get('earned', 0) + ((e.kind == 'sale' || e.kind == 'fee') ? e.amount : 0)
-        && after.spent == before.get('spent', 0) + (e.kind == 'purchase' ? 0 - e.amount : 0)
+        && after.earned == before.get('earned', 0) + ((e.kind == 'sale' || e.kind == 'fee' || e.kind == 'tip-in') ? e.amount : 0)
+        && after.spent == before.get('spent', 0) + ((e.kind == 'purchase' || e.kind == 'tip') ? 0 - e.amount : 0)
         && after.paidOut == before.get('paidOut', 0) + ((e.kind == 'payout' || e.kind == 'payout-return') ? 0 - e.amount : 0)
         && after.toppedUp == before.get('toppedUp', 0) + (e.kind == 'topup' ? e.amount : 0)
         && after.updated == request.time;
@@ -412,6 +412,24 @@ service cloud.firestore {
       let after = getAfter(mTopUp(e.ref)).data;
       return before.uid == w && before.status == 'pending' && after.status == 'done' && e.amount == before.amount;
     }
+    // 27.0: поддержка (tips/{tid}, tid = «t_» + uid дарящего + «_» + 14 цифр). Дарящий списывает у себя ровно сумму
+    // поддержки; автор забирает её без комиссии один раз; владелец забирает комиссию один раз.
+    function mTip(tid) { return /databases/$(database)/documents/tips/$(tid); }
+    function mTipOk(w, e) {
+      let t = getAfter(mTip(e.ref)).data;
+      return !exists(mTip(e.ref)) && t.from == w && e.amount == 0 - t.amount && e.party == t.to;
+    }
+    function mTipInOk(w, e) {
+      let before = get(mTip(e.ref)).data;
+      let after = getAfter(mTip(e.ref)).data;
+      return before.to == w && before.claimed == false && after.claimed == true
+        && e.amount == before.amount - before.fee && e.party == before.from;
+    }
+    function mTipFeeOk(w, e) {
+      let before = get(mTip(e.ref)).data;
+      let after = getAfter(mTip(e.ref)).data;
+      return before.feeTaken == false && after.feeTaken == true && before.fee > 0 && e.amount == before.fee;
+    }
     function mEntryOk(w, n) {
       let e = request.resource.data;
       let after = getAfter(mWallet(w)).data;
@@ -427,7 +445,9 @@ service cloud.firestore {
           || (e.kind == 'payout-return' && mAdmin() && mPayoutReturnOk(w, e))
           || (e.kind == 'topup' && mAdmin() && mTopUpOk(w, e))
           || (e.kind == 'grant' && mAdmin() && e.note.size() > 0)
-          || (e.kind == 'fee' && w == request.auth.uid && mAdmin() && mFeeOk(w, e)));
+          || (e.kind == 'tip' && w == request.auth.uid && mTipOk(w, e))
+          || (e.kind == 'tip-in' && w == request.auth.uid && mTipInOk(w, e))
+          || (e.kind == 'fee' && w == request.auth.uid && mAdmin() && (e.ref.matches('^t_.*') ? mTipFeeOk(w, e) : mFeeOk(w, e))));
     }
 
     function mValid(d) {
@@ -547,6 +567,33 @@ service cloud.firestore {
         allow create: if request.auth != null && w == request.auth.uid && mNewSale(id, w)
           && request.resource.data.keys().hasOnly(['title', 'kind', 'seller', 'price', 'created']);
       }
+    }
+
+    // 27.0: «Поддержать автора» (to = uid автора, комиссия — как у продаж) и «Поддержать ModLaunch»
+    // (to = '_platform', комиссия = вся сумма, забирать автору нечего). Создать — только вместе со списанием «tip».
+    match /tips/{tid} {
+      allow get, list: if request.auth != null
+        && (resource.data.from == request.auth.uid || resource.data.to == request.auth.uid || mAdmin());
+      allow create: if mMember() && tid.matches('^t_' + request.auth.uid + '_[0-9]{14}$')
+        && request.resource.data.keys().hasOnly(['from', 'fromName', 'to', 'toName', 'amount', 'fee', 'message', 'claimed', 'feeTaken', 'created'])
+        && request.resource.data.from == request.auth.uid && request.resource.data.to != request.auth.uid
+        && mText(request.resource.data.to, 128) && request.resource.data.to.size() > 0
+        && mText(request.resource.data.fromName, 32) && mText(request.resource.data.toName, 32) && mText(request.resource.data.message, 300)
+        && request.resource.data.amount is int && request.resource.data.amount >= 1000 && request.resource.data.amount <= 10000000
+        && request.resource.data.fee == (request.resource.data.to == '_platform'
+          ? request.resource.data.amount : math.floor(request.resource.data.amount * mFee() / 100))
+        && request.resource.data.claimed == (request.resource.data.to == '_platform')
+        && request.resource.data.feeTaken == false
+        && request.resource.data.created == request.time
+        && mEntryIs(request.auth.uid, 'tip', tid);
+      // Автор забирает поддержку — только вместе с записью «tip-in» в своём журнале.
+      allow update: if request.auth != null && resource.data.to == request.auth.uid
+        && mOnly(['claimed']) && resource.data.claimed == false && request.resource.data.claimed == true
+        && mEntryIs(request.auth.uid, 'tip-in', tid);
+      // Владелец забирает комиссию — только вместе с записью «fee» в своём журнале.
+      allow update: if mAdmin() && mOnly(['feeTaken'])
+        && resource.data.feeTaken == false && request.resource.data.feeTaken == true
+        && mEntryIs(request.auth.uid, 'fee', tid);
     }
 
     match /payouts/{pid} {

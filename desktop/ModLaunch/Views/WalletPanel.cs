@@ -229,6 +229,9 @@ public sealed class WalletPanel : UserControl
             "topup" => (Icons.Plus, Ui.Res("Good"), I18n.T("v95.w.k.topup"), ""),
             "fee" => (Icons.Percent, Ui.Res("Good"), I18n.T("v14.w.k.fee", ("title", e.Note != "" ? e.Note : ListingTitle())), I18n.T("v14.w.k.fee.sub")),
             "grant" => (Icons.Sparkles, Ui.Res("Brand2"), I18n.T("v95.w.k.grant"), e.Note),
+            // 27.0: поддержка — отправленная (кому) и полученная (от кого и что написал).
+            "tip" => (Icons.Heart, Ui.Res("Brand2"), e.Party == Tips.Platform ? I18n.T("v27.tip.k.platform") : I18n.T("v27.tip.k.sent"), e.Note),
+            "tip-in" => (Icons.Heart, Ui.Res("Good"), I18n.T("v27.tip.k.got"), e.Note),
             _ => (Icons.Info, Ui.Res("Muted"), e.Kind, e.Note),
         };
     }

@@ -74,4 +74,22 @@ public static class V27Shots
         V23Shots.Scroll(s, 1);
         s.Save("v27-08-mod-safe");
     }
+
+    /// <summary>MODLAUNCH_SHOTS=V27Support: «Поддержать ModLaunch» (страница и окно) и «Поддержать автора».</summary>
+    [DemoShots]
+    static void V27Support(Shots s)
+    {
+        s.Pump(4500);
+        s.Window.Navigate(() => new DonatePage());
+        s.Pump(1200);
+        s.Save("v27-09-donate-page");
+        TipUi.Show(Creator.Tips.Platform, "ModLaunch");
+        s.Pump(800);
+        s.Save("v27-10-support-modlaunch");
+        s.Window.CloseDialog();
+        TipUi.Show("demo_author", "NightOwl");
+        s.Pump(800);
+        s.Save("v27-11-support-author");
+        s.Window.CloseDialog();
+    }
 }

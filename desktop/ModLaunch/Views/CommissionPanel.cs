@@ -17,6 +17,8 @@ namespace ModLaunch.Views;
 public sealed class CommissionPanel : UserControl
 {
     static List<FeeSale>? _sales;
+    /// <summary>27.0: поддержки с незабранной комиссией (и поддержки ModLaunch целиком). Правила ещё не выложены — пусто.</summary>
+    static List<Tip> _tips = [];
     static string? _error;
     static bool _loading;
     string? _note;
@@ -36,6 +38,7 @@ public sealed class CommissionPanel : UserControl
             try { await PayMethods.Load(force: true); } catch { }
             try { await Market.LoadFee(force: true); _sales = await Commission.AllSales(); _error = null; }
             catch (Exception e) { _error = Market.Explain(e); _sales = null; }
+            try { _tips = await Tips.PendingFees(); } catch { _tips = []; }
             _loading = false;
             Dispatcher.UIThread.Post(Render);
         });
@@ -90,12 +93,16 @@ public sealed class CommissionPanel : UserControl
             Ui.Row(18, slider, value, save),
             example), 22);
 
-        var claim = Ui.Button(I18n.T("v14.fee.claim", ("sum", Market.Money(s.Pending))), () => _ = Claim(), "primary", Icons.Download);
-        claim.IsEnabled = s.Pending > 0 && !_busy;
-        var claimCard = Ui.Card(Ui.Col(12,
+        var tipsPending = _tips.Where(t => !t.FeeTaken).Sum(t => t.Fee);
+        var claim = Ui.Button(I18n.T("v14.fee.claim", ("sum", Market.Money(s.Pending + tipsPending))), () => _ = Claim(), "primary", Icons.Download);
+        claim.IsEnabled = s.Pending + tipsPending > 0 && !_busy;
+        var claimCol = Ui.Col(12,
             Ui.Text(I18n.T("v14.fee.wallet"), "h3"),
-            Ui.Text(I18n.T("v14.fee.wallet.text"), "small muted", wrap: true),
-            Ui.Row(10, claim, Ui.Button(I18n.T("v93.mk.tab.wallet"), () => MainWindow.Current?.Navigate(() => new AccountPage("wallet")), "ghost", Icons.Bag))), 22);
+            Ui.Text(I18n.T("v14.fee.wallet.text"), "small muted", wrap: true));
+        // 27.0: комиссия с поддержек авторов и поддержка самого ModLaunch — забираются той же кнопкой.
+        if (tipsPending > 0) claimCol.Children.Add(Ui.Text(I18n.T("v27.tip.fees", ("n", _tips.Count(t => !t.FeeTaken)), ("sum", Market.Money(tipsPending))), "small muted", wrap: true));
+        claimCol.Children.Add(Ui.Row(10, claim, Ui.Button(I18n.T("v93.mk.tab.wallet"), () => MainWindow.Current?.Navigate(() => new AccountPage("wallet")), "ghost", Icons.Bag)));
+        var claimCard = Ui.Card(claimCol, 22);
         var two = new Grid { ColumnDefinitions = new ColumnDefinitions("*,*"), ColumnSpacing = 18 };
         two.Children.Add(percentCard);
         Grid.SetColumn(claimCard, 1);
@@ -220,8 +227,15 @@ public sealed class CommissionPanel : UserControl
         try
         {
             var (count, amount) = await Commission.Claim(_sales);
+            if (_tips.Count > 0)
+            {
+                var (tipCount, tipAmount) = await Tips.TakeFees(_tips);
+                count += tipCount;
+                amount += tipAmount;
+            }
             _note = I18n.T("v14.fee.claimed", ("n", count), ("sum", Market.Money(amount)));
             _sales = await Commission.AllSales();
+            try { _tips = await Tips.PendingFees(); } catch { _tips = []; }
             WalletPanel.Reset();
         }
         catch (Exception e) { _note = Market.Explain(e); }

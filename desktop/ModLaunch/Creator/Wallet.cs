@@ -23,13 +23,13 @@ public sealed record LedgerEntry(long Seq, string Kind, long Amount, long Balanc
 /// </summary>
 public static class Ledger
 {
-    public static readonly string[] Kinds = ["purchase", "sale", "payout", "payout-return", "topup", "grant", "fee"];
+    public static readonly string[] Kinds = ["purchase", "sale", "payout", "payout-return", "topup", "grant", "fee", "tip", "tip-in"];
 
-    /// <summary>Новое состояние после записи — та же арифметика, что в правилах (mWalletOk).</summary>
+    /// <summary>Новое состояние после записи — та же арифметика, что в правилах (mWalletOk). 27.0: поддержка — «tip» (трата) и «tip-in» (доход).</summary>
     public static WalletState Next(WalletState prev, string kind, long amount) => new(
         prev.Balance + amount,
-        prev.Earned + (kind is "sale" or "fee" ? amount : 0),
-        prev.Spent + (kind == "purchase" ? -amount : 0),
+        prev.Earned + (kind is "sale" or "fee" or "tip-in" ? amount : 0),
+        prev.Spent + (kind is "purchase" or "tip" ? -amount : 0),
         prev.PaidOut + (kind is "payout" or "payout-return" ? -amount : 0),
         prev.ToppedUp + (kind == "topup" ? amount : 0),
         prev.Seq + 1);
@@ -144,7 +144,7 @@ public static class Ledger
         if (Avalonia.Application.Current is null) return "skipped (no UI assets in --selfcheck)";
         using var stream = Avalonia.Platform.AssetLoader.Open(new Uri("avares://ModLaunch/Assets/firestore.rules"));
         var text = new StreamReader(stream).ReadToEnd();
-        foreach (var part in new[] { "rules_version = '2'", "match /friendships/", "match /creations/", "match /reviews/", "function mWalletOk", "match /ledger/" })
+        foreach (var part in new[] { "rules_version = '2'", "match /friendships/", "match /creations/", "match /reviews/", "function mWalletOk", "match /ledger/", "match /tips/", "e.kind == 'tip-in'" })
             if (!text.Contains(part)) throw new Exception("rules file misses " + part);
         // 14.0: процент — в config/market; без документа правила берут те же 10 %, что market.config.json.
         if (!text.Contains($"get(mCfg()).data.get('fee', {Market.FeePercent}) : {Market.FeePercent}; }}")) throw new Exception("default fee in rules differs from market.config.json");

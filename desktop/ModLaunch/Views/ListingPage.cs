@@ -460,6 +460,14 @@ public sealed class AuthorPage : Page
         var head = new DockPanel();
         DockPanel.SetDock(avatar, Dock.Left);
         head.Children.Add(avatar);
+        // 27.0: «Поддержать автора» — деньги с баланса ModLaunch, автору — за вычетом комиссии площадки.
+        if (!(Social.Account.SignedIn && Social.Account.Uid == _uid))
+        {
+            var support = Ui.Button(I18n.T("v27.tip.author.button"), () => TipUi.Show(_uid, _name), "primary", Icons.Heart);
+            support.VerticalAlignment = VerticalAlignment.Center;
+            DockPanel.SetDock(support, Dock.Right);
+            head.Children.Add(support);
+        }
         head.Children.Add(stats);
         col.Children.Add(new Border { Classes = { "card" }, Padding = new Thickness(20, 16), Child = head });
 
