@@ -18,6 +18,9 @@ public sealed partial class ProfilePage : Page
     static string _tab = "achievements";
     static string _set = Achievements.Main;
 
+    /// <summary>Снимки экрана: к концу страницы (новые достижения внизу набора).</summary>
+    internal void DemoScrollToEnd() { if (Content is ScrollViewer sv) sv.ScrollToEnd(); }
+
     public ProfilePage(string tab = "achievements", string? set = null)
     {
         _tab = tab;

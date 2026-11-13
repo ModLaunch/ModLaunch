@@ -105,7 +105,18 @@
     "v28.cs.keepLocal": "Оставить этого ПК",
     "v28.cs.keptLocal": "Оставил сохранения этого ПК и отправил в облако. Облачная копия — в резервных копиях.",
     "v28.cs.keptCloud": "Взял облачные сохранения. Сохранения этого ПК — в резервных копиях.",
-    "v28.cs.resolveFailed": "Не получилось: {error}. Сохранения не тронуты."
+    "v28.cs.resolveFailed": "Не получилось: {error}. Сохранения не тронуты.",
+    "v28.ovl.steamTab": "В {game} Shift+Tab занят оверлеем Steam — оверлей ModLaunch открывается по {key}",
+    "v98.ach.stores-3": "Без границ",
+    "v98.ach.stores-3.d": "Игры из трёх разных лаунчеров во «Всех играх»",
+    "v98.ach.wishlist-5": "Мечтатель",
+    "v98.ach.wishlist-5.d": "Пять игр в «Желаемом»",
+    "v98.ach.game-review": "Голос игрока",
+    "v98.ach.game-review.d": "Оценить игру, в которую наиграно больше часа",
+    "v98.ach.cloud-saves": "Всё с собой",
+    "v98.ach.cloud-saves.d": "Включить облачные сохранения для игры",
+    "v98.ach.chat-first": "На связи",
+    "v98.ach.chat-first.d": "Написать другу в чат ModLaunch"
   },
   "en": {
     "v28.wish.title": "Wishlist",
@@ -213,7 +224,18 @@
     "v28.cs.keepLocal": "Keep this PC's",
     "v28.cs.keptLocal": "Kept this PC's saves and uploaded them. The cloud copy is in backups.",
     "v28.cs.keptCloud": "Took the cloud saves. This PC's saves are in backups.",
-    "v28.cs.resolveFailed": "That didn't work: {error}. Your saves are untouched."
+    "v28.cs.resolveFailed": "That didn't work: {error}. Your saves are untouched.",
+    "v28.ovl.steamTab": "In {game} Shift+Tab belongs to the Steam overlay — the ModLaunch overlay opens with {key}",
+    "v98.ach.stores-3": "No borders",
+    "v98.ach.stores-3.d": "Games from three different launchers in All games",
+    "v98.ach.wishlist-5": "Dreamer",
+    "v98.ach.wishlist-5.d": "Five games on your wishlist",
+    "v98.ach.game-review": "Player's voice",
+    "v98.ach.game-review.d": "Rate a game you've played for over an hour",
+    "v98.ach.cloud-saves": "Take it with you",
+    "v98.ach.cloud-saves.d": "Turn on cloud saves for a game",
+    "v98.ach.chat-first": "Keeping in touch",
+    "v98.ach.chat-first.d": "Send a friend a message in ModLaunch chat"
   },
   "uk": {
     "v28.wish.title": "Бажане",
@@ -321,7 +343,18 @@
     "v28.cs.keepLocal": "Залишити цього ПК",
     "v28.cs.keptLocal": "Залишив збереження цього ПК і надіслав у хмару. Хмарна копія — в резервних копіях.",
     "v28.cs.keptCloud": "Узяв хмарні збереження. Збереження цього ПК — в резервних копіях.",
-    "v28.cs.resolveFailed": "Не вийшло: {error}. Збереження не зачеплено."
+    "v28.cs.resolveFailed": "Не вийшло: {error}. Збереження не зачеплено.",
+    "v28.ovl.steamTab": "У {game} Shift+Tab зайнятий оверлеєм Steam — оверлей ModLaunch відкривається за {key}",
+    "v98.ach.stores-3": "Без кордонів",
+    "v98.ach.stores-3.d": "Ігри з трьох різних лаунчерів у «Усіх іграх»",
+    "v98.ach.wishlist-5": "Мрійник",
+    "v98.ach.wishlist-5.d": "П'ять ігор у «Бажаному»",
+    "v98.ach.game-review": "Голос гравця",
+    "v98.ach.game-review.d": "Оцінити гру, у яку награно понад годину",
+    "v98.ach.cloud-saves": "Усе з собою",
+    "v98.ach.cloud-saves.d": "Увімкнути хмарні збереження для гри",
+    "v98.ach.chat-first": "На зв'язку",
+    "v98.ach.chat-first.d": "Написати другові в чат ModLaunch"
   },
   "es": {
     "v28.wish.title": "Deseados",
@@ -429,7 +462,18 @@
     "v28.cs.keepLocal": "Conservar las de este PC",
     "v28.cs.keptLocal": "Conservé las partidas de este PC y las subí. La copia de la nube está en las copias de seguridad.",
     "v28.cs.keptCloud": "Tomé las partidas de la nube. Las de este PC están en las copias de seguridad.",
-    "v28.cs.resolveFailed": "No funcionó: {error}. Tus partidas no se tocaron."
+    "v28.cs.resolveFailed": "No funcionó: {error}. Tus partidas no se tocaron.",
+    "v28.ovl.steamTab": "En {game}, Shift+Tab es del overlay de Steam: el overlay de ModLaunch se abre con {key}",
+    "v98.ach.stores-3": "Sin fronteras",
+    "v98.ach.stores-3.d": "Juegos de tres launchers distintos en Todos los juegos",
+    "v98.ach.wishlist-5": "Soñador",
+    "v98.ach.wishlist-5.d": "Cinco juegos en deseados",
+    "v98.ach.game-review": "Voz del jugador",
+    "v98.ach.game-review.d": "Valora un juego que hayas jugado más de una hora",
+    "v98.ach.cloud-saves": "Todo contigo",
+    "v98.ach.cloud-saves.d": "Activa las partidas en la nube de un juego",
+    "v98.ach.chat-first": "En contacto",
+    "v98.ach.chat-first.d": "Escribe a un amigo en el chat de ModLaunch"
   },
   "de": {
     "v28.wish.title": "Wunschliste",
@@ -537,7 +581,18 @@
     "v28.cs.keepLocal": "Stände dieses PCs behalten",
     "v28.cs.keptLocal": "Spielstände dieses PCs behalten und hochgeladen. Die Cloud-Kopie liegt in den Sicherungen.",
     "v28.cs.keptCloud": "Cloud-Spielstände übernommen. Die Spielstände dieses PCs liegen in den Sicherungen.",
-    "v28.cs.resolveFailed": "Das hat nicht geklappt: {error}. Deine Spielstände sind unverändert."
+    "v28.cs.resolveFailed": "Das hat nicht geklappt: {error}. Deine Spielstände sind unverändert.",
+    "v28.ovl.steamTab": "In {game} gehört Umschalt+Tab dem Steam-Overlay – das ModLaunch-Overlay öffnet sich mit {key}",
+    "v98.ach.stores-3": "Grenzenlos",
+    "v98.ach.stores-3.d": "Spiele aus drei verschiedenen Launchern unter „Alle Spiele“",
+    "v98.ach.wishlist-5": "Träumer",
+    "v98.ach.wishlist-5.d": "Fünf Spiele auf der Wunschliste",
+    "v98.ach.game-review": "Stimme der Spieler",
+    "v98.ach.game-review.d": "Bewerte ein Spiel, das du über eine Stunde gespielt hast",
+    "v98.ach.cloud-saves": "Alles dabei",
+    "v98.ach.cloud-saves.d": "Cloud-Spielstände für ein Spiel einschalten",
+    "v98.ach.chat-first": "In Verbindung",
+    "v98.ach.chat-first.d": "Einem Freund im ModLaunch-Chat schreiben"
   },
   "fr": {
     "v28.wish.title": "Liste de souhaits",
@@ -645,7 +700,18 @@
     "v28.cs.keepLocal": "Garder celles de ce PC",
     "v28.cs.keptLocal": "Sauvegardes de ce PC gardées et envoyées. La copie du cloud est dans les copies de secours.",
     "v28.cs.keptCloud": "Sauvegardes du cloud récupérées. Celles de ce PC sont dans les copies de secours.",
-    "v28.cs.resolveFailed": "Échec : {error}. Vos sauvegardes sont intactes."
+    "v28.cs.resolveFailed": "Échec : {error}. Vos sauvegardes sont intactes.",
+    "v28.ovl.steamTab": "Dans {game}, Maj+Tab appartient à l'overlay Steam — l'overlay ModLaunch s'ouvre avec {key}",
+    "v98.ach.stores-3": "Sans frontières",
+    "v98.ach.stores-3.d": "Des jeux de trois launchers différents dans Tous les jeux",
+    "v98.ach.wishlist-5": "Rêveur",
+    "v98.ach.wishlist-5.d": "Cinq jeux dans la liste de souhaits",
+    "v98.ach.game-review": "Voix du joueur",
+    "v98.ach.game-review.d": "Noter un jeu auquel vous avez joué plus d'une heure",
+    "v98.ach.cloud-saves": "Tout avec soi",
+    "v98.ach.cloud-saves.d": "Activer les sauvegardes dans le cloud pour un jeu",
+    "v98.ach.chat-first": "En contact",
+    "v98.ach.chat-first.d": "Écrire à un ami dans le chat ModLaunch"
   },
   "pt-BR": {
     "v28.wish.title": "Lista de desejos",
@@ -753,7 +819,18 @@
     "v28.cs.keepLocal": "Manter os deste PC",
     "v28.cs.keptLocal": "Mantive os saves deste PC e enviei para a nuvem. A cópia da nuvem está nos backups.",
     "v28.cs.keptCloud": "Peguei os saves da nuvem. Os deste PC estão nos backups.",
-    "v28.cs.resolveFailed": "Não deu certo: {error}. Seus saves não foram tocados."
+    "v28.cs.resolveFailed": "Não deu certo: {error}. Seus saves não foram tocados.",
+    "v28.ovl.steamTab": "Em {game}, Shift+Tab é do overlay da Steam — o overlay do ModLaunch abre com {key}",
+    "v98.ach.stores-3": "Sem fronteiras",
+    "v98.ach.stores-3.d": "Jogos de três launchers diferentes em Todos os jogos",
+    "v98.ach.wishlist-5": "Sonhador",
+    "v98.ach.wishlist-5.d": "Cinco jogos na lista de desejos",
+    "v98.ach.game-review": "Voz do jogador",
+    "v98.ach.game-review.d": "Avalie um jogo que você jogou por mais de uma hora",
+    "v98.ach.cloud-saves": "Tudo com você",
+    "v98.ach.cloud-saves.d": "Ative os saves na nuvem de um jogo",
+    "v98.ach.chat-first": "Em contato",
+    "v98.ach.chat-first.d": "Mande uma mensagem a um amigo no chat do ModLaunch"
   },
   "zh-CN": {
     "v28.wish.title": "愿望单",
@@ -861,6 +938,17 @@
     "v28.cs.keepLocal": "保留本机存档",
     "v28.cs.keptLocal": "已保留本机存档并上传。云端副本已放入备份。",
     "v28.cs.keptCloud": "已取回云端存档。本机存档已放入备份。",
-    "v28.cs.resolveFailed": "未成功：{error}。你的存档没有改动。"
+    "v28.cs.resolveFailed": "未成功：{error}。你的存档没有改动。",
+    "v28.ovl.steamTab": "在 {game} 中 Shift+Tab 被 Steam 覆盖层占用——ModLaunch 覆盖层改用 {key} 打开",
+    "v98.ach.stores-3": "无界",
+    "v98.ach.stores-3.d": "“全部游戏”中有来自三个不同启动器的游戏",
+    "v98.ach.wishlist-5": "梦想家",
+    "v98.ach.wishlist-5.d": "愿望单里有五款游戏",
+    "v98.ach.game-review": "玩家之声",
+    "v98.ach.game-review.d": "评价一款玩了一小时以上的游戏",
+    "v98.ach.cloud-saves": "随身携带",
+    "v98.ach.cloud-saves.d": "为一款游戏开启云存档",
+    "v98.ach.chat-first": "保持联系",
+    "v98.ach.chat-first.d": "在 ModLaunch 聊天中给好友发消息"
   }
 }

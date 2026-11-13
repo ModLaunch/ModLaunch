@@ -78,6 +78,16 @@ public static partial class Friends
             }
         }
 
+        /// <summary>Сколько своих сообщений в истории этого ПК (для достижений).</summary>
+        public static int SentCount
+        {
+            get
+            {
+                var me = Account.Uid ?? "";
+                lock (Lock) return Store.Data.Where(kv => kv.Key != "uid").Sum(kv => (kv.Value as JsonObject)?.Arr("msgs").Count(m => m.Str("from") == me) ?? 0);
+            }
+        }
+
         public static void MarkRead(string uid)
         {
             lock (Lock)

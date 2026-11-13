@@ -119,6 +119,20 @@ public static class V28Shots
         s.Pump(500);
     }
 
+    /// <summary>MODLAUNCH_SHOTS=V28Achievements: новые достижения 28.0 в профиле.</summary>
+    [DemoShots]
+    static void V28Achievements(Shots s)
+    {
+        s.Pump(4500);
+        Games.AllGames.Refresh();
+        s.Pump(1500);
+        s.Window.Navigate(() => new ProfilePage("achievements", Features.Achievements.Main));
+        s.Pump(2000);
+        if (s.Window.CurrentPage is ProfilePage p) p.DemoScrollToEnd();
+        s.Pump(800);
+        s.Save("v28-12-achievements");
+    }
+
     /// <summary>MODLAUNCH_SHOTS=V28Cloud: облачные сохранения на вкладке «Сохранения» и спор «какую копию оставить».</summary>
     [DemoShots]
     static void V28Cloud(Shots s)

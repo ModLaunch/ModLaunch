@@ -152,7 +152,7 @@ public sealed class OverlayWindow : Window
         var footer = Ui.Row(10,
             Ui.Button(I18n.T("ovl.open"), () => { Hide(); var w = MainWindow.Current; if (w is not null) { w.WindowState = WindowState.Normal; w.Activate(); } }, "", Icons.Home),
             Ui.Button(I18n.T("ovl.close"), Hide, "ghost", Icons.Close),
-            Ui.Text(I18n.T("ovl.hint", ("key", Hotkey.Display(Hotkey.KeyOf(Settings.Data.Str("overlayKey"))))), "small", color: Ui.Hex("#AAB2C2")));
+            Ui.Text(I18n.T("ovl.hint", ("key", Hotkey.Display(Hotkey.Armed ?? Hotkey.KeyOf(Settings.Data.Str("overlayKey"))))), "small", color: Ui.Hex("#AAB2C2")));
         foreach (var c in footer.Children) c.VerticalAlignment = VerticalAlignment.Center;
 
         Content = Frame(Ui.Col(20, panel, friends), 420, footer);
@@ -190,7 +190,14 @@ public sealed class OverlayWindow : Window
         _studio = false;
         // 23.0: в игре стоят моды из Creator Hub — копия сохранений «до» (защита прогресса).
         try { ProgressGuard.Begin(AppState.Game(gameId)); } catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException) { }
-        if (Settings.Data.Bool("overlay", true)) Hotkey.Arm(Settings.Data.Str("overlayKey") ?? Hotkey.Keys[0], Toggle);
+        if (Settings.Data.Bool("overlay", true))
+        {
+            var chosen = Hotkey.KeyOf(Settings.Data.Str("overlayKey"));
+            var def = AppState.Games.FirstOrDefault(g => g.Def.Id == gameId)?.Def;
+            var key = Hotkey.Effective(chosen, def is { SteamAppId: > 0 });
+            Hotkey.Arm(key, Toggle);
+            if (key != chosen && def is not null) MainWindow.Current?.Toast(I18n.T("v28.ovl.steamTab", ("game", def.Name), ("key", Hotkey.Display(key))));
+        }
     }
 
     public static void OnGameExited()

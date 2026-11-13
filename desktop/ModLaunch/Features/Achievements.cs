@@ -56,6 +56,12 @@ public static class Achievements
         try { plays = BuildTime.All(); } catch { }
         var best = plays.Count == 0 ? 0 : (long)plays.Max(b => b.Hours);
         var lived = plays.Count(b => b.Hours >= 1);
+        long stores = 0, wishes = 0, gameReviews = 0, cloudGames = 0, sent = 0;
+        try { stores = (Games.AllGames.Current ?? []).Where(g => g.Store != "other").Select(g => g.Store).Distinct().Count(); } catch { }
+        try { wishes = Wishlist.Count; } catch { }
+        try { gameReviews = Social.Account.Uid is { } me ? Social.Reviews.List().Count(r => r.Mod == Social.GameReviews.Mod && r.Uid == me) : 0; } catch { }
+        try { cloudGames = CloudSaves.EnabledCount; } catch { }
+        try { sent = Social.Friends.Chat.SentCount; } catch { }
         return
         [
             new("first-game", "Gamepad", found.Count, 1, "common", Reward: new("frame", "bronze")),
@@ -76,6 +82,12 @@ public static class Achievements
             new("build-10", "Hourglass", best, 10, "rare", Reward: new("badge", "build")),
             new("build-100", "Shield", best, 100, "epic", Reward: new("frame", "steel")),
             new("build-500", "Trophy", best, 500, "legend", Reward: new("banner", "forge")),
+            // 28.0: за единую библиотеку, желаемое, отзыв об игре, облачные сохранения и чат.
+            new("stores-3", "Grid", stores, 3, "rare"),
+            new("wishlist-5", "Heart", wishes, 5, "common"),
+            new("game-review", "Star", gameReviews, 1, "common"),
+            new("cloud-saves", "Cloud", cloudGames, 1, "common"),
+            new("chat-first", "Chat", sent, 1, "common"),
         ];
     }
 

@@ -9,7 +9,8 @@ namespace ModLaunch.Features;
 /// </summary>
 public static partial class Hotkey
 {
-    public static readonly string[] Keys = ["CommandOrControl+Shift+M", "Alt+`", "Shift+F1"];
+    // 28.0: и Shift+Tab, как в Steam. В играх Steam его занимает оверлей Steam — там берём Shift+F1 (Effective).
+    public static readonly string[] Keys = ["CommandOrControl+Shift+M", "Alt+`", "Shift+F1", "Shift+Tab"];
     public static string Display(string key) => key.Replace("CommandOrControl", "Ctrl");
 
     const int WmHotkey = 0x0312, WmQuit = 0x0012;
@@ -30,10 +31,23 @@ public static partial class Hotkey
 
     public static string KeyOf(string? value) => Keys.Contains(value) ? value! : Keys[0];
 
+    /// <summary>Какое сочетание занять в этой игре: Shift+Tab в игре Steam отдали бы у оверлея Steam — берём Shift+F1.</summary>
+    public static string Effective(string? chosen, bool steamGame) => KeyOf(chosen) is "Shift+Tab" && steamGame ? "Shift+F1" : KeyOf(chosen);
+
+    [SelfTest]
+    static string ShiftTabFallsBackInSteamGames()
+    {
+        if (Parse("Shift+Tab") != (ModShift, 0x09u)) throw new Exception("Shift+Tab parse");
+        if (Effective("Shift+Tab", steamGame: true) != "Shift+F1" || Effective("Shift+Tab", steamGame: false) != "Shift+Tab") throw new Exception("fallback");
+        if (Effective("Alt+`", steamGame: true) != "Alt+`" || Effective("nonsense", false) != Keys[0]) throw new Exception("other keys");
+        return "Shift+Tab on its own; in Steam games falls back to Shift+F1";
+    }
+
     static (uint Mods, uint Vk) Parse(string key) => key switch
     {
         "Alt+`" => (ModAlt, 0xC0),
         "Shift+F1" => (ModShift, 0x70),
+        "Shift+Tab" => (ModShift, 0x09),
         _ => (ModControl | ModShift, 'M'),
     };
 

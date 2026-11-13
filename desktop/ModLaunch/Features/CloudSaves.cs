@@ -44,6 +44,9 @@ public static class CloudSaves
 
     public static BackupTarget? Place() => Places().FirstOrDefault(t => t.Id == PlaceId && t.Available && t.Folder is not null);
 
+    /// <summary>Сколько игр синхронизируются (для достижений).</summary>
+    public static int EnabledCount => Store.Data.Count(kv => kv.Value is JsonObject o && o.Bool("on"));
+
     public static bool Enabled(string gameId) => Store.Data[gameId] is JsonObject o && o.Bool("on");
 
     public static void SetEnabled(string gameId, bool on)
