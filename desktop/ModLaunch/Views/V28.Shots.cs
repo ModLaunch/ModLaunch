@@ -36,4 +36,25 @@ public static class V28Shots
         }
         finally { Look.SetTheme(was); }
     }
+
+    /// <summary>MODLAUNCH_SHOTS=V28Reviews: отзывы игроков на странице игры и замок для тех, кто ещё не наиграл час.</summary>
+    [DemoShots]
+    static void V28Reviews(Shots s)
+    {
+        s.Pump(4500);
+        Games.AllGames.Refresh();
+        s.Pump(1500);
+        Social.Reviews.DemoGame("steam:1245620", "ELDEN RING");
+        s.Window.Navigate(() => new AllGamesPage("steam:1245620"));
+        s.Pump(2500);
+        if (s.Window.CurrentPage is AllGamesPage page) page.ScrollDetailToEnd();
+        s.Pump(800);
+        s.Save("v28-05-game-reviews");
+
+        s.Window.Navigate(() => new AllGamesPage("epic:Hades"));
+        s.Pump(2000);
+        if (s.Window.CurrentPage is AllGamesPage locked) locked.ScrollDetailToEnd();
+        s.Pump(800);
+        s.Save("v28-06-game-reviews-locked");
+    }
 }

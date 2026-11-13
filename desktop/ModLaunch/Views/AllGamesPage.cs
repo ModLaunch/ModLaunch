@@ -25,6 +25,10 @@ public sealed class AllGamesPage : Page
     string _selected = Settings.Data.Str("allGamesSel") ?? "";
     ScrollViewer _list = new();
     ContentControl _detail = new();
+    ScrollViewer? _right;
+
+    /// <summary>Снимки экрана: показать низ страницы игры (отзывы).</summary>
+    internal void ScrollDetailToEnd() => _right?.ScrollToEnd();
 
     public AllGamesPage(string? key = null)
     {
@@ -121,7 +125,7 @@ public sealed class AllGamesPage : Page
         var side = new Border { Width = 300, BorderBrush = Ui.Res("Line"), BorderThickness = new Thickness(0, 0, 1, 0), Background = Ui.Res("Layer"), Child = left };
         var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*") };
         grid.Children.Add(side);
-        var right = new ScrollViewer { Content = _detail, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+        var right = _right = new ScrollViewer { Content = _detail, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
         Grid.SetColumn(right, 1);
         grid.Children.Add(right);
         Content = grid;
@@ -299,7 +303,8 @@ public sealed class AllGamesPage : Page
             mods = Line(Icons.Package, I18n.T("v14.steam.hasMods"), I18n.T("v27.lib.modsAfterInstall"), null);
         else mods = Line(Icons.Package, I18n.T("v14.steam.noMods"), I18n.T("v27.lib.noMods.text"), null);
 
-        var body = Ui.Col(16, barCard, Ui.Card(mods, 18));
+        // 28.0: отзывы игроков — оценить может только тот, кто наиграл час и больше.
+        var body = Ui.Col(16, barCard, Ui.Card(mods, 18), new GameReviewsCard(g));
         if (folder is not null) body.Children.Add(Ui.Text(folder, "tiny muted", wrap: true));
         body.Margin = new Thickness(34, -6, 34, 34);
         body.MaxWidth = 1100;
@@ -335,7 +340,7 @@ public sealed class AllGamesPage : Page
         return row;
     }
 
-    static string Hours(long minutes) => minutes <= 0
+    internal static string Hours(long minutes) => minutes <= 0
         ? I18n.T("v14.steam.zero")
         : minutes < 60 ? I18n.T("v14.steam.min", ("n", minutes)) : I18n.T("v14.steam.h", ("n", (minutes / 60.0).ToString(minutes < 600 ? "0.#" : "N0", I18n.Culture)));
 

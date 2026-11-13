@@ -42,7 +42,15 @@
     "v28.wish.toast.target": "«{name}» подешевела до {price}",
     "v28.wish.toast.many": "Скидки в желаемом: {n}. Загляните в «Желаемое».",
     "v28.wish.bell.sale": "Скидка {pct}% · {price}",
-    "v28.wish.bell.target": "Цена дошла до заданной · {price}"
+    "v28.wish.bell.target": "Цена дошла до заданной · {price}",
+    "v28.grev.title": "Отзывы игроков",
+    "v28.grev.lead": "Оценить игру может только тот, кто наиграл в неё {h} ч и больше — по часам Steam или учёту ModLaunch. Без накруток от тех, кто не играл.",
+    "v28.grev.empty": "Отзывов об этой игре пока нет.",
+    "v28.grev.more": "Показать все отзывы ({n})",
+    "v28.grev.gate": "Оценить можно после {h} ч в игре",
+    "v28.grev.gate.text": "Сейчас наиграно: {played}. Часы считает Steam, а для остальных игр — ModLaunch, если запускать их отсюда.",
+    "v28.grev.text": "Что понравилось, что нет — другим игрокам пригодится",
+    "v28.grev.write": "Ваш отзыв · наиграно {played}"
   },
   "en": {
     "v28.wish.title": "Wishlist",
@@ -87,7 +95,15 @@
     "v28.wish.toast.target": "“{name}” dropped to {price}",
     "v28.wish.toast.many": "Sales on your wishlist: {n}. Have a look at Wishlist.",
     "v28.wish.bell.sale": "{pct}% off · {price}",
-    "v28.wish.bell.target": "Reached your price · {price}"
+    "v28.wish.bell.target": "Reached your price · {price}",
+    "v28.grev.title": "Player reviews",
+    "v28.grev.lead": "Only people who played this game for {h} h or more can rate it — by Steam hours or ModLaunch tracking. No drive-by ratings from people who never played.",
+    "v28.grev.empty": "No reviews for this game yet.",
+    "v28.grev.more": "Show all reviews ({n})",
+    "v28.grev.gate": "You can rate it after {h} h of play",
+    "v28.grev.gate.text": "Played so far: {played}. Steam counts the hours; for other games ModLaunch does when you launch them from here.",
+    "v28.grev.text": "What you liked and what you didn't — it will help other players",
+    "v28.grev.write": "Your review · played {played}"
   },
   "uk": {
     "v28.wish.title": "Бажане",
@@ -132,7 +148,15 @@
     "v28.wish.toast.target": "«{name}» подешевшала до {price}",
     "v28.wish.toast.many": "Знижки в бажаному: {n}. Загляньте в «Бажане».",
     "v28.wish.bell.sale": "Знижка {pct}% · {price}",
-    "v28.wish.bell.target": "Ціна дійшла до заданої · {price}"
+    "v28.wish.bell.target": "Ціна дійшла до заданої · {price}",
+    "v28.grev.title": "Відгуки гравців",
+    "v28.grev.lead": "Оцінити гру може лише той, хто награв у неї {h} год і більше — за годинами Steam або обліком ModLaunch. Без накруток від тих, хто не грав.",
+    "v28.grev.empty": "Відгуків про цю гру поки немає.",
+    "v28.grev.more": "Показати всі відгуки ({n})",
+    "v28.grev.gate": "Оцінити можна після {h} год у грі",
+    "v28.grev.gate.text": "Зараз награно: {played}. Години рахує Steam, а для інших ігор — ModLaunch, якщо запускати їх звідси.",
+    "v28.grev.text": "Що сподобалося, що ні — іншим гравцям знадобиться",
+    "v28.grev.write": "Ваш відгук · награно {played}"
   },
   "es": {
     "v28.wish.title": "Deseados",
@@ -177,7 +201,15 @@
     "v28.wish.toast.target": "«{name}» bajó a {price}",
     "v28.wish.toast.many": "Ofertas en tus deseados: {n}. Échale un vistazo a Deseados.",
     "v28.wish.bell.sale": "{pct}% de descuento · {price}",
-    "v28.wish.bell.target": "Llegó a tu precio · {price}"
+    "v28.wish.bell.target": "Llegó a tu precio · {price}",
+    "v28.grev.title": "Reseñas de jugadores",
+    "v28.grev.lead": "Solo puede valorar el juego quien lo jugó {h} h o más, según las horas de Steam o el registro de ModLaunch. Sin valoraciones de quien no jugó.",
+    "v28.grev.empty": "Aún no hay reseñas de este juego.",
+    "v28.grev.more": "Ver todas las reseñas ({n})",
+    "v28.grev.gate": "Podrás valorarlo tras {h} h de juego",
+    "v28.grev.gate.text": "Jugado hasta ahora: {played}. Steam cuenta las horas; en otros juegos lo hace ModLaunch si los abres desde aquí.",
+    "v28.grev.text": "Qué te gustó y qué no: ayudará a otros jugadores",
+    "v28.grev.write": "Tu reseña · jugado {played}"
   },
   "de": {
     "v28.wish.title": "Wunschliste",
@@ -222,7 +254,15 @@
     "v28.wish.toast.target": "„{name}“ kostet jetzt nur noch {price}",
     "v28.wish.toast.many": "Angebote auf deiner Wunschliste: {n}. Schau in die Wunschliste.",
     "v28.wish.bell.sale": "{pct} % Rabatt · {price}",
-    "v28.wish.bell.target": "Dein Wunschpreis ist erreicht · {price}"
+    "v28.wish.bell.target": "Dein Wunschpreis ist erreicht · {price}",
+    "v28.grev.title": "Spielerbewertungen",
+    "v28.grev.lead": "Bewerten kann nur, wer das Spiel {h} Std. oder länger gespielt hat – laut Steam-Stunden oder ModLaunch-Zählung. Keine Bewertungen von Leuten, die nie gespielt haben.",
+    "v28.grev.empty": "Zu diesem Spiel gibt es noch keine Bewertungen.",
+    "v28.grev.more": "Alle Bewertungen zeigen ({n})",
+    "v28.grev.gate": "Bewerten geht nach {h} Std. Spielzeit",
+    "v28.grev.gate.text": "Bisher gespielt: {played}. Steam zählt die Stunden, bei anderen Spielen ModLaunch, wenn du sie hier startest.",
+    "v28.grev.text": "Was dir gefallen hat und was nicht – das hilft anderen Spielern",
+    "v28.grev.write": "Deine Bewertung · gespielt {played}"
   },
   "fr": {
     "v28.wish.title": "Liste de souhaits",
@@ -267,7 +307,15 @@
     "v28.wish.toast.target": "« {name} » est passé à {price}",
     "v28.wish.toast.many": "Promos dans votre liste de souhaits : {n}. Jetez un œil à la liste.",
     "v28.wish.bell.sale": "-{pct} % · {price}",
-    "v28.wish.bell.target": "Votre prix est atteint · {price}"
+    "v28.wish.bell.target": "Votre prix est atteint · {price}",
+    "v28.grev.title": "Avis des joueurs",
+    "v28.grev.lead": "Seuls ceux qui ont joué {h} h ou plus peuvent noter ce jeu — d'après les heures Steam ou le suivi ModLaunch. Pas de notes de gens qui n'y ont pas joué.",
+    "v28.grev.empty": "Pas encore d'avis sur ce jeu.",
+    "v28.grev.more": "Voir tous les avis ({n})",
+    "v28.grev.gate": "Vous pourrez noter après {h} h de jeu",
+    "v28.grev.gate.text": "Temps de jeu actuel : {played}. Steam compte les heures ; pour les autres jeux, ModLaunch le fait si vous les lancez d'ici.",
+    "v28.grev.text": "Ce qui vous a plu ou non — cela aidera les autres joueurs",
+    "v28.grev.write": "Votre avis · joué {played}"
   },
   "pt-BR": {
     "v28.wish.title": "Lista de desejos",
@@ -312,7 +360,15 @@
     "v28.wish.toast.target": "“{name}” caiu para {price}",
     "v28.wish.toast.many": "Promoções na sua lista de desejos: {n}. Dê uma olhada.",
     "v28.wish.bell.sale": "{pct}% de desconto · {price}",
-    "v28.wish.bell.target": "Chegou ao seu preço · {price}"
+    "v28.wish.bell.target": "Chegou ao seu preço · {price}",
+    "v28.grev.title": "Avaliações de jogadores",
+    "v28.grev.lead": "Só pode avaliar quem jogou {h} h ou mais — pelas horas da Steam ou pela contagem do ModLaunch. Nada de notas de quem nunca jogou.",
+    "v28.grev.empty": "Ainda não há avaliações deste jogo.",
+    "v28.grev.more": "Mostrar todas as avaliações ({n})",
+    "v28.grev.gate": "Você poderá avaliar depois de {h} h de jogo",
+    "v28.grev.gate.text": "Jogado até agora: {played}. A Steam conta as horas; nos outros jogos, o ModLaunch conta se você abri-los por aqui.",
+    "v28.grev.text": "O que você gostou e o que não — vai ajudar outros jogadores",
+    "v28.grev.write": "Sua avaliação · jogou {played}"
   },
   "zh-CN": {
     "v28.wish.title": "愿望单",
@@ -357,6 +413,14 @@
     "v28.wish.toast.target": "“{name}”降到了 {price}",
     "v28.wish.toast.many": "愿望单中有 {n} 款游戏在打折，去看看吧。",
     "v28.wish.bell.sale": "折扣 {pct}% · {price}",
-    "v28.wish.bell.target": "已降到你设定的价格 · {price}"
+    "v28.wish.bell.target": "已降到你设定的价格 · {price}",
+    "v28.grev.title": "玩家评价",
+    "v28.grev.lead": "只有玩过 {h} 小时及以上的人才能评价这款游戏（按 Steam 时长或 ModLaunch 统计）。没玩过的人无法刷分。",
+    "v28.grev.empty": "这款游戏还没有评价。",
+    "v28.grev.more": "显示全部评价（{n}）",
+    "v28.grev.gate": "游玩 {h} 小时后即可评价",
+    "v28.grev.gate.text": "目前已玩：{played}。Steam 游戏由 Steam 统计时长；其他游戏从这里启动时由 ModLaunch 统计。",
+    "v28.grev.text": "喜欢什么、不喜欢什么——对其他玩家很有帮助",
+    "v28.grev.write": "你的评价 · 已玩 {played}"
   }
 }

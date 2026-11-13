@@ -186,7 +186,7 @@ public sealed class StatsPage : Page
         col.Children.Add(head);
         if (_error is not null) col.Children.Add(Ui.Card(Ui.Text(_error, "muted", wrap: true), 18));
 
-        var reviews = Reviews.List();
+        var reviews = Reviews.List().Where(r => r.Mod != GameReviews.Mod).ToList(); // 28.0: отзывы об играх — не в рейтинг модов
         var total = _releases?.Sum(r => r.Total) ?? 0;
         var tiles = new UniformGrid { Columns = 3 };
         tiles.Children.Add(Tile(I18n.T("stats.downloads"), total.ToString("N0"), I18n.T("stats.releasesN", ("n", _releases?.Count ?? 0))));
