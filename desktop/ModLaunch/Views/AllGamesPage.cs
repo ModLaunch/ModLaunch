@@ -93,9 +93,13 @@ public sealed class AllGamesPage : Page
 
         var hours = games.Sum(g => AllGames.Played(g).Minutes) / 60;
         var refresh = Ui.Button("", () => { _ = AllGames.Refresh(); }, "icon ghost", Icons.Refresh, I18n.T("v27.lib.refresh"));
+        // 28.0: «Желаемое» — рядом с библиотекой, как в Steam.
+        var wish = Ui.Button("", () => MainWindow.Current?.Navigate(() => new WishlistPage()), "icon ghost", Icons.Heart, I18n.T("v28.wish.title") + " · Ctrl+Shift+W");
         var titleRow = new DockPanel();
         DockPanel.SetDock(refresh, Dock.Right);
         titleRow.Children.Add(refresh);
+        DockPanel.SetDock(wish, Dock.Right);
+        titleRow.Children.Add(wish);
         titleRow.Children.Add(Ui.Row(10, Ui.Icon(Icons.Grid, 16, Ui.Res("Muted")), Ui.Text(I18n.T("v27.lib.title"), "h3")));
         var stores = games.Select(g => g.Store).Distinct().Count();
         var head = Ui.Col(10,

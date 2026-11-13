@@ -176,6 +176,9 @@ public sealed partial class MainWindow : Window
             Child = Ui.Col(12, Ui.Text(I18n.T("nx.notify"), "h3"), new ScrollViewer { Content = _bellList, MaxHeight = 460 }),
         };
         Features.Tracking.Changed += () => Dispatcher.UIThread.Post(() => { RenderBell(); });
+        // 28.0: скидки из «Желаемого» — в колокольчик; цены проверяются раз в шесть часов.
+        Features.Wishlist.Changed += () => Dispatcher.UIThread.Post(RenderBell);
+        Features.Wishlist.StartWatch();
         // 26.0: уведомления автора (MainWindow.Creator.cs).
         WatchCreator();
 
@@ -813,6 +816,9 @@ public sealed partial class MainWindow : Window
         return null;
     }
 
+    /// <summary>Перерисовать колокольчик (страница сама отметила уведомления прочитанными).</summary>
+    public void RefreshBell() => RenderBell();
+
     /// <summary>Уведомления: новые версии отслеживаемых модов (всех каталогов и ModLaunch Hub).</summary>
     void RenderBell()
     {
@@ -820,13 +826,29 @@ public sealed partial class MainWindow : Window
         var hub = Creator.Hub.Updates.Where(h => !updates.Any(u => u.Item.Source == "hub" && u.Item.Id == h.Id)).ToList();
         // 26.0: и что нового у своих модов (раздел «Автору»).
         var creator = Creator.CreatorWatch.Notes;
-        _bellBadge.IsVisible = updates.Count + hub.Count + creator.Count > 0;
+        // 28.0: и скидки на игры из «Желаемого».
+        var deals = Features.Wishlist.Fresh;
+        _bellBadge.IsVisible = updates.Count + hub.Count + creator.Count + deals.Count > 0;
         _bell.IsVisible = _bellBadge.IsVisible || _bellPanel.IsVisible;
         _bellList.Children.Clear();
-        if (updates.Count + hub.Count + creator.Count == 0)
+        if (updates.Count + hub.Count + creator.Count + deals.Count == 0)
         {
             _bellList.Children.Add(Ui.Col(6, Ui.Text(I18n.T("nx.notify.empty"), "h3"), Ui.Text(I18n.T("nx.notify.empty.text"), "muted small", wrap: true)));
             return;
+        }
+        foreach (var d in deals)
+        {
+            var line = d.Price is { OnSale: true } p
+                ? I18n.T("v28.wish.bell.sale", ("pct", p.Discount), ("price", p.FinalText))
+                : I18n.T("v28.wish.bell.target", ("price", d.Price?.FinalText ?? ""));
+            var row = new Button
+            {
+                Classes = { "ghost" }, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Left, Padding = new Thickness(8),
+                Content = Ui.Row(10, new Border { Width = 64, Height = 30, CornerRadius = new CornerRadius(4), ClipToBounds = true, Child = HomePage.WebArt(Games.GameDef.SteamArt(d.AppId), null, d.Name, 140) },
+                    Ui.Col(2, Ui.Text(d.Name, "h3"), Ui.Text(line, "small", color: Ui.Res("Good")))),
+            };
+            row.Click += (_, _) => { _bellPanel.IsVisible = false; Navigate(() => new WishlistPage()); };
+            _bellList.Children.Add(row);
         }
         RenderCreatorBell(creator);
         foreach (var u in updates)
@@ -866,6 +888,7 @@ public sealed partial class MainWindow : Window
             foreach (var u in Features.Tracking.Updates.ToList()) Features.Tracking.Seen(u);
             foreach (var h in Creator.Hub.Updates.ToList()) Creator.Hub.MarkSeen(h);
             if (Creator.CreatorWatch.Notes.Count > 0) Creator.CreatorWatch.MarkSeen();
+            Features.Wishlist.MarkSeen();
             RenderBell();
         }, "ghost", Icons.Check);
         var center = Ui.Button(I18n.T("mc.open"), () => { _bellPanel.IsVisible = false; Navigate(() => new ModsCenterPage()); }, "ghost", Icons.Package);
@@ -904,6 +927,7 @@ public sealed partial class MainWindow : Window
         else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.OemComma) Navigate(() => new SettingsPage());
         else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.L) Navigate(() => new LibraryPage());
         else if (e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift) && e.Key == Key.L) Navigate(() => new AllGamesPage());
+        else if (e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift) && e.Key == Key.W) Navigate(() => new WishlistPage());
         else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.U) Navigate(() => new ModsCenterPage());
         else if (e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift) && e.Key == Key.C) Navigate(() => new CreatorPage());
         else if (e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift) && e.Key == Key.P) Navigate(() => new SettingsPage("panel"));
