@@ -81,16 +81,7 @@ public static class PlayControls
             {
                 var name = p.Name;
                 var item = new MenuItem { Header = p.Name, Icon = p.Active ? Ui.Icon(Icons.Check, 14) : null };
-                item.Click += (_, _) => Guard.Later(() =>
-                {
-                    try
-                    {
-                        var (on, off, _) = Profiles.Apply(g.Def.Id, name, g.Registry!);
-                        MainWindow.Current?.Toast(I18n.T("profile.applied", ("name", name), ("on", on), ("off", off)));
-                        AppState.Notify();
-                    }
-                    catch (Exception e) { MainWindow.Current?.Toast(Jobs.Explain(e), bad: true); }
-                });
+                item.Click += (_, _) => Guard.Later(() => Actions.ApplyProfile(g, name));
                 menu.Items.Add(item);
             }
             // Как «Play Vanilla» в CurseForge и Purge в Vortex: без модов — на один раз или пока не вернёшь.

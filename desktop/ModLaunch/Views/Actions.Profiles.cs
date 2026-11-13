@@ -11,6 +11,44 @@ namespace ModLaunch.Views;
 public static partial class Actions
 {
     /// <summary>
+    /// 27.0: применить профиль модов — одно действие для вкладки «Профили» и меню у «Играть» (раньше меню
+    /// не делало снимок «как было» и не переключало пресет ReShade). Пока игра запущена, моды не трогаем.
+    /// Чего в профиле не хватает (или стоит другой версии) — предлагаем поставить. false — профиль не применён.
+    /// </summary>
+    public static bool ApplyProfile(GameState g, string name)
+    {
+        var w = MainWindow.Current;
+        if (g.Registry is not { } registry) return false;
+        if (Launcher.IsRunning(g.Def.Id)) { w?.Toast(I18n.T("vanilla.running"), bad: true); return false; }
+        try
+        {
+            Snapshots.Take(g, "profile");
+            var (on, off, missing) = Profiles.Apply(g.Def.Id, name, registry);
+            Installer.SyncPreset(registry, null);
+            w?.Toast(missing > 0
+                ? I18n.T("prof.applied.missing", ("name", name), ("n", missing))
+                : I18n.T("prof.applied", ("name", name), ("on", on), ("off", off)));
+        }
+        catch (Exception e) { w?.Toast(Jobs.Explain(e), bad: true); return false; }
+        finally { AppState.Notify(); }
+        OfferProfileFix(g, name);
+        return true;
+    }
+
+    /// <summary>После «Применить профиль»: чего не хватает и что другой версии — поставить?</summary>
+    static void OfferProfileFix(GameState g, string name)
+    {
+        if (MainWindow.Current is not { } w || g.Registry is not { } registry) return;
+        var (missing, other) = Profiles.Differences(g.Def.Id, name, registry);
+        var fix = missing.Concat(other).Where(m => m.Source != "file" && m.Source != "").ToList();
+        if (fix.Count == 0) return;
+        w.Dialog(I18n.T("prof.fix.title", ("name", name)),
+            Ui.Text(I18n.T("prof.fix.text", ("missing", missing.Count), ("other", other.Count), ("list", string.Join(", ", fix.Take(6).Select(m => m.Name)))), "muted", wrap: true),
+            Ui.Button(I18n.T("deps.orphans.keep"), w.CloseDialog),
+            Ui.Button(I18n.T("prof.fix.go", ("n", fix.Count)), () => { w.CloseDialog(); FixSetup(g, name, fix); }, "primary", Icons.Download));
+    }
+
+    /// <summary>
     /// Поставить сборку из кода как у друга: те же версии модов (другие версии заменяются),
     /// по желанию — выключить лишние и взять настройки. Перед этим — снимок «как было».
     /// 11.0: задача завершается, когда сборка встала (true) или не встала — так «Подключиться» к серверу

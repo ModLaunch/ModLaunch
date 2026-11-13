@@ -287,17 +287,4 @@ public sealed partial class GamePage
         w.CloseDialog();
         Environment.SetEnvironmentVariable("MODLAUNCH_MANAGERS_ROOT", null);
     }
-
-    /// <summary>После «Применить профиль»: чего не хватает и что другой версии — поставить?</summary>
-    void OfferProfileFix(string name)
-    {
-        var (missing, other) = Profiles.Differences(_g.Def.Id, name, _g.Registry!);
-        var fix = missing.Concat(other).Where(m => m.Source != "file" && m.Source != "").ToList();
-        if (fix.Count == 0) return;
-        var w = MainWindow.Current!;
-        w.Dialog(I18n.T("prof.fix.title", ("name", name)),
-            Ui.Text(I18n.T("prof.fix.text", ("missing", missing.Count), ("other", other.Count), ("list", string.Join(", ", fix.Take(6).Select(m => m.Name)))), "muted", wrap: true),
-            Ui.Button(I18n.T("deps.orphans.keep"), w.CloseDialog),
-            Ui.Button(I18n.T("prof.fix.go", ("n", fix.Count)), () => { w.CloseDialog(); Actions.FixSetup(_g, name, fix); }, "primary", Icons.Download));
-    }
 }

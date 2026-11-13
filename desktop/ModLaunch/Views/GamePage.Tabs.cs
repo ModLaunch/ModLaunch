@@ -77,19 +77,8 @@ public sealed partial class GamePage
 
     void ApplyProfile(string name)
     {
-        try
-        {
-            Snapshots.Take(_g, "profile");
-            var (on, off, missing) = Profiles.Apply(_g.Def.Id, name, _g.Registry!);
-            Mods.Installer.SyncPreset(_g.Registry!, null);
-            MainWindow.Current?.Toast(missing > 0
-                ? I18n.T("prof.applied.missing", ("name", name), ("n", missing))
-                : I18n.T("prof.applied", ("name", name), ("on", on), ("off", off)));
-        }
-        catch (Exception e) { MainWindow.Current?.Toast(Jobs.Explain(e), bad: true); }
         _missing = null;
-        AppState.Notify();
-        OfferProfileFix(name);
+        Actions.ApplyProfile(_g, name);
     }
 
     void Overwrite(string name)
