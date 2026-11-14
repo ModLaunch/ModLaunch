@@ -38,6 +38,13 @@ public static partial class Account
         (new(@"TOO_MANY_ATTEMPTS"), "TOO_MANY"),
         (new(@"OPERATION_NOT_ALLOWED|ADMIN_ONLY_OPERATION|CONFIGURATION_NOT_FOUND"), "NOT_ENABLED"),
         (new(@"CREDENTIAL_TOO_OLD"), "RELOGIN"),
+        // 30.0: двухфакторная защита.
+        (new(@"INVALID_MFA_PENDING_CREDENTIAL|MISSING_MFA_PENDING_CREDENTIAL|SESSION_EXPIRED"), "NO_MFA_SESSION"),
+        (new(@"INVALID_CODE|INVALID_VERIFICATION_CODE|MISSING_CODE|INVALID_TOTP", RegexOptions.IgnoreCase), "BAD_CODE"),
+        (new(@"UNVERIFIED_EMAIL"), "VERIFY_FIRST"),
+        // Двухфакторная защита не включена в проекте (нужен Identity Platform с TOTP) — «временно недоступно».
+        (new(@"MFA_NOT_ENABLED|TOTP[_ ].*NOT[_ ]ENABLED|UNSUPPORTED_FIRST_FACTOR|UNSUPPORTED_TENANT_OPERATION", RegexOptions.IgnoreCase), "NOT_ENABLED"),
+        (new(@"MFA_ENROLLMENT_NOT_FOUND|MISSING_MFA_ENROLLMENT_ID"), "NO_MFA_SESSION"),
         (new(@"TOKEN_EXPIRED|USER_NOT_FOUND|INVALID_REFRESH_TOKEN|INVALID_ID_TOKEN|INVALID_GRANT_TYPE"), "SESSION"),
         (new(@"RESOURCE_EXHAUSTED|quota|UNAVAILABLE|billing", RegexOptions.IgnoreCase), "BUSY"),
         (new(@"API.?key", RegexOptions.IgnoreCase), "BAD_KEY"),
@@ -222,6 +229,9 @@ public static partial class Account
         if (!EmailRe().IsMatch(mail)) throw new ServiceError("BAD_EMAIL");
         if (string.IsNullOrEmpty(password)) throw new ServiceError("WRONG_LOGIN");
         var data = await Request(IdentityUrl("accounts:signInWithPassword"), new JsonObject { ["email"] = mail, ["password"] = password, ["returnSecureToken"] = true });
+        // 30.0: у аккаунта включена двухфакторная защита — нужен код из приложения (Account.Mfa.cs).
+        if (data.Str("mfaPendingCredential") is not null) NeedSecondFactor(data, mail);
+        Pending = null;
         Remember("user", data.Str("localId")!, data.Str("idToken")!, data.Str("refreshToken")!, data.Str("expiresIn"), new JsonObject
         {
             ["email"] = data.Str("email") ?? mail,
@@ -307,6 +317,8 @@ public static partial class Account
     {
         if (Slot("user") is not JsonObject user) throw new ServiceError("SESSION");
         var fresh = await Request(IdentityUrl("accounts:signInWithPassword"), new JsonObject { ["email"] = user.Str("email"), ["password"] = password, ["returnSecureToken"] = true });
+        // С двухфакторной защитой удалить аккаунт паролем нельзя — сначала её выключают в «Безопасности».
+        if (fresh.Str("mfaPendingCredential") is not null) throw new ServiceError("MFA_DELETE");
         if (fresh.Str("localId") != user.Str("uid")) throw new ServiceError("WRONG_LOGIN");
         await Request(IdentityUrl("accounts:delete"), new JsonObject { ["idToken"] = fresh.Str("idToken") });
         SignOut();

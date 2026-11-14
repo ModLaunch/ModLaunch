@@ -797,7 +797,10 @@ public sealed partial class SettingsPage : Page
               }), "primary", Icons.User)
             : Ui.Button(_accBusy ? I18n.T("acc.signin.busy") : I18n.T("acc.signin.go"), () => AccountCall(async () =>
               {
-                  var p = await Social.Account.SignIn(email.Text ?? "", password.Text ?? "");
+                  Social.Profile p;
+                  try { p = await Social.Account.SignIn(email.Text ?? "", password.Text ?? ""); }
+                  // 30.0: включена двухфакторная защита — спросить код из приложения.
+                  catch (Social.ServiceError e) when (e.Code == "MFA_REQUIRED") { if (await MfaUi.AskCode() is not { } second) return; p = second; }
                   MainWindow.Current?.Toast(I18n.T("acc.welcome", ("name", p.Name ?? "")));
               }), "primary", Icons.Key);
         go.IsEnabled = !_accBusy;

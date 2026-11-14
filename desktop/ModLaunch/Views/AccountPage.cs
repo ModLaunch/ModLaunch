@@ -175,7 +175,10 @@ public sealed partial class AccountPage : Page
             "reset" => Ui.Button(I18n.T("acc.reset.go"), () => Call(() => Account.ResetPassword(email.Text), I18n.T("acc.reset.sent", ("email", email.Text ?? ""))), "primary"),
             _ => Ui.Button(I18n.T("acc.signin.go"), () => Call(async () =>
             {
-                var p = await Account.SignIn(email.Text ?? "", password.Text ?? "");
+                Profile p;
+                try { p = await Account.SignIn(email.Text ?? "", password.Text ?? ""); }
+                // 30.0: включена двухфакторная защита — спросить код из приложения.
+                catch (ServiceError e) when (e.Code == "MFA_REQUIRED") { if (await MfaUi.AskCode() is not { } second) return; p = second; }
                 MainWindow.Current?.Toast(I18n.T("acc.welcome", ("name", p.Name ?? "")));
             }), "primary", Icons.Key),
         };
@@ -243,6 +246,8 @@ public sealed partial class AccountPage : Page
         col.Children.Add(Card(I18n.T("acc.email.title"), null, Ui.Text(p.Email ?? "", "h3"), verify));
         col.Children.Add(Card(I18n.T("acc.password.change"), I18n.T("acc.password.hint", ("email", p.Email ?? "")),
             Ui.Button(I18n.T("acc.password.send"), () => Call(() => Account.ResetPassword(p.Email), I18n.T("acc.password.sent", ("email", p.Email ?? "")), reload: false), "", Icons.Key)));
+        // 30.0: двухфакторная защита (код из приложения-аутентификатора).
+        col.Children.Add(MfaUi.Card(p));
         col.Children.Add(Card(I18n.T("acc.session"), I18n.T("acc.session.text"),
             Ui.Row(10,
                 Ui.Button(I18n.T("acc.session.refresh"), () => Call(async () => { await Account.RefreshProfile(); }, I18n.T("acc.session.ok"), reload: false), "", Icons.Refresh),

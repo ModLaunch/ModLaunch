@@ -57,4 +57,19 @@ public static class V30Shots
         OverlayWindow.OnLibraryGameExited(lib);
         s.Pump(300);
     }
+
+    /// <summary>MODLAUNCH_SHOTS=V30Mfa: «Аккаунт → Безопасность» — карточка двухфакторной защиты и окно подключения.</summary>
+    [DemoShots]
+    static void V30Mfa(Shots s)
+    {
+        s.Pump(4500);
+        Social.Account.DemoSignIn();
+        s.Window.Navigate(() => new AccountPage("security"));
+        s.Pump(1500);
+        s.Save("v30-05-mfa-card");
+        MfaUi.Enable(() => { });
+        s.Pump(800);
+        s.Save("v30-06-mfa-enable");
+        s.Window.CloseDialog();
+    }
 }
