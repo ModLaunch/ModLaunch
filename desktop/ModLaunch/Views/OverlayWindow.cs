@@ -190,14 +190,32 @@ public sealed class OverlayWindow : Window
         _studio = false;
         // 23.0: в игре стоят моды из Creator Hub — копия сохранений «до» (защита прогресса).
         try { ProgressGuard.Begin(AppState.Game(gameId)); } catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException) { }
-        if (Settings.Data.Bool("overlay", true))
+        var def = AppState.Games.FirstOrDefault(g => g.Def.Id == gameId)?.Def;
+        ArmKeys(def?.Name ?? gameId, def is { SteamAppId: > 0 });
+    }
+
+    /// <summary>
+    /// Занять сочетания на время игры: оверлей (если включён) и 30.0 — снимок экрана (если включён).
+    /// В играх Steam Shift+Tab и F12 — у Steam, там берём Shift+F1 и Ctrl+F12.
+    /// </summary>
+    internal static void ArmKeys(string game, bool steamGame)
+    {
+        var overlayOn = Settings.Data.Bool("overlay", true);
+        var chosen = Hotkey.KeyOf(Settings.Data.Str("overlayKey"));
+        var key = overlayOn ? Hotkey.Effective(chosen, steamGame) : null;
+        var shot = GameShots.Enabled ? Hotkey.EffectiveShot(Settings.Data.Str("shotKey"), steamGame) : null;
+        if (key is null && shot is null) return;
+        Hotkey.Arm(key, overlayOn ? Toggle : null, shot, shot is null ? null : () => _ = TakeShot(game));
+        if (key is not null && key != chosen) MainWindow.Current?.Toast(I18n.T("v28.ovl.steamTab", ("game", game), ("key", Hotkey.Display(key))));
+    }
+
+    static async Task TakeShot(string game)
+    {
+        try
         {
-            var chosen = Hotkey.KeyOf(Settings.Data.Str("overlayKey"));
-            var def = AppState.Games.FirstOrDefault(g => g.Def.Id == gameId)?.Def;
-            var key = Hotkey.Effective(chosen, def is { SteamAppId: > 0 });
-            Hotkey.Arm(key, Toggle);
-            if (key != chosen && def is not null) MainWindow.Current?.Toast(I18n.T("v28.ovl.steamTab", ("game", def.Name), ("key", Hotkey.Display(key))));
+            if (await GameShots.Capture(game) is { } file) GameHintWindow.Flash(game, I18n.T("v30.shot.saved"), file);
         }
+        catch (Exception e) { Guard.Log(e); }
     }
 
     public static void OnGameExited()

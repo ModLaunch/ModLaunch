@@ -3,48 +3,96 @@
     "v30.upd.gameRunning": "Сначала закройте игру: обновление перезапускает ModLaunch, а игру лучше не прерывать посреди сессии. Обновление никуда не денется.",
     "v30.nexus.skip": "Пропустить этот мод",
     "v30.nexus.cancelAll": "Отменить всё",
-    "v30.upd.skipped": "Пропущены (обновите их позже): {list}"
+    "v30.upd.skipped": "Пропущены (обновите их позже): {list}",
+    "v30.shot.saved": "Снимок сохранён",
+    "v30.shot.folder": "Открыть папку снимков",
+    "v30.shot.key": "Снимок экрана в игре",
+    "v30.shot.key.hint": "Сохраняет окно игры в «Изображения\\ModLaunch» — снимки видны и в галерее игры. В играх Steam F12 занята самим Steam, там будет Ctrl+F12.",
+    "v30.shot.on": "Снимки экрана в игре",
+    "v30.shot.on.hint": "Сочетание работает, только пока идёт игра, запущенная из ModLaunch."
   },
   "en": {
     "v30.upd.gameRunning": "Close the game first: updating restarts ModLaunch, and it's better not to interrupt your session. The update will wait.",
     "v30.nexus.skip": "Skip this mod",
     "v30.nexus.cancelAll": "Cancel all",
-    "v30.upd.skipped": "Skipped (update them later): {list}"
+    "v30.upd.skipped": "Skipped (update them later): {list}",
+    "v30.shot.saved": "Screenshot saved",
+    "v30.shot.folder": "Open screenshots folder",
+    "v30.shot.key": "In-game screenshot",
+    "v30.shot.key.hint": "Saves the game window to Pictures\\ModLaunch — screenshots also show up in the game's gallery. In Steam games F12 belongs to Steam, so there it's Ctrl+F12.",
+    "v30.shot.on": "In-game screenshots",
+    "v30.shot.on.hint": "The key only works while a game started from ModLaunch is running."
   },
   "uk": {
     "v30.upd.gameRunning": "Спершу закрийте гру: оновлення перезапускає ModLaunch, а гру краще не переривати посеред сесії. Оновлення нікуди не дінеться.",
     "v30.nexus.skip": "Пропустити цей мод",
     "v30.nexus.cancelAll": "Скасувати все",
-    "v30.upd.skipped": "Пропущено (оновіть їх пізніше): {list}"
+    "v30.upd.skipped": "Пропущено (оновіть їх пізніше): {list}",
+    "v30.shot.saved": "Знімок збережено",
+    "v30.shot.folder": "Відкрити теку знімків",
+    "v30.shot.key": "Знімок екрана в грі",
+    "v30.shot.key.hint": "Зберігає вікно гри в «Зображення\\ModLaunch» — знімки видно й у галереї гри. В іграх Steam F12 зайнята самим Steam, там буде Ctrl+F12.",
+    "v30.shot.on": "Знімки екрана в грі",
+    "v30.shot.on.hint": "Поєднання працює, лише поки йде гра, запущена з ModLaunch."
   },
   "es": {
     "v30.upd.gameRunning": "Cierra primero el juego: la actualización reinicia ModLaunch y es mejor no interrumpir la partida. La actualización esperará.",
     "v30.nexus.skip": "Omitir este mod",
     "v30.nexus.cancelAll": "Cancelar todo",
-    "v30.upd.skipped": "Omitidos (actualízalos más tarde): {list}"
+    "v30.upd.skipped": "Omitidos (actualízalos más tarde): {list}",
+    "v30.shot.saved": "Captura guardada",
+    "v30.shot.folder": "Abrir carpeta de capturas",
+    "v30.shot.key": "Captura en el juego",
+    "v30.shot.key.hint": "Guarda la ventana del juego en Imágenes\\ModLaunch; las capturas también aparecen en la galería del juego. En juegos de Steam, F12 es de Steam, así que allí será Ctrl+F12.",
+    "v30.shot.on": "Capturas en el juego",
+    "v30.shot.on.hint": "La tecla solo funciona mientras se ejecuta un juego abierto desde ModLaunch."
   },
   "de": {
     "v30.upd.gameRunning": "Schließ zuerst das Spiel: Das Update startet ModLaunch neu, und die Sitzung sollte nicht unterbrochen werden. Das Update wartet.",
     "v30.nexus.skip": "Diesen Mod überspringen",
     "v30.nexus.cancelAll": "Alles abbrechen",
-    "v30.upd.skipped": "Übersprungen (später aktualisieren): {list}"
+    "v30.upd.skipped": "Übersprungen (später aktualisieren): {list}",
+    "v30.shot.saved": "Screenshot gespeichert",
+    "v30.shot.folder": "Screenshot-Ordner öffnen",
+    "v30.shot.key": "Screenshot im Spiel",
+    "v30.shot.key.hint": "Speichert das Spielfenster unter Bilder\\ModLaunch – die Screenshots erscheinen auch in der Galerie des Spiels. In Steam-Spielen gehört F12 Steam, dort gilt Strg+F12.",
+    "v30.shot.on": "Screenshots im Spiel",
+    "v30.shot.on.hint": "Die Taste funktioniert nur, solange ein aus ModLaunch gestartetes Spiel läuft."
   },
   "fr": {
     "v30.upd.gameRunning": "Fermez d'abord le jeu : la mise à jour redémarre ModLaunch et mieux vaut ne pas interrompre la partie. La mise à jour attendra.",
     "v30.nexus.skip": "Passer ce mod",
     "v30.nexus.cancelAll": "Tout annuler",
-    "v30.upd.skipped": "Ignorés (à mettre à jour plus tard) : {list}"
+    "v30.upd.skipped": "Ignorés (à mettre à jour plus tard) : {list}",
+    "v30.shot.saved": "Capture enregistrée",
+    "v30.shot.folder": "Ouvrir le dossier des captures",
+    "v30.shot.key": "Capture en jeu",
+    "v30.shot.key.hint": "Enregistre la fenêtre du jeu dans Images\\ModLaunch — les captures apparaissent aussi dans la galerie du jeu. Dans les jeux Steam, F12 appartient à Steam : là, ce sera Ctrl+F12.",
+    "v30.shot.on": "Captures d'écran en jeu",
+    "v30.shot.on.hint": "La touche ne fonctionne que pendant un jeu lancé depuis ModLaunch."
   },
   "pt-BR": {
     "v30.upd.gameRunning": "Feche o jogo primeiro: a atualização reinicia o ModLaunch, e é melhor não interromper a sessão. A atualização vai esperar.",
     "v30.nexus.skip": "Pular este mod",
     "v30.nexus.cancelAll": "Cancelar tudo",
-    "v30.upd.skipped": "Pulados (atualize depois): {list}"
+    "v30.upd.skipped": "Pulados (atualize depois): {list}",
+    "v30.shot.saved": "Captura salva",
+    "v30.shot.folder": "Abrir pasta de capturas",
+    "v30.shot.key": "Captura no jogo",
+    "v30.shot.key.hint": "Salva a janela do jogo em Imagens\\ModLaunch — as capturas também aparecem na galeria do jogo. Nos jogos da Steam, F12 é da Steam, então lá será Ctrl+F12.",
+    "v30.shot.on": "Capturas de tela no jogo",
+    "v30.shot.on.hint": "A tecla só funciona enquanto um jogo aberto pelo ModLaunch estiver rodando."
   },
   "zh-CN": {
     "v30.upd.gameRunning": "请先关闭游戏：更新会重启 ModLaunch，最好不要中途打断游戏。更新会一直等着你。",
     "v30.nexus.skip": "跳过这个模组",
     "v30.nexus.cancelAll": "全部取消",
-    "v30.upd.skipped": "已跳过（稍后再更新）：{list}"
+    "v30.upd.skipped": "已跳过（稍后再更新）：{list}",
+    "v30.shot.saved": "截图已保存",
+    "v30.shot.folder": "打开截图文件夹",
+    "v30.shot.key": "游戏内截图",
+    "v30.shot.key.hint": "把游戏窗口保存到“图片\\ModLaunch”——截图也会出现在游戏图库中。在 Steam 游戏中 F12 归 Steam 使用，那里改用 Ctrl+F12。",
+    "v30.shot.on": "游戏内截图",
+    "v30.shot.on.hint": "只有在从 ModLaunch 启动的游戏运行时，快捷键才生效。"
   }
 }

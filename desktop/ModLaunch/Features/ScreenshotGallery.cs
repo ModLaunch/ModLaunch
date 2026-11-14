@@ -25,6 +25,8 @@ public static class ScreenshotGallery
             }
             catch { }
         }
+        // 30.0: свои снимки ModLaunch (Ctrl+F12 в игре).
+        if (Directory.Exists(GameShots.Folder(game.Name))) result.Add(GameShots.Folder(game.Name));
         if (gamePath is not null)
             foreach (var name in new[] { "Screenshots", "screenshots" })
                 if (Directory.Exists(Path.Combine(gamePath, name))) result.Add(Path.Combine(gamePath, name));

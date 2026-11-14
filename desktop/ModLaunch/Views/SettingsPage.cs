@@ -188,7 +188,7 @@ public sealed partial class SettingsPage : Page
 
         var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*") };
         grid.Children.Add(side);
-        var scroll = new ScrollViewer { Content = right, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+        var scroll = _scroll = new ScrollViewer { Content = right, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
         Grid.SetColumn(scroll, 1);
         grid.Children.Add(scroll);
         Content = grid;
@@ -325,6 +325,11 @@ public sealed partial class SettingsPage : Page
             state, row);
     }
 
+    ScrollViewer? _scroll;
+
+    /// <summary>Снимки экрана: показать раздел целиком (настройки снимков — внизу вкладки).</summary>
+    internal void DemoScroll(double y) { if (_scroll is not null) _scroll.Offset = new Avalonia.Vector(0, y); }
+
     Control LaunchTab()
     {
         var col = new StackPanel { Spacing = 16 };
@@ -369,10 +374,23 @@ public sealed partial class SettingsPage : Page
         DockPanel.SetDock(go, Dock.Right);
         preview.Children.Add(go);
         preview.Children.Add(Ui.Col(3, Ui.Text(I18n.T("ov.preview"), "h3"), Ui.Text(I18n.T("ov.preview.hint"), "small muted")));
+        // 30.0: снимок экрана в игре.
+        var shotKey = new ComboBox { Width = 200 };
+        foreach (var k in Hotkey.ShotKeys) shotKey.Items.Add(Hotkey.Display(k));
+        shotKey.SelectedIndex = Array.IndexOf(Hotkey.ShotKeys, Hotkey.ShotKeyOf(Settings.Data.Str("shotKey")));
+        shotKey.SelectionChanged += (_, _) => { if (shotKey.SelectedIndex >= 0) { Settings.Data["shotKey"] = Hotkey.ShotKeys[shotKey.SelectedIndex]; Settings.Save(); } };
+        var shotFolder = Ui.Button("", () => { Directory.CreateDirectory(GameShots.Root); Actions.OpenFolder(GameShots.Root); }, "icon ghost", Icons.Folder, I18n.T("v30.shot.folder"));
+        var shotRow = new DockPanel();
+        var shotTools = Ui.Row(6, shotFolder, shotKey);
+        DockPanel.SetDock(shotTools, Dock.Right);
+        shotRow.Children.Add(shotTools);
+        shotRow.Children.Add(Ui.Col(3, Ui.Text(I18n.T("v30.shot.key"), "h3"), Ui.Text(I18n.T("v30.shot.key.hint"), "small muted", wrap: true)));
         col.Children.Add(Section(I18n.T("ov.title"), null,
             Toggle(I18n.T("ov.on"), I18n.T("ov.on.hint"), Settings.Data.Bool("overlay", true), v => Settings.Data["overlay"] = v),
             Toggle(I18n.T("launch.hint.setting"), I18n.T("launch.hint.setting.hint"), Settings.Data.Bool("overlayHint", true), v => Settings.Data["overlayHint"] = v),
-            keyRow, preview));
+            keyRow, preview,
+            Toggle(I18n.T("v30.shot.on"), I18n.T("v30.shot.on.hint"), GameShots.Enabled, v => Settings.Data["gameShots"] = v),
+            shotRow));
 
         // Параметры запуска по играм.
         var found = AppState.Games.Where(g => g.Status == Detect.Found).ToList();

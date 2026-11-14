@@ -16,4 +16,16 @@ public static class V30Shots
         s.Save("v30-01-nexus-skip");
         s.Window.CloseDialog();
     }
+
+    /// <summary>MODLAUNCH_SHOTS=V30Shot: настройки снимка экрана в игре (рядом с оверлеем).</summary>
+    [DemoShots]
+    static void V30Shot(Shots s)
+    {
+        s.Pump(4500);
+        s.Window.Navigate(() => new SettingsPage("launch"));
+        s.Pump(1500);
+        if (s.Window.CurrentPage is SettingsPage p) p.DemoScroll(1080);
+        s.Pump(800);
+        s.Save("v30-02-shot-settings");
+    }
 }

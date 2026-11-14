@@ -15,7 +15,7 @@ namespace ModLaunch.Views;
 /// </summary>
 public sealed class GameHintWindow : Window
 {
-    public GameHintWindow(string game, string key)
+    public GameHintWindow(string game, string text)
     {
         SystemDecorations = SystemDecorations.None;
         Topmost = true;
@@ -26,11 +26,11 @@ public sealed class GameHintWindow : Window
         TransparencyLevelHint = [WindowTransparencyLevel.Transparent];
         SizeToContent = SizeToContent.WidthAndHeight;
         WindowStartupLocation = WindowStartupLocation.Manual;
-        Content = Card(game, key);
+        Content = Card(game, text);
         Opened += (_, _) => Place();
     }
 
-    static Control Card(string game, string key)
+    static Control Card(string game, string text)
     {
         var icon = new Border
         {
@@ -39,7 +39,7 @@ public sealed class GameHintWindow : Window
         };
         var words = Ui.Col(2,
             new TextBlock { Text = "ModLaunch · " + game, FontSize = 12, Foreground = Ui.Hex("#AAB2C2") },
-            new TextBlock { Text = I18n.T("hint.overlay", ("key", key)), FontSize = 15, FontWeight = FontWeight.SemiBold, Foreground = Brushes.White });
+            new TextBlock { Text = text, FontSize = 15, FontWeight = FontWeight.SemiBold, Foreground = Brushes.White });
         words.VerticalAlignment = VerticalAlignment.Center;
         return new Border
         {
@@ -65,6 +65,19 @@ public sealed class GameHintWindow : Window
             area.Bottom - (int)(Bounds.Height * s) - (int)(12 * s));
     }
 
+    /// <summary>30.0: «Снимок сохранён» поверх игры на пару секунд (фокус у игры не забирает).</summary>
+    public static void Flash(string game, string text, string? file = null)
+    {
+        if (!OperatingSystem.IsWindows() || Program.Screenshot) return;
+        try
+        {
+            var w = new GameHintWindow(game, file is null ? text : text + " · " + Path.GetFileName(file));
+            w.Show();
+            DispatcherTimer.RunOnce(() => { try { w.Close(); } catch { } }, TimeSpan.FromSeconds(2.5));
+        }
+        catch { }
+    }
+
     /// <summary>Показать через несколько секунд после запуска игры и закрыть сама собой.</summary>
     public static void ShowFor(string game)
     {
@@ -75,7 +88,7 @@ public sealed class GameHintWindow : Window
         {
             try
             {
-                var w = new GameHintWindow(game, key);
+                var w = new GameHintWindow(game, I18n.T("hint.overlay", ("key", key)));
                 w.Show();
                 DispatcherTimer.RunOnce(() => { try { w.Close(); } catch { } }, TimeSpan.FromSeconds(6));
             }
