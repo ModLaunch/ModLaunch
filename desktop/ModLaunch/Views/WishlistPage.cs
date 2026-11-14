@@ -143,14 +143,24 @@ public sealed class WishlistPage : Page
         if (item.Checked is DateTime at) notes.Add(I18n.T("v28.wish.checked", ("when", Ui.Ago(at))));
 
         var info = Ui.Col(6, Ui.Text(item.Name, "h3"), price);
+        // 29.0: где дешевле — по данным CheapShark, если уже узнавали.
+        if (PriceCompare.Known(item.AppId) is { Cheapest: { } best } other && best.StoreId != "1")
+        {
+            var steamUsd = other.Deals.FirstOrDefault(d => d.StoreId == "1");
+            var cheaper = Ui.Text(steamUsd is null
+                ? I18n.T("v29.price.cheaperNoSteam", ("store", best.Store), ("price", PriceCompare.Usd(best.Price)))
+                : I18n.T("v29.price.cheaper", ("store", best.Store), ("price", PriceCompare.Usd(best.Price)), ("steam", PriceCompare.Usd(steamUsd.Price))), "small", color: Ui.Res("Good"), wrap: true);
+            info.Children.Add(cheaper);
+        }
         if (notes.Count > 0) info.Children.Add(Ui.Text(string.Join(" · ", notes), "tiny muted", wrap: true));
         info.VerticalAlignment = VerticalAlignment.Center;
         info.Margin = new Thickness(16, 0, 12, 0);
 
         var target_ = Ui.Button("", () => AskTarget(item), "icon ghost", Icons.Bell, I18n.T("v28.wish.target"));
+        var compare = Ui.Button("", () => PriceUi.Show(item.AppId, item.Name, item.Price), "icon ghost", Icons.Percent, I18n.T("v29.price.compare"));
         var store = Ui.Button("", () => SteamLibrary.StorePage(item.AppId), "icon ghost", Icons.Globe, I18n.T("v12w.steam.page"));
         var remove = Ui.Button("", () => { Wishlist.Remove(item.AppId); MainWindow.Current?.Toast(I18n.T("v28.wish.removed", ("name", item.Name))); }, "icon ghost", Icons.Trash, I18n.T("v28.wish.remove"));
-        var tools = Ui.Row(2, target_, store, remove);
+        var tools = Ui.Row(2, compare, target_, store, remove);
         tools.VerticalAlignment = VerticalAlignment.Center;
 
         var row = new DockPanel();
@@ -224,6 +234,12 @@ public sealed class WishlistPage : Page
         try
         {
             var told = await Wishlist.Check(force: true);
+            // 29.0: и цены в других магазинах — по одной игре, чтобы не долбить CheapShark.
+            foreach (var item in Wishlist.Items)
+            {
+                try { await PriceCompare.For(item.AppId, force: true); } catch { /* одна игра не ответила — остальные всё равно */ }
+                await Task.Delay(250);
+            }
             if (told == 0) MainWindow.Current?.Toast(I18n.T("v28.wish.checkedNone"));
         }
         catch (Exception e) { MainWindow.Current?.Toast(I18n.T("v28.wish.checkFailed", ("error", Jobs.Explain(e))), bad: true); }
