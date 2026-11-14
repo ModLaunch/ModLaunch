@@ -95,7 +95,8 @@ public static class ListingWizard
         // ---- шаг 1: что продаёте
         var kinds = new UniformGrid { Columns = 5 };
         var kindButtons = new List<(string Id, Button B)>();
-        foreach (var k in Market.Kinds)
+        // 29.0: игры выставляются в «Инди-играх» (там своя сборка по ссылке и жанры).
+        foreach (var k in Market.Kinds.Where(k => k != Creator.IndieGames.Kind))
         {
             var id = k;
             var b = new Button

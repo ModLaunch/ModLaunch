@@ -48,7 +48,9 @@ public sealed class RecommendPage : Page
         var refresh = Ui.Button(I18n.T("v29.rec.refresh"), () => _ = Load(true), "", Icons.Refresh);
         refresh.IsEnabled = !_loading;
         var wish = Ui.Button(I18n.T("v28.wish.title"), () => MainWindow.Current?.Navigate(() => new WishlistPage()), "ghost", Icons.Heart);
-        var tools = Ui.Row(8, wish, refresh);
+        // 29.0: и игры от независимых разработчиков.
+        var indie = Ui.Button(I18n.T("v29.indie.title"), () => MainWindow.Current?.Navigate(() => new IndiePage()), "ghost", Icons.Gamepad);
+        var tools = Ui.Row(8, indie, wish, refresh);
         tools.VerticalAlignment = VerticalAlignment.Center;
         var head = new DockPanel();
         DockPanel.SetDock(tools, Dock.Right);

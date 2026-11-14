@@ -52,7 +52,8 @@ public static class Commission
     /// <summary>Сохранить новый процент. Он сразу действует для новых продаж: правила базы читают тот же документ.</summary>
     public static async Task SetPercent(int percent)
     {
-        percent = Math.Clamp(percent, 0, 50);
+        // 29.0: комиссия площадки всегда ниже 30 % (Steam берёт 30 %) — это же проверяют правила базы.
+        percent = Math.Clamp(percent, 0, Market.MaxFeePercent);
         if (Program.Demo || Program.Screenshot) { Market.SetFee(percent); return; }
         var (uid, token, _) = await Hub.Member();
         await Hub.Commit(

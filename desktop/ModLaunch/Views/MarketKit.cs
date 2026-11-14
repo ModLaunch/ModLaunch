@@ -165,7 +165,7 @@ public static class MarketTiles
         return new Border { Background = bg, ClipToBounds = true, Child = panel };
     }
 
-    public static string GameName(string id) => GameCatalog.ById(id)?.ShortName ?? (id == "" ? I18n.T("mk.anyGame") : id);
+    public static string GameName(string id) => id == "windows" ? "Windows" : GameCatalog.ById(id)?.ShortName ?? (id == "" ? I18n.T("mk.anyGame") : id);
 
     /// <summary>Сердечко «в желаемое» поверх картинки.</summary>
     public static Button WishButton(Listing l, bool onArt = true)

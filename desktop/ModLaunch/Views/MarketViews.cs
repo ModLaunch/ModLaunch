@@ -17,6 +17,7 @@ public static class MarketViews
         "code" => Icons.Code,
         "script" => Icons.Wand,
         "asset" => Icons.Image,
+        "game" => Icons.Gamepad,
         _ => Icons.Package,
     };
 
@@ -166,6 +167,7 @@ public static class MarketViews
 
     public static async void Download(Listing l)
     {
+        if (l.Kind == Creator.IndieGames.Kind) { IndiePage.Install(l); return; }
         // 11.0: «запечатанный» купленный лот (код/скрипт/сборка) исходником не скачивается — подключаем инжектом.
         // Прикрывает все входы в скачивание сразу: меню карточки, «Библиотека» и «Покупки».
         if (Moderation.Sealed(l)) { Connect(l); return; }
@@ -186,6 +188,11 @@ public static class MarketViews
     /// </summary>
     public static Button OwnedAction(Listing l, Action? before = null)
     {
+        // 29.0: инди-игра — не файл, а игра в библиотеке: «Установить», потом «Играть».
+        if (l.Kind == Creator.IndieGames.Kind)
+            return Creator.IndieGames.Installed(l) is { } installed
+                ? Ui.Button(I18n.T("games.play"), () => { before?.Invoke(); Actions.Play(installed); }, "primary", Icons.Play)
+                : Ui.Button(I18n.T("v29.indie.install"), () => { before?.Invoke(); IndiePage.Install(l); }, "primary", Icons.Download);
         if (!Moderation.Sealed(l)) return Ui.Button(I18n.T("mk.download"), () => { before?.Invoke(); Download(l); }, "primary", Icons.Download);
         if (Features.Inject.Get("mk_" + l.Id) is not null)
             return Ui.Button(I18n.T("v11.inj.open"), () => { before?.Invoke(); MainWindow.Current?.Navigate(() => new CreatorPage("injects")); }, "primary", Icons.Zap);

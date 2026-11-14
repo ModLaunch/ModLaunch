@@ -29,6 +29,9 @@ public sealed record Payout(string Id, string Uid, string Author, long Amount, s
 public sealed record TopUp(string Id, string Uid, string Author, long Amount, string Reference, string Status, DateTime? Created);
 public sealed record ListingReview(string Uid, string Author, int Stars, string Text, DateTime? Created);
 
+/// <summary>29.0: сборка игры, которая лежит у разработчика (ссылка https), — с отпечатком для проверки.</summary>
+public sealed record ExternalBuild(string Url, string Sha256, long Size, string FileName);
+
 /// <summary>Что выставляем на продажу.</summary>
 public sealed class ListingDraft
 {
@@ -61,9 +64,12 @@ public static class Market
 {
     public const int MaxPreview = 4000;
     public const long MaxFile = 8 * 1024 * 1024;
+    /// <summary>29.0: потолок комиссии площадки — ниже, чем 30 % у Steam (то же в правилах config/market).</summary>
+    public const int MaxFeePercent = 29;
     const int ChunkChars = 900_000;
 
-    public static readonly string[] Kinds = ["model", "code", "script", "asset", "pack"];
+    // 29.0: game — инди-игра (Creator/IndieGames.cs).
+    public static readonly string[] Kinds = ["model", "code", "script", "asset", "pack", "game"];
     public static readonly string[] Licenses = ["personal", "commercial", "open"];
 
     /// <summary>
@@ -87,7 +93,7 @@ public static class Market
         {
             var doc = await Hub.Call(Firebase.Url("/config/market"), HttpMethod.Get, null, null) as JsonObject;
             var f = Firebase.FromFields(doc?["fields"] as JsonObject);
-            SetFee(f.ContainsKey("fee") ? (int)Math.Clamp(f.L("fee"), 0, 50) : 10);
+            SetFee(f.ContainsKey("fee") ? (int)Math.Clamp(f.L("fee"), 0, MaxFeePercent) : 10);
         }
         catch (ServiceError e) when (e.Code == "NOT_FOUND") { SetFee(10); }
         catch { }
@@ -108,7 +114,7 @@ public static class Market
     static Market()
     {
         var json = Resources.Json("market.config.json");
-        DefaultFee = (int)Math.Clamp(json.Long("feePercent") is > 0 and var f ? f : 10, 0, 50);
+        DefaultFee = (int)Math.Clamp(json.Long("feePercent") is > 0 and var f ? f : 10, 0, MaxFeePercent);
         Currency = json.Str("currency") ?? "₽";
         MinPayout = json.Long("minPayout") is > 0 and var m ? m : 50000;
         TopUpUrl = json.Str("topUpUrl") ?? "";
@@ -404,20 +410,34 @@ public static class Market
     // ---------------------------------------------------------------- продажа
 
     /// <summary>Выставить или обновить лот. Файл — кусками в market/{id}/files (читают продавец и купившие).</summary>
-    public static async Task<string> Save(ListingDraft d, Listing? existing, IProgress<double>? progress = null)
+    public static async Task<string> Save(ListingDraft d, Listing? existing, IProgress<double>? progress = null, ExternalBuild? external = null)
     {
         var (uid, token, author) = await Hub.Member();
         var title = Hub.Clip(d.Title, 60);
         if (title == "" || !Kinds.Contains(d.Kind) || !Licenses.Contains(d.License)) throw new ServiceError("INVALID");
         if (!Regex.IsMatch(d.Version, @"^\d+\.\d+\.\d+$")) throw new ServiceError("INVALID", "version");
         if (d.Price is < 0 or > 100_000_000) throw new ServiceError("INVALID", "price");
-        if (existing is null && d.File is null) throw new ServiceError("NO_FILE");
+        if (existing is null && d.File is null && external is null) throw new ServiceError("NO_FILE");
         var id = existing?.Id ?? Hub.DocId(uid, title);
         if (existing is null && await Get(id) is not null) throw new ServiceError("EXISTS");
 
         long size = existing?.Size ?? 0;
         string sha = existing?.Sha256 ?? "", fileName = existing?.FileName ?? "";
         var chunks = existing?.Chunks ?? 0;
+        // 29.0: большая сборка игры лежит у разработчика — в лоте только её отпечаток и имя, файлов в базе нет.
+        if (external is not null && d.File is null)
+        {
+            size = 0;
+            sha = external.Sha256;
+            fileName = Hub.Clip(external.FileName, 120);
+            if (chunks > 0)
+            {
+                var stale = new JsonArray();
+                for (var n = 0; n < chunks; n++) stale.Add(new JsonObject { ["delete"] = Firebase.Doc($"market/{id}/files/{n}") });
+                try { await Hub.Commit(stale, token); } catch { }
+            }
+            chunks = 0;
+        }
         if (d.File is not null)
         {
             var bytes = await File.ReadAllBytesAsync(d.File);
@@ -462,7 +482,7 @@ public static class Market
             ["license"] = d.License,
             ["version"] = d.Version,
             ["preview"] = (d.Preview ?? "").Replace("\r\n", "\n") is var p && p.Length > MaxPreview ? p[..MaxPreview] : d.Preview ?? "",
-            ["tags"] = d.Tags.Where(Hub.Tags.Contains).Distinct().Take(6).ToList(),
+            ["tags"] = d.Tags.Where(t => d.Kind == IndieGames.Kind ? IndieGames.Genres.Contains(t) : Hub.Tags.Contains(t)).Distinct().Take(6).ToList(),
             ["images"] = d.Images.Where(u => u.StartsWith("https://")).Select(u => Hub.Clip(u, 400)).Take(6).ToList(),
             ["size"] = size,
             ["sha256"] = sha,

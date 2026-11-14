@@ -504,7 +504,7 @@ service cloud.firestore {
         && mText(d.author, 32) && d.author.size() > 0
         && mText(d.title, 60) && d.title.size() > 0
         && mText(d.summary, 200) && mText(d.description, 5000) && mText(d.game, 40)
-        && d.kind in ['model', 'code', 'script', 'asset', 'pack']
+        && d.kind in ['model', 'code', 'script', 'asset', 'pack', 'game']
         && d.license in ['personal', 'commercial', 'open']
         && d.price is int && d.price >= 0 && d.price <= 100000000
         && mText(d.version, 20) && mText(d.preview, 4000)
@@ -587,7 +587,8 @@ service cloud.firestore {
       allow create, update: if mAdmin() && name == 'market'
         && request.resource.data.keys().hasOnly(['fee', 'updated', 'by', 'pay', 'premium', 'premiumAll'])
         && (!('fee' in request.resource.data)
-          || (request.resource.data.fee is int && request.resource.data.fee >= 0 && request.resource.data.fee <= 50))
+          // 29.0: комиссия всегда ниже 30 % (обещание инди-разработчикам), раньше потолок был 50.
+          || (request.resource.data.fee is int && request.resource.data.fee >= 0 && request.resource.data.fee <= 29))
         // 25.0: реквизиты для пополнения кошельков (способ → реквизиты) и лот ModLaunch Premium.
         && (!('pay' in request.resource.data) || (request.resource.data.pay is map && request.resource.data.pay.size() <= 10))
         // id лота — uid (28) + «_» + имя пакета (до 60): до 128 с запасом. premiumAll — все лоты Premium (купившие их не теряют его).

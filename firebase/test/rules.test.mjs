@@ -558,10 +558,12 @@ async function takeFee(who = ADMIN, { amount = fee(PRICE), buyer = BUYER.uid } =
   return b.commit();
 }
 
-test('комиссия: процент меняет только админ, 0–50, и покупка считается по нему', async () => {
+test('комиссия: процент меняет только админ, 0–29 (меньше 30 % у Steam), и покупка считается по нему', async () => {
   const cfg = (who, over = {}) => setDoc(doc(db(who), 'config', 'market'), { fee: 20, by: who.uid, updated: serverTimestamp(), ...over });
   await assertFails(cfg(SELLER, { by: SELLER.uid }));
   await assertFails(cfg(ADMIN, { fee: 51 }));
+  await assertFails(cfg(ADMIN, { fee: 30 }));
+  await assertSucceeds(cfg(ADMIN, { fee: 29 }));
   await assertFails(cfg(ADMIN, { fee: 12.5 }));
   await assertFails(cfg(ADMIN, { by: SELLER.uid }));
   await assertFails(setDoc(doc(db(ADMIN), 'config', 'other'), { fee: 20, by: ADMIN.uid, updated: serverTimestamp() }));
@@ -727,4 +729,17 @@ test('почтовый ящик: друг пишет только своё по�
   await assertSucceeds(getDoc(doc(db(BUYER), 'inbox', BUYER.uid)));
   await assertFails(getDoc(doc(db(SELLER), 'inbox', BUYER.uid)));
   await assertSucceeds(deleteDoc(doc(db(BUYER), 'inbox', BUYER.uid)));
+});
+
+// ── 29.0: инди-игры — лот вида game ─────────────────────────────────────
+test('инди-игра: лот game создаётся, ссылку на сборку видят только разработчик и купившие', async () => {
+  const game = { ...listing(29900), kind: 'game', game: 'windows', tags: ['puzzle', 'story'], size: 0, chunks: 0, sha256: 'a'.repeat(64), fileName: 'game.zip' };
+  const id = `${SELLER.uid}_lantern`;
+  await assertSucceeds(setDoc(doc(db(SELLER), 'market', id), { ...game, sales: 0, created: serverTimestamp(), updated: serverTimestamp() }));
+  await assertFails(setDoc(doc(db(SELLER), 'market', `${SELLER.uid}_other`), { ...game, kind: 'film', sales: 0, created: serverTimestamp(), updated: serverTimestamp() }));
+  const link = { uid: SELLER.uid, data: JSON.stringify({ url: 'https://example.com/game.zip', sha256: 'a'.repeat(64), size: 123456789 }) };
+  await assertSucceeds(setDoc(doc(db(SELLER), 'market', id, 'files', 'link'), link));
+  await assertFails(setDoc(doc(db(OTHER), 'market', id, 'files', 'link'), { ...link, uid: OTHER.uid }));
+  await assertSucceeds(getDoc(doc(db(SELLER), 'market', id, 'files', 'link')));
+  await assertFails(getDoc(doc(db(BUYER), 'market', id, 'files', 'link')));
 });

@@ -40,6 +40,19 @@ public static class V29Shots
         }
     }
 
+    /// <summary>MODLAUNCH_SHOTS=V29Indie: витрина инди-игр, раздел для разработчиков (комиссии) и окно публикации.</summary>
+    [DemoShots]
+    static void V29Indie(Shots s)
+    {
+        s.Pump(4500);
+        s.Window.Navigate(() => new IndiePage());
+        s.Pump(2500);
+        s.Save("v29-06-indie-store");
+        s.Window.Navigate(() => new IndiePage("dev"));
+        s.Pump(2000);
+        s.Save("v29-07-indie-dev");
+    }
+
     /// <summary>MODLAUNCH_SHOTS=V29Recommend: «Для вас» — похожие игры с причиной.</summary>
     [DemoShots]
     static void V29Recommend(Shots s)
