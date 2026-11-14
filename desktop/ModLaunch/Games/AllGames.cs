@@ -36,6 +36,9 @@ public static partial class AllGames
 
     public static event Action? Changed;
 
+    /// <summary>30.0: игра из «Всех игр» запустилась / закрылась (процесс из её папки) — оверлей, снимки, статус для друзей.</summary>
+    public static event Action<LibGame>? Started, Exited;
+
     /// <summary>Последний собранный список (null — ещё не собран).</summary>
     public static IReadOnlyList<LibGame>? Current => _games;
 
@@ -183,7 +186,8 @@ public static partial class AllGames
 
     static void Watch(LibGame g)
     {
-        if (g.Store == "steam") return;
+        // Часы игр Steam считает сам Steam; процесс всё равно ждём — ради оверлея, снимков и статуса «в игре».
+        var countTime = g.Store != "steam";
         var id = g.TimeId;
         var dirs = new[] { g.Dir, g.Source?.AltDir }.OfType<string>().Select(d => Norm(d) + "\\").Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         lock (Watching) if (dirs.Length == 0 || !Watching.Add(id)) return;
@@ -197,19 +201,19 @@ public static partial class AllGames
                 {
                     if (DateTime.UtcNow > until)
                     {
-                        Dispatcher.UIThread.Post(() => { PlayTime.Start(id); PlayTime.Stop(id); Changed?.Invoke(); });
+                        if (countTime) Dispatcher.UIThread.Post(() => { PlayTime.Start(id); PlayTime.Stop(id); Changed?.Invoke(); });
                         return;
                     }
                     await Task.Delay(3000);
                 }
-                Dispatcher.UIThread.Post(() => { PlayTime.Start(id); Changed?.Invoke(); });
+                Dispatcher.UIThread.Post(() => { if (countTime) PlayTime.Start(id); Started?.Invoke(g); Changed?.Invoke(); });
                 // Два промаха подряд: игра могла перезапуститься (лаунчер → игра), это не конец сеанса.
                 for (var miss = 0; miss < 2;)
                 {
                     await Task.Delay(5000);
                     miss = ProcessPaths.AnyUnder(dirs) ? 0 : miss + 1;
                 }
-                Dispatcher.UIThread.Post(() => { PlayTime.Stop(id); Changed?.Invoke(); });
+                Dispatcher.UIThread.Post(() => { if (countTime) PlayTime.Stop(id); Exited?.Invoke(g); Changed?.Invoke(); });
             }
             finally { lock (Watching) Watching.Remove(id); }
         });

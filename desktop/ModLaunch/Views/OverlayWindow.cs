@@ -6,6 +6,7 @@ using Avalonia.Media;
 using Avalonia.Threading;
 using ModLaunch.Core;
 using ModLaunch.Features;
+using ModLaunch.Games;
 using ModLaunch.Social;
 
 namespace ModLaunch.Views;
@@ -20,6 +21,9 @@ public sealed class OverlayWindow : Window
     public static string? GameId { get; set; }
     public static DateTime? StartedAt { get; set; }
     public static bool Preview { get; set; }
+
+    /// <summary>30.0: идёт игра не из ModLaunch (из «Всех игр»): оверлей с временем, снимком и друзьями.</summary>
+    public static LibGame? Library { get; private set; }
 
     readonly DispatcherTimer _clock;
     TextBlock? _session;
@@ -90,7 +94,17 @@ public sealed class OverlayWindow : Window
         var panel = Ui.Col(16);
 
         // Игра и время.
-        if (g is null) panel.Children.Add(Ui.Text(I18n.T("ovl.noGame"), "h2", color: Brushes.White));
+        if (g is null && Library is { } lib)
+        {
+            panel.Children.Add(Ui.Text(I18n.T("ovl.playing"), "small", color: Ui.Hex("#AAB2C2")));
+            panel.Children.Add(Ui.Text(lib.Name, "h1", color: Brushes.White));
+            _session = new TextBlock { Text = StartedAt is DateTime s ? Clock(DateTime.UtcNow - s) : "00:00", FontSize = 44, FontWeight = FontWeight.Bold, Foreground = Ui.Res("Brand2") };
+            panel.Children.Add(_session);
+            panel.Children.Add(Ui.Text(I18n.T("v30.ovl.total", ("time", AllGamesPage.Hours(AllGames.Played(lib).Minutes)), ("store", Stores.Title(lib.Store))), "small", color: Ui.Hex("#C9CFDB")));
+            var shot = Ui.Button(I18n.T("v30.ovl.shot"), () => { Hide(); DispatcherTimer.RunOnce(() => _ = TakeShot(lib.Name), TimeSpan.FromMilliseconds(350)); }, "primary", Icons.Image);
+            panel.Children.Add(Ui.Row(10, shot, Ui.Text(Hotkey.ArmedShot is { } k ? Hotkey.Display(k) : "", "small", color: Ui.Hex("#AAB2C2"))));
+        }
+        else if (g is null) panel.Children.Add(Ui.Text(I18n.T("ovl.noGame"), "h2", color: Brushes.White));
         else
         {
             panel.Children.Add(Ui.Text(Preview ? I18n.T("ovl.preview") : I18n.T("ovl.playing"), "small", color: Ui.Hex("#AAB2C2")));
@@ -149,11 +163,12 @@ public sealed class OverlayWindow : Window
                     Ui.Text(f.State == "playing" ? I18n.T("friends.playing", ("game", f.GameName)) : I18n.T("friends.online"), "small", color: Ui.Hex("#AAB2C2"))));
         }
 
-        var footer = Ui.Row(10,
-            Ui.Button(I18n.T("ovl.open"), () => { Hide(); var w = MainWindow.Current; if (w is not null) { w.WindowState = WindowState.Normal; w.Activate(); } }, "", Icons.Home),
-            Ui.Button(I18n.T("ovl.close"), Hide, "ghost", Icons.Close),
-            Ui.Text(I18n.T("ovl.hint", ("key", Hotkey.Display(Hotkey.Armed ?? Hotkey.KeyOf(Settings.Data.Str("overlayKey"))))), "small", color: Ui.Hex("#AAB2C2")));
-        foreach (var c in footer.Children) c.VerticalAlignment = VerticalAlignment.Center;
+        // 30.0: подсказка — отдельной строкой: в одну строку с кнопками она вылезала за край панели.
+        var footer = Ui.Col(8,
+            Ui.Row(10,
+                Ui.Button(I18n.T("ovl.open"), () => { Hide(); var w = MainWindow.Current; if (w is not null) { w.WindowState = WindowState.Normal; w.Activate(); } }, "", Icons.Home),
+                Ui.Button(I18n.T("ovl.close"), Hide, "ghost", Icons.Close)),
+            Ui.Text(I18n.T("ovl.hint", ("key", Hotkey.Display(Hotkey.Armed ?? Hotkey.KeyOf(Settings.Data.Str("overlayKey"))))), "small", color: Ui.Hex("#AAB2C2"), wrap: true));
 
         Content = Frame(Ui.Col(20, panel, friends), 420, footer);
     }
@@ -185,6 +200,7 @@ public sealed class OverlayWindow : Window
     /// <summary>Игра запущена — занять сочетание клавиш; закрыта — освободить.</summary>
     public static void OnGameStarted(string gameId)
     {
+        Library = null;
         GameId = gameId;
         StartedAt = DateTime.UtcNow;
         _studio = false;
@@ -204,7 +220,7 @@ public sealed class OverlayWindow : Window
         var chosen = Hotkey.KeyOf(Settings.Data.Str("overlayKey"));
         var key = overlayOn ? Hotkey.Effective(chosen, steamGame) : null;
         var shot = GameShots.Enabled ? Hotkey.EffectiveShot(Settings.Data.Str("shotKey"), steamGame) : null;
-        if (key is null && shot is null) return;
+        if (key is null && shot is null || Program.Screenshot) return;
         Hotkey.Arm(key, overlayOn ? Toggle : null, shot, shot is null ? null : () => _ = TakeShot(game));
         if (key is not null && key != chosen) MainWindow.Current?.Toast(I18n.T("v28.ovl.steamTab", ("game", game), ("key", Hotkey.Display(key))));
     }
@@ -216,6 +232,25 @@ public sealed class OverlayWindow : Window
             if (await GameShots.Capture(game) is { } file) GameHintWindow.Flash(game, I18n.T("v30.shot.saved"), file);
         }
         catch (Exception e) { Guard.Log(e); }
+    }
+
+    /// <summary>30.0: игра из «Всех игр» запустилась — если не идёт игра ModLaunch, занять оверлей и снимок, сказать друзьям.</summary>
+    public static void OnLibraryGameStarted(LibGame g)
+    {
+        if (Features.Launcher.AnyRunning() || GameId is not null && StartedAt is not null) return;
+        Library = g;
+        GameId = null;
+        StartedAt = DateTime.UtcNow;
+        ArmKeys(g.Name, steamGame: g.Store == "steam");
+        Friends.SetActivity("playing", GameReviews.Key(g), g.Name);
+    }
+
+    public static void OnLibraryGameExited(LibGame g)
+    {
+        if (Library?.Key != g.Key) return;
+        Library = null;
+        OnGameExited();
+        Friends.SetActivity("online");
     }
 
     public static void OnGameExited()

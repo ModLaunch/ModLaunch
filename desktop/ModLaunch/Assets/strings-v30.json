@@ -17,7 +17,9 @@
     "v30.ach.hidden": "Скрытое достижение",
     "v30.ach.hidden.text": "Подробности откроются, когда вы его получите.",
     "v30.ach.got": "получено",
-    "v30.ach.dialog": "{game} · достижения {got} из {n}"
+    "v30.ach.dialog": "{game} · достижения {got} из {n}",
+    "v30.ovl.total": "Всего: {time} · {store}",
+    "v30.ovl.shot": "Снимок экрана"
   },
   "en": {
     "v30.upd.gameRunning": "Close the game first: updating restarts ModLaunch, and it's better not to interrupt your session. The update will wait.",
@@ -37,7 +39,9 @@
     "v30.ach.hidden": "Hidden achievement",
     "v30.ach.hidden.text": "Details appear once you unlock it.",
     "v30.ach.got": "unlocked",
-    "v30.ach.dialog": "{game} · achievements {got} of {n}"
+    "v30.ach.dialog": "{game} · achievements {got} of {n}",
+    "v30.ovl.total": "Total: {time} · {store}",
+    "v30.ovl.shot": "Screenshot"
   },
   "uk": {
     "v30.upd.gameRunning": "Спершу закрийте гру: оновлення перезапускає ModLaunch, а гру краще не переривати посеред сесії. Оновлення нікуди не дінеться.",
@@ -57,7 +61,9 @@
     "v30.ach.hidden": "Приховане досягнення",
     "v30.ach.hidden.text": "Подробиці відкриються, коли ви його отримаєте.",
     "v30.ach.got": "отримано",
-    "v30.ach.dialog": "{game} · досягнення {got} з {n}"
+    "v30.ach.dialog": "{game} · досягнення {got} з {n}",
+    "v30.ovl.total": "Усього: {time} · {store}",
+    "v30.ovl.shot": "Знімок екрана"
   },
   "es": {
     "v30.upd.gameRunning": "Cierra primero el juego: la actualización reinicia ModLaunch y es mejor no interrumpir la partida. La actualización esperará.",
@@ -77,7 +83,9 @@
     "v30.ach.hidden": "Logro oculto",
     "v30.ach.hidden.text": "Los detalles aparecen al desbloquearlo.",
     "v30.ach.got": "desbloqueado",
-    "v30.ach.dialog": "{game} · logros {got} de {n}"
+    "v30.ach.dialog": "{game} · logros {got} de {n}",
+    "v30.ovl.total": "Total: {time} · {store}",
+    "v30.ovl.shot": "Captura"
   },
   "de": {
     "v30.upd.gameRunning": "Schließ zuerst das Spiel: Das Update startet ModLaunch neu, und die Sitzung sollte nicht unterbrochen werden. Das Update wartet.",
@@ -97,7 +105,9 @@
     "v30.ach.hidden": "Versteckter Erfolg",
     "v30.ach.hidden.text": "Details erscheinen, sobald du ihn freischaltest.",
     "v30.ach.got": "freigeschaltet",
-    "v30.ach.dialog": "{game} · Erfolge {got} von {n}"
+    "v30.ach.dialog": "{game} · Erfolge {got} von {n}",
+    "v30.ovl.total": "Gesamt: {time} · {store}",
+    "v30.ovl.shot": "Screenshot"
   },
   "fr": {
     "v30.upd.gameRunning": "Fermez d'abord le jeu : la mise à jour redémarre ModLaunch et mieux vaut ne pas interrompre la partie. La mise à jour attendra.",
@@ -117,7 +127,9 @@
     "v30.ach.hidden": "Succès caché",
     "v30.ach.hidden.text": "Les détails apparaîtront une fois débloqué.",
     "v30.ach.got": "débloqué",
-    "v30.ach.dialog": "{game} · succès {got} sur {n}"
+    "v30.ach.dialog": "{game} · succès {got} sur {n}",
+    "v30.ovl.total": "Total : {time} · {store}",
+    "v30.ovl.shot": "Capture d'écran"
   },
   "pt-BR": {
     "v30.upd.gameRunning": "Feche o jogo primeiro: a atualização reinicia o ModLaunch, e é melhor não interromper a sessão. A atualização vai esperar.",
@@ -137,7 +149,9 @@
     "v30.ach.hidden": "Conquista oculta",
     "v30.ach.hidden.text": "Os detalhes aparecem quando você a desbloquear.",
     "v30.ach.got": "desbloqueada",
-    "v30.ach.dialog": "{game} · conquistas {got} de {n}"
+    "v30.ach.dialog": "{game} · conquistas {got} de {n}",
+    "v30.ovl.total": "Total: {time} · {store}",
+    "v30.ovl.shot": "Captura de tela"
   },
   "zh-CN": {
     "v30.upd.gameRunning": "请先关闭游戏：更新会重启 ModLaunch，最好不要中途打断游戏。更新会一直等着你。",
@@ -157,6 +171,8 @@
     "v30.ach.hidden": "隐藏成就",
     "v30.ach.hidden.text": "解锁后才会显示详情。",
     "v30.ach.got": "已解锁",
-    "v30.ach.dialog": "{game} · 成就 {got} / {n}"
+    "v30.ach.dialog": "{game} · 成就 {got} / {n}",
+    "v30.ovl.total": "总计：{time} · {store}",
+    "v30.ovl.shot": "截图"
   }
 }

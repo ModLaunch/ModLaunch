@@ -179,6 +179,9 @@ public sealed partial class MainWindow : Window
         // 28.0: скидки из «Желаемого» — в колокольчик; цены проверяются раз в шесть часов.
         Features.Wishlist.Changed += () => Dispatcher.UIThread.Post(RenderBell);
         Features.Wishlist.StartWatch();
+        // 30.0: игры из «Всех игр» тоже получают оверлей, снимки и статус «в игре».
+        Games.AllGames.Started += OverlayWindow.OnLibraryGameStarted;
+        Games.AllGames.Exited += OverlayWindow.OnLibraryGameExited;
         // 28.0: чат друзей — свой ящик фоном раз в две минуты.
         Social.Friends.Chat.Start();
         // 26.0: уведомления автора (MainWindow.Creator.cs).

@@ -40,4 +40,21 @@ public static class V30Shots
         s.Pump(2500);
         s.Save("v30-03-steam-achievements");
     }
+
+    /// <summary>MODLAUNCH_SHOTS=V30LibOverlay: оверлей поверх игры из «Всех игр» (Epic): время, снимок, друзья.</summary>
+    [DemoShots]
+    static void V30LibOverlay(Shots s)
+    {
+        s.Pump(4500);
+        Games.AllGames.Refresh();
+        s.Pump(1500);
+        if (Games.AllGames.Current?.FirstOrDefault(g => g.Key == "epic:Hades") is not { } lib) return;
+        OverlayWindow.OnLibraryGameStarted(lib);
+        OverlayWindow.Toggle();
+        s.Pump(1500);
+        if (OverlayWindow.Current is { } o) Avalonia.Headless.HeadlessWindowExtensions.CaptureRenderedFrame(o)?.Save(Path.Combine(s.OutDir, "v30-04-library-overlay.png"));
+        Console.WriteLine("saved v30-04-library-overlay");
+        OverlayWindow.OnLibraryGameExited(lib);
+        s.Pump(300);
+    }
 }
