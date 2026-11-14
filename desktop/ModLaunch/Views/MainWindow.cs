@@ -1130,6 +1130,12 @@ public sealed partial class MainWindow : Window
             Button? go = null;
             go = Ui.Button(I18n.T("upd.app.install"), async () =>
             {
+                // 30.0: идёт игра — обновление закрыло бы ModLaunch посреди игры; просим доиграть.
+                if (Features.Launcher.AnyRunning() || (Games.AllGames.Current ?? []).Any(Games.AllGames.IsRunning))
+                {
+                    Toast(I18n.T("v30.upd.gameRunning"), bad: true);
+                    return;
+                }
                 go!.IsEnabled = false;
                 go.Content = I18n.T("upd.app.installing");
                 bar.IsVisible = true;

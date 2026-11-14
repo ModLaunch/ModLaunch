@@ -83,7 +83,10 @@ public static class Installer
         return rel == "." || (!rel.StartsWith("..") && !Path.IsPathRooted(rel));
     }
 
-    /// <summary>Закрыть запущенный ModLaunch (и старый ModHub) из этой папки.</summary>
+    /// <summary>
+    /// Закрыть запущенный ModLaunch (и старый ModHub) из этой папки. 30.0: только сам ModLaunch, без дочерних процессов —
+    /// раньше закрывалось всё дерево, и игра, запущенная из ModLaunch, закрывалась посреди игры без сохранения.
+    /// </summary>
     public static void CloseRunning(string dir)
     {
         var me = Environment.ProcessId;
@@ -96,7 +99,7 @@ public static class Installer
                 if (p.Id == me) continue;
                 var path = p.MainModule?.FileName;
                 if (path is null || !Inside(path, dir)) continue;
-                p.Kill(entireProcessTree: true);
+                p.Kill(entireProcessTree: false);
                 p.WaitForExit(3000);
                 closed = true;
             }

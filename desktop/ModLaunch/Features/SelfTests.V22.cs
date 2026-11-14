@@ -47,6 +47,7 @@ static class V22Tests
             || k.StartsWith("v27.", StringComparison.Ordinal) || k.StartsWith("new.v27.", StringComparison.Ordinal)
             || k.StartsWith("v28.", StringComparison.Ordinal) || k.StartsWith("new.v28.", StringComparison.Ordinal)
             || k.StartsWith("v29.", StringComparison.Ordinal) || k.StartsWith("new.v29.", StringComparison.Ordinal)
+            || k.StartsWith("v30.", StringComparison.Ordinal) || k.StartsWith("new.v30.", StringComparison.Ordinal)
             || k is "v99.frame.premium" or "v99.banner.premium" or "v99.title.premium" or "v99.badge.premium" or "v99.frame.jubilee" or "v99.banner.jubilee" or "v99.title.jubilee").ToList();
         var missing = new List<string>();
         var backlog = new List<string>();

@@ -1,0 +1,26 @@
+{
+  "ru": {
+    "v30.upd.gameRunning": "Сначала закройте игру: обновление перезапускает ModLaunch, а игру лучше не прерывать посреди сессии. Обновление никуда не денется."
+  },
+  "en": {
+    "v30.upd.gameRunning": "Close the game first: updating restarts ModLaunch, and it's better not to interrupt your session. The update will wait."
+  },
+  "uk": {
+    "v30.upd.gameRunning": "Спершу закрийте гру: оновлення перезапускає ModLaunch, а гру краще не переривати посеред сесії. Оновлення нікуди не дінеться."
+  },
+  "es": {
+    "v30.upd.gameRunning": "Cierra primero el juego: la actualización reinicia ModLaunch y es mejor no interrumpir la partida. La actualización esperará."
+  },
+  "de": {
+    "v30.upd.gameRunning": "Schließ zuerst das Spiel: Das Update startet ModLaunch neu, und die Sitzung sollte nicht unterbrochen werden. Das Update wartet."
+  },
+  "fr": {
+    "v30.upd.gameRunning": "Fermez d'abord le jeu : la mise à jour redémarre ModLaunch et mieux vaut ne pas interrompre la partie. La mise à jour attendra."
+  },
+  "pt-BR": {
+    "v30.upd.gameRunning": "Feche o jogo primeiro: a atualização reinicia o ModLaunch, e é melhor não interromper a sessão. A atualização vai esperar."
+  },
+  "zh-CN": {
+    "v30.upd.gameRunning": "请先关闭游戏：更新会重启 ModLaunch，最好不要中途打断游戏。更新会一直等着你。"
+  }
+}
