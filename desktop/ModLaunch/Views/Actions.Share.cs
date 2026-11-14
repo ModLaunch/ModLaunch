@@ -38,6 +38,7 @@ public static partial class Actions
             Snapshots.Take(g, "code");
             var (missing, other) = ModSetup.Differences(registry, wanted.Select(m => m.Setup));
             var todo = missing.Concat(other).ToList();
+            InBatch.Value = todo.Count > 1;
             var failed = new List<string>();
             for (var i = 0; i < todo.Count; i++)
             {

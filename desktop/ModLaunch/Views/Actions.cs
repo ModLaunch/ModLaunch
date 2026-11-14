@@ -20,6 +20,12 @@ public static partial class Actions
     /// <summary>Моды Nexus, которые ждём из браузера: «игра:номер» → куда отдать файл (или готовую запись по nxm://).</summary>
     static readonly Dictionary<string, TaskCompletionSource<object>> BrowserWaits = [];
 
+    /// <summary>
+    /// 30.0: идёт задача на несколько модов (обновления, сборка по коду). Тогда в окне ожидания браузера Nexus есть
+    /// «Пропустить этот мод» — раньше «Отмена» отменяла всю задачу, и остальные обновления молча пропадали.
+    /// </summary>
+    static readonly AsyncLocal<bool> InBatch = new();
+
     /// <summary>Окна ожидания файла показываем по одному: иначе человек запутается, какую кнопку нажимать.</summary>
     static readonly SemaphoreSlim NexusBrowser = new(1);
 
@@ -190,7 +196,8 @@ public static partial class Actions
         var tcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
         lock (BrowserWaits) BrowserWaits[waitKey] = tcs;
         progress.Report(new InstallStep("install.browser", name));
-        await Dispatcher.UIThread.InvokeAsync(() => ShowNexusWait(name, page, job, tcs));
+        var skippable = InBatch.Value;
+        await Dispatcher.UIThread.InvokeAsync(() => ShowNexusWait(name, page, job, tcs, skippable));
         Ui.OpenUrl(page);
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(ct);
         var watch = DownloadWatch.WaitForArchive(DownloadWatch.NexusMatcher(modId), stop.Token)
@@ -206,15 +213,21 @@ public static partial class Actions
         }
     }
 
-    static void ShowNexusWait(string mod, string page, Job job, TaskCompletionSource<object> picked)
+    internal static void ShowNexusWait(string mod, string page, Job job, TaskCompletionSource<object> picked, bool skippable = false)
     {
         var steps = Ui.Col(10,
             Ui.Text("1. " + I18n.T("nexus.wait.step1", ("mod", mod)), wrap: true),
             Ui.Text("2. " + I18n.T("nexus.wait.step2"), wrap: true),
             Ui.Text("3. " + I18n.T("nexus.wait.step3"), wrap: true),
             Ui.Row(10, new ProgressBar { IsIndeterminate = true, Width = 120, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center }, Ui.Text(I18n.T("nexus.wait.status"), "muted small")));
-        W.Dialog(I18n.T("nexus.wait.title"), steps,
-            Ui.Button(I18n.T("common.cancel"), () => { job.Cancel.Cancel(); picked.TrySetCanceled(); W.CloseDialog(); }),
+        // В задаче на несколько модов: «Пропустить» — только этот мод (остальные продолжатся), «Отменить всё» — всю задачу.
+        var cancel = skippable
+            ? Ui.Button(I18n.T("v30.nexus.cancelAll"), () => { job.Cancel.Cancel(); picked.TrySetCanceled(); W.CloseDialog(); }, "ghost")
+            : Ui.Button(I18n.T("common.cancel"), () => { job.Cancel.Cancel(); picked.TrySetCanceled(); W.CloseDialog(); });
+        var skip = Ui.Button(I18n.T("v30.nexus.skip"), () => { picked.TrySetCanceled(); W.CloseDialog(); }, "", Icons.Forward);
+        skip.IsVisible = skippable;
+        W.Dialog(I18n.T("nexus.wait.title"), steps, skippable ? 700 : 520,
+            cancel, skip,
             Ui.Button(I18n.T("nexus.wait.file"), async () =>
             {
                 var file = await W.PickFile(I18n.T("dialog.pickArchive"));

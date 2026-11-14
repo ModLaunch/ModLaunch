@@ -46,8 +46,10 @@ public static partial class Actions
             // «Повторить» запускает работу заново — снова помечаем моды как обновляемые;
             // те, что уже обновляет другая задача, не трогаем (иначе две задачи пишут в одну папку).
             var mine = retry ? list.Where(u => Updating.TryAdd(UpdateKey(g, u.RecordId), 0)).ToList() : list;
+            InBatch.Value = mine.Count > 1;
             Snapshots.Take(g, "update");
             var failed = new List<string>();
+            var skipped = new List<string>();
             try
             {
                 for (var i = 0; i < mine.Count; i++)
@@ -68,6 +70,8 @@ public static partial class Actions
                             && UpdateLog.Add(g.Def.Id, g.Def.Name, u.RecordId, now.Str("displayName") ?? u.Name, from, to, now.Str("source") ?? u.Source, auto, now.Str("url")) is { } logId)
                             UpdateLog.FetchChangelog(g.Def, logId, u.CatalogId, g.Def.SourceOf(u.RecordId, now.Str("source")), from, to);
                     }
+                    // 30.0: «Пропустить этот мод» в окне браузера Nexus — не ошибка; мод останется в списке обновлений.
+                    catch (OperationCanceledException) when (mine.Count > 1 && !ct.IsCancellationRequested) { skipped.Add(u.Name); }
                     catch (Exception) when (mine.Count > 1 && !ct.IsCancellationRequested) { failed.Add(u.Name); }
                     finally
                     {
@@ -81,6 +85,7 @@ public static partial class Actions
                 foreach (var u in mine) Updating.TryRemove(UpdateKey(g, u.RecordId), out _);
                 Dispatcher.UIThread.Post(AppState.Notify);
             }
+            if (skipped.Count > 0) Dispatcher.UIThread.Post(() => W.Toast(I18n.T("v30.upd.skipped", ("list", string.Join(", ", skipped.Take(6))))));
             if (failed.Count > 0) throw new InvalidOperationException(I18n.T("upd.failedSome", ("list", string.Join(", ", failed))));
         });
         void OnFinished(Job j)

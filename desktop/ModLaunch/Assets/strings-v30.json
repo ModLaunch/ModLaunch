@@ -1,26 +1,50 @@
 {
   "ru": {
-    "v30.upd.gameRunning": "Сначала закройте игру: обновление перезапускает ModLaunch, а игру лучше не прерывать посреди сессии. Обновление никуда не денется."
+    "v30.upd.gameRunning": "Сначала закройте игру: обновление перезапускает ModLaunch, а игру лучше не прерывать посреди сессии. Обновление никуда не денется.",
+    "v30.nexus.skip": "Пропустить этот мод",
+    "v30.nexus.cancelAll": "Отменить всё",
+    "v30.upd.skipped": "Пропущены (обновите их позже): {list}"
   },
   "en": {
-    "v30.upd.gameRunning": "Close the game first: updating restarts ModLaunch, and it's better not to interrupt your session. The update will wait."
+    "v30.upd.gameRunning": "Close the game first: updating restarts ModLaunch, and it's better not to interrupt your session. The update will wait.",
+    "v30.nexus.skip": "Skip this mod",
+    "v30.nexus.cancelAll": "Cancel all",
+    "v30.upd.skipped": "Skipped (update them later): {list}"
   },
   "uk": {
-    "v30.upd.gameRunning": "Спершу закрийте гру: оновлення перезапускає ModLaunch, а гру краще не переривати посеред сесії. Оновлення нікуди не дінеться."
+    "v30.upd.gameRunning": "Спершу закрийте гру: оновлення перезапускає ModLaunch, а гру краще не переривати посеред сесії. Оновлення нікуди не дінеться.",
+    "v30.nexus.skip": "Пропустити цей мод",
+    "v30.nexus.cancelAll": "Скасувати все",
+    "v30.upd.skipped": "Пропущено (оновіть їх пізніше): {list}"
   },
   "es": {
-    "v30.upd.gameRunning": "Cierra primero el juego: la actualización reinicia ModLaunch y es mejor no interrumpir la partida. La actualización esperará."
+    "v30.upd.gameRunning": "Cierra primero el juego: la actualización reinicia ModLaunch y es mejor no interrumpir la partida. La actualización esperará.",
+    "v30.nexus.skip": "Omitir este mod",
+    "v30.nexus.cancelAll": "Cancelar todo",
+    "v30.upd.skipped": "Omitidos (actualízalos más tarde): {list}"
   },
   "de": {
-    "v30.upd.gameRunning": "Schließ zuerst das Spiel: Das Update startet ModLaunch neu, und die Sitzung sollte nicht unterbrochen werden. Das Update wartet."
+    "v30.upd.gameRunning": "Schließ zuerst das Spiel: Das Update startet ModLaunch neu, und die Sitzung sollte nicht unterbrochen werden. Das Update wartet.",
+    "v30.nexus.skip": "Diesen Mod überspringen",
+    "v30.nexus.cancelAll": "Alles abbrechen",
+    "v30.upd.skipped": "Übersprungen (später aktualisieren): {list}"
   },
   "fr": {
-    "v30.upd.gameRunning": "Fermez d'abord le jeu : la mise à jour redémarre ModLaunch et mieux vaut ne pas interrompre la partie. La mise à jour attendra."
+    "v30.upd.gameRunning": "Fermez d'abord le jeu : la mise à jour redémarre ModLaunch et mieux vaut ne pas interrompre la partie. La mise à jour attendra.",
+    "v30.nexus.skip": "Passer ce mod",
+    "v30.nexus.cancelAll": "Tout annuler",
+    "v30.upd.skipped": "Ignorés (à mettre à jour plus tard) : {list}"
   },
   "pt-BR": {
-    "v30.upd.gameRunning": "Feche o jogo primeiro: a atualização reinicia o ModLaunch, e é melhor não interromper a sessão. A atualização vai esperar."
+    "v30.upd.gameRunning": "Feche o jogo primeiro: a atualização reinicia o ModLaunch, e é melhor não interromper a sessão. A atualização vai esperar.",
+    "v30.nexus.skip": "Pular este mod",
+    "v30.nexus.cancelAll": "Cancelar tudo",
+    "v30.upd.skipped": "Pulados (atualize depois): {list}"
   },
   "zh-CN": {
-    "v30.upd.gameRunning": "请先关闭游戏：更新会重启 ModLaunch，最好不要中途打断游戏。更新会一直等着你。"
+    "v30.upd.gameRunning": "请先关闭游戏：更新会重启 ModLaunch，最好不要中途打断游戏。更新会一直等着你。",
+    "v30.nexus.skip": "跳过这个模组",
+    "v30.nexus.cancelAll": "全部取消",
+    "v30.upd.skipped": "已跳过（稍后再更新）：{list}"
   }
 }
