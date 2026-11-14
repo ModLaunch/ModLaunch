@@ -21,6 +21,25 @@ public static class V29Shots
         s.Window.CloseDialog();
     }
 
+    /// <summary>MODLAUNCH_SHOTS=V29Packs: готовые сборки по играм и окно «Поставить и играть».</summary>
+    [DemoShots]
+    static void V29Packs(Shots s)
+    {
+        s.Pump(4500);
+        s.Window.Navigate(() => new ModpacksPage());
+        s.Pump(3000);
+        s.Save("v29-04-modpacks");
+        if (AppState.Games.FirstOrDefault(g => g.Def.Id == "lethal-company") is { } lc)
+        {
+            var pack = new Sources.ModInfo { Source = "thunderstore", Id = "Demo-NightShift", Name = "Night Shift Pack", Author = "Lena", Downloads = 412_000,
+                Dependencies = ["BepInEx-BepInExPack-5.4.2100", "notnotnotswipez-MoreCompany-1.11.0", "x753-More_Suits-1.4.3", "Sligili-More_Emotes-1.3.3"] };
+            ModpacksPage.Ask(lc, pack, 3);
+            s.Pump(800);
+            s.Save("v29-05-modpack-ask");
+            s.Window.CloseDialog();
+        }
+    }
+
     /// <summary>MODLAUNCH_SHOTS=V29Recommend: «Для вас» — похожие игры с причиной.</summary>
     [DemoShots]
     static void V29Recommend(Shots s)

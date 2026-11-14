@@ -81,7 +81,9 @@ public sealed partial class LibraryPage : Page
         var add = Ui.Button(I18n.T("add.title"), () => MainWindow.Current?.Navigate(() => new AddGamePage()), "", Icons.Plus);
         // 27.0: единая библиотека — все игры всех лаунчеров, и без модов тоже.
         var everything = Ui.Button(I18n.T("v27.lib.link"), () => MainWindow.Current?.Navigate(() => new AllGamesPage()), "", Icons.Grid, I18n.T("v27.lib.link.hint"));
-        var tools = Ui.Row(10, sort, everything, add);
+        // 29.0: готовые сборки в один клик.
+        var packs = Ui.Button(I18n.T("v29.packs.title"), () => MainWindow.Current?.Navigate(() => new ModpacksPage()), "", Icons.Layers);
+        var tools = Ui.Row(10, sort, packs, everything, add);
         tools.VerticalAlignment = VerticalAlignment.Top;
         var head = new DockPanel();
         DockPanel.SetDock(tools, Dock.Right);

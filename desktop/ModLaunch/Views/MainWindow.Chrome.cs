@@ -34,6 +34,7 @@ public sealed partial class MainWindow
             Ctx.Item(I18n.T("v27.lib.title"), Icons.Grid, () => Navigate(() => new AllGamesPage()), gesture: "Ctrl+Shift+L"),
             Ctx.Item(I18n.T("v28.wish.title"), Icons.Heart, () => Navigate(() => new WishlistPage()), gesture: "Ctrl+Shift+W"),
             Ctx.Item(I18n.T("v29.rec.title"), Icons.Sparkles, () => Navigate(() => new RecommendPage())),
+            Ctx.Item(I18n.T("v29.packs.title"), Icons.Layers, () => Navigate(() => new ModpacksPage())),
             Ctx.Item(I18n.T("mc.title"), Icons.Package, () => Navigate(() => new ModsCenterPage()), gesture: "Ctrl+U"),
             Ctx.Item(Settings.Data.Bool("railHidden") ? I18n.T("top.rail.show") : I18n.T("top.rail.hide"), Icons.Layers, ToggleRail, gesture: "Ctrl+B"),
             "-",
