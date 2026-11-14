@@ -97,7 +97,7 @@ public sealed class OpenRun
     sealed class Track
     {
         public required Control View;
-        public double Delay, Duration = 480, Dx, Dy, Scale = 1, ScaleY = 1, Rotate, Opacity;
+        public double Delay, Duration = 480, Dx, Dy, Scale = 1, ScaleY = 1, Rotate, Opacity = 0;
         public Func<double, double> Ease = OpenRun.CubicOut;
         public RelativePoint Origin = RelativePoint.Center;
         readonly TranslateTransform _t = new();

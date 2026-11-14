@@ -65,7 +65,7 @@ public sealed class Splash : Panel
         var word = new TextBlock
         {
             FontFamily = Look.Unbounded, FontSize = 40, FontWeight = FontWeight.Bold, LetterSpacing = -1.2, HorizontalAlignment = HorizontalAlignment.Center,
-            Inlines = { new Run("Mod") { Foreground = Ui.Res("Text") }, new Run("Launch") { Foreground = Ui.Res("Brand2") } },
+            Inlines = new InlineCollection { new Run("Mod") { Foreground = Ui.Res("Text") }, new Run("Launch") { Foreground = Ui.Res("Brand2") } },
         };
         var tag = new Border
         {

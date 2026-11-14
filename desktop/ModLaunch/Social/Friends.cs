@@ -274,7 +274,7 @@ public static partial class Friends
                 var profile = profiles.GetValueOrDefault(uid);
                 var seen = Firebase.Time(profile?.S("seen"));
                 var online = profile is not null && profile.S("state") != "offline" && seen is DateTime s && serverNow - s < OnlineWindow;
-                var playing = online && profile!.S("state") == "playing" && profile.S("game") != "";
+                var playing = online && profile!.S("state") == "playing" && profile!.S("game") != "";
                 var name = Account.CleanName(profile?.S("name")) is { Length: > 0 } pn ? pn : Account.CleanName(l.S("from") == uid ? l.S("fromName") : l.S("toName"));
                 return new JsonObject
                 {
@@ -282,7 +282,7 @@ public static partial class Friends
                     ["name"] = name == "" ? "—" : name,
                     ["state"] = playing ? "playing" : online ? "online" : "offline",
                     ["game"] = playing ? profile!.S("game") : "",
-                    ["gameName"] = playing ? (profile!.S("gameName") is { Length: > 0 } gn ? gn : profile.S("game")) : "",
+                    ["gameName"] = playing ? (profile!.S("gameName") is { Length: > 0 } gn ? gn : profile!.S("game")) : "",
                     ["since"] = online ? Local(profile!.S("since"))?.ToString("o") : null,
                     ["seen"] = seen is null ? null : Local(profile!.S("seen"))?.ToString("o"),
                 };

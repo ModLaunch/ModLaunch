@@ -202,7 +202,7 @@ public static partial class Installer
         foreach (var root in roots)
         {
             var fileMeta = root.Marker is not null && root.Marker.EndsWith("manifest.json", StringComparison.OrdinalIgnoreCase)
-                ? ReadManifest(game, Archive.ReadText(archivePath, root.Marker), root.Name)
+                ? ReadManifest(game, Archive.ReadText(archivePath, root.Marker), root.Name ?? Path.GetFileNameWithoutExtension(archivePath))
                 : new Manifest(null, null, null, null, []);
 
             var rawName = fileMeta.Name ?? root.Name ?? metaName ?? "mod";

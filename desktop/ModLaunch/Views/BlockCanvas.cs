@@ -453,7 +453,7 @@ public sealed class BlockCanvas : UserControl
     /// Новый блок по имени из палитры: say, set, add, let, if, ifelse, chance, repeat, while, each, fn, call, return,
     /// break, note. hook:&lt;событие&gt; и piece:&lt;название&gt; — не блоки тела, их кладёт Place.
     /// </summary>
-    internal static XBlock? Template(string id) => id switch
+    internal static new XBlock? Template(string id) => id switch
     {
         "say" => XBlock.New("say", ("text", I18n.T("v21.t.say"))),
         "log" => XBlock.New("log", ("text", "debug: {gold}")),

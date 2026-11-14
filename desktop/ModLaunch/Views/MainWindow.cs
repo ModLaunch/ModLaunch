@@ -125,7 +125,7 @@ public sealed partial class MainWindow : Window
         ExtendClientAreaToDecorationsHint = true;
         ExtendClientAreaChromeHints = Avalonia.Platform.ExtendClientAreaChromeHints.NoChrome;
         ExtendClientAreaTitleBarHeightHint = -1;
-        try { Icon = new WindowIcon(Images.Asset("icon.png")); } catch { }
+        try { if (Images.Asset("icon.png") is { } icon) Icon = new WindowIcon(icon); } catch { }
 
         _back = Ui.Button("", GoBack, "icon ghost", Icons.Back, I18n.T("nav.back"));
         _forward = Ui.Button("", GoForward, "icon ghost", Icons.Forward, I18n.T("nav.forward"));
@@ -621,7 +621,7 @@ public sealed partial class MainWindow : Window
         quit.Click += (_, _) => { _quitting = true; Close(); };
         menu.Items.Add(quit);
         _tray = new TrayIcon { ToolTipText = "ModLaunch", Menu = menu, IsVisible = true };
-        try { _tray.Icon = new WindowIcon(Images.Asset("icon.png")); } catch { }
+        try { if (Images.Asset("icon.png") is { } trayIcon) _tray.Icon = new WindowIcon(trayIcon); } catch { }
         _tray.Clicked += (_, _) => ShowFromTray();
         TrayIcon.SetIcons(Application.Current, [_tray]);
     }

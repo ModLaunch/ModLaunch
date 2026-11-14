@@ -26,7 +26,7 @@ public static class ModRow
         var name = new TextBlock
         {
             FontSize = 16, FontWeight = FontWeight.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis,
-            Inlines =
+            Inlines = new Avalonia.Controls.Documents.InlineCollection
             {
                 new Avalonia.Controls.Documents.Run(mod.Name),
                 new Avalonia.Controls.Documents.Run("  " + (mod.Author == "" ? "" : I18n.T("mod.by", ("author", mod.Author)))) { FontSize = 13, Foreground = Ui.Res("Brand2") },

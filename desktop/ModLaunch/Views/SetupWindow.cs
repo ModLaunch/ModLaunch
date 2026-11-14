@@ -45,7 +45,7 @@ public sealed partial class SetupWindow : Window
         ExtendClientAreaChromeHints = Avalonia.Platform.ExtendClientAreaChromeHints.NoChrome;
         ExtendClientAreaTitleBarHeightHint = -1;
         Background = Ui.Res("Bg");
-        try { Icon = new WindowIcon(Images.Asset("icon.png")); } catch { }
+        try { if (Images.Asset("icon.png") is { } icon) Icon = new WindowIcon(icon); } catch { }
 
         Compose();
         if (mode == SetupMode.Update) Opened += (_, _) => Run();
@@ -121,7 +121,7 @@ public sealed partial class SetupWindow : Window
             Child = new Image { Source = Images.Asset("icon.png", 96) },
         };
         var brand = Ui.Row(12, logo,
-            new TextBlock { FontSize = 26, FontWeight = FontWeight.Bold, Foreground = Brushes.White, VerticalAlignment = VerticalAlignment.Center, Inlines = { new Avalonia.Controls.Documents.Run("Mod"), new Avalonia.Controls.Documents.Run("Launch") { Foreground = new SolidColorBrush(Accent) } } });
+            new TextBlock { FontSize = 26, FontWeight = FontWeight.Bold, Foreground = Brushes.White, VerticalAlignment = VerticalAlignment.Center, Inlines = new Avalonia.Controls.Documents.InlineCollection { new Avalonia.Controls.Documents.Run("Mod"), new Avalonia.Controls.Documents.Run("Launch") { Foreground = new SolidColorBrush(Accent) } } });
         Animate.From(logo, "scale(0.6) rotate(-12deg)", 620, 60, new BackEaseOut());
 
         var side = new Panel

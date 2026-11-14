@@ -25,14 +25,12 @@ public sealed partial class AccountPage : Page
 
     // Загружается по требованию, сбрасывается кнопкой «Обновить».
     List<Purchase>? _purchases;
-    List<Payout>? _payouts;
-    List<TopUp>? _topups;
     (List<TopUp> TopUps, List<Payout> Payouts, Wallet Platform)? _admin;
     string? _error;
 
     public AccountPage(string tab = "profile") { _tab = tab == "selling" ? "earnings" : tab; }
 
-    void Reset() { _earn = null; _purchases = null; _payouts = null; _topups = null; _admin = null; _error = null; _tried.Clear(); }
+    void Reset() { _earn = null; _purchases = null; _admin = null; _error = null; _tried.Clear(); }
 
     /// <summary>Что уже пробовали загрузить: после ошибки не повторяем сами (иначе бесконечный цикл запросов), только по кнопке «Обновить».</summary>
     readonly HashSet<string> _tried = [];

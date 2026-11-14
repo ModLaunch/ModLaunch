@@ -216,7 +216,7 @@ public sealed partial class CreatorPage
     }
 
     /// <summary>Пометка в правом верхнем углу обложки: версия, «Куплен», «Импорт». 26.0: общий ярлык хаба (тёмный на картинке).</summary>
-    static Border Tag(string text, IBrush? background, HorizontalAlignment h)
+    static new Border Tag(string text, IBrush? background, HorizontalAlignment h)
     {
         var badge = HubLook.Badge(text, "onArt");
         if (background is not null) badge.Background = background;
