@@ -20,4 +20,16 @@ public static class V29Shots
         s.Save("v29-02-price-compare");
         s.Window.CloseDialog();
     }
+
+    /// <summary>MODLAUNCH_SHOTS=V29Recommend: «Для вас» — похожие игры с причиной.</summary>
+    [DemoShots]
+    static void V29Recommend(Shots s)
+    {
+        s.Pump(4500);
+        Games.AllGames.Refresh();
+        s.Pump(1500);
+        s.Window.Navigate(() => new RecommendPage());
+        s.Pump(2500);
+        s.Save("v29-03-for-you");
+    }
 }

@@ -48,7 +48,8 @@ public sealed class WishlistPage : Page
         var country = new ComboBox { ItemsSource = Wishlist.Countries.Select(c => c.ToUpperInvariant()).ToList(), SelectedItem = Wishlist.Country.ToUpperInvariant(), MinWidth = 76 };
         ToolTip.SetTip(country, I18n.T("v28.wish.country"));
         country.SelectionChanged += (_, _) => { if (country.SelectedItem is string c) Wishlist.Country = c.ToLowerInvariant(); };
-        var tools = Ui.Row(8, check, import, country);
+        var forYou = Ui.Button(I18n.T("v29.rec.title"), () => MainWindow.Current?.Navigate(() => new RecommendPage()), "ghost", Icons.Sparkles);
+        var tools = Ui.Row(8, forYou, check, import, country);
         tools.VerticalAlignment = VerticalAlignment.Center;
 
         var head = new DockPanel();

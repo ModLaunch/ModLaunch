@@ -104,6 +104,10 @@ public sealed class AllGamesPage : Page
         titleRow.Children.Add(refresh);
         DockPanel.SetDock(wish, Dock.Right);
         titleRow.Children.Add(wish);
+        // 29.0: «Для вас» — похожие игры.
+        var forYou = Ui.Button("", () => MainWindow.Current?.Navigate(() => new RecommendPage()), "icon ghost", Icons.Sparkles, I18n.T("v29.rec.title"));
+        DockPanel.SetDock(forYou, Dock.Right);
+        titleRow.Children.Add(forYou);
         titleRow.Children.Add(Ui.Row(10, Ui.Icon(Icons.Grid, 16, Ui.Res("Muted")), Ui.Text(I18n.T("v27.lib.title"), "h3")));
         var stores = games.Select(g => g.Store).Distinct().Count();
         var head = Ui.Col(10,
