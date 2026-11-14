@@ -221,7 +221,8 @@ public static partial class AllGames
         SteamCatalog.EnsureLoaded().GetAwaiter().GetResult();
         var games = Merge(SteamAccount.All.Where(g => g.IsInstalled), Stores.ScanAll(), [], SteamIdByName);
         foreach (var g in games.OrderBy(g => Array.IndexOf(Stores.Order, g.Store)).ThenBy(g => g.Name, StringComparer.OrdinalIgnoreCase))
-            Console.WriteLine($"{g.Store,-10} {g.Name} | steam={g.SteamAppId} | {g.Dir} | {g.Source?.Uri ?? g.Source?.Exe ?? (g.Store == "steam" ? "steam://rungameid/" + g.SteamAppId : "exe from folder")}");
+            Console.WriteLine($"{g.Store,-10} {g.Name} | steam={g.SteamAppId} | {g.Dir} | {g.Source?.Uri ?? g.Source?.Exe ?? (g.Store == "steam" ? "steam://rungameid/" + g.SteamAppId : "exe from folder")}"
+                + (SteamAchievements.For(g.SteamAppId) is { Count: > 0 } ach ? $" | achievements {ach.Count(a => a.Unlocked)}/{ach.Count}" : ""));
         Console.WriteLine($"{games.Count} installed games, stores: {string.Join(", ", games.GroupBy(g => g.Store).Select(x => x.Key + " " + x.Count()))}");
         return 0;
     }

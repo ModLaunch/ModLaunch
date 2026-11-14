@@ -308,7 +308,11 @@ public sealed class AllGamesPage : Page
         else mods = Line(Icons.Package, I18n.T("v14.steam.noMods"), I18n.T("v27.lib.noMods.text"), null);
 
         // 28.0: отзывы игроков — оценить может только тот, кто наиграл час и больше.
-        var body = Ui.Col(16, barCard, Ui.Card(mods, 18), new GameReviewsCard(g));
+        var body = Ui.Col(16, barCard);
+        // 30.0: достижения Steam — из файлов Steam на этом ПК.
+        if (SteamAchievementsCard.For(g) is { } achievements) body.Children.Add(achievements);
+        body.Children.Add(Ui.Card(mods, 18));
+        body.Children.Add(new GameReviewsCard(g));
         if (folder is not null) body.Children.Add(Ui.Text(folder, "tiny muted", wrap: true));
         body.Margin = new Thickness(34, -6, 34, 34);
         body.MaxWidth = 1100;

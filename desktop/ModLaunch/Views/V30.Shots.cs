@@ -28,4 +28,16 @@ public static class V30Shots
         s.Pump(800);
         s.Save("v30-02-shot-settings");
     }
+
+    /// <summary>MODLAUNCH_SHOTS=V30Ach: достижения Steam на странице игры во «Всех играх».</summary>
+    [DemoShots]
+    static void V30Ach(Shots s)
+    {
+        s.Pump(4500);
+        Games.AllGames.Refresh();
+        s.Pump(1500);
+        s.Window.Navigate(() => new AllGamesPage("steam:1245620"));
+        s.Pump(2500);
+        s.Save("v30-03-steam-achievements");
+    }
 }
