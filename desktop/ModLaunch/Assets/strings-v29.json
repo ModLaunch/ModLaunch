@@ -121,7 +121,12 @@
     "v29.indie.g.sandbox": "Песочница",
     "v29.indie.g.casual": "Казуальная",
     "v29.indie.g.story": "Сюжетная",
-    "v29.indie.g.multiplayer": "Мультиплеер"
+    "v29.indie.g.multiplayer": "Мультиплеер",
+    "new.v29.subtitle": "Где дешевле, игры «для вас», готовые сборки в один клик и магазин инди-игр",
+    "new.v29.prices": "Где дешевле: у каждой игры в «Желаемом» — цены во всех магазинах (GOG, Humble, Fanatical и другие), скидки и самая низкая цена за всё время. Если где-то дешевле, чем в Steam, ModLaunch так и напишет.",
+    "new.v29.foryou": "Для вас: игры, похожие на те, в которые вы больше всего играете, — с объяснением «потому что вы играли в …». Без рекламы и платных мест; неинтересное можно скрыть.",
+    "new.v29.packs": "Готовые сборки: популярные сборки модов для всех ваших игр на одной странице. «Поставить и играть» само ставит загрузчик, все моды и отдельный профиль — и запускает игру.",
+    "new.v29.indie": "Инди-игры: магазин независимых разработчиков прямо в ModLaunch. Разработчик отдаёт площадке 10% (выше 29% поднять нельзя), а не 30%, как в Steam; купленная игра ставится в библиотеку одной кнопкой."
   },
   "en": {
     "v29.price.compare": "Where it's cheaper",
@@ -245,7 +250,12 @@
     "v29.indie.g.sandbox": "Sandbox",
     "v29.indie.g.casual": "Casual",
     "v29.indie.g.story": "Story",
-    "v29.indie.g.multiplayer": "Multiplayer"
+    "v29.indie.g.multiplayer": "Multiplayer",
+    "new.v29.subtitle": "Where it's cheaper, games “for you”, one-click modpacks and an indie games store",
+    "new.v29.prices": "Where it's cheaper: every game on your wishlist shows its price in all stores (GOG, Humble, Fanatical and more), sales and the lowest price ever. If it's cheaper somewhere than on Steam, ModLaunch says so.",
+    "new.v29.foryou": "For you: games like the ones you play the most, with “because you played …”. No ads, no paid placements; hide what doesn't interest you.",
+    "new.v29.packs": "Modpacks: popular modpacks for all your games on one page. Install & play sets up the loader, every mod and a separate profile by itself — and starts the game.",
+    "new.v29.indie": "Indie games: a store for independent developers right in ModLaunch. Developers give the platform 10% (it can't go above 29%), not 30% like on Steam; a bought game installs to your library in one click."
   },
   "uk": {
     "v29.price.compare": "Де дешевше",
@@ -369,7 +379,12 @@
     "v29.indie.g.sandbox": "Пісочниця",
     "v29.indie.g.casual": "Казуальна",
     "v29.indie.g.story": "Сюжетна",
-    "v29.indie.g.multiplayer": "Мультиплеєр"
+    "v29.indie.g.multiplayer": "Мультиплеєр",
+    "new.v29.subtitle": "Де дешевше, ігри «для вас», готові збірки в один клік і магазин інді-ігор",
+    "new.v29.prices": "Де дешевше: у кожної гри в «Бажаному» — ціни в усіх магазинах (GOG, Humble, Fanatical та інші), знижки й найнижча ціна за весь час. Якщо десь дешевше, ніж у Steam, ModLaunch так і напише.",
+    "new.v29.foryou": "Для вас: ігри, схожі на ті, у які ви граєте найбільше, — з поясненням «бо ви грали в …». Без реклами й платних місць; нецікаве можна приховати.",
+    "new.v29.packs": "Готові збірки: популярні збірки модів для всіх ваших ігор на одній сторінці. «Встановити й грати» саме ставить завантажувач, усі моди й окремий профіль — і запускає гру.",
+    "new.v29.indie": "Інді-ігри: магазин незалежних розробників просто в ModLaunch. Розробник віддає майданчику 10% (вище 29% підняти не можна), а не 30%, як у Steam; куплена гра встановлюється в бібліотеку однією кнопкою."
   },
   "es": {
     "v29.price.compare": "Dónde es más barato",
@@ -493,7 +508,12 @@
     "v29.indie.g.sandbox": "Sandbox",
     "v29.indie.g.casual": "Casual",
     "v29.indie.g.story": "Narrativo",
-    "v29.indie.g.multiplayer": "Multijugador"
+    "v29.indie.g.multiplayer": "Multijugador",
+    "new.v29.subtitle": "Dónde es más barato, juegos «para ti», modpacks en un clic y una tienda de juegos indie",
+    "new.v29.prices": "Dónde es más barato: cada juego de tus deseados muestra su precio en todas las tiendas (GOG, Humble, Fanatical y más), las ofertas y el precio más bajo de la historia. Si en algún sitio es más barato que en Steam, ModLaunch te lo dice.",
+    "new.v29.foryou": "Para ti: juegos parecidos a los que más juegas, con «porque jugaste a …». Sin anuncios ni puestos pagados; oculta lo que no te interese.",
+    "new.v29.packs": "Modpacks: modpacks populares para todos tus juegos en una página. «Instalar y jugar» pone el cargador, todos los mods y un perfil propio, y abre el juego.",
+    "new.v29.indie": "Juegos indie: una tienda de desarrolladores independientes dentro de ModLaunch. El desarrollador cede el 10% a la plataforma (no puede pasar del 29%), no el 30% como en Steam; el juego comprado se instala en la biblioteca con un clic."
   },
   "de": {
     "v29.price.compare": "Wo ist es günstiger",
@@ -617,7 +637,12 @@
     "v29.indie.g.sandbox": "Sandbox",
     "v29.indie.g.casual": "Casual",
     "v29.indie.g.story": "Story",
-    "v29.indie.g.multiplayer": "Mehrspieler"
+    "v29.indie.g.multiplayer": "Mehrspieler",
+    "new.v29.subtitle": "Wo ist es günstiger, Spiele „für dich“, Modpacks mit einem Klick und ein Indie-Shop",
+    "new.v29.prices": "Wo ist es günstiger: Jedes Spiel auf deiner Wunschliste zeigt seinen Preis in allen Shops (GOG, Humble, Fanatical und mehr), Angebote und den niedrigsten Preis aller Zeiten. Ist es irgendwo günstiger als auf Steam, sagt ModLaunch es dir.",
+    "new.v29.foryou": "Für dich: Spiele wie die, die du am meisten spielst, mit „weil du … gespielt hast“. Ohne Werbung und bezahlte Plätze; Uninteressantes lässt sich ausblenden.",
+    "new.v29.packs": "Modpacks: beliebte Modpacks für all deine Spiele auf einer Seite. „Installieren & spielen“ richtet Loader, alle Mods und ein eigenes Profil selbst ein – und startet das Spiel.",
+    "new.v29.indie": "Indie-Spiele: ein Shop für unabhängige Entwickler direkt in ModLaunch. Entwickler geben der Plattform 10 % (mehr als 29 % geht nicht), nicht 30 % wie bei Steam; ein gekauftes Spiel landet mit einem Klick in der Bibliothek."
   },
   "fr": {
     "v29.price.compare": "Où c'est moins cher",
@@ -741,7 +766,12 @@
     "v29.indie.g.sandbox": "Bac à sable",
     "v29.indie.g.casual": "Occasionnel",
     "v29.indie.g.story": "Narratif",
-    "v29.indie.g.multiplayer": "Multijoueur"
+    "v29.indie.g.multiplayer": "Multijoueur",
+    "new.v29.subtitle": "Où c'est moins cher, des jeux « pour vous », des modpacks en un clic et une boutique de jeux indé",
+    "new.v29.prices": "Où c'est moins cher : chaque jeu de votre liste de souhaits affiche son prix dans toutes les boutiques (GOG, Humble, Fanatical et d'autres), les promos et le prix le plus bas de tous les temps. Si c'est moins cher ailleurs que sur Steam, ModLaunch le dit.",
+    "new.v29.foryou": "Pour vous : des jeux proches de ceux auxquels vous jouez le plus, avec « parce que vous avez joué à … ». Sans pub ni places payées ; masquez ce qui ne vous intéresse pas.",
+    "new.v29.packs": "Modpacks : les modpacks populaires pour tous vos jeux sur une seule page. « Installer et jouer » installe le chargeur, tous les mods et un profil dédié — et lance le jeu.",
+    "new.v29.indie": "Jeux indé : une boutique de développeurs indépendants directement dans ModLaunch. Le développeur cède 10 % à la plateforme (impossible de dépasser 29 %), pas 30 % comme sur Steam ; un jeu acheté s'installe dans la bibliothèque en un clic."
   },
   "pt-BR": {
     "v29.price.compare": "Onde está mais barato",
@@ -865,7 +895,12 @@
     "v29.indie.g.sandbox": "Sandbox",
     "v29.indie.g.casual": "Casual",
     "v29.indie.g.story": "Narrativo",
-    "v29.indie.g.multiplayer": "Multijogador"
+    "v29.indie.g.multiplayer": "Multijogador",
+    "new.v29.subtitle": "Onde está mais barato, jogos “para você”, modpacks em um clique e uma loja de jogos indie",
+    "new.v29.prices": "Onde está mais barato: cada jogo da sua lista de desejos mostra o preço em todas as lojas (GOG, Humble, Fanatical e outras), as promoções e o menor preço de todos os tempos. Se estiver mais barato em algum lugar do que na Steam, o ModLaunch avisa.",
+    "new.v29.foryou": "Para você: jogos parecidos com os que você mais joga, com “porque você jogou …”. Sem anúncios nem lugares pagos; esconda o que não interessa.",
+    "new.v29.packs": "Modpacks: modpacks populares para todos os seus jogos em uma página. “Instalar e jogar” instala o loader, todos os mods e um perfil próprio — e abre o jogo.",
+    "new.v29.indie": "Jogos indie: uma loja de desenvolvedores independentes dentro do ModLaunch. O desenvolvedor cede 10% à plataforma (não pode passar de 29%), não 30% como na Steam; o jogo comprado vai para a biblioteca com um clique."
   },
   "zh-CN": {
     "v29.price.compare": "哪里更便宜",
@@ -989,6 +1024,11 @@
     "v29.indie.g.sandbox": "沙盒",
     "v29.indie.g.casual": "休闲",
     "v29.indie.g.story": "剧情",
-    "v29.indie.g.multiplayer": "多人"
+    "v29.indie.g.multiplayer": "多人",
+    "new.v29.subtitle": "哪里更便宜、为你推荐、一键整合包和独立游戏商店",
+    "new.v29.prices": "哪里更便宜：愿望单里的每款游戏都会显示在所有商店（GOG、Humble、Fanatical 等）的价格、折扣和史低价格。如果别处比 Steam 便宜，ModLaunch 会直接告诉你。",
+    "new.v29.foryou": "为你推荐：与你玩得最多的游戏相似的作品，并说明“因为你玩过……”。没有广告和付费位置；不感兴趣的可以隐藏。",
+    "new.v29.packs": "整合包：你所有游戏的热门模组整合包都在一页上。“安装并开始游戏”会自动安装加载器、所有模组和单独的配置，然后启动游戏。",
+    "new.v29.indie": "独立游戏：ModLaunch 内的独立开发者商店。开发者只让平台抽成 10%（不能超过 29%），而不是 Steam 的 30%；买到的游戏一键安装到游戏库。"
   }
 }
