@@ -258,7 +258,8 @@
     "v30.news.title": "Новости",
     "v30.news.all": "Все новости",
     "v30.news.loading": "Загружаю новости…",
-    "new.v30.news": "Новости игры: на странице игры — три последних объявления разработчиков, и не только для игр Steam, но и для игр из Epic, GOG и других лаунчеров."
+    "new.v30.news": "Новости игры: на странице игры — три последних объявления разработчиков, и не только для игр Steam, но и для игр из Epic, GOG и других лаунчеров.",
+    "v30.keys.hint": "↑/↓ — выбрать игру, Enter — играть, F — в избранное (когда курсор не в поле ввода)"
   },
   "en": {
     "v30.upd.gameRunning": "Close the game first: updating restarts ModLaunch, and it's better not to interrupt your session. The update will wait.",
@@ -519,7 +520,8 @@
     "v30.news.title": "News",
     "v30.news.all": "All news",
     "v30.news.loading": "Loading news…",
-    "new.v30.news": "Game news: a game's page shows the developers' three latest announcements — not only for Steam games but for Epic, GOG and other launchers too."
+    "new.v30.news": "Game news: a game's page shows the developers' three latest announcements — not only for Steam games but for Epic, GOG and other launchers too.",
+    "v30.keys.hint": "↑/↓ — pick a game, Enter — play, F — favorite (when not typing in a field)"
   },
   "uk": {
     "v30.upd.gameRunning": "Спершу закрийте гру: оновлення перезапускає ModLaunch, а гру краще не переривати посеред сесії. Оновлення нікуди не дінеться.",
@@ -780,7 +782,8 @@
     "v30.news.title": "Новини",
     "v30.news.all": "Усі новини",
     "v30.news.loading": "Завантажую новини…",
-    "new.v30.news": "Новини гри: на сторінці гри — три останні оголошення розробників, і не лише для ігор Steam, а й для ігор з Epic, GOG та інших лаунчерів."
+    "new.v30.news": "Новини гри: на сторінці гри — три останні оголошення розробників, і не лише для ігор Steam, а й для ігор з Epic, GOG та інших лаунчерів.",
+    "v30.keys.hint": "↑/↓ — вибрати гру, Enter — грати, F — до обраного (коли курсор не в полі введення)"
   },
   "es": {
     "v30.upd.gameRunning": "Cierra primero el juego: la actualización reinicia ModLaunch y es mejor no interrumpir la partida. La actualización esperará.",
@@ -1041,7 +1044,8 @@
     "v30.news.title": "Noticias",
     "v30.news.all": "Todas las noticias",
     "v30.news.loading": "Cargando noticias…",
-    "new.v30.news": "Noticias del juego: la página del juego muestra los tres últimos anuncios de los desarrolladores, no solo en juegos de Steam, también de Epic, GOG y otros launchers."
+    "new.v30.news": "Noticias del juego: la página del juego muestra los tres últimos anuncios de los desarrolladores, no solo en juegos de Steam, también de Epic, GOG y otros launchers.",
+    "v30.keys.hint": "↑/↓: elegir juego, Enter: jugar, F: favorito (fuera de los campos de texto)"
   },
   "de": {
     "v30.upd.gameRunning": "Schließ zuerst das Spiel: Das Update startet ModLaunch neu, und die Sitzung sollte nicht unterbrochen werden. Das Update wartet.",
@@ -1302,7 +1306,8 @@
     "v30.news.title": "Neuigkeiten",
     "v30.news.all": "Alle Neuigkeiten",
     "v30.news.loading": "Lade Neuigkeiten…",
-    "new.v30.news": "Spielneuigkeiten: Die Spielseite zeigt die drei neuesten Ankündigungen der Entwickler – nicht nur für Steam-Spiele, auch für Epic, GOG und andere Launcher."
+    "new.v30.news": "Spielneuigkeiten: Die Spielseite zeigt die drei neuesten Ankündigungen der Entwickler – nicht nur für Steam-Spiele, auch für Epic, GOG und andere Launcher.",
+    "v30.keys.hint": "↑/↓ – Spiel wählen, Enter – spielen, F – Favorit (wenn kein Textfeld aktiv ist)"
   },
   "fr": {
     "v30.upd.gameRunning": "Fermez d'abord le jeu : la mise à jour redémarre ModLaunch et mieux vaut ne pas interrompre la partie. La mise à jour attendra.",
@@ -1563,7 +1568,8 @@
     "v30.news.title": "Actualités",
     "v30.news.all": "Toutes les actualités",
     "v30.news.loading": "Chargement des actualités…",
-    "new.v30.news": "Actualités du jeu : la page du jeu affiche les trois dernières annonces des développeurs — pas seulement pour Steam, aussi pour Epic, GOG et les autres launchers."
+    "new.v30.news": "Actualités du jeu : la page du jeu affiche les trois dernières annonces des développeurs — pas seulement pour Steam, aussi pour Epic, GOG et les autres launchers.",
+    "v30.keys.hint": "↑/↓ — choisir un jeu, Entrée — jouer, F — favori (hors champ de saisie)"
   },
   "pt-BR": {
     "v30.upd.gameRunning": "Feche o jogo primeiro: a atualização reinicia o ModLaunch, e é melhor não interromper a sessão. A atualização vai esperar.",
@@ -1824,7 +1830,8 @@
     "v30.news.title": "Notícias",
     "v30.news.all": "Todas as notícias",
     "v30.news.loading": "Carregando notícias…",
-    "new.v30.news": "Notícias do jogo: a página do jogo mostra os três anúncios mais recentes dos desenvolvedores — não só de jogos da Steam, mas também da Epic, GOG e outros launchers."
+    "new.v30.news": "Notícias do jogo: a página do jogo mostra os três anúncios mais recentes dos desenvolvedores — não só de jogos da Steam, mas também da Epic, GOG e outros launchers.",
+    "v30.keys.hint": "↑/↓ — escolher jogo, Enter — jogar, F — favoritar (fora dos campos de texto)"
   },
   "zh-CN": {
     "v30.upd.gameRunning": "请先关闭游戏：更新会重启 ModLaunch，最好不要中途打断游戏。更新会一直等着你。",
@@ -2085,6 +2092,7 @@
     "v30.news.title": "新闻",
     "v30.news.all": "全部新闻",
     "v30.news.loading": "正在加载新闻…",
-    "new.v30.news": "游戏新闻：游戏页面会显示开发者最近的三条公告——不仅限 Steam 游戏，Epic、GOG 等启动器的游戏也有。"
+    "new.v30.news": "游戏新闻：游戏页面会显示开发者最近的三条公告——不仅限 Steam 游戏，Epic、GOG 等启动器的游戏也有。",
+    "v30.keys.hint": "↑/↓ 选择游戏，Enter 开始游戏，F 加入收藏（不在输入框中时）"
   }
 }

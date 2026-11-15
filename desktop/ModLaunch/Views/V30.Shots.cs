@@ -271,4 +271,20 @@ public static class V30Shots
         s.Pump(800);
         s.Save("v30-20-news");
     }
+
+    /// <summary>MODLAUNCH_SHOTS=V30Keys: «Все игры» после трёх нажатий ↓ — выбор сдвинулся, статус значком в строке.</summary>
+    [DemoShots]
+    static void V30Keys(Shots s)
+    {
+        s.Pump(4500);
+        Games.AllGames.Refresh();
+        s.Pump(1500);
+        Games.Shelves.Current.SetStatus("steam:1245620", "playing");
+        Settings.Data["allGamesStore"] = "all";
+        s.Window.Navigate(() => new AllGamesPage("steam:1245620"));
+        s.Pump(1500);
+        if (s.Window.CurrentPage is AllGamesPage page) { page.Step(1); page.Step(1); page.Step(1); }
+        s.Pump(1200);
+        s.Save("v30-21-keys");
+    }
 }

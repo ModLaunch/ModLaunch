@@ -43,6 +43,8 @@ public sealed class AllGamesPage : Page
         void Changed() => Dispatcher.UIThread.Post(() => { if (MainWindow.Current?.CurrentPage == this) Build(); });
         AttachedToVisualTree += (_, _) => { AllGames.Changed += Changed; SteamAccount.Changed += Refresh; Shelves.Changed += Changed; };
         DetachedFromVisualTree += (_, _) => { AllGames.Changed -= Changed; SteamAccount.Changed -= Refresh; Shelves.Changed -= Changed; };
+        // 30.9: клавиатура — ↑/↓ выбирают игру (и прямо из поиска), Enter — играть, F — избранное.
+        AddHandler(KeyDownEvent, OnKeys, Avalonia.Interactivity.RoutingStrategies.Tunnel);
     }
 
     static void Refresh() => Dispatcher.UIThread.Post(() => _ = AllGames.Refresh());
@@ -96,8 +98,9 @@ public sealed class AllGamesPage : Page
         _list = new ScrollViewer { HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
         _detail = new ContentControl();
 
-        var search = new TextBox { Watermark = I18n.T("v27.lib.filter"), Text = _query, Classes = { "search" } };
+        var search = _searchBox = new TextBox { Watermark = I18n.T("v27.lib.filter"), Text = _query, Classes = { "search" } };
         search.TextChanged += (_, _) => { _query = search.Text?.Trim() ?? ""; RenderList(); };
+        ToolTip.SetTip(search, I18n.T("v30.keys.hint"));
         var chips = new WrapPanel();
         Button Chip(string id, string text, int count)
         {
@@ -247,7 +250,15 @@ public sealed class AllGamesPage : Page
             foreach (var g in recent) col.Children.Add(Row(g));
         }
         col.Children.Add(Group(I18n.T("v27.lib.allGames", ("n", visible.Count.ToString("N0", I18n.Culture)))));
-        foreach (var g in Shelves.Order(visible, shelves.Sort, AllGames.Played)) col.Children.Add(Row(g));
+        _order.Clear();
+        _rowOf.Clear();
+        foreach (var g in Shelves.Order(visible, shelves.Sort, AllGames.Played))
+        {
+            var row = Row(g);
+            _order.Add(g.Key);
+            _rowOf[g.Key] = row;
+            col.Children.Add(row);
+        }
         if (visible.Count == 0)
             col.Children.Add(new Border
             {
@@ -255,6 +266,46 @@ public sealed class AllGamesPage : Page
                 Child = Ui.Text(_store.StartsWith("c:", StringComparison.Ordinal) && _query == "" ? I18n.T("v30.shelf.empty") : I18n.T("v27.lib.nothing"), "small muted", wrap: true),
             });
         _list.Content = col;
+    }
+
+    TextBox? _searchBox;
+    readonly List<string> _order = [];
+    readonly Dictionary<string, Control> _rowOf = [];
+
+    /// <summary>Выбрать соседнюю игру в общем списке (по его нынешнему порядку и фильтрам) и показать её.</summary>
+    internal void Step(int delta)
+    {
+        if (_order.Count == 0) return;
+        var at = _order.IndexOf(_selected);
+        at = at < 0 ? (delta > 0 ? 0 : _order.Count - 1) : Math.Clamp(at + delta, 0, _order.Count - 1);
+        _selected = _order[at];
+        Settings.Data["allGamesSel"] = _selected;
+        RenderList();
+        RenderDetail();
+        if (_rowOf.TryGetValue(_selected, out var row)) Dispatcher.UIThread.Post(() => row.BringIntoView(), DispatcherPriority.Loaded);
+    }
+
+    void OnKeys(object? sender, Avalonia.Input.KeyEventArgs e)
+    {
+        // В заметках и других полях ввода стрелки и Enter — их; только строка поиска списка работает как «быстрый выбор».
+        if (e.Source is TextBox box && box != _searchBox) return;
+        if (e.KeyModifiers != Avalonia.Input.KeyModifiers.None) return;
+        var typing = e.Source is TextBox;
+        switch (e.Key)
+        {
+            case Avalonia.Input.Key.Down: Step(1); e.Handled = true; break;
+            case Avalonia.Input.Key.Up: Step(-1); e.Handled = true; break;
+            case Avalonia.Input.Key.PageDown: Step(10); e.Handled = true; break;
+            case Avalonia.Input.Key.PageUp: Step(-10); e.Handled = true; break;
+            case Avalonia.Input.Key.Enter when typing || e.Source is Button { Classes: var c } && c.Contains("steam-row"):
+                if (Games.FirstOrDefault(g => g.Key == _selected) is { } game) Play(game);
+                e.Handled = true;
+                break;
+            case Avalonia.Input.Key.F when !typing:
+                if (_selected != "") Shelves.Current.ToggleFavorite(_selected);
+                e.Handled = true;
+                break;
+        }
     }
 
     static Control Group(string text) => new TextBlock
@@ -312,6 +363,16 @@ public sealed class AllGamesPage : Page
         {
             DockPanel.SetDock(store, Dock.Right);
             row.Children.Add(store);
+        }
+        // 30.9: статус прохождения — значком в строке.
+        if (Shelves.Current.StatusOf(g.Key) is { Length: > 0 } status)
+        {
+            var mark = Ui.Icon(StatusIcon(status), 11, status is "playing" ? Ui.Res("Brand2") : Ui.Res("Faint"));
+            mark.Margin = new Thickness(6, 0, 0, 0);
+            mark.VerticalAlignment = VerticalAlignment.Center;
+            ToolTip.SetTip(mark, I18n.T("v30.status." + status));
+            DockPanel.SetDock(mark, Dock.Right);
+            row.Children.Add(mark);
         }
         if (Shelves.Current.IsFavorite(g.Key))
         {
