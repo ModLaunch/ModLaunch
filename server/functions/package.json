@@ -1,0 +1,16 @@
+{
+  "name": "modlaunch-server",
+  "private": true,
+  "type": "module",
+  "description": "ModLaunch server: card payments (bePaid / WebPay), fulfillment, receipts, refunds, keys, payouts, file scanning, sign-in alerts, waitlist",
+  "main": "index.js",
+  "engines": { "node": "22" },
+  "scripts": {
+    "test": "node --test --test-concurrency=1 test/providers.test.js test/store.test.js"
+  },
+  "dependencies": {
+    "firebase-admin": "14.5.1",
+    "firebase-functions": "7.4.0",
+    "nodemailer": "10.5.0"
+  }
+}

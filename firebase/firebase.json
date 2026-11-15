@@ -3,9 +3,18 @@
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
   },
+  "functions": [
+    {
+      "source": "../server/functions",
+      "codebase": "default",
+      "runtime": "nodejs22",
+      "ignore": ["node_modules", "test", ".secret.local", ".env.local", "*.log"]
+    }
+  ],
   "emulators": {
     "firestore": { "port": 8080 },
     "auth": { "port": 9099 },
+    "functions": { "port": 5001 },
     "ui": { "enabled": false },
     "singleProjectMode": true
   }

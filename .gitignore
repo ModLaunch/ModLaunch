@@ -19,3 +19,6 @@ build/task.log
 build/publish.log
 firestore-debug.log
 build/signing.json
+server/functions/node_modules/
+server/functions/.secret.local
+server/functions/.env.local

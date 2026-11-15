@@ -2,10 +2,10 @@
 # Интеграционные проверки ModLaunch на локальном эмуляторе Firebase (вход, деньги, правила базы).
 # Боевой проект не трогается: эмулятор работает с проектом demo-modlaunch и правилами из firebase/.
 # Нужны: Node.js 20+, Java 11+ (JAVA_HOME или java в PATH), собранный ModLaunch.exe.
-# Запуск:  tools/integration.sh [путь к ModLaunch.exe]      (rules — только тесты правил: tools/integration.sh rules)
+# Запуск:  tools/integration.sh [ModLaunch.exe]  |  tools/integration.sh rules  |  tools/integration.sh server  |  tools/integration.sh e2e
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
-mode="app"; [ "${1:-}" = "rules" ] && { mode="rules"; shift; }
+mode="app"; case "${1:-}" in rules|server|e2e) mode="$1"; shift;; esac
 exe="${1:-$root/desktop/ModLaunch/bin/Release/net8.0/win-x64/ModLaunch.exe}"
 if [ -z "${JAVA_HOME:-}" ] && ! command -v java >/dev/null; then
   for j in "/c/Program Files/JetBrains/"*/jbr "/c/Program Files/Eclipse Adoptium/"* "/c/Program Files/Java/"*; do
@@ -24,6 +24,17 @@ fb="${FIREBASE:-npx -y firebase-tools@15}"
 if [ "$mode" = "rules" ]; then
   (cd test && npm ci --no-audit --no-fund >/dev/null)
   exec $fb emulators:exec --project demo-modlaunch --only firestore "cd test && npm test"
+fi
+# Сервер (Cloud Functions): логика магазина на эмуляторе базы и сквозной прогон самих функций.
+if [ "$mode" = "server" ]; then
+  (cd ../server/functions && npm ci --no-audit --no-fund >/dev/null)
+  exec $fb emulators:exec --project demo-modlaunch --only firestore "cd ../server/functions && npm test"
+fi
+if [ "$mode" = "e2e" ]; then
+  (cd ../server/functions && npm ci --no-audit --no-fund >/dev/null)
+  [ -f ../server/functions/.secret.local ] || cp ../server/functions/test/e2e.secret.local ../server/functions/.secret.local
+  export FUNCTIONS_DISCOVERY_TIMEOUT=120
+  exec $fb emulators:exec --project demo-modlaunch --only auth,firestore,functions "node ../server/functions/test/e2e.mjs"
 fi
 export DOTNET_ROLL_FORWARD=Major MODLAUNCH_FIREBASE_EMULATOR=127.0.0.1 MODLAUNCH_FIREBASE_PROJECT=demo-modlaunch
 exec $fb emulators:exec --project demo-modlaunch --only firestore,auth "\"$exe\" --integration"
