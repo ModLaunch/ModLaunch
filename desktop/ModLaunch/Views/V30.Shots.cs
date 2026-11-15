@@ -287,4 +287,21 @@ public static class V30Shots
         s.Pump(1200);
         s.Save("v30-21-keys");
     }
+
+    /// <summary>MODLAUNCH_SHOTS=V30Home: обзор библиотеки с полками обложек.</summary>
+    [DemoShots]
+    static void V30Home(Shots s)
+    {
+        s.Pump(4500);
+        Games.AllGames.Refresh();
+        s.Pump(1500);
+        var shelves = Games.Shelves.Current;
+        foreach (var key in new[] { "steam:1245620", "epic:Hades", "steam:892970" }) if (!shelves.IsFavorite(key)) shelves.ToggleFavorite(key);
+        shelves.SetStatus("steam:1245620", "playing");
+        var coop = shelves.Create("Кооператив");
+        foreach (var key in new[] { "steam:892970", "steam:1966720", "steam:550" }) if (!shelves.Contains(coop, key)) shelves.Toggle(coop, key);
+        s.Window.Navigate(() => new AllGamesPage(home: true));
+        s.Pump(3000);
+        s.Save("v30-22-home");
+    }
 }

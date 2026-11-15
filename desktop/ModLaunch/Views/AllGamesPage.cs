@@ -37,9 +37,13 @@ public sealed class AllGamesPage : Page
     /// <summary>Снимки экрана: прокрутить страницу игры до нужного места.</summary>
     internal void ScrollDetailTo(double y) { if (_right is not null) _right.Offset = new Vector(0, y); }
 
-    public AllGamesPage(string? key = null)
+    /// <summary>30.10: обзор с полками обложек вместо страницы игры (щелчок по «Все игры»).</summary>
+    bool _home;
+
+    public AllGamesPage(string? key = null, bool home = false)
     {
         if (key is not null) _selected = key;
+        _home = home;
         void Changed() => Dispatcher.UIThread.Post(() => { if (MainWindow.Current?.CurrentPage == this) Build(); });
         AttachedToVisualTree += (_, _) => { AllGames.Changed += Changed; SteamAccount.Changed += Refresh; Shelves.Changed += Changed; };
         DetachedFromVisualTree += (_, _) => { AllGames.Changed -= Changed; SteamAccount.Changed -= Refresh; Shelves.Changed -= Changed; };
@@ -190,7 +194,15 @@ public sealed class AllGamesPage : Page
         var disk = Ui.Button("", () => MainWindow.Current?.Navigate(() => new StoragePage()), "icon ghost", Icons.Folder, I18n.T("v30.disk.title"));
         DockPanel.SetDock(disk, Dock.Right);
         titleRow.Children.Add(disk);
-        titleRow.Children.Add(Ui.Row(10, Ui.Icon(Icons.Grid, 16, Ui.Res("Muted")), Ui.Text(I18n.T("v27.lib.title"), "h3")));
+        // 30.10: «Все игры» — кнопка обзора: полки обложек, как домашний экран библиотеки Steam, но для всех лаунчеров.
+        var homeButton = new Button
+        {
+            Classes = { "ghost" }, Padding = new Thickness(4, 2), Background = Brushes.Transparent,
+            Content = Ui.Row(10, Ui.Icon(Icons.Grid, 16, _home ? Ui.Res("Brand2") : Ui.Res("Muted")), Ui.Text(I18n.T("v27.lib.title"), "h3")),
+        };
+        ToolTip.SetTip(homeButton, I18n.T("v30.home.tip"));
+        homeButton.Click += (_, _) => { _home = true; RenderDetail(); };
+        titleRow.Children.Add(homeButton);
         var stores = games.Select(g => g.Store).Distinct().Count();
         var head = Ui.Col(10,
             titleRow,
@@ -276,6 +288,7 @@ public sealed class AllGamesPage : Page
     internal void Step(int delta)
     {
         if (_order.Count == 0) return;
+        _home = false;
         var at = _order.IndexOf(_selected);
         at = at < 0 ? (delta > 0 ? 0 : _order.Count - 1) : Math.Clamp(at + delta, 0, _order.Count - 1);
         _selected = _order[at];
@@ -383,7 +396,7 @@ public sealed class AllGamesPage : Page
         row.Children.Add(name);
         var b = new Button { Classes = { "ghost", "steam-row" }, Content = row, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch, Padding = new Thickness(8, 5) };
         if (g.Key == _selected) { b.Classes.Add("active"); b.Background = Ui.Res("Surface2"); }
-        b.Click += (_, _) => { _selected = g.Key; Settings.Data["allGamesSel"] = g.Key; Settings.Save(); RenderList(); RenderDetail(); };
+        b.Click += (_, _) => { _home = false; _selected = g.Key; Settings.Data["allGamesSel"] = g.Key; Settings.Save(); RenderList(); RenderDetail(); };
         b.DoubleTapped += (_, _) => { if (g.Installed) Play(g); };
         ToolTip.SetTip(b, NameOf(g) + " · " + Stores.Title(g.Store));
         Ctx.Attach(b, () => ShelfMenu(g));
@@ -508,6 +521,7 @@ public sealed class AllGamesPage : Page
 
     void RenderDetail()
     {
+        if (_home) { _detail.Content = Home(); return; }
         if (Games.FirstOrDefault(x => x.Key == _selected) is not { } g) { _detail.Content = null; return; }
         var managed = Managed(g);
         var dir = managed is null ? (g.SteamAppId > 0 ? GameDirectory.BySteam(g.SteamAppId) : null) ?? GameDirectory.ByName(g.Name) : null;
@@ -661,6 +675,86 @@ public sealed class AllGamesPage : Page
         head.Children.Add(all);
         head.Children.Add(Ui.Row(8, Ui.Icon(Icons.Image, 16, Ui.Res("Brand2")), Ui.Text(I18n.T("v30.shots.title"), "h3")));
         return Ui.Card(Ui.Col(10, head, strip, Ui.Text(I18n.T("v30.shots.hint", ("key", Hotkey.Display(Hotkey.ShotKeyOf(Settings.Data.Str("shotKey"))))), "tiny muted", wrap: true)), 18);
+    }
+
+    // ---------------------------------------------------------------- 30.10: обзор с полками
+
+    /// <summary>Полки обзора: продолжить, избранное, играю, коллекции, в планах, давно не запускали.</summary>
+    internal static List<(string Title, List<LibGame> Games)> HomeShelves(IReadOnlyList<LibGame> all, Shelves shelves, Func<LibGame, (long Last, long Minutes)> played, DateTimeOffset now)
+    {
+        var games = all.Where(g => !shelves.IsHidden(g.Key)).ToList();
+        var byName = StringComparer.CurrentCultureIgnoreCase;
+        var result = new List<(string, List<LibGame>)>();
+        void Add(string title, IEnumerable<LibGame> list)
+        {
+            var items = list.Take(14).ToList();
+            if (items.Count > 0) result.Add((title, items));
+        }
+        var recentCut = now.AddDays(-30).ToUnixTimeSeconds();
+        Add(I18n.T("v30.home.continue"), games.Where(g => g.Installed && played(g).Last >= recentCut).OrderByDescending(g => played(g).Last));
+        Add("★ " + I18n.T("v30.shelf.fav"), games.Where(g => shelves.IsFavorite(g.Key)).OrderBy(g => g.Name, byName));
+        Add(I18n.T("v30.status.playing"), games.Where(g => shelves.StatusOf(g.Key) == "playing").OrderByDescending(g => played(g).Last));
+        foreach (var c in shelves.Collections.Take(8))
+            Add(c, games.Where(g => shelves.Contains(c, g.Key)).OrderBy(g => g.Name, byName));
+        Add(I18n.T("v30.status.backlog"), games.Where(g => shelves.StatusOf(g.Key) == "backlog").OrderBy(g => g.Name, byName));
+        var idleCut = now.AddDays(-60).ToUnixTimeSeconds();
+        Add(I18n.T("v30.home.idle"), games.Where(g => g.Installed && played(g).Last is > 0 and var l && l < idleCut && shelves.StatusOf(g.Key) is not ("done" or "dropped"))
+            .OrderByDescending(g => played(g).Minutes));
+        return result;
+    }
+
+    Control Home()
+    {
+        var shelvesList = HomeShelves(Games, Shelves.Current, AllGames.Played, DateTimeOffset.UtcNow);
+        var col = Ui.Col(22, Ui.Col(4, Ui.Text(I18n.T("v30.home.title"), "h1"), Ui.Text(I18n.T("v30.home.lead"), "muted", wrap: true)));
+        if (shelvesList.Count == 0) col.Children.Add(Ui.Card(Ui.Text(I18n.T("v30.home.empty"), "muted", wrap: true), 20));
+        foreach (var (title, games) in shelvesList)
+        {
+            // Полоса прокрутки рисуется поверх содержимого — отступ снизу, чтобы она не легла на подписи.
+            var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12, Margin = new Thickness(0, 0, 0, 16) };
+            foreach (var g in games) row.Children.Add(Tile(g));
+            col.Children.Add(Ui.Col(10,
+                Ui.Row(8, Ui.Text(title.ToUpper(I18n.Culture), "small muted"), Ui.Text(games.Count.ToString(I18n.Culture), "small muted")),
+                new ScrollViewer { Content = row, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled }));
+        }
+        col.Margin = new Thickness(34, 28, 34, 34);
+        return col;
+    }
+
+    /// <summary>Обложка на полке: щелчок — страница игры, двойной — играть.</summary>
+    Control Tile(LibGame g)
+    {
+        var art = new Border { Width = 230, Height = 107, CornerRadius = new CornerRadius(10), ClipToBounds = true, Child = Art(g, 460), Opacity = g.Installed ? 1 : 0.6 };
+        var name = new TextBlock { Text = NameOf(g), FontSize = 13, TextTrimming = TextTrimming.CharacterEllipsis, Width = 230, Foreground = Ui.Res("Text"), Margin = new Thickness(2, 6, 2, 0) };
+        var sub = new TextBlock { Text = Stores.Title(g.Store) + (AllGames.Played(g).Minutes > 0 ? " · " + Hours(AllGames.Played(g).Minutes) : ""), FontSize = 11, Foreground = Ui.Res("Faint"), Margin = new Thickness(2, 1, 2, 0) };
+        var b = new Button { Classes = { "ghost" }, Padding = new Thickness(0), Background = Brushes.Transparent, Content = Ui.Col(0, art, name, sub) };
+        b.Click += (_, _) => { _home = false; _selected = g.Key; Settings.Data["allGamesSel"] = g.Key; RenderList(); RenderDetail(); _right?.ScrollToHome(); };
+        b.DoubleTapped += (_, _) => { if (g.Installed) Play(g); };
+        Ctx.Attach(b, () => ShelfMenu(g));
+        ToolTip.SetTip(b, NameOf(g) + " · " + Stores.Title(g.Store));
+        return b;
+    }
+
+    [SelfTest]
+    static string HomeShelvesPickRightGames()
+    {
+        var now = DateTimeOffset.FromUnixTimeSeconds(1_800_000_000);
+        var s = new Shelves(new System.Text.Json.Nodes.JsonObject());
+        LibGame G(string key, bool installed = true) => new(key, "steam", key, null, 1, installed, 0);
+        var games = new[] { G("recent"), G("fav", false), G("old"), G("never"), G("hidden") };
+        var stats = new Dictionary<string, (long, long)>
+        {
+            ["recent"] = (now.AddDays(-2).ToUnixTimeSeconds(), 60), ["fav"] = (0, 0), ["old"] = (now.AddDays(-90).ToUnixTimeSeconds(), 600),
+            ["never"] = (0, 0), ["hidden"] = (now.AddDays(-1).ToUnixTimeSeconds(), 5),
+        };
+        s.ToggleFavorite("fav");
+        s.ToggleHidden("hidden");
+        s.SetStatus("never", "backlog");
+        var shelves = HomeShelves(games, s, g => stats[g.Key], now);
+        string Keys(int i) => string.Join(",", shelves[i].Games.Select(g => g.Key));
+        if (shelves.Count != 4 || Keys(0) != "recent" || Keys(1) != "fav" || Keys(2) != "never" || Keys(3) != "old")
+            throw new Exception(string.Join(" | ", shelves.Select(x => x.Title + ": " + string.Join(",", x.Games.Select(g => g.Key)))));
+        return "continue / favorites / backlog / long-unplayed shelves, hidden games skipped, empty shelves dropped";
     }
 
     /// <summary>Друзья, которые прямо сейчас в этой игре (по ключу игры, номеру игры ModLaunch или по имени).</summary>

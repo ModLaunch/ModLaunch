@@ -260,7 +260,13 @@
     "v30.news.loading": "Загружаю новости…",
     "new.v30.news": "Новости игры: на странице игры — три последних объявления разработчиков, и не только для игр Steam, но и для игр из Epic, GOG и других лаунчеров.",
     "v30.keys.hint": "↑/↓ — выбрать игру, Enter — играть, F — в избранное (когда курсор не в поле ввода)",
-    "new.v30.keys": "Библиотека с клавиатуры: во «Всех играх» ↑/↓ выбирают игру прямо из строки поиска, Enter запускает, F — в избранное; статус игры виден значком в списке."
+    "new.v30.keys": "Библиотека с клавиатуры: во «Всех играх» ↑/↓ выбирают игру прямо из строки поиска, Enter запускает, F — в избранное; статус игры виден значком в списке.",
+    "v30.home.tip": "Обзор: полки обложек",
+    "v30.home.title": "Обзор библиотеки",
+    "v30.home.lead": "Игры из всех лаунчеров по полкам: что продолжить, избранное, ваши коллекции и то, к чему давно не возвращались. Щелчок — страница игры, двойной — играть.",
+    "v30.home.continue": "Продолжить",
+    "v30.home.idle": "Давно не запускали",
+    "v30.home.empty": "Полок пока нет: поиграйте во что-нибудь, отметьте избранное или создайте коллекцию."
   },
   "en": {
     "v30.upd.gameRunning": "Close the game first: updating restarts ModLaunch, and it's better not to interrupt your session. The update will wait.",
@@ -523,7 +529,13 @@
     "v30.news.loading": "Loading news…",
     "new.v30.news": "Game news: a game's page shows the developers' three latest announcements — not only for Steam games but for Epic, GOG and other launchers too.",
     "v30.keys.hint": "↑/↓ — pick a game, Enter — play, F — favorite (when not typing in a field)",
-    "new.v30.keys": "Keyboard library: in All games ↑/↓ pick a game right from the search box, Enter plays, F favorites; a game's status shows as an icon in the list."
+    "new.v30.keys": "Keyboard library: in All games ↑/↓ pick a game right from the search box, Enter plays, F favorites; a game's status shows as an icon in the list.",
+    "v30.home.tip": "Overview: cover shelves",
+    "v30.home.title": "Library overview",
+    "v30.home.lead": "Games from every launcher on shelves: what to continue, favorites, your collections and what you haven't returned to in a while. Click for the game page, double-click to play.",
+    "v30.home.continue": "Continue",
+    "v30.home.idle": "Not played in a while",
+    "v30.home.empty": "No shelves yet: play something, mark favorites or create a collection."
   },
   "uk": {
     "v30.upd.gameRunning": "Спершу закрийте гру: оновлення перезапускає ModLaunch, а гру краще не переривати посеред сесії. Оновлення нікуди не дінеться.",
@@ -786,7 +798,13 @@
     "v30.news.loading": "Завантажую новини…",
     "new.v30.news": "Новини гри: на сторінці гри — три останні оголошення розробників, і не лише для ігор Steam, а й для ігор з Epic, GOG та інших лаунчерів.",
     "v30.keys.hint": "↑/↓ — вибрати гру, Enter — грати, F — до обраного (коли курсор не в полі введення)",
-    "new.v30.keys": "Бібліотека з клавіатури: у «Усіх іграх» ↑/↓ вибирають гру просто з рядка пошуку, Enter запускає, F — до обраного; статус гри видно значком у списку."
+    "new.v30.keys": "Бібліотека з клавіатури: у «Усіх іграх» ↑/↓ вибирають гру просто з рядка пошуку, Enter запускає, F — до обраного; статус гри видно значком у списку.",
+    "v30.home.tip": "Огляд: полиці обкладинок",
+    "v30.home.title": "Огляд бібліотеки",
+    "v30.home.lead": "Ігри з усіх лаунчерів на полицях: що продовжити, обране, ваші колекції й те, до чого давно не поверталися. Клік — сторінка гри, подвійний — грати.",
+    "v30.home.continue": "Продовжити",
+    "v30.home.idle": "Давно не запускали",
+    "v30.home.empty": "Полиць поки немає: пограйте в щось, позначте обране або створіть колекцію."
   },
   "es": {
     "v30.upd.gameRunning": "Cierra primero el juego: la actualización reinicia ModLaunch y es mejor no interrumpir la partida. La actualización esperará.",
@@ -1049,7 +1067,13 @@
     "v30.news.loading": "Cargando noticias…",
     "new.v30.news": "Noticias del juego: la página del juego muestra los tres últimos anuncios de los desarrolladores, no solo en juegos de Steam, también de Epic, GOG y otros launchers.",
     "v30.keys.hint": "↑/↓: elegir juego, Enter: jugar, F: favorito (fuera de los campos de texto)",
-    "new.v30.keys": "Biblioteca con teclado: en Todos los juegos ↑/↓ eligen un juego desde la búsqueda, Enter lo abre y F lo marca como favorito; el estado se ve como icono en la lista."
+    "new.v30.keys": "Biblioteca con teclado: en Todos los juegos ↑/↓ eligen un juego desde la búsqueda, Enter lo abre y F lo marca como favorito; el estado se ve como icono en la lista.",
+    "v30.home.tip": "Vista general: estanterías de portadas",
+    "v30.home.title": "Vista de la biblioteca",
+    "v30.home.lead": "Juegos de todos los launchers en estanterías: qué continuar, favoritos, tus colecciones y lo que hace tiempo no abres. Clic: página del juego; doble clic: jugar.",
+    "v30.home.continue": "Continuar",
+    "v30.home.idle": "Sin jugar hace tiempo",
+    "v30.home.empty": "Aún no hay estanterías: juega algo, marca favoritos o crea una colección."
   },
   "de": {
     "v30.upd.gameRunning": "Schließ zuerst das Spiel: Das Update startet ModLaunch neu, und die Sitzung sollte nicht unterbrochen werden. Das Update wartet.",
@@ -1312,7 +1336,13 @@
     "v30.news.loading": "Lade Neuigkeiten…",
     "new.v30.news": "Spielneuigkeiten: Die Spielseite zeigt die drei neuesten Ankündigungen der Entwickler – nicht nur für Steam-Spiele, auch für Epic, GOG und andere Launcher.",
     "v30.keys.hint": "↑/↓ – Spiel wählen, Enter – spielen, F – Favorit (wenn kein Textfeld aktiv ist)",
-    "new.v30.keys": "Bibliothek per Tastatur: In „Alle Spiele“ wählen ↑/↓ direkt aus dem Suchfeld ein Spiel, Enter startet, F macht es zum Favoriten; der Status erscheint als Symbol in der Liste."
+    "new.v30.keys": "Bibliothek per Tastatur: In „Alle Spiele“ wählen ↑/↓ direkt aus dem Suchfeld ein Spiel, Enter startet, F macht es zum Favoriten; der Status erscheint als Symbol in der Liste.",
+    "v30.home.tip": "Übersicht: Regale mit Covern",
+    "v30.home.title": "Bibliotheksübersicht",
+    "v30.home.lead": "Spiele aus allen Launchern in Regalen: Weiterspielen, Favoriten, deine Sammlungen und was du lange nicht gestartet hast. Klick – Spielseite, Doppelklick – spielen.",
+    "v30.home.continue": "Weiterspielen",
+    "v30.home.idle": "Lange nicht gespielt",
+    "v30.home.empty": "Noch keine Regale: spiel etwas, markiere Favoriten oder erstelle eine Sammlung."
   },
   "fr": {
     "v30.upd.gameRunning": "Fermez d'abord le jeu : la mise à jour redémarre ModLaunch et mieux vaut ne pas interrompre la partie. La mise à jour attendra.",
@@ -1575,7 +1605,13 @@
     "v30.news.loading": "Chargement des actualités…",
     "new.v30.news": "Actualités du jeu : la page du jeu affiche les trois dernières annonces des développeurs — pas seulement pour Steam, aussi pour Epic, GOG et les autres launchers.",
     "v30.keys.hint": "↑/↓ — choisir un jeu, Entrée — jouer, F — favori (hors champ de saisie)",
-    "new.v30.keys": "Bibliothèque au clavier : dans Tous les jeux, ↑/↓ choisissent un jeu depuis la recherche, Entrée le lance, F l'ajoute aux favoris ; le statut s'affiche en icône dans la liste."
+    "new.v30.keys": "Bibliothèque au clavier : dans Tous les jeux, ↑/↓ choisissent un jeu depuis la recherche, Entrée le lance, F l'ajoute aux favoris ; le statut s'affiche en icône dans la liste.",
+    "v30.home.tip": "Vue d'ensemble : étagères de jaquettes",
+    "v30.home.title": "Vue d'ensemble de la bibliothèque",
+    "v30.home.lead": "Les jeux de tous les launchers sur des étagères : à reprendre, favoris, vos collections et ce que vous n'avez pas relancé depuis longtemps. Clic : page du jeu ; double clic : jouer.",
+    "v30.home.continue": "Reprendre",
+    "v30.home.idle": "Pas lancés depuis longtemps",
+    "v30.home.empty": "Pas encore d'étagères : jouez à quelque chose, ajoutez des favoris ou créez une collection."
   },
   "pt-BR": {
     "v30.upd.gameRunning": "Feche o jogo primeiro: a atualização reinicia o ModLaunch, e é melhor não interromper a sessão. A atualização vai esperar.",
@@ -1838,7 +1874,13 @@
     "v30.news.loading": "Carregando notícias…",
     "new.v30.news": "Notícias do jogo: a página do jogo mostra os três anúncios mais recentes dos desenvolvedores — não só de jogos da Steam, mas também da Epic, GOG e outros launchers.",
     "v30.keys.hint": "↑/↓ — escolher jogo, Enter — jogar, F — favoritar (fora dos campos de texto)",
-    "new.v30.keys": "Biblioteca pelo teclado: em Todos os jogos, ↑/↓ escolhem um jogo direto da busca, Enter abre e F favorita; o status aparece como ícone na lista."
+    "new.v30.keys": "Biblioteca pelo teclado: em Todos os jogos, ↑/↓ escolhem um jogo direto da busca, Enter abre e F favorita; o status aparece como ícone na lista.",
+    "v30.home.tip": "Visão geral: prateleiras de capas",
+    "v30.home.title": "Visão geral da biblioteca",
+    "v30.home.lead": "Jogos de todos os launchers em prateleiras: o que continuar, favoritos, suas coleções e o que você não abre há tempos. Clique: página do jogo; clique duplo: jogar.",
+    "v30.home.continue": "Continuar",
+    "v30.home.idle": "Sem jogar há tempos",
+    "v30.home.empty": "Ainda não há prateleiras: jogue algo, marque favoritos ou crie uma coleção."
   },
   "zh-CN": {
     "v30.upd.gameRunning": "请先关闭游戏：更新会重启 ModLaunch，最好不要中途打断游戏。更新会一直等着你。",
@@ -2101,6 +2143,12 @@
     "v30.news.loading": "正在加载新闻…",
     "new.v30.news": "游戏新闻：游戏页面会显示开发者最近的三条公告——不仅限 Steam 游戏，Epic、GOG 等启动器的游戏也有。",
     "v30.keys.hint": "↑/↓ 选择游戏，Enter 开始游戏，F 加入收藏（不在输入框中时）",
-    "new.v30.keys": "键盘操作游戏库：在“所有游戏”中，可在搜索框里用 ↑/↓ 选择游戏，Enter 开始游戏，F 加入收藏；游戏状态以图标显示在列表中。"
+    "new.v30.keys": "键盘操作游戏库：在“所有游戏”中，可在搜索框里用 ↑/↓ 选择游戏，Enter 开始游戏，F 加入收藏；游戏状态以图标显示在列表中。",
+    "v30.home.tip": "概览：封面书架",
+    "v30.home.title": "游戏库概览",
+    "v30.home.lead": "所有启动器的游戏按书架排列：继续玩、收藏、你的收藏夹，以及很久没玩的游戏。单击打开游戏页面，双击开始游戏。",
+    "v30.home.continue": "继续玩",
+    "v30.home.idle": "很久没玩",
+    "v30.home.empty": "还没有书架：先玩点什么、加入收藏或创建一个收藏夹吧。"
   }
 }
