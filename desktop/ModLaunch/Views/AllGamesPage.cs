@@ -313,6 +313,8 @@ public sealed class AllGamesPage : Page
         if (SteamAchievementsCard.For(g) is { } achievements) body.Children.Add(achievements);
         body.Children.Add(Ui.Card(mods, 18));
         body.Children.Add(new GameReviewsCard(g));
+        // 30.0: что пишут об игре кураторы, на которых подписан.
+        body.Children.Add(new CuratorPicksCard(g));
         if (folder is not null) body.Children.Add(Ui.Text(folder, "tiny muted", wrap: true));
         body.Margin = new Thickness(34, -6, 34, 34);
         body.MaxWidth = 1100;

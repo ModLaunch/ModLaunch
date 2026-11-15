@@ -805,3 +805,66 @@ test('возврат: отказ — отметка админа; без зая�
   await assertSucceeds(getDoc(doc(db(BUYER), 'refunds', RID)));
   await assertFails(getDoc(doc(db(OTHER), 'refunds', RID)));
 });
+
+// ---------------------------------------------------------------- 30.0: кураторы
+
+const curator = (over = {}) => ({ name: 'Seller', about: 'игры без спешки', picks: 0, followers: 0, updated: serverTimestamp(), ...over });
+const pick = (over = {}) => ({ game: 'steam:264710', title: 'Subnautica', verdict: 'yes', text: 'отлично', updated: serverTimestamp(), ...over });
+
+/** Подписка одной пачкой, как Social/Curators.cs: запись в followers и +1 к счётчику. */
+async function follow(who, uid = SELLER.uid, { by = 1, withDoc = true } = {}) {
+  const d = db(who);
+  const b = writeBatch(d);
+  if (withDoc) b.set(doc(d, 'curators', uid, 'followers', who.uid), { created: serverTimestamp() });
+  b.update(doc(d, 'curators', uid), { followers: increment(by) });
+  return b.commit();
+}
+
+async function unfollow(who, uid = SELLER.uid) {
+  const d = db(who);
+  const b = writeBatch(d);
+  b.delete(doc(d, 'curators', uid, 'followers', who.uid));
+  b.update(doc(d, 'curators', uid), { followers: increment(-1) });
+  return b.commit();
+}
+
+test('кураторы: страницу заводит и правит только хозяин; подписчиков себе не накрутить', async () => {
+  await assertFails(setDoc(doc(db(OTHER), 'curators', SELLER.uid), curator()));
+  await assertFails(setDoc(doc(db(SELLER), 'curators', SELLER.uid), curator({ followers: 100 })));
+  await assertFails(setDoc(doc(anon('anon1'), 'curators', 'anon1'), curator()));
+  await assertSucceeds(setDoc(doc(db(SELLER), 'curators', SELLER.uid), curator()));
+  await assertSucceeds(updateDoc(doc(db(SELLER), 'curators', SELLER.uid), { about: 'новое', updated: serverTimestamp() }));
+  await assertFails(updateDoc(doc(db(SELLER), 'curators', SELLER.uid), { followers: 5, updated: serverTimestamp() }));
+  await assertFails(updateDoc(doc(db(OTHER), 'curators', SELLER.uid), { about: 'чужое', updated: serverTimestamp() }));
+  await assertSucceeds(getDoc(doc(anon('anon2'), 'curators', SELLER.uid)));
+});
+
+test('кураторы: мнения пишет только хозяин — ключ игры совпадает, вердикт из трёх, текст до 500', async () => {
+  await assertSucceeds(setDoc(doc(db(SELLER), 'curators', SELLER.uid), curator()));
+  const at = (who, game) => doc(db(who), 'curators', SELLER.uid, 'picks', game);
+  await assertFails(setDoc(at(OTHER, 'steam:264710'), pick()));
+  await assertFails(setDoc(at(SELLER, 'steam:1'), pick()));
+  await assertFails(setDoc(at(SELLER, 'steam:264710'), pick({ verdict: 'maybe' })));
+  await assertFails(setDoc(at(SELLER, 'steam:264710'), pick({ text: 'x'.repeat(501) })));
+  await assertSucceeds(setDoc(at(SELLER, 'steam:264710'), pick()));
+  await assertSucceeds(getDoc(doc(anon('anon3'), 'curators', SELLER.uid, 'picks', 'steam:264710')));
+  await assertFails(deleteDoc(at(OTHER, 'steam:264710')));
+  await assertSucceeds(deleteDoc(at(SELLER, 'steam:264710')));
+});
+
+test('кураторы: подписка — ровно +1 вместе со своей записью, один раз; отписка — −1', async () => {
+  await assertSucceeds(setDoc(doc(db(SELLER), 'curators', SELLER.uid), curator()));
+  await assertFails(follow(BUYER, SELLER.uid, { withDoc: false }));
+  await assertFails(follow(BUYER, SELLER.uid, { by: 5 }));
+  await assertFails(follow(SELLER));
+  await assertSucceeds(follow(BUYER));
+  await assertFails(follow(BUYER));
+  await assertSucceeds(follow(OTHER));
+  let c = null;
+  await raw(async (d) => { c = (await getDoc(doc(d, 'curators', SELLER.uid))).data(); });
+  if (c.followers !== 2) throw new Error(JSON.stringify(c));
+  await assertFails(unfollow(ADMIN));
+  await assertSucceeds(unfollow(BUYER));
+  await raw(async (d) => { c = (await getDoc(doc(d, 'curators', SELLER.uid))).data(); });
+  if (c.followers !== 1) throw new Error(JSON.stringify(c));
+});

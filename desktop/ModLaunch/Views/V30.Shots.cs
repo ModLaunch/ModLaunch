@@ -1,3 +1,4 @@
+using Avalonia.VisualTree;
 using ModLaunch.Core;
 
 namespace ModLaunch.Views;
@@ -89,5 +90,32 @@ public static class V30Shots
         s.Pump(800);
         s.Save("v30-08-refund-ask");
         s.Window.CloseDialog();
+    }
+
+    /// <summary>MODLAUNCH_SHOTS=V30Curators: популярные кураторы, страница куратора и «Кураторы об игре».</summary>
+    [DemoShots]
+    static void V30Curators(Shots s)
+    {
+        s.Pump(4500);
+        s.Window.Navigate(() => new CuratorsPage());
+        s.Pump(1500);
+        s.Save("v30-09-curators");
+        s.Window.Navigate(() => new CuratorsPage("demo-c2"));
+        s.Pump(1500);
+        s.Save("v30-10-curator-page");
+        Games.AllGames.Refresh();
+        s.Pump(1500);
+        s.Window.Navigate(() => new AllGamesPage("steam:1245620"));
+        s.Pump(2500);
+        if (s.Window.CurrentPage is AllGamesPage) DemoScrollToEnd(s);
+        s.Pump(600);
+        s.Save("v30-11-curators-on-game");
+    }
+
+    /// <summary>Пролистать открытую страницу вниз до конца.</summary>
+    static void DemoScrollToEnd(Shots s)
+    {
+        foreach (var sv in s.Window.CurrentPage!.GetVisualDescendants().OfType<Avalonia.Controls.ScrollViewer>())
+            sv.Offset = new Avalonia.Vector(sv.Offset.X, sv.Extent.Height);
     }
 }

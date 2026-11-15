@@ -722,6 +722,55 @@ service cloud.firestore {
     }
     // ── конец правил рынка ───────────────────────────────────────────────
 
+    // ── Кураторы (30.0) ──────────────────────────────────────────────────
+    // curators/{uid} — страница куратора (имя, о себе, сколько игр, сколько подписчиков); читают все.
+    // Хозяин правит имя, «о себе» и счётчик игр; подписчиков — только сами подписчики, по одному,
+    // вместе со своей записью в followers/{свой uid}. Мнения об играх — picks/{ключ игры} (как у отзывов).
+    function curDoc(uid) { return /databases/$(database)/documents/curators/$(uid); }
+    function curFollower(uid, f) { return /databases/$(database)/documents/curators/$(uid)/followers/$(f); }
+    function curOk(d) {
+      return d.keys().hasOnly(['name', 'about', 'picks', 'followers', 'updated'])
+        && friendsName(d.name) && d.about is string && d.about.size() <= 300
+        && d.picks is int && d.picks >= 0 && d.picks <= 500
+        && d.followers is int && d.followers >= 0
+        && d.updated == request.time;
+    }
+    match /curators/{uid} {
+      allow get, list: if true;
+      allow create: if friendsMember() && request.auth.uid == uid
+        && curOk(request.resource.data) && request.resource.data.followers == 0;
+      allow update: if friendsMember() && request.auth.uid == uid
+        && curOk(request.resource.data) && request.resource.data.followers == resource.data.followers;
+      allow update: if friendsMember() && request.auth.uid != uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followers'])
+        && ((request.resource.data.followers == resource.data.followers + 1
+              && existsAfter(curFollower(uid, request.auth.uid)) && !exists(curFollower(uid, request.auth.uid)))
+          || (request.resource.data.followers == resource.data.followers - 1
+              && !existsAfter(curFollower(uid, request.auth.uid)) && exists(curFollower(uid, request.auth.uid))));
+      allow delete: if friendsMember() && request.auth.uid == uid;
+
+      match /picks/{game} {
+        allow get, list: if true;
+        allow create, update: if friendsMember() && request.auth.uid == uid
+          && request.resource.data.keys().hasOnly(['game', 'title', 'verdict', 'text', 'updated'])
+          && request.resource.data.game == game && game.size() <= 40
+          && request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 80
+          && request.resource.data.verdict in ['yes', 'no', 'info']
+          && request.resource.data.text is string && request.resource.data.text.size() <= 500
+          && request.resource.data.updated == request.time;
+        allow delete: if friendsMember() && request.auth.uid == uid;
+      }
+
+      match /followers/{f} {
+        allow get: if request.auth != null && request.auth.uid == f;
+        allow create: if friendsMember() && request.auth.uid == f && f != uid
+          && request.resource.data.keys().hasOnly(['created']) && request.resource.data.created == request.time
+          && getAfter(curDoc(uid)).data.followers == get(curDoc(uid)).data.followers + 1;
+        allow delete: if friendsMember() && request.auth.uid == f
+          && getAfter(curDoc(uid)).data.followers == get(curDoc(uid)).data.followers - 1;
+      }
+    }
+
     // ── Профиль в облаке (10.0) ──────────────────────────────────────────
     // Один документ на аккаунт: сборки каждого ПК, награды, кейсы и стиль одной
     // JSON-строкой. Читать и писать может только хозяин.
