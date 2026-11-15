@@ -7,6 +7,7 @@ using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using ModLaunch.Core;
 using ModLaunch.Games;
+using ModLaunch.Social;
 
 namespace ModLaunch.Views;
 
@@ -34,8 +35,8 @@ public sealed class AllGamesPage : Page
     {
         if (key is not null) _selected = key;
         void Changed() => Dispatcher.UIThread.Post(() => { if (MainWindow.Current?.CurrentPage == this) Build(); });
-        AttachedToVisualTree += (_, _) => { AllGames.Changed += Changed; SteamAccount.Changed += Refresh; };
-        DetachedFromVisualTree += (_, _) => { AllGames.Changed -= Changed; SteamAccount.Changed -= Refresh; };
+        AttachedToVisualTree += (_, _) => { AllGames.Changed += Changed; SteamAccount.Changed += Refresh; Shelves.Changed += Changed; };
+        DetachedFromVisualTree += (_, _) => { AllGames.Changed -= Changed; SteamAccount.Changed -= Refresh; Shelves.Changed -= Changed; };
     }
 
     static void Refresh() => Dispatcher.UIThread.Post(() => _ = AllGames.Refresh());
@@ -47,8 +48,17 @@ public sealed class AllGamesPage : Page
     IEnumerable<LibGame> Visible()
     {
         IEnumerable<LibGame> all = Games;
-        if (_store == "installed") all = all.Where(g => g.Installed);
-        else if (_store != "all") all = all.Where(g => g.Store == _store);
+        // 30.2: полки — избранное, свои коллекции, скрытые (скрытые видны только в своём фильтре).
+        var shelves = Shelves.Current;
+        if (_store == "hidden") all = all.Where(g => shelves.IsHidden(g.Key));
+        else
+        {
+            all = all.Where(g => !shelves.IsHidden(g.Key));
+            if (_store == "installed") all = all.Where(g => g.Installed);
+            else if (_store == "fav") all = all.Where(g => shelves.IsFavorite(g.Key));
+            else if (_store.StartsWith("c:", StringComparison.Ordinal)) { var name = _store[2..]; all = all.Where(g => shelves.Contains(name, g.Key)); }
+            else if (_store != "all") all = all.Where(g => g.Store == _store);
+        }
         if (_query != "") all = all.Where(g => g.Name.Contains(_query, StringComparison.CurrentCultureIgnoreCase));
         return all;
     }
@@ -70,7 +80,11 @@ public sealed class AllGamesPage : Page
                 Ui.Row(8, Ui.Button(I18n.T("add.title"), () => MainWindow.Current?.Navigate(() => new AddGamePage()), "primary", Icons.Plus))));
             return;
         }
-        if (_store is not ("all" or "installed") && !games.Any(g => g.Store == _store)) _store = "all";
+        var shelves = Shelves.Current;
+        if (_store is "fav" && shelves.FavoriteCount == 0) _store = "all";
+        else if (_store is "hidden" && shelves.HiddenCount == 0) _store = "all";
+        else if (_store.StartsWith("c:", StringComparison.Ordinal) && !shelves.Collections.Contains(_store[2..])) _store = "all";
+        else if (_store is not ("all" or "installed" or "fav" or "hidden") && !_store.StartsWith("c:", StringComparison.Ordinal) && !games.Any(g => g.Store == _store)) _store = "all";
         if (games.All(g => g.Key != _selected)) _selected = (games.Where(g => g.Installed).OrderByDescending(g => AllGames.Played(g).Last).FirstOrDefault() ?? games[0]).Key;
         _list = new ScrollViewer { HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
         _detail = new ContentControl();
@@ -78,7 +92,7 @@ public sealed class AllGamesPage : Page
         var search = new TextBox { Watermark = I18n.T("v27.lib.filter"), Text = _query, Classes = { "search" } };
         search.TextChanged += (_, _) => { _query = search.Text?.Trim() ?? ""; RenderList(); };
         var chips = new WrapPanel();
-        void Chip(string id, string text, int count)
+        Button Chip(string id, string text, int count)
         {
             var b = Ui.Button(text + " " + count.ToString("N0", I18n.Culture), () =>
             {
@@ -89,11 +103,35 @@ public sealed class AllGamesPage : Page
             }, id == _store ? "chip active" : "chip");
             b.Margin = new Thickness(0, 0, 4, 4);
             chips.Children.Add(b);
+            return b;
         }
-        Chip("all", I18n.T("v27.lib.f.all"), games.Count);
-        Chip("installed", I18n.T("v27.lib.f.installed"), games.Count(g => g.Installed));
+        var shown = games.Where(g => !shelves.IsHidden(g.Key)).ToList();
+        Chip("all", I18n.T("v27.lib.f.all"), shown.Count);
+        Chip("installed", I18n.T("v27.lib.f.installed"), shown.Count(g => g.Installed));
+        if (shelves.FavoriteCount > 0) Chip("fav", "★ " + I18n.T("v30.shelf.fav"), shown.Count(g => shelves.IsFavorite(g.Key)));
+        foreach (var name in shelves.Collections)
+        {
+            var collection = name;
+            Ctx.Attach(Chip("c:" + name, name, shown.Count(g => shelves.Contains(collection, g.Key))), () => Ctx.Menu(
+                Ctx.Item(I18n.T("v30.shelf.rename"), Icons.Edit, () => AskName(collection, null)),
+                Ctx.Item(I18n.T("v30.shelf.delete"), Icons.Trash, () => DeleteCollection(collection))));
+        }
         foreach (var store in Stores.Order)
-            if (games.Count(g => g.Store == store) is var n and > 0) Chip(store, Stores.Title(store), n);
+            if (shown.Count(g => g.Store == store) is var n and > 0) Chip(store, Stores.Title(store), n);
+        if (shelves.HiddenCount > 0) Chip("hidden", I18n.T("v30.shelf.hidden"), games.Count(g => shelves.IsHidden(g.Key)));
+        var newCollection = Ui.Button("+ " + I18n.T("v30.shelf.collection"), () => AskName(null, null), "chip");
+        newCollection.Margin = new Thickness(0, 0, 4, 4);
+        ToolTip.SetTip(newCollection, I18n.T("v30.shelf.new.hint"));
+        chips.Children.Add(newCollection);
+
+        // 30.2: порядок списка — по имени, недавние, наиграно, размер.
+        var sort = new ComboBox
+        {
+            ItemsSource = Shelves.Sorts.Select(s => I18n.T("v30.shelf.sort." + s)).ToList(),
+            SelectedIndex = Array.IndexOf(Shelves.Sorts, shelves.Sort), MinWidth = 150, HorizontalAlignment = HorizontalAlignment.Left,
+        };
+        ToolTip.SetTip(sort, I18n.T("v30.shelf.sort"));
+        sort.SelectionChanged += (_, _) => { if (sort.SelectedIndex >= 0 && Shelves.Sorts[sort.SelectedIndex] != shelves.Sort) shelves.Sort = Shelves.Sorts[sort.SelectedIndex]; };
 
         var hours = games.Sum(g => AllGames.Played(g).Minutes) / 60;
         var refresh = Ui.Button("", () => { _ = AllGames.Refresh(); }, "icon ghost", Icons.Refresh, I18n.T("v27.lib.refresh"));
@@ -113,7 +151,7 @@ public sealed class AllGamesPage : Page
         var head = Ui.Col(10,
             titleRow,
             Ui.Text(I18n.T("v27.lib.total", ("n", games.Count.ToString("N0", I18n.Culture)), ("stores", stores), ("h", hours.ToString("N0", I18n.Culture))), "tiny muted"),
-            search, chips);
+            search, chips, sort);
         head.Margin = new Thickness(16, 18, 16, 10);
 
         var left = new DockPanel();
@@ -152,15 +190,29 @@ public sealed class AllGamesPage : Page
         var col = new StackPanel { Spacing = 1, Margin = new Thickness(8, 0, 8, 8) };
         var visible = Visible().ToList();
         var cutoff = DateTimeOffset.UtcNow.AddDays(-14).ToUnixTimeSeconds();
-        var recent = _query == "" ? visible.Select(g => (Game: g, Last: AllGames.Played(g).Last)).Where(x => x.Last >= cutoff).OrderByDescending(x => x.Last).Take(8).Select(x => x.Game).ToList() : [];
+        var shelves = Shelves.Current;
+        var top = _query == "" && _store is "all" or "installed";
+        // 30.2: избранное — первой полкой, как в Steam.
+        var favorites = top ? visible.Where(g => shelves.IsFavorite(g.Key)).OrderBy(g => g.Name, StringComparer.CurrentCultureIgnoreCase).ToList() : [];
+        if (favorites.Count > 0)
+        {
+            col.Children.Add(Group("★ " + I18n.T("v30.shelf.fav")));
+            foreach (var g in favorites) col.Children.Add(Row(g));
+        }
+        var recent = top && shelves.Sort != "recent" ? visible.Select(g => (Game: g, Last: AllGames.Played(g).Last)).Where(x => x.Last >= cutoff).OrderByDescending(x => x.Last).Take(8).Select(x => x.Game).ToList() : [];
         if (recent.Count > 0)
         {
             col.Children.Add(Group(I18n.T("v27.lib.recent")));
             foreach (var g in recent) col.Children.Add(Row(g));
         }
         col.Children.Add(Group(I18n.T("v27.lib.allGames", ("n", visible.Count.ToString("N0", I18n.Culture)))));
-        foreach (var g in visible.OrderBy(g => g.Name == "" ? "￿" : g.Name, StringComparer.CurrentCultureIgnoreCase)) col.Children.Add(Row(g));
-        if (visible.Count == 0) col.Children.Add(new Border { Padding = new Thickness(10, 8), Child = Ui.Text(I18n.T("v27.lib.nothing"), "small muted", wrap: true) });
+        foreach (var g in Shelves.Order(visible, shelves.Sort, AllGames.Played)) col.Children.Add(Row(g));
+        if (visible.Count == 0)
+            col.Children.Add(new Border
+            {
+                Padding = new Thickness(10, 8),
+                Child = Ui.Text(_store.StartsWith("c:", StringComparison.Ordinal) && _query == "" ? I18n.T("v30.shelf.empty") : I18n.T("v27.lib.nothing"), "small muted", wrap: true),
+            });
         _list.Content = col;
     }
 
@@ -215,10 +267,16 @@ public sealed class AllGamesPage : Page
             DockPanel.SetDock(dot, Dock.Right);
             row.Children.Add(dot);
         }
-        if (_store == "all" || _store == "installed")
+        if (_store is not ("steam" or "epic" or "gog" or "xbox" or "ea" or "ubisoft" or "battlenet" or "custom"))
         {
             DockPanel.SetDock(store, Dock.Right);
             row.Children.Add(store);
+        }
+        if (Shelves.Current.IsFavorite(g.Key))
+        {
+            var star = new TextBlock { Text = "★", FontSize = 11, Foreground = Ui.Res("Warn"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) };
+            DockPanel.SetDock(star, Dock.Right);
+            row.Children.Add(star);
         }
         row.Children.Add(name);
         var b = new Button { Classes = { "ghost", "steam-row" }, Content = row, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch, Padding = new Thickness(8, 5) };
@@ -226,7 +284,73 @@ public sealed class AllGamesPage : Page
         b.Click += (_, _) => { _selected = g.Key; Settings.Data["allGamesSel"] = g.Key; Settings.Save(); RenderList(); RenderDetail(); };
         b.DoubleTapped += (_, _) => { if (g.Installed) Play(g); };
         ToolTip.SetTip(b, NameOf(g) + " · " + Stores.Title(g.Store));
+        Ctx.Attach(b, () => ShelfMenu(g));
         return b;
+    }
+
+    // ---------------------------------------------------------------- 30.2: полки
+
+    /// <summary>Меню игры: избранное, коллекции, скрыть. И правым щелчком в списке, и кнопкой на странице игры.</summary>
+    MenuFlyout ShelfMenu(LibGame g)
+    {
+        var shelves = Shelves.Current;
+        var collections = shelves.Collections.Select(c => (object?)Ctx.Item((shelves.Contains(c, g.Key) ? "✓ " : "") + c, Icons.Layers, () =>
+        {
+            var on = shelves.Toggle(c, g.Key);
+            MainWindow.Current?.Toast(I18n.T(on ? "v30.shelf.added" : "v30.shelf.removedFrom", ("name", NameOf(g)), ("collection", c)));
+        })).ToList();
+        if (collections.Count > 0) collections.Add("-");
+        collections.Add(Ctx.Item(I18n.T("v30.shelf.new"), Icons.Plus, () => AskName(null, g)));
+        var hidden = shelves.IsHidden(g.Key);
+        return Ctx.Menu(
+            hidden ? null : Ctx.Item(I18n.T(shelves.IsFavorite(g.Key) ? "v30.shelf.favRemove" : "v30.shelf.favAdd"), Icons.Star, () => shelves.ToggleFavorite(g.Key)),
+            Ctx.Sub(I18n.T("v30.shelf.toCollection"), Icons.Layers, collections),
+            "-",
+            Ctx.Item(I18n.T(hidden ? "v30.shelf.unhide" : "v30.shelf.hide"), hidden ? Icons.Eye : Icons.EyeOff, () =>
+            {
+                if (shelves.ToggleHidden(g.Key)) MainWindow.Current?.Toast(I18n.T("v30.shelf.hidden.toast", ("name", NameOf(g))));
+            }));
+    }
+
+    /// <summary>Новая коллекция (и сразу положить туда игру) или новое имя для существующей.</summary>
+    void AskName(string? rename, LibGame? add)
+    {
+        if (MainWindow.Current is not { } w) return;
+        var box = new TextBox { Text = rename ?? "", MaxLength = Shelves.MaxName, Watermark = I18n.T("v30.shelf.new.name"), Width = 360 };
+        void Done()
+        {
+            try
+            {
+                var shelves = Shelves.Current;
+                if (rename is not null)
+                {
+                    shelves.Rename(rename, box.Text ?? "");
+                    var renamed = Shelves.CleanName(box.Text);
+                    if (_store == "c:" + rename && renamed != "") { _store = "c:" + renamed; Settings.Data["allGamesStore"] = _store; Settings.Save(); }
+                    w.CloseDialog();
+                    Build();
+                    return;
+                }
+                var name = shelves.Create(box.Text ?? "");
+                if (add is not null && !shelves.Contains(name, add.Key)) shelves.Toggle(name, add.Key);
+                w.CloseDialog();
+                w.Toast(add is null ? I18n.T("v30.shelf.created", ("collection", name)) : I18n.T("v30.shelf.added", ("name", NameOf(add)), ("collection", name)));
+            }
+            catch (ServiceError e) { w.Toast(I18n.T("v30.shelf.err." + e.Code), bad: true); }
+        }
+        box.KeyDown += (_, e) => { if (e.Key == Avalonia.Input.Key.Enter) Done(); };
+        w.Dialog(I18n.T(rename is null ? "v30.shelf.new.title" : "v30.shelf.rename"), Ui.Col(10, Ui.Text(I18n.T("v30.shelf.new.text"), "muted", wrap: true), box),
+            Ui.Button(I18n.T("common.cancel"), w.CloseDialog),
+            Ui.Button(I18n.T(rename is null ? "v30.shelf.create" : "v30.cur.save"), Done, "primary", Icons.Check));
+        Dispatcher.UIThread.Post(() => box.Focus());
+    }
+
+    void DeleteCollection(string name)
+    {
+        if (MainWindow.Current is not { } w) return;
+        w.Dialog(I18n.T("v30.shelf.delete"), Ui.Text(I18n.T("v30.shelf.delete.text", ("collection", name)), "muted", wrap: true),
+            Ui.Button(I18n.T("common.cancel"), w.CloseDialog),
+            Ui.Button(I18n.T("v30.shelf.delete"), () => { w.CloseDialog(); Shelves.Current.Delete(name); }, "primary", Icons.Trash));
     }
 
     static GameState? Managed(LibGame g) => g.ManagedId is { } id ? AppState.Games.FirstOrDefault(x => x.Def.Id == id && x.Path is not null) : null;
@@ -288,6 +412,15 @@ public sealed class AllGamesPage : Page
         if (g.SteamAppId > 0) tools.Children.Add(Ui.Button("", () => SteamLibrary.StorePage(g.SteamAppId), "icon ghost", Icons.Globe, I18n.T("v12w.steam.page")));
         var folder = g.Source?.AltDir ?? g.Dir;
         if (folder is not null && Directory.Exists(folder)) tools.Children.Add(Ui.Button("", () => Ui.OpenUrl(folder), "icon ghost", Icons.Folder, I18n.T("v14.steam.folder")));
+        // 30.2: избранное и полки — как в Steam, но для игр из любого лаунчера.
+        var fav = Shelves.Current.IsFavorite(g.Key);
+        var star = Ui.Button(fav ? "★" : "☆", () => Shelves.Current.ToggleFavorite(g.Key), "icon ghost", null, I18n.T(fav ? "v30.shelf.favRemove" : "v30.shelf.favAdd"));
+        if (fav) star.Foreground = Ui.Res("Warn");
+        star.FontSize = 18;
+        tools.Children.Add(star);
+        Button? more = null;
+        more = Ui.Button("", () => ShelfMenu(g).ShowAt(more!), "icon ghost", Icons.Layers, I18n.T("v30.shelf.toCollection"));
+        tools.Children.Add(more);
         tools.VerticalAlignment = VerticalAlignment.Center;
         tools.Margin = new Thickness(12, 0, 0, 0);
         bar.Children.Add(tools);

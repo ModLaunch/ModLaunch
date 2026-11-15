@@ -118,4 +118,20 @@ public static class V30Shots
         foreach (var sv in s.Window.CurrentPage!.GetVisualDescendants().OfType<Avalonia.Controls.ScrollViewer>())
             sv.Offset = new Avalonia.Vector(sv.Offset.X, sv.Extent.Height);
     }
+
+    /// <summary>MODLAUNCH_SHOTS=V30Shelves: «Все игры» с избранным, коллекцией и меню полок.</summary>
+    [DemoShots]
+    static void V30Shelves(Shots s)
+    {
+        s.Pump(4500);
+        Games.AllGames.Refresh();
+        s.Pump(1500);
+        var shelves = Games.Shelves.Current;
+        foreach (var key in new[] { "steam:1245620", "epic:Hades" }) if (!shelves.IsFavorite(key)) shelves.ToggleFavorite(key);
+        var coop = shelves.Create("Кооператив");
+        foreach (var key in new[] { "steam:892970", "epic:Hades" }) if (!shelves.Contains(coop, key)) shelves.Toggle(coop, key);
+        s.Window.Navigate(() => new AllGamesPage("steam:1245620"));
+        s.Pump(2000);
+        s.Save("v30-12-shelves");
+    }
 }
