@@ -683,6 +683,31 @@ public sealed partial class MainWindow : Window
             commands.Add((gs.Def.Name, Icons.Folder, () => Navigate(() => new GamePage(gs.Def.Id))));
             if (gs.Status == Detect.Found) commands.Add((I18n.T("tray.play", ("game", gs.Def.Name)), Icons.Play, () => Actions.Play(gs)));
         }
+        // 30.3: страницы последних версий и игры из всех лаунчеров — «Играть» прямо из палитры (недавние — выше).
+        commands.Add((I18n.T("v27.lib.title"), Icons.Grid, () => Navigate(() => new AllGamesPage())));
+        commands.Add((I18n.T("v28.wish.title"), Icons.Heart, () => Navigate(() => new WishlistPage())));
+        commands.Add((I18n.T("v29.rec.title"), Icons.Sparkles, () => Navigate(() => new RecommendPage())));
+        commands.Add((I18n.T("v29.packs.title"), Icons.Layers, () => Navigate(() => new ModpacksPage())));
+        commands.Add((I18n.T("v29.indie.title"), Icons.Gamepad, () => Navigate(() => new IndiePage())));
+        commands.Add((I18n.T("v30.cur.title"), Icons.Users, () => Navigate(() => new CuratorsPage())));
+        commands.Add((I18n.T("v30.disk.title"), Icons.Folder, () => Navigate(() => new StoragePage())));
+        commands.Add((I18n.T("v30.recap.title"), Icons.Chart, () => Navigate(() => new RecapPage())));
+        commands.Add((I18n.T("bp.open"), Icons.Tv, BigPictureWindow.Open));
+        commands.Add((I18n.T("v30.pick.title"), Icons.Sparkles, () =>
+        {
+            if (Games.Shelves.Current.Pick(Games.AllGames.Current ?? [], g => Games.AllGames.Played(g).Last, new Random(), DateTimeOffset.UtcNow) is { } pick)
+            {
+                Navigate(() => new AllGamesPage(pick.Key));
+                Toast(I18n.T("v30.pick.toast", ("name", pick.Name)));
+            }
+            else Toast(I18n.T("v30.pick.none"), bad: true);
+        }));
+        foreach (var lib in (Games.AllGames.Current ?? []).Where(x => x.ManagedId is null && x.Installed && !Games.Shelves.Current.IsHidden(x.Key))
+                     .OrderByDescending(x => Games.AllGames.Played(x).Last))
+        {
+            var game = lib;
+            commands.Add((I18n.T("tray.play", ("game", game.Name)), Icons.Play, () => AllGamesPage.Play(game)));
+        }
         // Сначала — где запрос в начале названия, потом — в начале слова, потом — где угодно; внутри — как в списке.
         static int Rank(string title, string q) =>
             q == "" || title.StartsWith(q, StringComparison.OrdinalIgnoreCase) ? 0

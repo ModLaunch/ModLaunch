@@ -180,4 +180,19 @@ public static class V30Shots
         s.Pump(600);
         s.Save("v30-15-status-notes");
     }
+
+    /// <summary>MODLAUNCH_SHOTS=V30Palette: палитра Ctrl+P — «Играть» для игр из всех лаунчеров.</summary>
+    [DemoShots]
+    static void V30Palette(Shots s)
+    {
+        s.Pump(4500);
+        Games.AllGames.Refresh();
+        s.Pump(1500);
+        s.Window.CommandPalette();
+        s.Pump(500);
+        if (s.Window.GetVisualDescendants().OfType<Avalonia.Controls.TextBox>().FirstOrDefault(t => t.Watermark == I18n.T("cmd.hint")) is { } box) box.Text = "ha";
+        s.Pump(600);
+        s.Save("v30-16-palette");
+        s.Window.CloseDialog();
+    }
 }
