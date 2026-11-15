@@ -20,7 +20,7 @@
     "v30.ach.dialog": "{game} · достижения {got} из {n}",
     "v30.ovl.total": "Всего: {time} · {store}",
     "v30.ovl.shot": "Снимок экрана",
-    "new.v30.subtitle": "Полки и коллекции в библиотеке, место на дисках, итоги игрового времени, кураторы и возвраты",
+    "new.v30.subtitle": "Статус прохождения, заметки, ярлыки игр, быстрый переход, полки, место на дисках и итоги",
     "new.v30.shots": "Снимок экрана в игре: Ctrl+F12 сохраняет окно игры в «Изображения\\ModLaunch», снимки видны в галерее игры. В играх Steam F12 остаётся за Steam.",
     "new.v30.achievements": "Достижения Steam: на странице игры во «Всех играх» — сколько получено, последние и полный список. Читается из файлов Steam на этом ПК, без сети.",
     "new.v30.overlay": "Оверлей для всех игр: игры из Epic, GOG, Xbox и других лаунчеров тоже получают оверлей, снимки экрана и статус «в игре» для друзей.",
@@ -213,7 +213,10 @@
     "v30.link.fail": "Не получилось создать ярлык: {reason}",
     "v30.link.missing": "Этой игры больше нет в библиотеке — возможно, её удалили.",
     "v30.link.notInstalled": "«{name}» не установлена — открываю её страницу.",
-    "v30.pick.short": "Случайная"
+    "v30.pick.short": "Случайная",
+    "new.v30.status": "Статус и случайная игра: отмечайте «Играю», «В планах», «Пройдено», «Брошено», а кнопка «Случайная» подскажет, во что поиграть сегодня.",
+    "new.v30.notes": "Заметки и ярлыки: заметки к любой игре — на её странице и в оверлее; ярлык на рабочий стол для игры из любого лаунчера.",
+    "new.v30.palette": "Быстрый переход: Ctrl+P, начните набирать название — «Играть» для любой установленной игры и все новые страницы."
   },
   "en": {
     "v30.upd.gameRunning": "Close the game first: updating restarts ModLaunch, and it's better not to interrupt your session. The update will wait.",
@@ -236,7 +239,7 @@
     "v30.ach.dialog": "{game} · achievements {got} of {n}",
     "v30.ovl.total": "Total: {time} · {store}",
     "v30.ovl.shot": "Screenshot",
-    "new.v30.subtitle": "Library shelves and collections, disk space, play time recap, curators and refunds",
+    "new.v30.subtitle": "Completion status, notes, game shortcuts, quick jump, shelves, disk space and recap",
     "new.v30.shots": "In-game screenshot: Ctrl+F12 saves the game window to Pictures\\ModLaunch, and screenshots show up in the game's gallery. In Steam games F12 stays Steam's.",
     "new.v30.achievements": "Steam achievements: the game page in All games shows how many are unlocked, the latest ones and the full list. Read from Steam's files on this PC, no network.",
     "new.v30.overlay": "Overlay for every game: games from Epic, GOG, Xbox and other launchers also get the overlay, screenshots and a “playing” status for friends.",
@@ -429,7 +432,10 @@
     "v30.link.fail": "Couldn't create the shortcut: {reason}",
     "v30.link.missing": "This game is no longer in your library — it may have been uninstalled.",
     "v30.link.notInstalled": "“{name}” isn't installed — opening its page.",
-    "v30.pick.short": "Random"
+    "v30.pick.short": "Random",
+    "new.v30.status": "Status and random pick: mark games Playing, Backlog, Completed or Dropped, and the Random button suggests what to play tonight.",
+    "new.v30.notes": "Notes and shortcuts: notes for any game on its page and in the overlay; a desktop shortcut for a game from any launcher.",
+    "new.v30.palette": "Quick jump: press Ctrl+P and start typing — Play for any installed game and all the new pages."
   },
   "uk": {
     "v30.upd.gameRunning": "Спершу закрийте гру: оновлення перезапускає ModLaunch, а гру краще не переривати посеред сесії. Оновлення нікуди не дінеться.",
@@ -452,7 +458,7 @@
     "v30.ach.dialog": "{game} · досягнення {got} з {n}",
     "v30.ovl.total": "Усього: {time} · {store}",
     "v30.ovl.shot": "Знімок екрана",
-    "new.v30.subtitle": "Полиці й колекції в бібліотеці, місце на дисках, підсумки ігрового часу, куратори та повернення",
+    "new.v30.subtitle": "Статус проходження, нотатки, ярлики ігор, швидкий перехід, полиці, місце на дисках і підсумки",
     "new.v30.shots": "Знімок екрана в грі: Ctrl+F12 зберігає вікно гри в «Зображення\\ModLaunch», знімки видно в галереї гри. В іграх Steam F12 лишається за Steam.",
     "new.v30.achievements": "Досягнення Steam: на сторінці гри в «Усіх іграх» — скільки отримано, останні й повний список. Читається з файлів Steam на цьому ПК, без мережі.",
     "new.v30.overlay": "Оверлей для всіх ігор: ігри з Epic, GOG, Xbox та інших лаунчерів теж отримують оверлей, знімки екрана й статус «у грі» для друзів.",
@@ -645,7 +651,10 @@
     "v30.link.fail": "Не вдалося створити ярлик: {reason}",
     "v30.link.missing": "Цієї гри вже немає в бібліотеці — можливо, її видалили.",
     "v30.link.notInstalled": "«{name}» не встановлена — відкриваю її сторінку.",
-    "v30.pick.short": "Випадкова"
+    "v30.pick.short": "Випадкова",
+    "new.v30.status": "Статус і випадкова гра: позначайте «Граю», «У планах», «Пройдено», «Покинуто», а кнопка «Випадкова» підкаже, у що пограти сьогодні.",
+    "new.v30.notes": "Нотатки та ярлики: нотатки до будь-якої гри — на її сторінці та в оверлеї; ярлик на робочий стіл для гри з будь-якого лаунчера.",
+    "new.v30.palette": "Швидкий перехід: Ctrl+P і почніть вводити назву — «Грати» для будь-якої встановленої гри та всі нові сторінки."
   },
   "es": {
     "v30.upd.gameRunning": "Cierra primero el juego: la actualización reinicia ModLaunch y es mejor no interrumpir la partida. La actualización esperará.",
@@ -668,7 +677,7 @@
     "v30.ach.dialog": "{game} · logros {got} de {n}",
     "v30.ovl.total": "Total: {time} · {store}",
     "v30.ovl.shot": "Captura",
-    "new.v30.subtitle": "Estanterías y colecciones, espacio en disco, resumen de juego, curadores y reembolsos",
+    "new.v30.subtitle": "Estado, notas, accesos directos, salto rápido, estanterías, espacio en disco y resumen",
     "new.v30.shots": "Captura en el juego: Ctrl+F12 guarda la ventana del juego en Imágenes\\ModLaunch y las capturas aparecen en la galería del juego. En juegos de Steam, F12 sigue siendo de Steam.",
     "new.v30.achievements": "Logros de Steam: la página del juego en Todos los juegos muestra cuántos llevas, los últimos y la lista completa. Se leen de los archivos de Steam de este PC, sin red.",
     "new.v30.overlay": "Overlay para todos los juegos: los juegos de Epic, GOG, Xbox y otros launchers también tienen overlay, capturas y el estado «jugando» para tus amigos.",
@@ -861,7 +870,10 @@
     "v30.link.fail": "No se pudo crear el acceso directo: {reason}",
     "v30.link.missing": "Este juego ya no está en la biblioteca; puede que se haya desinstalado.",
     "v30.link.notInstalled": "«{name}» no está instalado: abro su página.",
-    "v30.pick.short": "Al azar"
+    "v30.pick.short": "Al azar",
+    "new.v30.status": "Estado y juego al azar: marca Jugando, Pendiente, Completado o Abandonado, y el botón Al azar te sugiere a qué jugar hoy.",
+    "new.v30.notes": "Notas y accesos directos: notas para cualquier juego en su página y en el overlay; acceso directo en el escritorio para juegos de cualquier launcher.",
+    "new.v30.palette": "Salto rápido: pulsa Ctrl+P y escribe: Jugar para cualquier juego instalado y todas las páginas nuevas."
   },
   "de": {
     "v30.upd.gameRunning": "Schließ zuerst das Spiel: Das Update startet ModLaunch neu, und die Sitzung sollte nicht unterbrochen werden. Das Update wartet.",
@@ -884,7 +896,7 @@
     "v30.ach.dialog": "{game} · Erfolge {got} von {n}",
     "v30.ovl.total": "Gesamt: {time} · {store}",
     "v30.ovl.shot": "Screenshot",
-    "new.v30.subtitle": "Regale und Sammlungen, Speicherplatz, Spielzeit-Rückblick, Kuratoren und Erstattungen",
+    "new.v30.subtitle": "Spielstatus, Notizen, Spielverknüpfungen, Schnellsprung, Regale, Speicherplatz und Rückblick",
     "new.v30.shots": "Screenshot im Spiel: Strg+F12 speichert das Spielfenster unter Bilder\\ModLaunch, die Screenshots erscheinen in der Galerie des Spiels. In Steam-Spielen bleibt F12 bei Steam.",
     "new.v30.achievements": "Steam-Erfolge: Die Spielseite unter „Alle Spiele“ zeigt, wie viele freigeschaltet sind, die neuesten und die ganze Liste. Gelesen aus den Steam-Dateien dieses PCs, ohne Netz.",
     "new.v30.overlay": "Overlay für alle Spiele: Spiele aus Epic, GOG, Xbox und anderen Launchern bekommen ebenfalls Overlay, Screenshots und den Status „spielt“ für Freunde.",
@@ -1077,7 +1089,10 @@
     "v30.link.fail": "Verknüpfung konnte nicht erstellt werden: {reason}",
     "v30.link.missing": "Dieses Spiel ist nicht mehr in der Bibliothek – vielleicht wurde es deinstalliert.",
     "v30.link.notInstalled": "„{name}“ ist nicht installiert – ich öffne die Seite.",
-    "v30.pick.short": "Zufällig"
+    "v30.pick.short": "Zufällig",
+    "new.v30.status": "Status und Zufallsspiel: Markiere Spiele als Spiele gerade, Geplant, Durchgespielt oder Abgebrochen – „Zufällig“ schlägt vor, was du heute spielst.",
+    "new.v30.notes": "Notizen und Verknüpfungen: Notizen zu jedem Spiel auf seiner Seite und im Overlay; Desktop-Verknüpfung für Spiele aus jedem Launcher.",
+    "new.v30.palette": "Schnellsprung: Strg+P drücken und tippen – „Spielen“ für jedes installierte Spiel und alle neuen Seiten."
   },
   "fr": {
     "v30.upd.gameRunning": "Fermez d'abord le jeu : la mise à jour redémarre ModLaunch et mieux vaut ne pas interrompre la partie. La mise à jour attendra.",
@@ -1100,7 +1115,7 @@
     "v30.ach.dialog": "{game} · succès {got} sur {n}",
     "v30.ovl.total": "Total : {time} · {store}",
     "v30.ovl.shot": "Capture d'écran",
-    "new.v30.subtitle": "Étagères et collections, espace disque, bilan du temps de jeu, curateurs et remboursements",
+    "new.v30.subtitle": "Statut, notes, raccourcis de jeux, accès rapide, étagères, espace disque et bilan",
     "new.v30.shots": "Capture en jeu : Ctrl+F12 enregistre la fenêtre du jeu dans Images\\ModLaunch, et les captures apparaissent dans la galerie du jeu. Dans les jeux Steam, F12 reste à Steam.",
     "new.v30.achievements": "Succès Steam : la page du jeu dans Tous les jeux affiche combien sont débloqués, les derniers et la liste complète. Lus dans les fichiers Steam de ce PC, sans réseau.",
     "new.v30.overlay": "Overlay pour tous les jeux : les jeux d'Epic, GOG, Xbox et d'autres launchers ont aussi l'overlay, les captures et le statut « en jeu » pour les amis.",
@@ -1293,7 +1308,10 @@
     "v30.link.fail": "Impossible de créer le raccourci : {reason}",
     "v30.link.missing": "Ce jeu n'est plus dans la bibliothèque — il a peut-être été désinstallé.",
     "v30.link.notInstalled": "« {name} » n'est pas installé — j'ouvre sa page.",
-    "v30.pick.short": "Au hasard"
+    "v30.pick.short": "Au hasard",
+    "new.v30.status": "Statut et jeu au hasard : marquez En cours, À faire, Terminé ou Abandonné, et le bouton Au hasard vous propose un jeu pour ce soir.",
+    "new.v30.notes": "Notes et raccourcis : des notes pour chaque jeu sur sa page et dans l'overlay ; un raccourci sur le bureau pour un jeu de n'importe quel launcher.",
+    "new.v30.palette": "Accès rapide : Ctrl+P puis tapez — Jouer pour n'importe quel jeu installé et toutes les nouvelles pages."
   },
   "pt-BR": {
     "v30.upd.gameRunning": "Feche o jogo primeiro: a atualização reinicia o ModLaunch, e é melhor não interromper a sessão. A atualização vai esperar.",
@@ -1316,7 +1334,7 @@
     "v30.ach.dialog": "{game} · conquistas {got} de {n}",
     "v30.ovl.total": "Total: {time} · {store}",
     "v30.ovl.shot": "Captura de tela",
-    "new.v30.subtitle": "Prateleiras e coleções, espaço em disco, resumo do tempo de jogo, curadores e reembolsos",
+    "new.v30.subtitle": "Status, notas, atalhos de jogos, acesso rápido, prateleiras, espaço em disco e resumo",
     "new.v30.shots": "Captura no jogo: Ctrl+F12 salva a janela do jogo em Imagens\\ModLaunch, e as capturas aparecem na galeria do jogo. Nos jogos da Steam, F12 continua da Steam.",
     "new.v30.achievements": "Conquistas da Steam: a página do jogo em Todos os jogos mostra quantas foram desbloqueadas, as últimas e a lista completa. Lidas dos arquivos da Steam neste PC, sem rede.",
     "new.v30.overlay": "Overlay para todos os jogos: jogos da Epic, GOG, Xbox e outros launchers também ganham overlay, capturas e o status “jogando” para os amigos.",
@@ -1509,7 +1527,10 @@
     "v30.link.fail": "Não deu para criar o atalho: {reason}",
     "v30.link.missing": "Este jogo não está mais na biblioteca — talvez tenha sido desinstalado.",
     "v30.link.notInstalled": "“{name}” não está instalado — abrindo a página dele.",
-    "v30.pick.short": "Aleatório"
+    "v30.pick.short": "Aleatório",
+    "new.v30.status": "Status e jogo aleatório: marque Jogando, Na fila, Zerado ou Abandonado, e o botão Aleatório sugere o que jogar hoje.",
+    "new.v30.notes": "Notas e atalhos: notas para qualquer jogo na página dele e no overlay; atalho na área de trabalho para jogos de qualquer launcher.",
+    "new.v30.palette": "Acesso rápido: Ctrl+P e comece a digitar — Jogar para qualquer jogo instalado e todas as páginas novas."
   },
   "zh-CN": {
     "v30.upd.gameRunning": "请先关闭游戏：更新会重启 ModLaunch，最好不要中途打断游戏。更新会一直等着你。",
@@ -1532,7 +1553,7 @@
     "v30.ach.dialog": "{game} · 成就 {got} / {n}",
     "v30.ovl.total": "总计：{time} · {store}",
     "v30.ovl.shot": "截图",
-    "new.v30.subtitle": "库书架与收藏夹、磁盘空间、游戏时长回顾、鉴赏家和退款",
+    "new.v30.subtitle": "游玩状态、笔记、游戏快捷方式、快速跳转、书架、磁盘空间和回顾",
     "new.v30.shots": "游戏内截图：Ctrl+F12 把游戏窗口保存到“图片\\ModLaunch”，截图会出现在游戏图库中。在 Steam 游戏中 F12 仍归 Steam。",
     "new.v30.achievements": "Steam 成就：“全部游戏”的游戏页面显示已解锁数量、最近解锁和完整列表。直接读取本机 Steam 文件，无需联网。",
     "new.v30.overlay": "所有游戏的覆盖层：来自 Epic、GOG、Xbox 等启动器的游戏也有覆盖层、截图，并向好友显示“正在游戏”。",
@@ -1725,6 +1746,9 @@
     "v30.link.fail": "无法创建快捷方式：{reason}",
     "v30.link.missing": "这款游戏已不在库中——可能已被卸载。",
     "v30.link.notInstalled": "“{name}”未安装——正在打开它的页面。",
-    "v30.pick.short": "随机"
+    "v30.pick.short": "随机",
+    "new.v30.status": "状态与随机挑选：将游戏标记为正在玩、计划玩、已通关或已弃坑，“随机”按钮会建议今天玩什么。",
+    "new.v30.notes": "笔记与快捷方式：任意游戏都能在页面和叠加层中写笔记；可为任意启动器的游戏创建桌面快捷方式。",
+    "new.v30.palette": "快速跳转：按 Ctrl+P 并输入——可直接“开始游戏”任意已安装游戏，并打开所有新页面。"
   }
 }

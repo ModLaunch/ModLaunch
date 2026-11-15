@@ -12,6 +12,10 @@ public static class WhatsNew
 {
     static readonly (string Icon, string Key, Func<Page>? Open)[] Items =
     [
+        // 30.3: статус и случайная игра, заметки и ярлыки, быстрый переход.
+        (Icons.Flag, "new.v30.status", () => new AllGamesPage()),
+        (Icons.Edit, "new.v30.notes", () => new AllGamesPage()),
+        (Icons.Search, "new.v30.palette", null),
         // 30.2: полки библиотеки, место на дисках, итоги.
         (Icons.Star, "new.v30.shelves", () => new AllGamesPage()),
         (Icons.Folder, "new.v30.disk", () => new StoragePage()),
