@@ -237,7 +237,10 @@
     "v30.csv.notes": "Заметки",
     "new.v30.sync": "Полки на всех ПК: избранное, коллекции, статусы и заметки едут через облачный профиль — на другом компьютере всё на месте.",
     "new.v30.friendsGame": "Друзья в игре: на странице игры видно, кто из друзей сейчас в ней, — можно сразу написать. После игры — итог сеанса и сколько сегодня всего.",
-    "new.v30.export": "Экспорт библиотеки: все игры из всех лаунчеров таблицей для Excel — часы, статус, коллекции, заметки."
+    "new.v30.export": "Экспорт библиотеки: все игры из всех лаунчеров таблицей для Excel — часы, статус, коллекции, заметки.",
+    "v30.tray.recent": "Недавние игры",
+    "v30.tray.fav": "Избранное",
+    "v30.tray.random": "Случайная игра"
   },
   "en": {
     "v30.upd.gameRunning": "Close the game first: updating restarts ModLaunch, and it's better not to interrupt your session. The update will wait.",
@@ -477,7 +480,10 @@
     "v30.csv.notes": "Notes",
     "new.v30.sync": "Shelves on every PC: favorites, collections, statuses and notes travel with your cloud profile — everything's in place on another computer.",
     "new.v30.friendsGame": "Friends in game: a game's page shows which friends are in it right now, with a Message button. After playing — a session summary and today's total.",
-    "new.v30.export": "Library export: every game from every launcher as an Excel sheet — hours, status, collections, notes."
+    "new.v30.export": "Library export: every game from every launcher as an Excel sheet — hours, status, collections, notes.",
+    "v30.tray.recent": "Recent games",
+    "v30.tray.fav": "Favorites",
+    "v30.tray.random": "Random game"
   },
   "uk": {
     "v30.upd.gameRunning": "Спершу закрийте гру: оновлення перезапускає ModLaunch, а гру краще не переривати посеред сесії. Оновлення нікуди не дінеться.",
@@ -717,7 +723,10 @@
     "v30.csv.notes": "Нотатки",
     "new.v30.sync": "Полиці на всіх ПК: обране, колекції, статуси й нотатки їдуть через хмарний профіль — на іншому комп'ютері все на місці.",
     "new.v30.friendsGame": "Друзі в грі: на сторінці гри видно, хто з друзів зараз у ній, — можна одразу написати. Після гри — підсумок сеансу і скільки сьогодні загалом.",
-    "new.v30.export": "Експорт бібліотеки: усі ігри з усіх лаунчерів таблицею для Excel — години, статус, колекції, нотатки."
+    "new.v30.export": "Експорт бібліотеки: усі ігри з усіх лаунчерів таблицею для Excel — години, статус, колекції, нотатки.",
+    "v30.tray.recent": "Нещодавні ігри",
+    "v30.tray.fav": "Обране",
+    "v30.tray.random": "Випадкова гра"
   },
   "es": {
     "v30.upd.gameRunning": "Cierra primero el juego: la actualización reinicia ModLaunch y es mejor no interrumpir la partida. La actualización esperará.",
@@ -957,7 +966,10 @@
     "v30.csv.notes": "Notas",
     "new.v30.sync": "Estanterías en todos tus PC: favoritos, colecciones, estados y notas viajan con tu perfil en la nube.",
     "new.v30.friendsGame": "Amigos en el juego: la página de un juego muestra qué amigos están en él ahora, con botón para escribir. Al terminar, resumen de la sesión y total de hoy.",
-    "new.v30.export": "Exportar biblioteca: todos los juegos de todos los launchers en una hoja de Excel: horas, estado, colecciones, notas."
+    "new.v30.export": "Exportar biblioteca: todos los juegos de todos los launchers en una hoja de Excel: horas, estado, colecciones, notas.",
+    "v30.tray.recent": "Juegos recientes",
+    "v30.tray.fav": "Favoritos",
+    "v30.tray.random": "Juego al azar"
   },
   "de": {
     "v30.upd.gameRunning": "Schließ zuerst das Spiel: Das Update startet ModLaunch neu, und die Sitzung sollte nicht unterbrochen werden. Das Update wartet.",
@@ -1197,7 +1209,10 @@
     "v30.csv.notes": "Notizen",
     "new.v30.sync": "Regale auf jedem PC: Favoriten, Sammlungen, Status und Notizen reisen mit deinem Cloud-Profil mit.",
     "new.v30.friendsGame": "Freunde im Spiel: Die Spielseite zeigt, welche Freunde gerade darin sind, mit Schreiben-Knopf. Nach dem Spielen – Sitzungsbilanz und heutige Gesamtzeit.",
-    "new.v30.export": "Bibliothek exportieren: alle Spiele aus allen Launchern als Excel-Tabelle – Stunden, Status, Sammlungen, Notizen."
+    "new.v30.export": "Bibliothek exportieren: alle Spiele aus allen Launchern als Excel-Tabelle – Stunden, Status, Sammlungen, Notizen.",
+    "v30.tray.recent": "Zuletzt gespielt",
+    "v30.tray.fav": "Favoriten",
+    "v30.tray.random": "Zufälliges Spiel"
   },
   "fr": {
     "v30.upd.gameRunning": "Fermez d'abord le jeu : la mise à jour redémarre ModLaunch et mieux vaut ne pas interrompre la partie. La mise à jour attendra.",
@@ -1437,7 +1452,10 @@
     "v30.csv.notes": "Notes",
     "new.v30.sync": "Étagères sur tous vos PC : favoris, collections, statuts et notes voyagent avec votre profil cloud.",
     "new.v30.friendsGame": "Amis en jeu : la page d'un jeu montre quels amis y jouent en ce moment, avec un bouton Écrire. Après la partie — le bilan de la session et le total du jour.",
-    "new.v30.export": "Export de la bibliothèque : tous les jeux de tous les launchers dans un tableau Excel — heures, statut, collections, notes."
+    "new.v30.export": "Export de la bibliothèque : tous les jeux de tous les launchers dans un tableau Excel — heures, statut, collections, notes.",
+    "v30.tray.recent": "Jeux récents",
+    "v30.tray.fav": "Favoris",
+    "v30.tray.random": "Jeu au hasard"
   },
   "pt-BR": {
     "v30.upd.gameRunning": "Feche o jogo primeiro: a atualização reinicia o ModLaunch, e é melhor não interromper a sessão. A atualização vai esperar.",
@@ -1677,7 +1695,10 @@
     "v30.csv.notes": "Notas",
     "new.v30.sync": "Prateleiras em todos os PCs: favoritos, coleções, status e notas vão junto com o seu perfil na nuvem.",
     "new.v30.friendsGame": "Amigos no jogo: a página do jogo mostra quais amigos estão nele agora, com botão de mensagem. Depois de jogar — resumo da sessão e total de hoje.",
-    "new.v30.export": "Exportar biblioteca: todos os jogos de todos os launchers em uma planilha do Excel — horas, status, coleções, notas."
+    "new.v30.export": "Exportar biblioteca: todos os jogos de todos os launchers em uma planilha do Excel — horas, status, coleções, notas.",
+    "v30.tray.recent": "Jogos recentes",
+    "v30.tray.fav": "Favoritos",
+    "v30.tray.random": "Jogo aleatório"
   },
   "zh-CN": {
     "v30.upd.gameRunning": "请先关闭游戏：更新会重启 ModLaunch，最好不要中途打断游戏。更新会一直等着你。",
@@ -1917,6 +1938,9 @@
     "v30.csv.notes": "笔记",
     "new.v30.sync": "多台电脑同步书架：收藏、收藏夹、状态和笔记随云端资料同步——换台电脑一切都在。",
     "new.v30.friendsGame": "好友在玩：游戏页面会显示哪些好友正在玩，并可直接发消息。游戏结束后显示本次时长和今天的总时长。",
-    "new.v30.export": "导出游戏库：将所有启动器的全部游戏导出为 Excel 表格——时长、状态、收藏夹、笔记。"
+    "new.v30.export": "导出游戏库：将所有启动器的全部游戏导出为 Excel 表格——时长、状态、收藏夹、笔记。",
+    "v30.tray.recent": "最近游戏",
+    "v30.tray.fav": "收藏",
+    "v30.tray.random": "随机游戏"
   }
 }

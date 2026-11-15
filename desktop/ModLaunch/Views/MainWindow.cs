@@ -185,6 +185,9 @@ public sealed partial class MainWindow : Window
         // 30.4: итог сеанса и для игр из других лаунчеров: сколько играли и сколько сегодня всего.
         Games.AllGames.Started += g => _libSessions[g.Key] = DateTime.UtcNow;
         Games.AllGames.Exited += OnLibraryGameExit;
+        // 30.5: меню трея следует за библиотекой и полками (недавние, избранное).
+        Games.AllGames.Changed += () => Dispatcher.UIThread.Post(() => { if (_tray is not null) UpdateTray(); });
+        Games.Shelves.Changed += () => Dispatcher.UIThread.Post(() => { if (_tray is not null) UpdateTray(); });
         // 28.0: чат друзей — свой ящик фоном раз в две минуты.
         Social.Friends.Chat.Start();
         // 26.0: уведомления автора (MainWindow.Creator.cs).
@@ -610,26 +613,73 @@ public sealed partial class MainWindow : Window
         if (Program.Screenshot || Application.Current is null) return;
         var want = Settings.Data.Bool("closeToTray");
         if (!want) { if (_tray is not null) { _tray.IsVisible = false; _tray.Dispose(); _tray = null; } return; }
-        if (_tray is not null) return;
-        var menu = new NativeMenu();
-        var open = new NativeMenuItem(I18n.T("tray.open"));
-        open.Click += (_, _) => ShowFromTray();
-        menu.Items.Add(open);
-        foreach (var g in AppState.Games.Where(g => g.Status == Detect.Found).Take(8))
-        {
-            var item = new NativeMenuItem(I18n.T("tray.play", ("game", g.Def.Name)));
-            var gs = g;
-            item.Click += (_, _) => Guard.Later(() => Actions.Play(gs));
-            menu.Items.Add(item);
-        }
-        menu.Items.Add(new NativeMenuItemSeparator());
-        var quit = new NativeMenuItem(I18n.T("tray.quit"));
-        quit.Click += (_, _) => { _quitting = true; Close(); };
-        menu.Items.Add(quit);
-        _tray = new TrayIcon { ToolTipText = "ModLaunch", Menu = menu, IsVisible = true };
+        if (_tray is not null) { _tray.Menu = TrayMenu(); return; }
+        _tray = new TrayIcon { ToolTipText = "ModLaunch", Menu = TrayMenu(), IsVisible = true };
         try { if (Images.Asset("icon.png") is { } trayIcon) _tray.Icon = new WindowIcon(trayIcon); } catch { }
         _tray.Clicked += (_, _) => ShowFromTray();
         TrayIcon.SetIcons(Application.Current, [_tray]);
+    }
+
+    /// <summary>
+    /// 30.5: меню в трее — недавние игры из всех лаунчеров (а не только игры ModLaunch), избранное, случайная игра
+    /// и «Итоги». Пересобирается, когда меняется библиотека или полки.
+    /// </summary>
+    NativeMenu TrayMenu()
+    {
+        var menu = new NativeMenu();
+        NativeMenuItem Item(string text, Action run)
+        {
+            var item = new NativeMenuItem(text);
+            item.Click += (_, _) => Guard.Later(run);
+            return item;
+        }
+        menu.Items.Add(Item(I18n.T("tray.open"), ShowFromTray));
+        var lib = Games.AllGames.Current;
+        var shelves = Games.Shelves.Current;
+        if (lib is { Count: > 0 })
+        {
+            var playable = lib.Where(g => g.Installed && !shelves.IsHidden(g.Key)).ToList();
+            menu.Items.Add(new NativeMenuItemSeparator());
+            menu.Items.Add(new NativeMenuItem(I18n.T("v30.tray.recent")) { IsEnabled = false });
+            foreach (var g in playable.OrderByDescending(g => Games.AllGames.Played(g).Last).ThenBy(g => g.Name, StringComparer.CurrentCultureIgnoreCase).Take(8))
+            {
+                var game = g;
+                menu.Items.Add(Item("▶  " + g.Name, () => AllGamesPage.Play(game)));
+            }
+            var favorites = playable.Where(g => shelves.IsFavorite(g.Key)).OrderBy(g => g.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
+            if (favorites.Count > 0)
+            {
+                var sub = new NativeMenu();
+                foreach (var g in favorites.Take(20))
+                {
+                    var game = g;
+                    sub.Items.Add(Item(g.Name, () => AllGamesPage.Play(game)));
+                }
+                menu.Items.Add(new NativeMenuItem("★  " + I18n.T("v30.tray.fav")) { Menu = sub });
+            }
+            menu.Items.Add(Item("🎲  " + I18n.T("v30.tray.random"), () =>
+            {
+                ShowFromTray();
+                if (shelves.Pick(lib, g => Games.AllGames.Played(g).Last, new Random(), DateTimeOffset.UtcNow) is { } pick)
+                {
+                    Navigate(() => new AllGamesPage(pick.Key));
+                    Toast(I18n.T("v30.pick.toast", ("name", pick.Name)));
+                }
+                else Toast(I18n.T("v30.pick.none"), bad: true);
+            }));
+        }
+        else
+            foreach (var g in AppState.Games.Where(g => g.Status == Detect.Found).Take(8))
+            {
+                var gs = g;
+                menu.Items.Add(Item(I18n.T("tray.play", ("game", g.Def.Name)), () => Actions.Play(gs)));
+            }
+        menu.Items.Add(new NativeMenuItemSeparator());
+        menu.Items.Add(Item(I18n.T("v30.recap.title"), () => { ShowFromTray(); Navigate(() => new RecapPage()); }));
+        var quit = new NativeMenuItem(I18n.T("tray.quit"));
+        quit.Click += (_, _) => { _quitting = true; Close(); };
+        menu.Items.Add(quit);
+        return menu;
     }
 
     void ShowFromTray()
