@@ -27,7 +27,9 @@ public static class Integration
             return 2;
         }
         var failed = 0;
-        foreach (var m in Hooks.Marked<IntegrationTestAttribute>())
+        // MODLAUNCH_ONLY=часть имени — гонять только подходящие проверки (отладка одной).
+        var only = Environment.GetEnvironmentVariable("MODLAUNCH_ONLY");
+        foreach (var m in Hooks.Marked<IntegrationTestAttribute>().Where(m => string.IsNullOrEmpty(only) || m.Name.Contains(only, StringComparison.OrdinalIgnoreCase)))
         {
             var name = $"{m.DeclaringType!.Name}.{m.Name}";
             try

@@ -166,4 +166,113 @@ public static partial class IntegrationSocial
         Expect(GameReviews.Mine(game) is null, "review still there after remove");
         return "5★ review saved, visible after sync, removed";
     }
+
+    /// <summary>31.0: жалоба → очередь админа → снятие: лот пропал с витрины, не покупается, файл не скачать; вернуть.</summary>
+    [IntegrationTest]
+    static async Task<string> ReportAndTakedown()
+    {
+        await Integration.Emu.Seed("config/market", new() { ["fee"] = 10L });
+        await Integration.NewUser("Админ", "admin@example.test");
+        await Integration.Emu.Seed("admins/admin@example.test", new() { ["note"] = "integration" });
+        var seller = await Integration.NewUser("Автор", "seller@example.test");
+        var file = Path.Combine(Paths.DataDir, "takedown-lot.zip");
+        File.WriteAllBytes(file, [0x50, 0x4B, 0x05, 0x06, .. new byte[18]]);
+        var id = await Step("listing", () => Market.Save(new ListingDraft { Title = "Подозрительный мод", Kind = "pack", Price = 0, File = file }, null));
+        var lot = (await Market.Get(id))!;
+
+        await Integration.NewUser("Игрок", "player@example.test");
+        await Step("report", () => Safety.Report("listing", id, seller, lot.Title, "malware", "Защитник Windows ругается на dll"));
+        try { await Safety.Report("listing", id, seller, lot.Title, "malware", "ещё раз"); throw new Exception("second report accepted"); }
+        catch (ServiceError e) when (e.Code == "REPORT_EXISTS") { }
+        try { await Safety.OpenReports(); throw new Exception("player read the report queue"); }
+        catch (ServiceError e) when (e.Code is "DENIED") { }
+
+        await As("admin@example.test");
+        var open = await Step("queue", () => Safety.OpenReports());
+        var report = open.Single(r => r.Target == id);
+        Expect(report.Reason == "malware" && report.Owner == seller, "report fields: " + report);
+        await Step("take down", () => Safety.TakeDown("listing", id, "malware", "Defender: Trojan", lot.Sha256, lot.Title, seller));
+        await Step("resolve", () => Safety.Resolve(report, true, "takedown", "снят"));
+        Expect((await Safety.OpenReports()).All(r => r.Target != id), "report still open");
+        Expect(Safety.IsBlocked(lot.Sha256), "malware hash not on the blocklist");
+
+        await As("player@example.test");
+        await Safety.Refresh(force: true);
+        Expect((await Market.All(force: true)).All(l => l.Id != id), "taken-down lot still on the storefront");
+        try { await Market.Buy((await Market.Get(id))!); throw new Exception("taken-down lot bought"); }
+        catch (ServiceError e) when (e.Code is "DENIED") { }
+
+        await As("seller@example.test");
+        try { await Market.Save(new ListingDraft { Title = "Подозрительный мод 2", Kind = "pack", Price = 0, File = file }, null); throw new Exception("blocked file listed again"); }
+        catch (ServiceError e) when (e.Code is "BLOCKED_FILE") { }
+
+        await As("admin@example.test");
+        await Step("restore", () => Safety.Restore("listing", id));
+        await As("player@example.test");
+        Expect((await Market.All(force: true)).Any(l => l.Id == id), "restored lot not back");
+        return "report (once) → admin queue → takedown + blocklist → hidden, not buyable, file can't be re-listed → restore";
+    }
+
+    /// <summary>31.0: блокировка — заблокированный не выставляет товары и не жалуется; разблокировка возвращает.</summary>
+    [IntegrationTest]
+    static async Task<string> BanBlocksPublishing()
+    {
+        await Integration.Emu.Seed("config/market", new() { ["fee"] = 10L });
+        await Integration.NewUser("Админ", "admin@example.test");
+        await Integration.Emu.Seed("admins/admin@example.test", new() { ["note"] = "integration" });
+        await Account.RefreshProfile();
+        var bad = await Integration.NewUser("Нарушитель", "bad@example.test");
+        await As("admin@example.test");
+        await Step("ban", () => Safety.BanUser(bad, "Нарушитель", "спам"));
+        Expect((await Safety.Bans()).Any(b => b.Uid == bad), "ban not listed");
+
+        await As("bad@example.test");
+        Expect(await Safety.MyBan() is not null, "banned user doesn't see own ban");
+        var file = Path.Combine(Paths.DataDir, "ban-lot.zip");
+        File.WriteAllBytes(file, [0x50, 0x4B, 0x05, 0x06, .. new byte[18]]);
+        try { await Market.Save(new ListingDraft { Title = "Спам", Kind = "pack", Price = 0, File = file }, null); throw new Exception("banned user listed an item"); }
+        catch (ServiceError e) when (e.Code is "DENIED") { }
+
+        await As("admin@example.test");
+        await Step("unban", () => Safety.Unban(bad));
+        await As("bad@example.test");
+        Expect(await Safety.MyBan() is null, "still banned");
+        await Step("list after unban", () => Market.Save(new ListingDraft { Title = "Нормальный мод", Kind = "pack", Price = 0, File = file }, null));
+        return "banned: can't list items, sees own ban; unbanned: can again";
+    }
+
+    /// <summary>31.0: вход с нового ПК — старый ПК видит «это вы?», «это я» снимает вопрос; первый ПК — без вопроса.</summary>
+    [IntegrationTest]
+    static async Task<string> NewDeviceAlert()
+    {
+        Settings.Data["deviceId"] = "dfirstpc00000001";
+        await Integration.NewUser("Хозяин", "owner@example.test");
+        await Step("register first", () => Devices.Register(force: true));
+        Expect((await Devices.Alerts()).Count == 0, "first PC raised an alert");
+        var first = (await Devices.List()).Single();
+        Expect(first.Mine && first.Ack, "first device not acknowledged");
+
+        // Второй ПК: тот же аккаунт, другой id копии программы.
+        Account.SignOut();
+        Settings.Data["deviceId"] = "dsecondpc0000002";
+        await Step("sign in on PC 2", () => Account.SignIn("owner@example.test", "correct-horse-1"));
+        Expect((await Devices.List()).Count == 2, "second device not registered");
+
+        // Снова первый ПК: видит новый вход.
+        Settings.Data["deviceId"] = "dfirstpc00000001";
+        var alerts = await Step("alerts", () => Devices.Alerts());
+        Expect(alerts.Count == 1 && alerts[0].Id == "dsecondpc0000002", "no alert for the new PC");
+        await Step("ack", () => Devices.Acknowledge(alerts[0]));
+        Expect((await Devices.Alerts()).Count == 0, "alert stays after «it's me»");
+
+        // Подбор пароля: после 5 неверных — пауза, даже верный пароль не пускает до её конца.
+        Account.SignOut();
+        for (var i = 0; i < 5; i++)
+            try { await Account.SignIn("owner@example.test", "wrong-pass-" + i); } catch (ServiceError) { }
+        try { await Account.SignIn("owner@example.test", "correct-horse-1"); throw new Exception("not locked after 5 wrong passwords"); }
+        catch (ServiceError e) when (e.Code == "LOCKED") { }
+        Devices.Succeeded("owner@example.test");
+        Settings.Data.Remove("deviceId");
+        return "first PC silent → PC 2 sign-in → PC 1 asks «it's you?» → ack clears; 5 wrong passwords lock even the right one";
+    }
 }
