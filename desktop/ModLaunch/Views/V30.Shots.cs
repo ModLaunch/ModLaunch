@@ -195,4 +195,26 @@ public static class V30Shots
         s.Save("v30-16-palette");
         s.Window.CloseDialog();
     }
+
+    /// <summary>MODLAUNCH_SHOTS=V30FriendsInGame: «Друзья в этой игре» на странице игры во «Всех играх».</summary>
+    [DemoShots]
+    static void V30FriendsInGame(Shots s)
+    {
+        s.Pump(4500);
+        Games.AllGames.Refresh();
+        s.Pump(1500);
+        var now = DateTime.UtcNow;
+        Social.Friends.DemoView = new Social.FriendsView(true, true, "ML-4K2Q-9", "online",
+        [
+            new("demo-f1", "Lena", "playing", "steam:1245620", "ELDEN RING", now.AddMinutes(-47), now),
+            new("demo-f2", "Artem", "playing", "steam:1245620", "ELDEN RING", now.AddMinutes(-112), now),
+            new("demo-f3", "Kira", "online", "", "", null, now),
+        ], [], [], null);
+        s.Window.Navigate(() => new AllGamesPage("steam:1245620"));
+        s.Pump(2000);
+        if (s.Window.CurrentPage is AllGamesPage page) page.ScrollDetailTo(330);
+        s.Pump(600);
+        s.Save("v30-17-friends-in-game");
+        Social.Friends.DemoView = null;
+    }
 }

@@ -6,6 +6,7 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using ModLaunch.Core;
+using ModLaunch.Features;
 using ModLaunch.Games;
 using ModLaunch.Social;
 
@@ -160,7 +161,7 @@ public sealed class AllGamesPage : Page
         ToolTip.SetTip(dice, I18n.T("v30.pick.title"));
         chips.Children.Add(dice);
         // Два списка делят ширину поровну, кубик — справа: в колонке 300 px всё помещается.
-        var sortRow = new Grid { ColumnDefinitions = new ColumnDefinitions("*,1.3*"), ColumnSpacing = 6 };
+        var sortRow = new Grid { ColumnDefinitions = new ColumnDefinitions("*,1.12*"), ColumnSpacing = 6 };
         sort.MinWidth = 0;
         statusBox.MinWidth = 0;
         sort.HorizontalAlignment = statusBox.HorizontalAlignment = HorizontalAlignment.Stretch;
@@ -534,6 +535,8 @@ public sealed class AllGamesPage : Page
         if (SteamAchievementsCard.For(g) is { } achievements) body.Children.Add(achievements);
         body.Children.Add(Ui.Card(mods, 18));
         body.Children.Add(NotesCard(g));
+        // 30.4: кто из друзей сейчас в этой игре — написать или позвать.
+        if (FriendsInGame(g) is { } friendsCard) body.Children.Add(friendsCard);
         body.Children.Add(new GameReviewsCard(g));
         // 30.0: что пишут об игре кураторы, на которых подписан.
         body.Children.Add(new CuratorPicksCard(g));
@@ -549,6 +552,48 @@ public sealed class AllGamesPage : Page
         if (Program.Screenshot) return;
         try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(uri) { UseShellExecute = true }); }
         catch { MainWindow.Current?.Toast(I18n.T("v27.lib.noLauncher", ("store", Stores.Title(g.Store))), bad: true); }
+    }
+
+    /// <summary>Друзья, которые прямо сейчас в этой игре (по ключу игры, номеру игры ModLaunch или по имени).</summary>
+    internal static List<Social.Friend> PlayingNow(LibGame g, IEnumerable<Social.Friend> friends)
+    {
+        var key = Social.GameReviews.Key(g);
+        return friends.Where(f => f.State == "playing" && (f.Game == key || (g.ManagedId is { } id && f.Game == id)
+            || string.Equals(f.GameName, g.Name, StringComparison.CurrentCultureIgnoreCase))).ToList();
+    }
+
+    [SelfTest]
+    static string FriendsPlayingThisGame()
+    {
+        var g = new LibGame("steam:1245620", "steam", "ELDEN RING", null, 1245620, true, 0);
+        var managed = new LibGame("steam:264710", "steam", "Subnautica", null, 264710, true, 0, ManagedId: "subnautica");
+        Social.Friend F(string name, string state, string game, string gameName) => new("u-" + name, name, state, game, gameName, null, null);
+        var list = new[] { F("a", "playing", "steam:1245620", "Elden Ring"), F("b", "online", "steam:1245620", ""), F("c", "playing", "epic:x", "elden ring"),
+            F("d", "playing", "subnautica", "Subnautica"), F("e", "playing", "steam:1", "Other") };
+        if (string.Join(",", PlayingNow(g, list).Select(f => f.Name)) != "a,c") throw new Exception("by key and by name, only playing");
+        if (string.Join(",", PlayingNow(managed, list).Select(f => f.Name)) != "d") throw new Exception("ModLaunch game id");
+        return "friend in game matched by game key, ModLaunch id or name; online-but-idle friends skipped";
+    }
+
+    static Control? FriendsInGame(LibGame g)
+    {
+        if (!Social.Account.SignedIn && Social.Friends.DemoView is null) return null;
+        var now = PlayingNow(g, Social.Friends.View().Friends);
+        if (now.Count == 0) return null;
+        var col = Ui.Col(10, Ui.Row(8, Ui.Icon(Icons.Users, 16, Ui.Res("Brand2")), Ui.Text(I18n.T("v30.friends.inGame", ("n", now.Count)), "h3")));
+        foreach (var f in now)
+        {
+            var friend = f;
+            var write = Ui.Button(I18n.T("v30.friends.write"), () => MainWindow.Current?.OpenChat(friend), "ghost", Icons.Chat);
+            write.VerticalAlignment = VerticalAlignment.Center;
+            var line = new DockPanel();
+            DockPanel.SetDock(write, Dock.Right);
+            line.Children.Add(write);
+            var since = f.Since is DateTime at ? " · " + I18n.T("v30.friends.since", ("time", PlayTime.Format((long)(DateTime.UtcNow - at.ToUniversalTime()).TotalMilliseconds))) : "";
+            line.Children.Add(Ui.Row(8, Ui.Dot(Ui.Res("Brand2")), Ui.Text(f.Name, "h3"), Ui.Text(I18n.T("v30.friends.playing") + since, "small muted")));
+            col.Children.Add(line);
+        }
+        return Ui.Card(col, 18);
     }
 
     /// <summary>30.3: заметки к игре — пароли от серверов не надо, а вот «где остановился» и коды — да. Видны и в оверлее.</summary>
