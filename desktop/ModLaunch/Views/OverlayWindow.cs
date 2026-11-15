@@ -103,6 +103,16 @@ public sealed class OverlayWindow : Window
             panel.Children.Add(Ui.Text(I18n.T("v30.ovl.total", ("time", AllGamesPage.Hours(AllGames.Played(lib).Minutes)), ("store", Stores.Title(lib.Store))), "small", color: Ui.Hex("#C9CFDB")));
             var shot = Ui.Button(I18n.T("v30.ovl.shot"), () => { Hide(); DispatcherTimer.RunOnce(() => _ = TakeShot(lib.Name), TimeSpan.FromMilliseconds(350)); }, "primary", Icons.Image);
             panel.Children.Add(Ui.Row(10, shot, Ui.Text(Hotkey.ArmedShot is { } k ? Hotkey.Display(k) : "", "small", color: Ui.Hex("#AAB2C2"))));
+
+            // 30.3: заметки и для игр из «Всех игр» — те же, что на странице игры.
+            var libNotes = new TextBox { Text = Shelves.Current.Note(lib), Watermark = I18n.T("ovl.notes.placeholder"), AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, Height = 120, MaxLength = Shelves.MaxNote };
+            var libSaved = Ui.Text("", "small", color: Ui.Res("Good"));
+            libNotes.LostFocus += (_, _) =>
+            {
+                Shelves.Current.SetNote(lib, libNotes.Text ?? "");
+                libSaved.Text = I18n.T("ovl.notes.saved");
+            };
+            panel.Children.Add(Ui.Col(6, Ui.Row(8, Ui.Text(I18n.T("ovl.notes"), "h3", color: Brushes.White), libSaved), libNotes));
         }
         else if (g is null) panel.Children.Add(Ui.Text(I18n.T("ovl.noGame"), "h2", color: Brushes.White));
         else

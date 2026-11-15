@@ -1115,7 +1115,18 @@ public sealed partial class MainWindow : Window
         if (line.StartsWith("nxm://", StringComparison.OrdinalIgnoreCase)) Actions.InstallNxm(line);
         // 24.0: modlaunch://pack/ABCD-EFGH — сборка друга по ссылке.
         else if (line.StartsWith("modlaunch://pack/", StringComparison.OrdinalIgnoreCase)) ShareUi.Enter(prefill: line);
+        // 30.3: modlaunch://play/<ключ> — ярлык игры на рабочем столе.
+        else if (Games.GameLinks.KeyOf(line) is { } key) _ = PlayFromLink(key);
         else if (Features.ModLink.IsAppLink(line)) OpenLink(line);
+    }
+
+    /// <summary>Запустить игру из библиотеки по ярлыку: только установленную, иначе — открыть её страницу.</summary>
+    async Task PlayFromLink(string key)
+    {
+        if (Games.AllGames.Current is null) await Games.AllGames.Refresh();
+        if (Games.AllGames.Current?.FirstOrDefault(g => g.Key == key) is not { } game) { Toast(I18n.T("v30.link.missing"), bad: true); return; }
+        if (!game.Installed) { Navigate(() => new AllGamesPage(game.Key)); Toast(I18n.T("v30.link.notInstalled", ("name", game.Name)), bad: true); return; }
+        AllGamesPage.Play(game);
     }
 
     /// <summary>Окно «Вышел ModLaunch X»: что нового и кнопка обновления.</summary>

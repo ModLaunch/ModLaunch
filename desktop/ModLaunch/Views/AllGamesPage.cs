@@ -23,6 +23,8 @@ public sealed class AllGamesPage : Page
 
     string _query = "";
     string _store = Settings.Data.Str("allGamesStore") ?? "all";
+    // 30.3: фильтр по статусу прохождения ("" — все).
+    string _status = Settings.Data.Str("allGamesStatus") is { } st && Shelves.Statuses.Contains(st) ? st : "";
     string _selected = Settings.Data.Str("allGamesSel") ?? "";
     ScrollViewer _list = new();
     ContentControl _detail = new();
@@ -30,6 +32,9 @@ public sealed class AllGamesPage : Page
 
     /// <summary>Снимки экрана: показать низ страницы игры (отзывы).</summary>
     internal void ScrollDetailToEnd() => _right?.ScrollToEnd();
+
+    /// <summary>Снимки экрана: прокрутить страницу игры до нужного места.</summary>
+    internal void ScrollDetailTo(double y) { if (_right is not null) _right.Offset = new Vector(0, y); }
 
     public AllGamesPage(string? key = null)
     {
@@ -59,6 +64,7 @@ public sealed class AllGamesPage : Page
             else if (_store.StartsWith("c:", StringComparison.Ordinal)) { var name = _store[2..]; all = all.Where(g => shelves.Contains(name, g.Key)); }
             else if (_store != "all") all = all.Where(g => g.Store == _store);
         }
+        if (_status != "") all = all.Where(g => shelves.StatusOf(g.Key) == _status);
         if (_query != "") all = all.Where(g => g.Name.Contains(_query, StringComparison.CurrentCultureIgnoreCase));
         return all;
     }
@@ -132,6 +138,36 @@ public sealed class AllGamesPage : Page
         };
         ToolTip.SetTip(sort, I18n.T("v30.shelf.sort"));
         sort.SelectionChanged += (_, _) => { if (sort.SelectedIndex >= 0 && Shelves.Sorts[sort.SelectedIndex] != shelves.Sort) shelves.Sort = Shelves.Sorts[sort.SelectedIndex]; };
+        // 30.3: статус прохождения — фильтром рядом с порядком.
+        var statuses = new[] { "" }.Concat(Shelves.Statuses).ToArray();
+        var statusBox = new ComboBox
+        {
+            ItemsSource = statuses.Select(s => s == "" ? I18n.T("v30.status.any") : I18n.T("v30.status." + s) + " " + shelves.CountStatus(s).ToString(I18n.Culture)).ToList(),
+            SelectedIndex = Array.IndexOf(statuses, _status), MinWidth = 110,
+        };
+        ToolTip.SetTip(statusBox, I18n.T("v30.status.title"));
+        statusBox.SelectionChanged += (_, _) =>
+        {
+            if (statusBox.SelectedIndex < 0 || statuses[statusBox.SelectedIndex] == _status) return;
+            _status = statuses[statusBox.SelectedIndex];
+            Settings.Data["allGamesStatus"] = _status;
+            Settings.Save();
+            Build();
+        };
+        // 30.3: «Во что поиграть?» — случайная игра из установленных (пройденные и брошенные — нет).
+        var dice = Ui.Button("🎲 " + I18n.T("v30.pick.short"), PickRandom, "chip");
+        dice.Margin = new Thickness(0, 0, 4, 4);
+        ToolTip.SetTip(dice, I18n.T("v30.pick.title"));
+        chips.Children.Add(dice);
+        // Два списка делят ширину поровну, кубик — справа: в колонке 300 px всё помещается.
+        var sortRow = new Grid { ColumnDefinitions = new ColumnDefinitions("*,1.3*"), ColumnSpacing = 6 };
+        sort.MinWidth = 0;
+        statusBox.MinWidth = 0;
+        sort.HorizontalAlignment = statusBox.HorizontalAlignment = HorizontalAlignment.Stretch;
+        sortRow.Children.Add(sort);
+        Grid.SetColumn(statusBox, 1);
+        sortRow.Children.Add(statusBox);
+
 
         var hours = games.Sum(g => AllGames.Played(g).Minutes) / 60;
         var refresh = Ui.Button("", () => { _ = AllGames.Refresh(); }, "icon ghost", Icons.Refresh, I18n.T("v27.lib.refresh"));
@@ -155,7 +191,7 @@ public sealed class AllGamesPage : Page
         var head = Ui.Col(10,
             titleRow,
             Ui.Text(I18n.T("v27.lib.total", ("n", games.Count.ToString("N0", I18n.Culture)), ("stores", stores), ("h", hours.ToString("N0", I18n.Culture))), "tiny muted"),
-            search, chips, sort);
+            search, chips, sortRow);
         head.Margin = new Thickness(16, 18, 16, 10);
 
         var left = new DockPanel();
@@ -294,6 +330,23 @@ public sealed class AllGamesPage : Page
 
     // ---------------------------------------------------------------- 30.2: полки
 
+    readonly Random _dice = new();
+
+    /// <summary>Случайная игра: выделить её и сказать, почему бы не она.</summary>
+    void PickRandom()
+    {
+        if (Shelves.Current.Pick(Games, g => AllGames.Played(g).Last, _dice, DateTimeOffset.UtcNow, _selected) is not { } g)
+        {
+            MainWindow.Current?.Toast(I18n.T("v30.pick.none"), bad: true);
+            return;
+        }
+        _selected = g.Key;
+        if (!Visible().Any(x => x.Key == g.Key)) { _store = "all"; _status = ""; _query = ""; Build(); }
+        else { RenderList(); RenderDetail(); }
+        _right?.ScrollToHome();
+        MainWindow.Current?.Toast(I18n.T("v30.pick.toast", ("name", NameOf(g))));
+    }
+
     /// <summary>Меню игры: избранное, коллекции, скрыть. И правым щелчком в списке, и кнопкой на странице игры.</summary>
     MenuFlyout ShelfMenu(LibGame g)
     {
@@ -306,14 +359,38 @@ public sealed class AllGamesPage : Page
         if (collections.Count > 0) collections.Add("-");
         collections.Add(Ctx.Item(I18n.T("v30.shelf.new"), Icons.Plus, () => AskName(null, g)));
         var hidden = shelves.IsHidden(g.Key);
+        var current = shelves.StatusOf(g.Key);
+        var statusItems = Shelves.Statuses.Select(s => (object?)Ctx.Item((current == s ? "✓ " : "") + I18n.T("v30.status." + s), StatusIcon(s), () => shelves.SetStatus(g.Key, current == s ? "" : s))).ToList();
+        if (current != "") { statusItems.Add("-"); statusItems.Add(Ctx.Item(I18n.T("v30.status.clear"), Icons.Close, () => shelves.SetStatus(g.Key, ""))); }
         return Ctx.Menu(
             hidden ? null : Ctx.Item(I18n.T(shelves.IsFavorite(g.Key) ? "v30.shelf.favRemove" : "v30.shelf.favAdd"), Icons.Star, () => shelves.ToggleFavorite(g.Key)),
             Ctx.Sub(I18n.T("v30.shelf.toCollection"), Icons.Layers, collections),
+            Ctx.Sub(I18n.T("v30.status.title"), Icons.Flag, statusItems),
+            g.Installed ? Ctx.Item(I18n.T("v30.link.desktop"), Icons.External, () => DesktopLink(g)) : null,
             "-",
             Ctx.Item(I18n.T(hidden ? "v30.shelf.unhide" : "v30.shelf.hide"), hidden ? Icons.Eye : Icons.EyeOff, () =>
             {
                 if (shelves.ToggleHidden(g.Key)) MainWindow.Current?.Toast(I18n.T("v30.shelf.hidden.toast", ("name", NameOf(g))));
             }));
+    }
+
+    internal static string StatusIcon(string status) => status switch
+    {
+        "playing" => Icons.Play,
+        "backlog" => Icons.Clock,
+        "done" => Icons.Check,
+        _ => Icons.Close,
+    };
+
+    /// <summary>Ярлык игры на рабочем столе: запускает её через ModLaunch (modlaunch://play/…) из любого лаунчера.</summary>
+    static void DesktopLink(LibGame g)
+    {
+        try
+        {
+            var path = GameLinks.CreateDesktop(g);
+            MainWindow.Current?.Toast(I18n.T("v30.link.done", ("name", Path.GetFileNameWithoutExtension(path))));
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { MainWindow.Current?.Toast(I18n.T("v30.link.fail", ("reason", e.Message)), bad: true); }
     }
 
     /// <summary>Новая коллекция (и сразу положить туда игру) или новое имя для существующей.</summary>
@@ -391,7 +468,14 @@ public sealed class AllGamesPage : Page
             Child = new TextBlock { Text = Stores.Title(g.Store), FontSize = 11.5, FontWeight = FontWeight.SemiBold, Foreground = Ui.Res("Text") },
         };
         var title = new TextBlock { Text = NameOf(g), FontSize = 34, FontWeight = FontWeight.SemiBold, Foreground = Ui.Res("Text"), TextWrapping = TextWrapping.Wrap, MaxWidth = 900 };
-        hero.Children.Add(new Border { Padding = new Thickness(34, 0, 34, 22), VerticalAlignment = VerticalAlignment.Bottom, Child = Ui.Col(10, badge, title) });
+        var badges = Ui.Row(6, badge);
+        if (Shelves.Current.StatusOf(g.Key) is { Length: > 0 } status)
+            badges.Children.Add(new Border
+            {
+                CornerRadius = new CornerRadius(6), Padding = new Thickness(8, 3), Background = Ui.Res("BrandSoft"),
+                Child = Ui.Row(5, Ui.Icon(StatusIcon(status), 11, Ui.Res("Brand2")), new TextBlock { Text = I18n.T("v30.status." + status), FontSize = 11.5, FontWeight = FontWeight.SemiBold, Foreground = Ui.Res("Brand2") }),
+            });
+        hero.Children.Add(new Border { Padding = new Thickness(34, 0, 34, 22), VerticalAlignment = VerticalAlignment.Bottom, Child = Ui.Col(10, badges, title) });
 
         Button main;
         if (AllGames.IsRunning(g))
@@ -449,6 +533,7 @@ public sealed class AllGamesPage : Page
         // 30.0: достижения Steam — из файлов Steam на этом ПК.
         if (SteamAchievementsCard.For(g) is { } achievements) body.Children.Add(achievements);
         body.Children.Add(Ui.Card(mods, 18));
+        body.Children.Add(NotesCard(g));
         body.Children.Add(new GameReviewsCard(g));
         // 30.0: что пишут об игре кураторы, на которых подписан.
         body.Children.Add(new CuratorPicksCard(g));
@@ -464,6 +549,27 @@ public sealed class AllGamesPage : Page
         if (Program.Screenshot) return;
         try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(uri) { UseShellExecute = true }); }
         catch { MainWindow.Current?.Toast(I18n.T("v27.lib.noLauncher", ("store", Stores.Title(g.Store))), bad: true); }
+    }
+
+    /// <summary>30.3: заметки к игре — пароли от серверов не надо, а вот «где остановился» и коды — да. Видны и в оверлее.</summary>
+    static Control NotesCard(LibGame g)
+    {
+        var box = new TextBox
+        {
+            Text = Shelves.Current.Note(g), Watermark = I18n.T("ovl.notes.placeholder"), AcceptsReturn = true, TextWrapping = TextWrapping.Wrap,
+            MinHeight = 80, MaxHeight = 260, MaxLength = Shelves.MaxNote, VerticalContentAlignment = VerticalAlignment.Top,
+        };
+        var saved = Ui.Text("", "small", color: Ui.Res("Good"));
+        void Save()
+        {
+            if ((box.Text ?? "") == Shelves.Current.Note(g)) return;
+            Shelves.Current.SetNote(g, box.Text ?? "");
+            saved.Text = "✓ " + I18n.T("ovl.notes.saved");
+        }
+        box.LostFocus += (_, _) => Save();
+        box.DetachedFromVisualTree += (_, _) => Save();
+        box.TextChanged += (_, _) => saved.Text = "";
+        return Ui.Card(Ui.Col(10, Ui.Row(8, Ui.Text(I18n.T("ovl.notes"), "h3"), saved), box), 18);
     }
 
     static Control Fact(string label, string value) => new Border

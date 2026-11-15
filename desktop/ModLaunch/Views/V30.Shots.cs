@@ -161,4 +161,23 @@ public static class V30Shots
         s.Pump(1500);
         s.Save("v30-14-recap");
     }
+
+    /// <summary>MODLAUNCH_SHOTS=V30Status: статус «Играю», заметки и меню игры во «Всех играх».</summary>
+    [DemoShots]
+    static void V30Status(Shots s)
+    {
+        s.Pump(4500);
+        Games.AllGames.Refresh();
+        s.Pump(1500);
+        var shelves = Games.Shelves.Current;
+        shelves.SetStatus("steam:1245620", "playing");
+        shelves.SetStatus("epic:Hades", "done");
+        if (Games.AllGames.Current?.FirstOrDefault(g => g.Key == "steam:1245620") is { } er)
+            shelves.SetNote(er, "Остановился у Малении. Билд на кровотечение, +10 к фляге — в Лиурнии.");
+        s.Window.Navigate(() => new AllGamesPage("steam:1245620"));
+        s.Pump(2000);
+        if (s.Window.CurrentPage is AllGamesPage page) page.ScrollDetailTo(330);
+        s.Pump(600);
+        s.Save("v30-15-status-notes");
+    }
 }

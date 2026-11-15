@@ -133,6 +133,78 @@ public sealed class Shelves
         if (Groups().Remove(collection)) Save();
     }
 
+    // ---------------------------------------------------------------- 30.3: статус прохождения
+
+    /// <summary>Играю, в планах, пройдено, брошено — как в Playnite, а в Steam такого нет.</summary>
+    public static readonly string[] Statuses = ["playing", "backlog", "done", "dropped"];
+
+    JsonObject StatusNode()
+    {
+        if (_data["status"] is JsonObject o) return o;
+        var created = new JsonObject();
+        _data["status"] = created;
+        return created;
+    }
+
+    public string StatusOf(string key) => StatusNode()[key]?.GetValue<string>() is { } s && Statuses.Contains(s) ? s : "";
+
+    /// <summary>Поставить статус ("" — убрать).</summary>
+    public void SetStatus(string key, string status)
+    {
+        if (status == "" || !Statuses.Contains(status)) StatusNode().Remove(key);
+        else StatusNode()[key] = status;
+        Save();
+    }
+
+    public int CountStatus(string status) => StatusNode().Count(kv => kv.Value?.GetValue<string>() == status);
+
+    // ---------------------------------------------------------------- 30.3: заметки к игре
+
+    public const int MaxNote = 4000;
+
+    /// <summary>
+    /// Заметка к игре. У игр ModLaunch — та же, что в оверлее с 3.x (settings.notes[id]), у остальных — в library.json.
+    /// </summary>
+    public string Note(LibGame g) => g.ManagedId is { } id
+        ? Settings.Data.Obj("notes").Str(id) ?? ""
+        : (_data["notes"] as JsonObject)?[g.Key]?.GetValue<string>() ?? "";
+
+    public void SetNote(LibGame g, string text)
+    {
+        text = text.Length > MaxNote ? text[..MaxNote] : text;
+        if (g.ManagedId is { } id)
+        {
+            Settings.Data.Obj("notes")[id] = text;
+            Settings.Save();
+            return;
+        }
+        if (_data["notes"] is not JsonObject notes) { notes = new JsonObject(); _data["notes"] = notes; }
+        if (string.IsNullOrWhiteSpace(text)) notes.Remove(g.Key); else notes[g.Key] = text;
+        if (Store.IsValueCreated && ReferenceEquals(this, Store.Value.Shelves)) Store.Value.File.Save();
+    }
+
+    // ---------------------------------------------------------------- 30.3: во что поиграть
+
+    /// <summary>
+    /// Случайная игра «на вечер»: установленная, не скрытая, не пройденная и не брошенная. «Играю» и «В планах» —
+    /// в три раза вероятнее, только что запущенная (последние сутки) — реже.
+    /// </summary>
+    public LibGame? Pick(IEnumerable<LibGame> games, Func<LibGame, long> lastPlayed, Random rnd, DateTimeOffset now, string? except = null)
+    {
+        var pool = games.Where(g => g.Installed && g.Key != except && !IsHidden(g.Key) && StatusOf(g.Key) is not ("done" or "dropped")).ToList();
+        if (pool.Count == 0) return null;
+        double Weight(LibGame g) =>
+            (StatusOf(g.Key) is "playing" or "backlog" ? 3 : 1) * (now.ToUnixTimeSeconds() - lastPlayed(g) < 86400 ? 0.3 : 1);
+        var total = pool.Sum(Weight);
+        var roll = rnd.NextDouble() * total;
+        foreach (var g in pool)
+        {
+            roll -= Weight(g);
+            if (roll <= 0) return g;
+        }
+        return pool[^1];
+    }
+
     // ---------------------------------------------------------------- порядок
 
     public string Sort
@@ -187,6 +259,17 @@ public sealed class Shelves
         if (Names("recent") != "Alpha,Gamma,beta") throw new Exception("recent " + Names("recent"));
         if (Names("played") != "beta,Gamma,Alpha") throw new Exception("played ties by name " + Names("played"));
         if (Names("size") != "beta,Gamma,Alpha") throw new Exception("size " + Names("size"));
-        return "favorites, hidden, collections (clean names, rename, delete) and four sort orders";
+        var st = new Shelves(new JsonObject());
+        st.SetStatus("a", "done");
+        st.SetStatus("b", "playing");
+        st.SetStatus("c", "nonsense");
+        if (st.StatusOf("a") != "done" || st.StatusOf("c") != "" || st.CountStatus("playing") != 1) throw new Exception("status");
+        st.SetStatus("a", "");
+        if (st.StatusOf("a") != "") throw new Exception("status clear");
+        st.SetStatus("steam:1", "done");
+        var picks = Enumerable.Range(0, 200).Select(i => st.Pick([a, b, c], g => stats[g.Key].Item1, new Random(i), now: DateTimeOffset.FromUnixTimeSeconds(10_000_000))?.Key).ToList();
+        if (picks.Contains("steam:1") || picks.Contains(null) || !picks.Contains("steam:2") || !picks.Contains("epic:c")) throw new Exception("pick skips done games");
+        if (st.Pick([a], g => 0, new Random(1), DateTimeOffset.UtcNow) is not null) throw new Exception("nothing to pick");
+        return "favorites, hidden, collections, status, random pick and four sort orders";
     }
 }
