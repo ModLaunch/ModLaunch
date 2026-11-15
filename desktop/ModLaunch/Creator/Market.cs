@@ -149,7 +149,7 @@ public static partial class Market
 
     static string Id(JsonObject doc) { var n = doc.Str("name") ?? ""; return n[(n.LastIndexOf('/') + 1)..]; }
 
-    static async Task<List<JsonObject>> Query(string collection, string? field, object? value, string? parent = null, string order = "created", int limit = 300, string? token = null)
+    static async Task<List<JsonObject>> Query(string collection, string? field, object? value, string? parent = null, string order = "created", int limit = 300, string? token = null, bool sorted = false)
     {
         var q = new JsonObject
         {
@@ -164,7 +164,7 @@ public static partial class Market
                     ["field"] = new JsonObject { ["fieldPath"] = field }, ["op"] = "EQUAL", ["value"] = Firebase.ToValue(value),
                 },
             };
-        else q["orderBy"] = new JsonArray(new JsonObject { ["field"] = new JsonObject { ["fieldPath"] = order }, ["direction"] = "DESCENDING" });
+        if (field is null || sorted) q["orderBy"] = new JsonArray(new JsonObject { ["field"] = new JsonObject { ["fieldPath"] = order }, ["direction"] = "DESCENDING" });
         var url = parent is null ? Firebase.Url(":runQuery") : Firebase.DocUrl(Firebase.Doc(parent), ":runQuery");
         var rows = await Hub.Call(url, HttpMethod.Post, new JsonObject { ["structuredQuery"] = q }, token);
         return (rows as JsonArray ?? []).Select(r => r?["document"] as JsonObject).OfType<JsonObject>().ToList();
@@ -177,7 +177,9 @@ public static partial class Market
     public static async Task<List<Listing>> All(bool force = false)
     {
         if (!force && _cache is not null && DateTime.UtcNow - _cachedAt < TimeSpan.FromMinutes(1)) return _cache;
-        _cache = (await Query("market", null, null, order: "updated")).Select(FromDoc).Where(l => l.Active).ToList();
+        // 31.0: только активные — правила базы не пускают запрос, который может вернуть чужие скрытые лоты
+        // (без фильтра витрина была пустой у всех, кроме админа). Индекс status+updated — firebase/firestore.indexes.json.
+        _cache = (await Query("market", "status", "active", order: "updated", sorted: true)).Select(FromDoc).Where(l => l.Active).ToList();
         _cachedAt = DateTime.UtcNow;
         return _cache;
     }
