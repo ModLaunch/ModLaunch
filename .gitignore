@@ -18,3 +18,4 @@ site/download/
 build/task.log
 build/publish.log
 firestore-debug.log
+build/signing.json

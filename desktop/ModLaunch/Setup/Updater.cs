@@ -129,6 +129,13 @@ public static partial class Updater
     public static void Launch()
     {
         if (Downloaded is null || !File.Exists(Downloaded)) throw new InvalidOperationException("not downloaded");
+        // 31.0: подписанная программа запускает только обновление, подписанное тем же издателем.
+        if (!Signature.UpdateAllowed(Downloaded, out var why))
+        {
+            try { File.Delete(Downloaded); } catch { }
+            Downloaded = null;
+            throw new InvalidOperationException(I18n.T("v31.upd.badSignature", ("reason", why ?? "")));
+        }
         Process.Start(new ProcessStartInfo(Downloaded, "--update") { UseShellExecute = false, WorkingDirectory = Path.GetTempPath() });
     }
 

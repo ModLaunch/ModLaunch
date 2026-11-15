@@ -16,6 +16,10 @@ dotnet publish -c Release -r win-x64 -o ..\..\out
 if errorlevel 1 (popd & echo. & echo  Сборка не удалась - пришлите этот текст Claude. & pause & exit /b 1)
 popd
 
+rem 31.0: подпись (если настроена — docs\release\CODE-SIGNING.md). Не настроена — сборка без подписи.
+powershell -NoProfile -ExecutionPolicy Bypass -File build\sign.ps1 -File out\ModLaunch.exe
+if errorlevel 1 (echo  Подпись не удалась - установщик НЕ собран. & pause & exit /b 1)
+
 echo  [2/3] Установщик ModLaunch-Setup-%VER%.exe...
 copy /y "out\ModLaunch.exe" "ModLaunch-Setup-%VER%.exe" >nul
 if errorlevel 1 (echo  Не удалось записать установщик - закройте его, если он открыт, и запустите снова. & pause & exit /b 1)

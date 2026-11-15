@@ -52,6 +52,24 @@ jobs:
           # Упавшие проверки — отдельными пометками: их видно в сводке запуска без скачивания логов.
           Get-Content selfcheck.txt | Where-Object { $_ -match '^\s*(FAIL|ERROR)' } | ForEach-Object { Write-Output "::error title=self-check::$_" }
           if ($p.ExitCode -ne 0) { throw "self-check failed" }
+      # 31.0: подпись — если в секретах репозитория задан способ (docs/release/CODE-SIGNING.md); иначе без подписи.
+      - name: Sign
+        shell: pwsh
+        env:
+          SIGN_MODE: ${{ secrets.SIGN_MODE }}
+          SIGN_AZURE_ENDPOINT: ${{ secrets.SIGN_AZURE_ENDPOINT }}
+          SIGN_AZURE_ACCOUNT: ${{ secrets.SIGN_AZURE_ACCOUNT }}
+          SIGN_AZURE_PROFILE: ${{ secrets.SIGN_AZURE_PROFILE }}
+          SIGN_AZURE_DLIB: ${{ secrets.SIGN_AZURE_DLIB }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          SIGN_ESIGNER_TOOL: ${{ secrets.SIGN_ESIGNER_TOOL }}
+          SIGN_ESIGNER_USER: ${{ secrets.SIGN_ESIGNER_USER }}
+          SIGN_ESIGNER_PASSWORD: ${{ secrets.SIGN_ESIGNER_PASSWORD }}
+          SIGN_ESIGNER_CREDENTIAL_ID: ${{ secrets.SIGN_ESIGNER_CREDENTIAL_ID }}
+          SIGN_ESIGNER_TOTP: ${{ secrets.SIGN_ESIGNER_TOTP }}
+        run: ./build/sign.ps1 -File out/ModLaunch.exe
       - name: Package
         shell: pwsh
         run: |
