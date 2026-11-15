@@ -266,7 +266,8 @@
     "v30.home.lead": "Игры из всех лаунчеров по полкам: что продолжить, избранное, ваши коллекции и то, к чему давно не возвращались. Щелчок — страница игры, двойной — играть.",
     "v30.home.continue": "Продолжить",
     "v30.home.idle": "Давно не запускали",
-    "v30.home.empty": "Полок пока нет: поиграйте во что-нибудь, отметьте избранное или создайте коллекцию."
+    "v30.home.empty": "Полок пока нет: поиграйте во что-нибудь, отметьте избранное или создайте коллекцию.",
+    "new.v30.home": "Обзор библиотеки: щелчок по «Все игры» — полки обложек из всех лаунчеров: продолжить, избранное, играю, коллекции, в планах и давно не запускали."
   },
   "en": {
     "v30.upd.gameRunning": "Close the game first: updating restarts ModLaunch, and it's better not to interrupt your session. The update will wait.",
@@ -535,7 +536,8 @@
     "v30.home.lead": "Games from every launcher on shelves: what to continue, favorites, your collections and what you haven't returned to in a while. Click for the game page, double-click to play.",
     "v30.home.continue": "Continue",
     "v30.home.idle": "Not played in a while",
-    "v30.home.empty": "No shelves yet: play something, mark favorites or create a collection."
+    "v30.home.empty": "No shelves yet: play something, mark favorites or create a collection.",
+    "new.v30.home": "Library overview: click “All games” for cover shelves from every launcher — continue, favorites, playing, collections, backlog and not played in a while."
   },
   "uk": {
     "v30.upd.gameRunning": "Спершу закрийте гру: оновлення перезапускає ModLaunch, а гру краще не переривати посеред сесії. Оновлення нікуди не дінеться.",
@@ -804,7 +806,8 @@
     "v30.home.lead": "Ігри з усіх лаунчерів на полицях: що продовжити, обране, ваші колекції й те, до чого давно не поверталися. Клік — сторінка гри, подвійний — грати.",
     "v30.home.continue": "Продовжити",
     "v30.home.idle": "Давно не запускали",
-    "v30.home.empty": "Полиць поки немає: пограйте в щось, позначте обране або створіть колекцію."
+    "v30.home.empty": "Полиць поки немає: пограйте в щось, позначте обране або створіть колекцію.",
+    "new.v30.home": "Огляд бібліотеки: клік по «Усі ігри» — полиці обкладинок з усіх лаунчерів: продовжити, обране, граю, колекції, у планах і давно не запускали."
   },
   "es": {
     "v30.upd.gameRunning": "Cierra primero el juego: la actualización reinicia ModLaunch y es mejor no interrumpir la partida. La actualización esperará.",
@@ -1073,7 +1076,8 @@
     "v30.home.lead": "Juegos de todos los launchers en estanterías: qué continuar, favoritos, tus colecciones y lo que hace tiempo no abres. Clic: página del juego; doble clic: jugar.",
     "v30.home.continue": "Continuar",
     "v30.home.idle": "Sin jugar hace tiempo",
-    "v30.home.empty": "Aún no hay estanterías: juega algo, marca favoritos o crea una colección."
+    "v30.home.empty": "Aún no hay estanterías: juega algo, marca favoritos o crea una colección.",
+    "new.v30.home": "Vista de la biblioteca: clic en «Todos los juegos» para ver estanterías de portadas de todos los launchers: continuar, favoritos, jugando, colecciones, pendientes y sin jugar hace tiempo."
   },
   "de": {
     "v30.upd.gameRunning": "Schließ zuerst das Spiel: Das Update startet ModLaunch neu, und die Sitzung sollte nicht unterbrochen werden. Das Update wartet.",
@@ -1342,7 +1346,8 @@
     "v30.home.lead": "Spiele aus allen Launchern in Regalen: Weiterspielen, Favoriten, deine Sammlungen und was du lange nicht gestartet hast. Klick – Spielseite, Doppelklick – spielen.",
     "v30.home.continue": "Weiterspielen",
     "v30.home.idle": "Lange nicht gespielt",
-    "v30.home.empty": "Noch keine Regale: spiel etwas, markiere Favoriten oder erstelle eine Sammlung."
+    "v30.home.empty": "Noch keine Regale: spiel etwas, markiere Favoriten oder erstelle eine Sammlung.",
+    "new.v30.home": "Bibliotheksübersicht: Klick auf „Alle Spiele“ zeigt Cover-Regale aus allen Launchern – Weiterspielen, Favoriten, Spiele gerade, Sammlungen, Geplant und lange nicht gespielt."
   },
   "fr": {
     "v30.upd.gameRunning": "Fermez d'abord le jeu : la mise à jour redémarre ModLaunch et mieux vaut ne pas interrompre la partie. La mise à jour attendra.",
@@ -1611,7 +1616,8 @@
     "v30.home.lead": "Les jeux de tous les launchers sur des étagères : à reprendre, favoris, vos collections et ce que vous n'avez pas relancé depuis longtemps. Clic : page du jeu ; double clic : jouer.",
     "v30.home.continue": "Reprendre",
     "v30.home.idle": "Pas lancés depuis longtemps",
-    "v30.home.empty": "Pas encore d'étagères : jouez à quelque chose, ajoutez des favoris ou créez une collection."
+    "v30.home.empty": "Pas encore d'étagères : jouez à quelque chose, ajoutez des favoris ou créez une collection.",
+    "new.v30.home": "Vue d'ensemble : cliquez sur « Tous les jeux » pour des étagères de jaquettes de tous les launchers — reprendre, favoris, en cours, collections, à faire et pas lancés depuis longtemps."
   },
   "pt-BR": {
     "v30.upd.gameRunning": "Feche o jogo primeiro: a atualização reinicia o ModLaunch, e é melhor não interromper a sessão. A atualização vai esperar.",
@@ -1880,7 +1886,8 @@
     "v30.home.lead": "Jogos de todos os launchers em prateleiras: o que continuar, favoritos, suas coleções e o que você não abre há tempos. Clique: página do jogo; clique duplo: jogar.",
     "v30.home.continue": "Continuar",
     "v30.home.idle": "Sem jogar há tempos",
-    "v30.home.empty": "Ainda não há prateleiras: jogue algo, marque favoritos ou crie uma coleção."
+    "v30.home.empty": "Ainda não há prateleiras: jogue algo, marque favoritos ou crie uma coleção.",
+    "new.v30.home": "Visão geral da biblioteca: clique em “Todos os jogos” para prateleiras de capas de todos os launchers — continuar, favoritos, jogando, coleções, na fila e sem jogar há tempos."
   },
   "zh-CN": {
     "v30.upd.gameRunning": "请先关闭游戏：更新会重启 ModLaunch，最好不要中途打断游戏。更新会一直等着你。",
@@ -2149,6 +2156,7 @@
     "v30.home.lead": "所有启动器的游戏按书架排列：继续玩、收藏、你的收藏夹，以及很久没玩的游戏。单击打开游戏页面，双击开始游戏。",
     "v30.home.continue": "继续玩",
     "v30.home.idle": "很久没玩",
-    "v30.home.empty": "还没有书架：先玩点什么、加入收藏或创建一个收藏夹吧。"
+    "v30.home.empty": "还没有书架：先玩点什么、加入收藏或创建一个收藏夹吧。",
+    "new.v30.home": "游戏库概览：点击“所有游戏”即可看到所有启动器的封面书架——继续玩、收藏、正在玩、收藏夹、计划玩和很久没玩。"
   }
 }
