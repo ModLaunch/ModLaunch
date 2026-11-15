@@ -971,3 +971,42 @@ test('сбои: пишет любой (и аноним) по формату, ч�
   await assertSucceeds(getDocs(collection(db(ADMIN), 'crashes')));
   await assertFails(updateDoc(doc(db(ADMIN), 'crashes', id), { message: 'edited' }));
 });
+
+test('магазин (31.0): заказы, чеки, заработок — только свои; подарок отмечает только получатель; пишет только сервер', async () => {
+  await raw(async (d) => {
+    await setDoc(doc(d, 'payments', 'p_1_aaaaaaaaaaaa'), { uid: BUYER.uid, status: 'paid', amount: 2990 });
+    await setDoc(doc(d, 'receipts', 'p_1_aaaaaaaaaaaa'), { uid: BUYER.uid, amount: 2990 });
+    await setDoc(doc(d, 'gifts', 'p_2_bbbbbbbbbbbb'), { from: BUYER.uid, to: OTHER.uid, seen: false });
+    await setDoc(doc(d, 'earnings', SELLER.uid), { totals: { BYN: { net: 100 } } });
+    await setDoc(doc(d, 'earnings', SELLER.uid, 'entries', 'p_1_aaaaaaaaaaaa'), { net: 100 });
+    await setDoc(doc(d, 'premium', BUYER.uid), { until: new Date() });
+  });
+  await assertSucceeds(getDoc(doc(db(BUYER), 'payments', 'p_1_aaaaaaaaaaaa')));
+  await assertFails(getDoc(doc(db(OTHER), 'payments', 'p_1_aaaaaaaaaaaa')));
+  await assertFails(setDoc(doc(db(BUYER), 'payments', 'p_9_cccccccccccc'), { uid: BUYER.uid, status: 'paid', amount: 1 }));
+  await assertFails(updateDoc(doc(db(BUYER), 'payments', 'p_1_aaaaaaaaaaaa'), { status: 'refunded' }));
+  await assertSucceeds(getDoc(doc(db(BUYER), 'receipts', 'p_1_aaaaaaaaaaaa')));
+  await assertFails(getDoc(doc(db(SELLER), 'receipts', 'p_1_aaaaaaaaaaaa')));
+  await assertSucceeds(getDoc(doc(db(OTHER), 'gifts', 'p_2_bbbbbbbbbbbb')));
+  await assertFails(updateDoc(doc(db(BUYER), 'gifts', 'p_2_bbbbbbbbbbbb'), { seen: true }));
+  await assertFails(updateDoc(doc(db(OTHER), 'gifts', 'p_2_bbbbbbbbbbbb'), { to: BUYER.uid }));
+  await assertSucceeds(updateDoc(doc(db(OTHER), 'gifts', 'p_2_bbbbbbbbbbbb'), { seen: true }));
+  await assertSucceeds(getDoc(doc(db(SELLER), 'earnings', SELLER.uid)));
+  await assertSucceeds(getDocs(collection(db(SELLER), 'earnings', SELLER.uid, 'entries')));
+  await assertFails(getDoc(doc(db(BUYER), 'earnings', SELLER.uid)));
+  await assertFails(setDoc(doc(db(SELLER), 'earnings', SELLER.uid), { totals: { BYN: { net: 999999 } } }));
+  await assertSucceeds(getDoc(doc(db(BUYER), 'premium', BUYER.uid)));
+  await assertFails(setDoc(doc(db(BUYER), 'premium', BUYER.uid), { until: new Date(2099, 1, 1) }));
+  await assertFails(getDoc(doc(db(BUYER), 'storeKeys', 'x')));
+});
+
+test('магазин (31.0): региональные цены и скидка у лота; настройки магазина — только админ, комиссия ≤ 29 %', async () => {
+  const l = { ...listing(1000), created: serverTimestamp(), updated: serverTimestamp(), prices: { BYN: 2990, USD: 999 }, sale: { percent: 20, until: new Date(2099, 1, 1) } };
+  await assertSucceeds(setDoc(doc(db(SELLER), 'market', `${SELLER.uid}_priced`), l));
+  await assertFails(setDoc(doc(db(SELLER), 'market', `${SELLER.uid}_priced2`), { ...l, prices: { GBP: 100 } }));
+  await assertFails(setDoc(doc(db(SELLER), 'market', `${SELLER.uid}_priced3`), { ...l, sale: { percent: 95, until: new Date() } }));
+  await assertSucceeds(getDoc(doc(anon('x3'), 'config', 'store')));
+  await assertFails(setDoc(doc(db(SELLER), 'config', 'store'), { fee: 0, updated: serverTimestamp(), by: SELLER.uid }));
+  await assertFails(setDoc(doc(db(ADMIN), 'config', 'store'), { fee: 30, updated: serverTimestamp(), by: ADMIN.uid }));
+  await assertSucceeds(setDoc(doc(db(ADMIN), 'config', 'store'), { fee: 12, enabled: true, updated: serverTimestamp(), by: ADMIN.uid }));
+});

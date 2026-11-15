@@ -595,7 +595,7 @@ service cloud.firestore {
     function mValid(d) {
       return d.keys().hasOnly(['uid', 'author', 'title', 'summary', 'description', 'kind', 'game', 'price', 'license',
                                'version', 'preview', 'tags', 'images', 'size', 'sha256', 'chunks', 'fileName',
-                               'status', 'sales', 'created', 'updated'])
+                               'status', 'sales', 'created', 'updated', 'prices', 'sale'])
         && d.uid == request.auth.uid
         && mText(d.author, 32) && d.author.size() > 0
         && mText(d.title, 60) && d.title.size() > 0
@@ -608,7 +608,10 @@ service cloud.firestore {
         && d.size is int && d.size <= 8388608 && d.chunks is int && d.chunks <= 16
         && mText(d.sha256, 64) && mText(d.fileName, 120)
         && d.status in ['active', 'hidden']
-        && d.updated == request.time;
+        && d.updated == request.time
+        // 31.0: цены для оплаты картой по регионам (копейки) и скидка со сроком; цену платежа считает сервер.
+        && (!('prices' in d) || (d.prices is map && d.prices.keys().hasOnly(['BYN', 'RUB', 'USD', 'EUR'])))
+        && (!('sale' in d) || (d.sale is map && d.sale.keys().hasOnly(['percent', 'until']) && d.sale.percent is int && d.sale.percent >= 0 && d.sale.percent <= 90));
     }
 
     match /market/{id} {
@@ -1047,6 +1050,45 @@ service cloud.firestore {
         && getAfter(/databases/$(database)/documents/teams/$(request.resource.data.team)).data.owner == request.auth.uid
         && getAfter(/databases/$(database)/documents/teams/$(request.resource.data.team)).data.code == code;
       allow delete: if friendsMember() && resource.data.owner == request.auth.uid;
+    }
+
+    // ── 31.0: магазин с оплатой картой. Всё ниже пишет только сервер (Cloud Functions, Admin SDK) —
+    // программа лишь читает своё. Цену, выдачу, возвраты и выплаты считает сервер.
+    match /payments/{pid} {
+      allow get, list: if request.auth != null && (resource.data.uid == request.auth.uid || mAdmin());
+    }
+    match /receipts/{pid} {
+      allow get, list: if request.auth != null && (resource.data.uid == request.auth.uid || mAdmin());
+    }
+    // Подарок: видит получатель (и дарящий); получатель отмечает «посмотрел».
+    match /gifts/{gid} {
+      allow get, list: if request.auth != null && (resource.data.to == request.auth.uid || resource.data.from == request.auth.uid);
+      allow update: if request.auth != null && resource.data.to == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['seen']) && request.resource.data.seen == true;
+    }
+    match /premium/{uid} {
+      allow get: if request.auth != null && (request.auth.uid == uid || mAdmin());
+    }
+    // Заработок разработчика по валютам и записи продаж — видит сам разработчик и админ.
+    match /earnings/{uid} {
+      allow get: if request.auth != null && (request.auth.uid == uid || mAdmin());
+      match /entries/{e} {
+        allow get, list: if request.auth != null && (request.auth.uid == uid || mAdmin());
+      }
+    }
+    match /payoutRequests/{id} {
+      allow get, list: if request.auth != null && (resource.data.uid == request.auth.uid || mAdmin());
+    }
+    match /scans/{sha} {
+      allow get, list: if mAdmin();
+    }
+    // Настройки магазина: комиссия (0–29 %), цены премиума, реквизиты компании для чеков, «магазин открыт».
+    match /config/store {
+      allow get: if true;
+      allow create, update: if mAdmin()
+        && request.resource.data.keys().hasOnly(['enabled', 'fee', 'feeOverrides', 'premium', 'company', 'minPayout', 'updated', 'by'])
+        && (!('fee' in request.resource.data) || (request.resource.data.fee is int && request.resource.data.fee >= 0 && request.resource.data.fee <= 29))
+        && request.resource.data.updated == request.time && request.resource.data.by == request.auth.uid;
     }
 
     // Всё остальное закрыто.
