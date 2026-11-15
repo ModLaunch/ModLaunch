@@ -206,6 +206,8 @@ public static partial class AllGames
                     }
                     await Task.Delay(3000);
                 }
+                var started = DateTime.UtcNow;
+                PlayLog.Remember(id, g.Name);
                 Dispatcher.UIThread.Post(() => { if (countTime) PlayTime.Start(id); Started?.Invoke(g); Changed?.Invoke(); });
                 // Два промаха подряд: игра могла перезапуститься (лаунчер → игра), это не конец сеанса.
                 for (var miss = 0; miss < 2;)
@@ -213,6 +215,8 @@ public static partial class AllGames
                     await Task.Delay(5000);
                     miss = ProcessPaths.AnyUnder(dirs) ? 0 : miss + 1;
                 }
+                // 30.2: часы Steam считает сам Steam, а в журнал по дням сеанс пишем и для Steam — история есть только у нас.
+                if (!countTime) PlayLog.Add(id, started, DateTime.UtcNow);
                 Dispatcher.UIThread.Post(() => { if (countTime) PlayTime.Stop(id); Exited?.Invoke(g); Changed?.Invoke(); });
             }
             finally { lock (Watching) Watching.Remove(id); }

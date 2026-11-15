@@ -114,7 +114,7 @@ public sealed class StoragePage : Page
         double Part(long v) => d.Total > 0 ? Math.Clamp((double)v / d.Total, 0, 1) : 0;
         var bar = new Grid { Height = 10, ClipToBounds = true };
         bar.Children.Add(new Border { Background = Ui.Res("Surface3"), CornerRadius = new CornerRadius(5), Opacity = 0.6 });
-        var fill = new Grid { ColumnDefinitions = new ColumnDefinitions($"{Part(d.Games):0.####}*,{Part(used - d.Games):0.####}*,{Part(d.Free):0.####}*") };
+        var fill = new Grid { ColumnDefinitions = RecapPage.Stars(Part(d.Games), Part(used - d.Games), Part(d.Free)) };
         var games = new Border { Background = Ui.Res("Brand"), CornerRadius = new CornerRadius(5, 0, 0, 5) };
         var other = new Border { Background = Ui.Res("Muted"), Opacity = 0.85, CornerRadius = d.Games > 0 ? default : new CornerRadius(5, 0, 0, 5) };
         Grid.SetColumn(other, 1);

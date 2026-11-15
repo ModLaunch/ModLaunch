@@ -146,4 +146,19 @@ public static class V30Shots
         s.Pump(2000);
         s.Save("v30-13-disk");
     }
+
+    /// <summary>MODLAUNCH_SHOTS=V30Recap: «Итоги» за месяц на демо-сеансах.</summary>
+    [DemoShots]
+    static void V30Recap(Shots s)
+    {
+        s.Pump(4500);
+        Games.AllGames.Refresh();
+        s.Pump(1500);
+        var ids = (Games.AllGames.Current ?? []).Where(g => g.Installed).OrderByDescending(g => Games.AllGames.Played(g).Minutes).Take(6).Select(g => g.TimeId).ToList();
+        Features.PlayLog.Demo(ids);
+        Settings.Data["recapPeriod"] = "month";
+        s.Window.Navigate(() => new RecapPage());
+        s.Pump(1500);
+        s.Save("v30-14-recap");
+    }
 }

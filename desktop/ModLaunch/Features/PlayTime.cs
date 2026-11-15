@@ -42,6 +42,8 @@ public static class PlayTime
         g["lastSessionMs"] = ms;
         g["longestMs"] = Math.Max(g.Long("longestMs"), ms);
         File.Save();
+        // 30.2: и в журнал по дням — для «Итогов».
+        PlayLog.Add(id, since, DateTime.UtcNow);
         return (true, ms);
     }
 

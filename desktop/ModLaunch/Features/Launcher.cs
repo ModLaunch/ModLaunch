@@ -138,6 +138,7 @@ public static partial class Launcher
     {
         var track = PlayTime.Track;
         if (track) PlayTime.Start(game.Id);
+        if (track) PlayLog.Remember(game.Id, game.Name);
         // 11.0: и часы той сборки, с которой запущена игра.
         if (track) try { BuildTime.Start(AppState.Game(game.Id), vanilla); } catch { }
         // 25.0: с каким набором модов запустили — «рабочая сборка» после выхода сверяется с ним.
