@@ -130,7 +130,7 @@ public static partial class Hub
     /// <summary>Все моды Hub (до 300 свежих). Кэш на минуту; сортировка и фильтры — на месте.</summary>
     public static async Task<List<HubMod>> All(bool force = false, CancellationToken ct = default)
     {
-        if (!force && _cache is not null && DateTime.UtcNow - _cachedAt < TimeSpan.FromMinutes(1)) return _cache;
+        if (!force && _cache is not null && DateTime.UtcNow - _cachedAt < TimeSpan.FromMinutes(5)) return _cache; // 31.0: 5 минут — 300 чтений на открытие каталога
         var query = new JsonObject
         {
             ["from"] = new JsonArray(new JsonObject { ["collectionId"] = "creations" }),

@@ -176,7 +176,7 @@ public static partial class Market
     /// <summary>Все активные лоты (до 300 свежих), кэш на минуту.</summary>
     public static async Task<List<Listing>> All(bool force = false)
     {
-        if (!force && _cache is not null && DateTime.UtcNow - _cachedAt < TimeSpan.FromMinutes(1)) return _cache;
+        if (!force && _cache is not null && DateTime.UtcNow - _cachedAt < TimeSpan.FromMinutes(5)) return _cache; // 31.0: 5 минут (кнопка «Обновить» берёт свежее)
         // 31.0: только активные — правила базы не пускают запрос, который может вернуть чужие скрытые лоты
         // (без фильтра витрина была пустой у всех, кроме админа). Индекс status+updated — firebase/firestore.indexes.json.
         try { await Safety.Refresh(); } catch { }

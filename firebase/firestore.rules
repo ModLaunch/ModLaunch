@@ -693,6 +693,10 @@ service cloud.firestore {
     // 14.0: настройки рынка. Читают все (приложение считает комиссию), пишет админ.
     match /config/{name} {
       allow get: if true;
+      // 31.0: сводка снятого (id) — одна на всех: программа читает её раз в 30 минут вместо всего списка.
+      allow create, update: if mAdmin() && name == 'takedowns'
+        && request.resource.data.keys().hasOnly(['ids', 'updated'])
+        && request.resource.data.ids is list && request.resource.data.ids.size() <= 10000;
       // 31.0: чёрный список файлов (sha256) — программа не ставит такие моды ни из какого источника.
       allow create, update: if mAdmin() && name == 'blocklist'
         && request.resource.data.keys().hasOnly(['hashes', 'updated', 'by'])

@@ -81,22 +81,30 @@ public static partial class Safety
     // ---------------------------------------------------------------- снятое и чёрный список (видят все)
 
     static readonly SemaphoreSlim Gate = new(1);
-    static Dictionary<string, Takedown> _down = [];
+    static HashSet<string> _down = new(StringComparer.Ordinal);
     static HashSet<string> _hashes = new(StringComparer.OrdinalIgnoreCase);
     static DateTime _loaded;
 
-    /// <summary>Снятое админом и запрещённые файлы — с сервера, не чаще раза в 10 минут. Без сети — как было.</summary>
+    /// <summary>
+    /// Снятое админом и запрещённые файлы — с сервера, не чаще раза в 30 минут. Без сети — как было.
+    /// 31.0: два чтения на человека (сводка config/takedowns + чёрный список), а не весь список снятого:
+    /// при 100 тыс. пользователей список целиком каждые 10 минут стоил бы сотни долларов в день.
+    /// </summary>
     public static async Task Refresh(bool force = false)
     {
         if (!Firebase.Configured || Program.Demo) return;
-        if (!force && DateTime.UtcNow - _loaded < TimeSpan.FromMinutes(10)) return;
+        if (!force && DateTime.UtcNow - _loaded < TimeSpan.FromMinutes(30)) return;
         await Gate.WaitAsync();
         try
         {
-            if (!force && DateTime.UtcNow - _loaded < TimeSpan.FromMinutes(10)) return;
-            var down = new Dictionary<string, Takedown>(StringComparer.Ordinal);
-            foreach (var d in await List("takedowns", null, 1000))
-                if (TakedownOf(d) is { } t) down[$"{t.Kind}_{t.Target}"] = t;
+            if (!force && DateTime.UtcNow - _loaded < TimeSpan.FromMinutes(30)) return;
+            var down = new HashSet<string>(StringComparer.Ordinal);
+            try
+            {
+                var summary = await Hub.Call(Firebase.Url("/config/takedowns"), HttpMethod.Get, null, null) as JsonObject;
+                foreach (var id in Firebase.FromFields(summary?["fields"] as JsonObject).A("ids")) down.Add(id);
+            }
+            catch (ServiceError e) when (e.Code is "NOT_FOUND") { }
             var hashes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             try
             {
@@ -105,7 +113,6 @@ public static partial class Safety
                     if (Regex.IsMatch(h, "^[0-9a-fA-F]{64}$")) hashes.Add(h.ToLowerInvariant());
             }
             catch (ServiceError e) when (e.Code is "NOT_FOUND") { }
-            foreach (var t in down.Values) if (t.Reason == "malware" && t.Sha256.Length == 64) hashes.Add(t.Sha256.ToLowerInvariant());
             _down = down;
             _hashes = hashes;
             _loaded = DateTime.UtcNow;
@@ -115,8 +122,7 @@ public static partial class Safety
         finally { Gate.Release(); }
     }
 
-    public static Takedown? Down(string kind, string id) => _down.GetValueOrDefault($"{kind}_{id}");
-    public static bool IsDown(string kind, string id) => _down.ContainsKey($"{kind}_{id}");
+    public static bool IsDown(string kind, string id) => _down.Contains($"{kind}_{id}");
     public static bool IsBlocked(string? sha256) => sha256 is { Length: 64 } && _hashes.Contains(sha256);
     public static int BlockedCount => _hashes.Count;
 
@@ -208,7 +214,7 @@ public static partial class Safety
         {
             ["kind"] = kind, ["target"] = target, ["reason"] = reason, ["note"] = Clip(note, 500), ["sha256"] = sha256,
             ["title"] = Clip(title, 120), ["owner"] = Clip(owner, 128), ["by"] = uid,
-        }, serverTimes: "at")], token);
+        }, serverTimes: "at"), Summary($"{kind}_{target}", add: true)], token);
         if (reason == "malware" && sha256 != "") await AddToBlocklist([sha256]);
         _loaded = default;
         await Refresh(force: true);
@@ -218,15 +224,32 @@ public static partial class Safety
     public static async Task Restore(string kind, string target)
     {
         var (_, token) = await Admin();
-        await Hub.Commit([Delete($"takedowns/{kind}_{target}")], token);
+        await Hub.Commit([Delete($"takedowns/{kind}_{target}"), Summary($"{kind}_{target}", add: false)], token);
         await Refresh(force: true);
     }
 
+    /// <summary>Админ: всё снятое с причинами (сама коллекция; людям хватает сводки config/takedowns).</summary>
     public static async Task<List<Takedown>> Takedowns()
     {
-        await Refresh(force: true);
-        return _down.Values.OrderByDescending(t => t.At).ToList();
+        var (_, token) = await Admin();
+        return (await List("takedowns", token, 1000)).Select(TakedownOf).OfType<Takedown>().OrderByDescending(t => t.At).ToList();
     }
+
+    /// <summary>Сводка снятого (config/takedowns.ids): добавить или убрать id той же пачкой записей, что и само снятие.</summary>
+    static JsonObject Summary(string id, bool add) => new()
+    {
+        ["transform"] = new JsonObject
+        {
+            ["document"] = Firebase.Doc("config/takedowns"),
+            ["fieldTransforms"] = new JsonArray(
+                new JsonObject
+                {
+                    ["fieldPath"] = "ids",
+                    [add ? "appendMissingElements" : "removeAllFromArray"] = new JsonObject { ["values"] = new JsonArray(Firebase.ToValue(id)) },
+                },
+                new JsonObject { ["fieldPath"] = "updated", ["setToServerValue"] = "REQUEST_TIME" }),
+        },
+    };
 
     /// <summary>Добавить отпечатки в чёрный список (до 5000; старые уходят первыми).</summary>
     public static async Task AddToBlocklist(IEnumerable<string> hashes)
