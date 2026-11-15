@@ -12,6 +12,8 @@ public static class WhatsNew
 {
     static readonly (string Icon, string Key, Func<Page>? Open)[] Items =
     [
+        // 30.13
+        (Icons.Sparkles, "new.v30.similar", () => new AllGamesPage()),
         // 30.12
         (Icons.Tv, "new.v30.bpShelves", null),
         // 30.11

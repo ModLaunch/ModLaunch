@@ -278,7 +278,8 @@
     "v30.similar.loading": "Подбираю похожие игры…",
     "v30.similar.free": "бесплатно",
     "v30.similar.wished": "Уже в желаемом",
-    "v30.similar.added": "«{name}» — в желаемом"
+    "v30.similar.added": "«{name}» — в желаемом",
+    "new.v30.similar": "Похожие игры: на странице игры — шесть похожих по тегам игроков и отзывам Steam, с оценкой, ценой и кнопкой «В желаемое»; то, что у вас уже есть, не предлагается."
   },
   "en": {
     "v30.upd.gameRunning": "Close the game first: updating restarts ModLaunch, and it's better not to interrupt your session. The update will wait.",
@@ -559,7 +560,8 @@
     "v30.similar.loading": "Finding similar games…",
     "v30.similar.free": "free",
     "v30.similar.wished": "Already on your wishlist",
-    "v30.similar.added": "“{name}” is on your wishlist"
+    "v30.similar.added": "“{name}” is on your wishlist",
+    "new.v30.similar": "Similar games: a game's page suggests six similar games by player tags and Steam reviews, with score, price and an Add to wishlist button; games you own aren't suggested."
   },
   "uk": {
     "v30.upd.gameRunning": "Спершу закрийте гру: оновлення перезапускає ModLaunch, а гру краще не переривати посеред сесії. Оновлення нікуди не дінеться.",
@@ -840,7 +842,8 @@
     "v30.similar.loading": "Добираю схожі ігри…",
     "v30.similar.free": "безкоштовно",
     "v30.similar.wished": "Уже в бажаному",
-    "v30.similar.added": "«{name}» — у бажаному"
+    "v30.similar.added": "«{name}» — у бажаному",
+    "new.v30.similar": "Схожі ігри: на сторінці гри — шість схожих за тегами гравців і відгуками Steam, з оцінкою, ціною та кнопкою «У бажане»; те, що у вас уже є, не пропонується."
   },
   "es": {
     "v30.upd.gameRunning": "Cierra primero el juego: la actualización reinicia ModLaunch y es mejor no interrumpir la partida. La actualización esperará.",
@@ -1121,7 +1124,8 @@
     "v30.similar.loading": "Buscando juegos similares…",
     "v30.similar.free": "gratis",
     "v30.similar.wished": "Ya está en tu lista de deseos",
-    "v30.similar.added": "«{name}» está en tu lista de deseos"
+    "v30.similar.added": "«{name}» está en tu lista de deseos",
+    "new.v30.similar": "Juegos similares: la página del juego sugiere seis parecidos según etiquetas y reseñas de Steam, con nota, precio y botón para la lista de deseos; no se sugieren los que ya tienes."
   },
   "de": {
     "v30.upd.gameRunning": "Schließ zuerst das Spiel: Das Update startet ModLaunch neu, und die Sitzung sollte nicht unterbrochen werden. Das Update wartet.",
@@ -1402,7 +1406,8 @@
     "v30.similar.loading": "Suche ähnliche Spiele…",
     "v30.similar.free": "kostenlos",
     "v30.similar.wished": "Schon auf der Wunschliste",
-    "v30.similar.added": "„{name}“ steht auf der Wunschliste"
+    "v30.similar.added": "„{name}“ steht auf der Wunschliste",
+    "new.v30.similar": "Ähnliche Spiele: Die Spielseite schlägt sechs ähnliche Spiele nach Spieler-Tags und Steam-Reviews vor, mit Wertung, Preis und Wunschlisten-Knopf; was du hast, wird nicht vorgeschlagen."
   },
   "fr": {
     "v30.upd.gameRunning": "Fermez d'abord le jeu : la mise à jour redémarre ModLaunch et mieux vaut ne pas interrompre la partie. La mise à jour attendra.",
@@ -1683,7 +1688,8 @@
     "v30.similar.loading": "Recherche de jeux similaires…",
     "v30.similar.free": "gratuit",
     "v30.similar.wished": "Déjà dans la liste de souhaits",
-    "v30.similar.added": "« {name} » est dans votre liste de souhaits"
+    "v30.similar.added": "« {name} » est dans votre liste de souhaits",
+    "new.v30.similar": "Jeux similaires : la page du jeu propose six jeux proches selon les tags des joueurs et les avis Steam, avec note, prix et bouton liste de souhaits ; ceux que vous avez déjà sont exclus."
   },
   "pt-BR": {
     "v30.upd.gameRunning": "Feche o jogo primeiro: a atualização reinicia o ModLaunch, e é melhor não interromper a sessão. A atualização vai esperar.",
@@ -1964,7 +1970,8 @@
     "v30.similar.loading": "Procurando jogos parecidos…",
     "v30.similar.free": "grátis",
     "v30.similar.wished": "Já está na lista de desejos",
-    "v30.similar.added": "“{name}” está na lista de desejos"
+    "v30.similar.added": "“{name}” está na lista de desejos",
+    "new.v30.similar": "Jogos parecidos: a página do jogo sugere seis parecidos pelas tags dos jogadores e análises da Steam, com nota, preço e botão de lista de desejos; os que você já tem não aparecem."
   },
   "zh-CN": {
     "v30.upd.gameRunning": "请先关闭游戏：更新会重启 ModLaunch，最好不要中途打断游戏。更新会一直等着你。",
@@ -2245,6 +2252,7 @@
     "v30.similar.loading": "正在寻找相似游戏…",
     "v30.similar.free": "免费",
     "v30.similar.wished": "已在愿望单中",
-    "v30.similar.added": "“{name}”已加入愿望单"
+    "v30.similar.added": "“{name}”已加入愿望单",
+    "new.v30.similar": "相似游戏：游戏页面会根据玩家标签和 Steam 评测推荐六款相似游戏，显示好评率、价格和“加入愿望单”按钮；不会推荐你已有的游戏。"
   }
 }
