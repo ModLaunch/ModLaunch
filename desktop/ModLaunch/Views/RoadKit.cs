@@ -58,10 +58,11 @@ public static class RoadKit
         var reached = steps.Count(s => s.Level <= level);
         var span = Math.Max(1, steps.Count - 1);
         var done = Math.Clamp(reached - 1 + (reached > 0 && reached < steps.Count ? 0.5 : 0), 0, span);
-        var progress = new Grid { ColumnDefinitions = new ColumnDefinitions($"{Math.Max(0.0001, done)}*,{Math.Max(0.0001, span - done)}*") };
+        // 30.2: доли — числами, а не строкой: «1,5*» в русской культуре разметка не понимает и линия пропадала.
+        var progress = new Grid { ColumnDefinitions = RecapPage.Stars(Math.Max(0.0001, done), Math.Max(0.0001, span - done)) };
         progress.Children.Add(new Border { Height = 3, CornerRadius = new CornerRadius(2), Background = accent, IsVisible = done > 0 });
         var rail = new Panel { Children = { new Border { Height = 3, CornerRadius = new CornerRadius(2), Background = Ui.Res("Surface3") }, progress } };
-        var line = new Grid { ColumnDefinitions = new ColumnDefinitions($"1*,{span * 2}*,1*"), VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, node / 2 - 1, 0, 0) };
+        var line = new Grid { ColumnDefinitions = RecapPage.Stars(1, span * 2, 1), VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, node / 2 - 1, 0, 0) };
         Grid.SetColumn(rail, 1);
         line.Children.Add(rail);
         Grid.SetColumnSpan(line, steps.Count);
