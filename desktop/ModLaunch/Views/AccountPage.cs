@@ -82,6 +82,8 @@ public sealed partial class AccountPage : Page
         if (p.Admin) sections.Add(("admin", "acc.s.admin", Icons.Shield));
         // 31.0: очередь жалоб, снятия (DMCA), блокировки и чёрный список файлов.
         if (p.Admin) sections.Add(("moderation", "v31.mod.tab", Icons.Flag));
+        // 31.0: сбои программы у людей (отчёты с согласия).
+        if (p.Admin) sections.Add(("crashes", "v31.crash.tab", Icons.Bug));
         // Снимки экрана: «Заработок» на примере, без входа.
         var demo = Program.Screenshot && _tab is "earnings" or "premium";
         if (!p.SignedIn && !demo && _tab != "premium") _tab = "profile";
@@ -117,6 +119,7 @@ public sealed partial class AccountPage : Page
             "data" => DataTab(p),
             "admin" when p.Admin => Admin(),
             "moderation" when p.Admin => new ModerationPanel(),
+            "crashes" when p.Admin => new CrashesPanel(),
             _ => Profile(p),
         };
         if (_error is not null) body = Ui.Col(16, Ui.Card(Ui.Col(10, Ui.Text(_error, "", color: Ui.Res("Bad"), wrap: true), Ui.Button(I18n.T("cr.refresh"), () => { Reset(); Build(); }, "", Icons.Refresh)), 18), body);

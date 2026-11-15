@@ -508,6 +508,8 @@ public sealed partial class SettingsPage
                 }, "", Icons.Refresh),
                 Setup.Updater.Available ? Ui.Button(I18n.T("upd.app.open"), () => MainWindow.Current?.ShowUpdate(), "primary", Icons.Sparkles) : new Panel()),
             Toggle(I18n.T("upd.app.auto"), I18n.T("upd.app.auto.hint"), Setup.Updater.AutoDownload, v => Settings.Data["autoDownloadUpdates"] = v),
+            // 31.0: отчёты о сбоях — только с согласия.
+            Toggle(I18n.T("v31.crash.setting"), I18n.T("v31.crash.setting.hint"), CrashReports.Consent == true, CrashReports.SetConsent),
             Toggle(I18n.T("upd.onStart"), I18n.T("upd.onStart.hint"), ModUpdates.OnStart, v => Settings.Data["checkModUpdates"] = v),
             Toggle(I18n.T("upd.auto"), I18n.T("upd.auto.hint"), ModUpdates.Auto, v => Settings.Data["autoUpdateMods"] = v),
             Toggle(I18n.T("upd.beforePlay"), I18n.T("upd.beforePlay.hint"), ModUpdates.BeforePlay, v => Settings.Data["updateBeforePlay"] = v),

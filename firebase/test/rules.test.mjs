@@ -960,3 +960,14 @@ test('устройства: свои видит и отмечает только
   await assertFails(dev(BUYER, BUYER.uid, 'device_cccc3333', { first: new Date(2020, 1, 1) }));
   await assertSucceeds(updateDoc(doc(db(BUYER), 'devices', BUYER.uid, 'list', 'device_aaaa1111'), { ack: true, last: serverTimestamp() }));
 });
+
+test('сбои: пишет любой (и аноним) по формату, читает только админ, лишних полей нельзя', async () => {
+  const id = '20261115120000123_0123456789abcdef_' + 'a'.repeat(32);
+  const crash = { version: '31.0.0', os: 'Windows 11', kind: 'fatal', type: 'System.Exception', message: 'boom', stack: 'at ModLaunch.X', sig: '0123456789abcdef', created: serverTimestamp() };
+  await assertSucceeds(setDoc(doc(anon('a1'), 'crashes', id), crash));
+  await assertFails(setDoc(doc(anon('a1'), 'crashes', 'bad-id'), crash));
+  await assertFails(setDoc(doc(anon('a1'), 'crashes', id.replace('123_', '124_')), { ...crash, email: 'x@y.z' }));
+  await assertFails(getDoc(doc(db(BUYER), 'crashes', id)));
+  await assertSucceeds(getDocs(collection(db(ADMIN), 'crashes')));
+  await assertFails(updateDoc(doc(db(ADMIN), 'crashes', id), { message: 'edited' }));
+});

@@ -193,6 +193,8 @@ public sealed partial class MainWindow : Window
         // 28.0: чат друзей — свой ящик фоном раз в две минуты.
         Social.Friends.Chat.Start();
         DevicesUi.CheckLater();
+        ModLaunch.Setup.UpdateGuard.StartHealthTimer();
+        CrashUi.CheckLater();
         // 26.0: уведомления автора (MainWindow.Creator.cs).
         WatchCreator();
 

@@ -275,4 +275,27 @@ public static partial class IntegrationSocial
         Settings.Data.Remove("deviceId");
         return "first PC silent → PC 2 sign-in → PC 1 asks «it's you?» → ack clears; 5 wrong passwords lock even the right one";
     }
+
+    /// <summary>31.0: сбой с согласия уходит в базу без личного; без согласия — нет; админ видит его в «Сбоях».</summary>
+    [IntegrationTest]
+    static async Task<string> CrashReportsReachAdmin()
+    {
+        Exception Boom() { try { throw new InvalidOperationException("integration crash"); } catch (Exception e) { return e; } }
+        CrashReports.SetConsent(false);
+        CrashReports.Save(Boom(), fatal: true);
+        Expect(await CrashReports.Send() == 0, "sent without consent");
+        CrashReports.SetConsent(true);
+        CrashReports.Save(Boom(), fatal: true);
+        CrashReports.Save(Boom(), fatal: true);
+        var sent = await Step("send", () => CrashReports.Send());
+        Expect(sent == 2 && CrashReports.Pending().Count == 0, $"sent {sent}, left {CrashReports.Pending().Count}");
+
+        await Integration.NewUser("Админ", "admin@example.test");
+        await Integration.Emu.Seed("admins/admin@example.test", new() { ["note"] = "integration" });
+        await Account.RefreshProfile();
+        var top = await Step("top", () => CrashReports.Top());
+        Expect(top.Count == 1 && top[0].Count == 2 && top[0].Latest.Message.Contains("integration crash"), "admin view: " + string.Join("; ", top.Select(t => $"{t.Sig} x{t.Count}")));
+        Settings.Data.Remove("crashReports");
+        return "no consent → nothing sent; consent → 2 reports sent (anonymous), admin sees one signature ×2";
+    }
 }

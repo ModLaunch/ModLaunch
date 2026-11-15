@@ -22,6 +22,8 @@ public static class Guard
         Dispatcher.UIThread.UnhandledException += (_, e) =>
         {
             Report(e.Exception);
+            // 31.0: ошибка в интерфейсе — в отчёт о сбое (уйдёт только с согласия человека).
+            CrashReports.Save(e.Exception, fatal: false);
             e.Handled = true;
         };
         TaskScheduler.UnobservedTaskException += (_, e) =>
@@ -29,7 +31,7 @@ public static class Guard
             Log(e.Exception);
             e.SetObserved();
         };
-        AppDomain.CurrentDomain.UnhandledException += (_, e) => { if (e.ExceptionObject is Exception ex) Log(ex, fatal: true); };
+        AppDomain.CurrentDomain.UnhandledException += (_, e) => { if (e.ExceptionObject is Exception ex) { Log(ex, fatal: true); CrashReports.Save(ex, fatal: true); } };
     }
 
     /// <summary>Записать и показать пользователю понятным текстом.</summary>

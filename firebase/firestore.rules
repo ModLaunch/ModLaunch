@@ -360,6 +360,20 @@ service cloud.firestore {
         && request.resource.data.last == request.time
         && (resource == null ? request.resource.data.first == request.time : request.resource.data.first == resource.data.first);
     }
+
+    // 31.0: отчёты о сбоях программы (только с согласия человека, без личных данных — их вычищает программа).
+    // Пишет любой пользователь программы (и анонимный), читает и удаляет только админ. Менять нельзя.
+    match /crashes/{id} {
+      allow create: if request.auth != null
+        && id.matches('^[0-9]{17}_[0-9a-f]{16}_[0-9a-f]{32}$')
+        && request.resource.data.keys().hasOnly(['version', 'os', 'kind', 'type', 'message', 'stack', 'sig', 'created'])
+        && request.resource.data.kind in ['fatal', 'error']
+        && hubText(request.resource.data.version, 20) && hubText(request.resource.data.os, 80)
+        && hubText(request.resource.data.type, 200) && hubText(request.resource.data.message, 300)
+        && hubText(request.resource.data.stack, 6000) && hubText(request.resource.data.sig, 16)
+        && request.resource.data.created == request.time;
+      allow get, list, delete: if mAdmin();
+    }
     // ── конец правил ModLaunch Hub ───────────────────────────────────────
 
     // ── Отзывы о модах и админы ─────────────────────────────────────────
