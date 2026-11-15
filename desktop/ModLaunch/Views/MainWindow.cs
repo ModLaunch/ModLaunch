@@ -182,6 +182,9 @@ public sealed partial class MainWindow : Window
         // 30.0: игры из «Всех игр» тоже получают оверлей, снимки и статус «в игре».
         Games.AllGames.Started += OverlayWindow.OnLibraryGameStarted;
         Games.AllGames.Exited += OverlayWindow.OnLibraryGameExited;
+        // 30.4: итог сеанса и для игр из других лаунчеров: сколько играли и сколько сегодня всего.
+        Games.AllGames.Started += g => _libSessions[g.Key] = DateTime.UtcNow;
+        Games.AllGames.Exited += OnLibraryGameExit;
         // 28.0: чат друзей — свой ящик фоном раз в две минуты.
         Social.Friends.Chat.Start();
         // 26.0: уведомления автора (MainWindow.Creator.cs).
@@ -1102,6 +1105,20 @@ public sealed partial class MainWindow : Window
         else Environment.Exit(0);
     }
 
+    readonly Dictionary<string, DateTime> _libSessions = [];
+
+    void OnLibraryGameExit(Games.LibGame g)
+    {
+        if (!_libSessions.Remove(g.Key, out var since)) return;
+        var played = DateTime.UtcNow - since;
+        if (played < TimeSpan.FromMinutes(1)) return;
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var total = Features.PlayLog.Summarize(today, today).Seconds;
+        var text = I18n.T("time.session", ("game", g.Name), ("time", Features.PlayTime.Format((long)played.TotalMilliseconds)));
+        if (total > played.TotalSeconds + 60) text += " · " + I18n.T("v30.session.today", ("time", Features.PlayTime.Format(total * 1000)));
+        Toast(text);
+    }
+
     void OnGameExit(string gameId, bool counted, long ms)
     {
         OverlayWindow.OnGameExited();
@@ -1109,7 +1126,15 @@ public sealed partial class MainWindow : Window
         var game = AppState.Game(gameId);
         if (Settings.Data.Str("afterLaunch") == "minimize" && Settings.Data.Bool("restoreAfterGame", true) && WindowState == WindowState.Minimized)
             WindowState = WindowState.Normal;
-        if (counted) Toast(I18n.T("time.session", ("game", game.Def.Name), ("time", Features.PlayTime.Format(ms))));
+        if (counted)
+        {
+            // 30.4: и сколько сегодня всего — из журнала по дням.
+            var today = DateOnly.FromDateTime(DateTime.Now);
+            var total = Features.PlayLog.Summarize(today, today).Seconds;
+            var text = I18n.T("time.session", ("game", game.Def.Name), ("time", Features.PlayTime.Format(ms)));
+            if (total * 1000 > ms + 60_000) text += " · " + I18n.T("v30.session.today", ("time", Features.PlayTime.Format(total * 1000)));
+            Toast(text);
+        }
         // 23.0: режим разработчика заканчивается вместе с игрой — сделанное в конструкторе остаётся модом.
         Features.DevMode.Leave(game.Path);
         // 23.0: защита прогресса — оставить новый прогресс или вернуть сохранения как было.

@@ -216,7 +216,8 @@
     "v30.pick.short": "Случайная",
     "new.v30.status": "Статус и случайная игра: отмечайте «Играю», «В планах», «Пройдено», «Брошено», а кнопка «Случайная» подскажет, во что поиграть сегодня.",
     "new.v30.notes": "Заметки и ярлыки: заметки к любой игре — на её странице и в оверлее; ярлык на рабочий стол для игры из любого лаунчера.",
-    "new.v30.palette": "Быстрый переход: Ctrl+P, начните набирать название — «Играть» для любой установленной игры и все новые страницы."
+    "new.v30.palette": "Быстрый переход: Ctrl+P, начните набирать название — «Играть» для любой установленной игры и все новые страницы.",
+    "v30.session.today": "сегодня всего {time}"
   },
   "en": {
     "v30.upd.gameRunning": "Close the game first: updating restarts ModLaunch, and it's better not to interrupt your session. The update will wait.",
@@ -435,7 +436,8 @@
     "v30.pick.short": "Random",
     "new.v30.status": "Status and random pick: mark games Playing, Backlog, Completed or Dropped, and the Random button suggests what to play tonight.",
     "new.v30.notes": "Notes and shortcuts: notes for any game on its page and in the overlay; a desktop shortcut for a game from any launcher.",
-    "new.v30.palette": "Quick jump: press Ctrl+P and start typing — Play for any installed game and all the new pages."
+    "new.v30.palette": "Quick jump: press Ctrl+P and start typing — Play for any installed game and all the new pages.",
+    "v30.session.today": "{time} today in total"
   },
   "uk": {
     "v30.upd.gameRunning": "Спершу закрийте гру: оновлення перезапускає ModLaunch, а гру краще не переривати посеред сесії. Оновлення нікуди не дінеться.",
@@ -654,7 +656,8 @@
     "v30.pick.short": "Випадкова",
     "new.v30.status": "Статус і випадкова гра: позначайте «Граю», «У планах», «Пройдено», «Покинуто», а кнопка «Випадкова» підкаже, у що пограти сьогодні.",
     "new.v30.notes": "Нотатки та ярлики: нотатки до будь-якої гри — на її сторінці та в оверлеї; ярлик на робочий стіл для гри з будь-якого лаунчера.",
-    "new.v30.palette": "Швидкий перехід: Ctrl+P і почніть вводити назву — «Грати» для будь-якої встановленої гри та всі нові сторінки."
+    "new.v30.palette": "Швидкий перехід: Ctrl+P і почніть вводити назву — «Грати» для будь-якої встановленої гри та всі нові сторінки.",
+    "v30.session.today": "сьогодні загалом {time}"
   },
   "es": {
     "v30.upd.gameRunning": "Cierra primero el juego: la actualización reinicia ModLaunch y es mejor no interrumpir la partida. La actualización esperará.",
@@ -873,7 +876,8 @@
     "v30.pick.short": "Al azar",
     "new.v30.status": "Estado y juego al azar: marca Jugando, Pendiente, Completado o Abandonado, y el botón Al azar te sugiere a qué jugar hoy.",
     "new.v30.notes": "Notas y accesos directos: notas para cualquier juego en su página y en el overlay; acceso directo en el escritorio para juegos de cualquier launcher.",
-    "new.v30.palette": "Salto rápido: pulsa Ctrl+P y escribe: Jugar para cualquier juego instalado y todas las páginas nuevas."
+    "new.v30.palette": "Salto rápido: pulsa Ctrl+P y escribe: Jugar para cualquier juego instalado y todas las páginas nuevas.",
+    "v30.session.today": "hoy en total {time}"
   },
   "de": {
     "v30.upd.gameRunning": "Schließ zuerst das Spiel: Das Update startet ModLaunch neu, und die Sitzung sollte nicht unterbrochen werden. Das Update wartet.",
@@ -1092,7 +1096,8 @@
     "v30.pick.short": "Zufällig",
     "new.v30.status": "Status und Zufallsspiel: Markiere Spiele als Spiele gerade, Geplant, Durchgespielt oder Abgebrochen – „Zufällig“ schlägt vor, was du heute spielst.",
     "new.v30.notes": "Notizen und Verknüpfungen: Notizen zu jedem Spiel auf seiner Seite und im Overlay; Desktop-Verknüpfung für Spiele aus jedem Launcher.",
-    "new.v30.palette": "Schnellsprung: Strg+P drücken und tippen – „Spielen“ für jedes installierte Spiel und alle neuen Seiten."
+    "new.v30.palette": "Schnellsprung: Strg+P drücken und tippen – „Spielen“ für jedes installierte Spiel und alle neuen Seiten.",
+    "v30.session.today": "heute insgesamt {time}"
   },
   "fr": {
     "v30.upd.gameRunning": "Fermez d'abord le jeu : la mise à jour redémarre ModLaunch et mieux vaut ne pas interrompre la partie. La mise à jour attendra.",
@@ -1311,7 +1316,8 @@
     "v30.pick.short": "Au hasard",
     "new.v30.status": "Statut et jeu au hasard : marquez En cours, À faire, Terminé ou Abandonné, et le bouton Au hasard vous propose un jeu pour ce soir.",
     "new.v30.notes": "Notes et raccourcis : des notes pour chaque jeu sur sa page et dans l'overlay ; un raccourci sur le bureau pour un jeu de n'importe quel launcher.",
-    "new.v30.palette": "Accès rapide : Ctrl+P puis tapez — Jouer pour n'importe quel jeu installé et toutes les nouvelles pages."
+    "new.v30.palette": "Accès rapide : Ctrl+P puis tapez — Jouer pour n'importe quel jeu installé et toutes les nouvelles pages.",
+    "v30.session.today": "{time} au total aujourd'hui"
   },
   "pt-BR": {
     "v30.upd.gameRunning": "Feche o jogo primeiro: a atualização reinicia o ModLaunch, e é melhor não interromper a sessão. A atualização vai esperar.",
@@ -1530,7 +1536,8 @@
     "v30.pick.short": "Aleatório",
     "new.v30.status": "Status e jogo aleatório: marque Jogando, Na fila, Zerado ou Abandonado, e o botão Aleatório sugere o que jogar hoje.",
     "new.v30.notes": "Notas e atalhos: notas para qualquer jogo na página dele e no overlay; atalho na área de trabalho para jogos de qualquer launcher.",
-    "new.v30.palette": "Acesso rápido: Ctrl+P e comece a digitar — Jogar para qualquer jogo instalado e todas as páginas novas."
+    "new.v30.palette": "Acesso rápido: Ctrl+P e comece a digitar — Jogar para qualquer jogo instalado e todas as páginas novas.",
+    "v30.session.today": "hoje no total {time}"
   },
   "zh-CN": {
     "v30.upd.gameRunning": "请先关闭游戏：更新会重启 ModLaunch，最好不要中途打断游戏。更新会一直等着你。",
@@ -1749,6 +1756,7 @@
     "v30.pick.short": "随机",
     "new.v30.status": "状态与随机挑选：将游戏标记为正在玩、计划玩、已通关或已弃坑，“随机”按钮会建议今天玩什么。",
     "new.v30.notes": "笔记与快捷方式：任意游戏都能在页面和叠加层中写笔记；可为任意启动器的游戏创建桌面快捷方式。",
-    "new.v30.palette": "快速跳转：按 Ctrl+P 并输入——可直接“开始游戏”任意已安装游戏，并打开所有新页面。"
+    "new.v30.palette": "快速跳转：按 Ctrl+P 并输入——可直接“开始游戏”任意已安装游戏，并打开所有新页面。",
+    "v30.session.today": "今天共 {time}"
   }
 }
