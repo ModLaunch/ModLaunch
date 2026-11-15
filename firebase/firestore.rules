@@ -365,6 +365,7 @@ service cloud.firestore {
     // wallets/{uid}/ledger/{seq}     — журнал: каждое изменение баланса, по порядку
     // wallets/{uid}/purchases/{id}   — свои покупки (библиотека)
     // payouts/{id}, topups/{id}      — заявки на вывод и пополнение (решает админ)
+    // refunds/r_{uid}_{лот}          — 30.0: заявка на возврат покупки (14 дней, решает админ)
     //
     // Главное правило кошелька: баланс меняется ТОЛЬКО вместе с новой записью журнала
     // (seq + 1), сумма записи = разница балансов, а сама запись проверяется по своему
@@ -395,6 +396,7 @@ service cloud.firestore {
     function mEntry(uid, seq) { return /databases/$(database)/documents/wallets/$(uid)/ledger/$(string(seq)); }
     function mPayout(pid) { return /databases/$(database)/documents/payouts/$(pid); }
     function mTopUp(tid) { return /databases/$(database)/documents/topups/$(tid); }
+    function mRefund(rid) { return /databases/$(database)/documents/refunds/$(rid); }
 
     // Кошелёк до этой пачки (нет — нулевой).
     function mZero() { return {'balance': 0, 'earned': 0, 'spent': 0, 'paidOut': 0, 'toppedUp': 0, 'seq': 0}; }
@@ -420,7 +422,7 @@ service cloud.firestore {
         && after.balance == before.get('balance', 0) + e.amount
         && e.balance == after.balance
         && after.earned == before.get('earned', 0) + ((e.kind == 'sale' || e.kind == 'fee' || e.kind == 'tip-in') ? e.amount : 0)
-        && after.spent == before.get('spent', 0) + ((e.kind == 'purchase' || e.kind == 'tip') ? 0 - e.amount : 0)
+        && after.spent == before.get('spent', 0) + ((e.kind == 'purchase' || e.kind == 'tip' || e.kind == 'refund') ? 0 - e.amount : 0)
         && after.paidOut == before.get('paidOut', 0) + ((e.kind == 'payout' || e.kind == 'payout-return') ? 0 - e.amount : 0)
         && after.toppedUp == before.get('toppedUp', 0) + (e.kind == 'topup' ? e.amount : 0)
         && after.updated == request.time;
@@ -442,6 +444,7 @@ service cloud.firestore {
       let before = get(mSale(e.ref, e.party)).data;
       let after = getAfter(mSale(e.ref, e.party)).data;
       return before.get('feeTaken', false) == false && after.feeTaken == true
+        && before.get('refunded', false) == false
         && before.fee > 0 && e.amount == before.fee;
     }
     function mPayoutOk(w, e) {
@@ -457,6 +460,19 @@ service cloud.firestore {
       let before = get(mTopUp(e.ref)).data;
       let after = getAfter(mTopUp(e.ref)).data;
       return before.uid == w && before.status == 'pending' && after.status == 'done' && e.amount == before.amount;
+    }
+    // 30.0: возврат покупки — ровно цена из заявки, заявка в этой же пачке становится «done».
+    function mRefundOk(w, e) {
+      let before = get(mRefund(e.ref)).data;
+      let after = getAfter(mRefund(e.ref)).data;
+      return before.uid == w && before.status == 'pending' && after.status == 'done' && e.amount == before.price;
+    }
+    // Заявку можно подать на свою платную покупку, деньги за которую ещё не возвращали, в течение 14 дней.
+    function mRefundable(id, buyer, r) {
+      let sale = get(mSale(id, buyer)).data;
+      return sale.get('refunded', false) == false
+        && r.price == sale.price && r.price > 0 && r.seller == sale.seller
+        && request.time < sale.created + duration.value(14, 'd');
     }
     // 27.0: поддержка (tips/{tid}, tid = «t_» + uid дарящего + «_» + 14 цифр). Дарящий списывает у себя ровно сумму
     // поддержки; автор забирает её без комиссии один раз; владелец забирает комиссию один раз.
@@ -490,6 +506,7 @@ service cloud.firestore {
           || (e.kind == 'payout' && w == request.auth.uid && mPayoutOk(w, e))
           || (e.kind == 'payout-return' && mAdmin() && mPayoutReturnOk(w, e))
           || (e.kind == 'topup' && mAdmin() && mTopUpOk(w, e))
+          || (e.kind == 'refund' && mAdmin() && mRefundOk(w, e))
           || (e.kind == 'grant' && mAdmin() && e.note.size() > 0)
           || (e.kind == 'tip' && w == request.auth.uid && mTipOk(w, e))
           || (e.kind == 'tip-in' && w == request.auth.uid && mTipInOk(w, e))
@@ -533,8 +550,10 @@ service cloud.firestore {
       allow delete: if request.auth != null && resource.data.uid == request.auth.uid && resource.data.sales == 0;
 
       match /files/{n} {
+        // 30.0: деньги за покупку вернули — файл больше не открыть.
         allow get: if request.auth != null
-          && (mListing(id).uid == request.auth.uid || exists(mSale(id, request.auth.uid)));
+          && (mListing(id).uid == request.auth.uid
+            || (exists(mSale(id, request.auth.uid)) && get(mSale(id, request.auth.uid)).data.get('refunded', false) == false));
         allow create, update: if mMember() && mListing(id).uid == request.auth.uid
           && request.resource.data.uid == request.auth.uid && request.resource.data.data is string;
         allow delete: if request.auth != null && mListing(id).uid == request.auth.uid;
@@ -563,6 +582,13 @@ service cloud.firestore {
         allow update: if mAdmin() && mOnly(['feeTaken'])
           && resource.data.get('feeTaken', false) == false && request.resource.data.feeTaken == true
           && mEntryIs(request.auth.uid, 'fee', id) && mNewEntry(request.auth.uid).party == buyer;
+        // 30.0: возврат — админ помечает продажу refunded (и claimed: выручку продавец уже не заберёт)
+        // только вместе с решением «done» по заявке этого покупателя.
+        allow update: if mAdmin() && mOnly(['refunded', 'claimed'])
+          && resource.data.get('refunded', false) == false
+          && request.resource.data.refunded == true && request.resource.data.claimed == true
+          && get(mRefund('r_' + buyer + '_' + id)).data.status == 'pending'
+          && getAfter(mRefund('r_' + buyer + '_' + id)).data.status == 'done';
       }
 
       match /reviews/{uid} {
@@ -672,6 +698,27 @@ service cloud.firestore {
       allow update: if mAdmin() && resource.data.status == 'pending' && mOnly(['status', 'note'])
         && (request.resource.data.status == 'rejected'
           || (request.resource.data.status == 'done' && mEntryIs(resource.data.uid, 'topup', tid)));
+    }
+    // 30.0: возврат покупки. Покупатель просит (одна заявка на покупку, до 14 дней после неё); админ решает:
+    // «done» — только вместе с записью «refund» в журнале покупателя на цену покупки и отметкой refunded
+    // на продаже; «rejected» — отметка с пояснением.
+    match /refunds/{rid} {
+      allow get, list: if request.auth != null && (resource.data.uid == request.auth.uid || mAdmin());
+      allow create: if mMember()
+        && request.resource.data.keys().hasOnly(['uid', 'author', 'listing', 'title', 'seller', 'price', 'reason', 'status', 'note', 'created'])
+        && request.resource.data.uid == request.auth.uid
+        && mText(request.resource.data.listing, 128) && request.resource.data.listing.size() > 0
+        && rid == 'r_' + request.auth.uid + '_' + request.resource.data.listing
+        && mRefundable(request.resource.data.listing, request.auth.uid, request.resource.data)
+        && request.resource.data.status == 'pending' && request.resource.data.note == ''
+        && mText(request.resource.data.author, 32) && mText(request.resource.data.title, 60)
+        && mText(request.resource.data.reason, 500) && request.resource.data.reason.size() >= 5
+        && request.resource.data.created == request.time;
+      allow update: if mAdmin() && resource.data.status == 'pending' && mOnly(['status', 'note'])
+        && mText(request.resource.data.note, 300)
+        && (request.resource.data.status == 'rejected'
+          || (request.resource.data.status == 'done' && mEntryIs(resource.data.uid, 'refund', rid)
+            && getAfter(mSale(resource.data.listing, resource.data.uid)).data.get('refunded', false) == true));
     }
     // ── конец правил рынка ───────────────────────────────────────────────
 

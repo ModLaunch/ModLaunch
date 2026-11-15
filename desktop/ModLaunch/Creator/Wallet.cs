@@ -23,13 +23,13 @@ public sealed record LedgerEntry(long Seq, string Kind, long Amount, long Balanc
 /// </summary>
 public static class Ledger
 {
-    public static readonly string[] Kinds = ["purchase", "sale", "payout", "payout-return", "topup", "grant", "fee", "tip", "tip-in"];
+    public static readonly string[] Kinds = ["purchase", "sale", "payout", "payout-return", "topup", "grant", "fee", "tip", "tip-in", "refund"];
 
     /// <summary>Новое состояние после записи — та же арифметика, что в правилах (mWalletOk). 27.0: поддержка — «tip» (трата) и «tip-in» (доход).</summary>
     public static WalletState Next(WalletState prev, string kind, long amount) => new(
         prev.Balance + amount,
         prev.Earned + (kind is "sale" or "fee" or "tip-in" ? amount : 0),
-        prev.Spent + (kind is "purchase" or "tip" ? -amount : 0),
+        prev.Spent + (kind is "purchase" or "tip" or "refund" ? -amount : 0),
         prev.PaidOut + (kind is "payout" or "payout-return" ? -amount : 0),
         prev.ToppedUp + (kind == "topup" ? amount : 0),
         prev.Seq + 1);

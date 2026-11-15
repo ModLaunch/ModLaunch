@@ -23,7 +23,7 @@ public sealed record Sale(string ListingId, string Buyer, string BuyerName, stri
     public long Net => Price - Fee;
 }
 
-public sealed record Purchase(string ListingId, string Title, string Kind, string Seller, long Price, DateTime? Created);
+public sealed record Purchase(string ListingId, string Title, string Kind, string Seller, long Price, DateTime? Created, Refund? Refund = null);
 public sealed record Wallet(long Balance, long Earned, long Spent, long PaidOut, long ToppedUp = 0, long Seq = 0);
 public sealed record Payout(string Id, string Uid, string Author, long Amount, string Method, string Status, string Note, DateTime? Created);
 public sealed record TopUp(string Id, string Uid, string Author, long Amount, string Reference, string Status, DateTime? Created);
@@ -60,7 +60,7 @@ public sealed class ListingDraft
 /// программа; кошельки — Creator/Wallet.cs. Пополнение и выплаты — заявками,
 /// их подтверждает админ (почта в коллекции admins).
 /// </summary>
-public static class Market
+public static partial class Market
 {
     public const int MaxPreview = 4000;
     public const long MaxFile = 8 * 1024 * 1024;
@@ -235,7 +235,18 @@ public static class Market
             var f = Firebase.FromFields(d["fields"] as JsonObject);
             return new Purchase(Id(d), f.S("title"), f.S("kind"), f.S("seller"), f.L("price"), Firebase.Time(f.S("created")));
         }).OrderByDescending(p => p.Created).ToList();
-        foreach (var p in list) Owned.Add(p.ListingId);
+        // 30.0: заявка на возврат — рядом с покупкой; деньги вернули — товар больше не «куплен».
+        try
+        {
+            var refunds = (await MyRefunds()).GroupBy(r => r.ListingId).ToDictionary(g => g.Key, g => g.First());
+            list = list.Select(p => refunds.TryGetValue(p.ListingId, out var r) ? p with { Refund = r } : p).ToList();
+        }
+        catch (ServiceError) { }
+        foreach (var p in list)
+        {
+            if (p.Refund?.Status == "done") { Owned.Remove(p.ListingId); RefundedSales.Add(p.ListingId); }
+            else Owned.Add(p.ListingId);
+        }
         return list;
     }
 
@@ -249,7 +260,8 @@ public static class Market
         var (uid, token, _) = await Hub.Member();
         try
         {
-            await Hub.Call(Firebase.Url($"/market/{l.Id}/sales/{uid}"), HttpMethod.Get, null, token);
+            var sale = await Hub.Call(Firebase.Url($"/market/{l.Id}/sales/{uid}"), HttpMethod.Get, null, token);
+            if (IsRefunded(sale)) { RefundedSales.Add(l.Id); return false; }
             Owned.Add(l.Id);
             return true;
         }
@@ -267,7 +279,8 @@ public static class Market
         var (uid, token, _) = await Hub.Member();
         try
         {
-            await Hub.Call(Firebase.Url($"/market/{listingId}/sales/{uid}"), HttpMethod.Get, null, token);
+            var sale = await Hub.Call(Firebase.Url($"/market/{listingId}/sales/{uid}"), HttpMethod.Get, null, token);
+            if (IsRefunded(sale)) { RefundedSales.Add(listingId); return false; }
             Owned.Add(listingId);
             return true;
         }
@@ -355,6 +368,7 @@ public static class Market
         var (uid, token, name) = await Hub.Member();
         if (l.Uid == uid) throw new ServiceError("OWN");
         if (await Bought(l)) throw new ServiceError("OWNED");
+        if (RefundedSales.Contains(l.Id)) throw new ServiceError("REFUNDED");
         var fresh = await Get(l.Id) ?? throw new ServiceError("NOT_FOUND");
         if (!fresh.Active) throw new ServiceError("NOT_FOUND");
         var price = fresh.Price;

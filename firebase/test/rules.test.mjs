@@ -43,7 +43,7 @@ function next(prev, kind, amount) {
   const n = {
     balance: (prev.balance ?? 0) + amount,
     earned: (prev.earned ?? 0) + (kind === 'sale' || kind === 'fee' || kind === 'tip-in' ? amount : 0),
-    spent: (prev.spent ?? 0) + (kind === 'purchase' || kind === 'tip' ? -amount : 0),
+    spent: (prev.spent ?? 0) + (kind === 'purchase' || kind === 'tip' || kind === 'refund' ? -amount : 0),
     paidOut: (prev.paidOut ?? 0) + (kind === 'payout' || kind === 'payout-return' ? -amount : 0),
     toppedUp: (prev.toppedUp ?? 0) + (kind === 'topup' ? amount : 0),
     seq: (prev.seq ?? 0) + 1,
@@ -742,4 +742,66 @@ test('инди-игра: лот game создаётся, ссылку на сб�
   await assertFails(setDoc(doc(db(OTHER), 'market', id, 'files', 'link'), { ...link, uid: OTHER.uid }));
   await assertSucceeds(getDoc(doc(db(SELLER), 'market', id, 'files', 'link')));
   await assertFails(getDoc(doc(db(BUYER), 'market', id, 'files', 'link')));
+});
+
+// ---------------------------------------------------------------- 30.0: возврат покупки
+
+const RID = `r_${BUYER.uid}_${LOT}`;
+const refundReq = (over = {}) => ({
+  uid: BUYER.uid, author: 'Buyer', listing: LOT, title: 'Lot', seller: SELLER.uid, price: PRICE,
+  reason: 'не запускается', status: 'pending', note: '', created: serverTimestamp(), ...over,
+});
+
+/** Решение админа одной пачкой, как Market.ResolveRefund. */
+async function decideRefund(who = ADMIN, { amount = PRICE, mark = true } = {}) {
+  const d = db(who);
+  const prev = await walletOf(BUYER.uid);
+  const b = writeBatch(d);
+  b.update(doc(d, 'refunds', RID), { status: 'done', note: 'ок' });
+  if (mark) b.update(doc(d, 'market', LOT, 'sales', BUYER.uid), { refunded: true, claimed: true });
+  ledger(b, d, BUYER.uid, prev, 'refund', amount, { ref: RID, party: SELLER.uid, note: 'Lot', by: who.uid });
+  return b.commit();
+}
+
+test('возврат: заявка — только на свою платную покупку, с её ценой, с причиной и в течение 14 дней', async () => {
+  await assertFails(setDoc(doc(db(BUYER), 'refunds', RID), refundReq()));
+  await assertSucceeds(buy());
+  await assertFails(setDoc(doc(db(OTHER), 'refunds', RID), refundReq({ uid: OTHER.uid })));
+  await assertFails(setDoc(doc(db(BUYER), 'refunds', RID), refundReq({ price: PRICE - 1 })));
+  await assertFails(setDoc(doc(db(BUYER), 'refunds', RID), refundReq({ reason: 'нет' })));
+  await assertFails(setDoc(doc(db(BUYER), 'refunds', RID), refundReq({ status: 'done' })));
+  await assertFails(setDoc(doc(db(BUYER), 'refunds', `r_x_${LOT}`), refundReq()));
+  await assertSucceeds(setDoc(doc(db(BUYER), 'refunds', RID), refundReq()));
+  await raw(async (d) => {
+    await deleteDoc(doc(d, 'refunds', RID));
+    await updateDoc(doc(d, 'market', LOT, 'sales', BUYER.uid), { created: new Date(Date.now() - 15 * 86400000) });
+  });
+  await assertFails(setDoc(doc(db(BUYER), 'refunds', RID), refundReq()));
+});
+
+test('возврат: решает только админ; деньги ровно цена, продажа закрыта, файл не открыть, выручку не забрать', async () => {
+  await assertSucceeds(buy());
+  await raw(async (d) => setDoc(doc(d, 'market', LOT, 'files', '0'), { uid: SELLER.uid, data: 'x' }));
+  await assertSucceeds(getDoc(doc(db(BUYER), 'market', LOT, 'files', '0')));
+  await assertSucceeds(setDoc(doc(db(BUYER), 'refunds', RID), refundReq()));
+  await assertFails(decideRefund(BUYER));
+  await assertFails(decideRefund(ADMIN, { amount: PRICE + 100 }));
+  await assertFails(decideRefund(ADMIN, { mark: false }));
+  await assertSucceeds(decideRefund(ADMIN));
+  await assertFails(decideRefund(ADMIN));
+  const w = await walletOf(BUYER.uid);
+  if (w.balance !== 50000 || w.spent !== 0 || w.seq !== 3) throw new Error(JSON.stringify(w));
+  await assertFails(getDoc(doc(db(BUYER), 'market', LOT, 'files', '0')));
+  await assertFails(claim());
+});
+
+test('возврат: отказ — отметка админа; без заявки продажу «возвращённой» не сделать; чужие заявки не видны', async () => {
+  await assertSucceeds(buy());
+  await assertFails(updateDoc(doc(db(ADMIN), 'market', LOT, 'sales', BUYER.uid), { refunded: true, claimed: true }));
+  await assertSucceeds(setDoc(doc(db(BUYER), 'refunds', RID), refundReq()));
+  await assertFails(updateDoc(doc(db(BUYER), 'refunds', RID), { status: 'rejected', note: '' }));
+  await assertSucceeds(updateDoc(doc(db(ADMIN), 'refunds', RID), { status: 'rejected', note: 'файл рабочий' }));
+  await assertFails(decideRefund(ADMIN));
+  await assertSucceeds(getDoc(doc(db(BUYER), 'refunds', RID)));
+  await assertFails(getDoc(doc(db(OTHER), 'refunds', RID)));
 });

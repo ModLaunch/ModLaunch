@@ -37,7 +37,7 @@ public static class Commission
             var parts = (d.Str("name") ?? "").Split('/');
             if (parts.Length < 4 || parts[^4] != "market") continue;
             var f = Firebase.FromFields(d["fields"] as JsonObject);
-            list.Add(new FeeSale(parts[^3], parts[^1], f.S("seller"), f.S("title"), f.L("price"), f.L("fee"), f.B("feeTaken"), Firebase.Time(f.S("created"))));
+            list.Add(new FeeSale(parts[^3], parts[^1], f.S("seller"), f.S("title"), f.L("price"), f.L("fee"), f.B("feeTaken") || f.B("refunded"), Firebase.Time(f.S("created"))));
         }
         return [.. list.OrderByDescending(s => s.Created)];
     }

@@ -72,4 +72,22 @@ public static class V30Shots
         s.Save("v30-06-mfa-enable");
         s.Window.CloseDialog();
     }
+
+    /// <summary>MODLAUNCH_SHOTS=V30Refund: «Аккаунт → Покупки» с возвратами и окно заявки.</summary>
+    [DemoShots]
+    static void V30Refund(Shots s)
+    {
+        s.Pump(4500);
+        Social.Account.DemoSignIn();
+        s.Window.Navigate(() => new AccountPage("purchases"));
+        s.Pump(800);
+        if (s.Window.CurrentPage is not AccountPage page) return;
+        page.DemoPurchases();
+        s.Pump(1200);
+        s.Save("v30-07-refunds");
+        if (page.FirstPurchase is { } first) page.AskRefund(first);
+        s.Pump(800);
+        s.Save("v30-08-refund-ask");
+        s.Window.CloseDialog();
+    }
 }

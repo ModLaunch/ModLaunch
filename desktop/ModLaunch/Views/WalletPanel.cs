@@ -232,6 +232,8 @@ public sealed class WalletPanel : UserControl
             // 27.0: поддержка — отправленная (кому) и полученная (от кого и что написал).
             "tip" => (Icons.Heart, Ui.Res("Brand2"), e.Party == Tips.Platform ? I18n.T("v27.tip.k.platform") : I18n.T("v27.tip.k.sent"), e.Note),
             "tip-in" => (Icons.Heart, Ui.Res("Good"), I18n.T("v27.tip.k.got"), e.Note),
+            // 30.0: деньги за покупку вернули.
+            "refund" => (Icons.Undo, Ui.Res("Good"), I18n.T("v30.refund.k", ("title", e.Note != "" ? e.Note : ListingTitle())), ""),
             _ => (Icons.Info, Ui.Res("Muted"), e.Kind, e.Note),
         };
     }

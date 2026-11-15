@@ -25,7 +25,7 @@ public sealed partial class AccountPage : Page
 
     // Загружается по требованию, сбрасывается кнопкой «Обновить».
     List<Purchase>? _purchases;
-    (List<TopUp> TopUps, List<Payout> Payouts, Wallet Platform)? _admin;
+    (List<TopUp> TopUps, List<Payout> Payouts, Wallet Platform, List<Refund> Refunds)? _admin;
     string? _error;
 
     public AccountPage(string tab = "profile") { _tab = tab == "selling" ? "earnings" : tab; }
@@ -288,17 +288,76 @@ public sealed partial class AccountPage : Page
             var item = p;
             var line = new DockPanel();
             var buttons = Ui.Row(6,
-                Ui.Button(I18n.T("st.open"), async () => { if (await Market.Get(item.ListingId) is { } l) MarketViews.Open(l); else MainWindow.Current?.Toast(I18n.T("err.market.NOT_FOUND"), bad: true); }, "ghost", Icons.Eye),
-                Ui.Button(I18n.T("mk.download"), async () => { if (await Market.Get(item.ListingId) is { } l) MarketViews.Download(l); else MainWindow.Current?.Toast(I18n.T("err.market.NOT_FOUND"), bad: true); }, "primary", Icons.Download));
+                Ui.Button(I18n.T("st.open"), async () => { if (await Market.Get(item.ListingId) is { } l) MarketViews.Open(l); else MainWindow.Current?.Toast(I18n.T("err.market.NOT_FOUND"), bad: true); }, "ghost", Icons.Eye));
+            // 30.0: возврат в течение 14 дней; деньги вернули — скачать уже нельзя.
+            if (Market.RefundOpen(item)) buttons.Children.Insert(0, Ui.Button(I18n.T("v30.refund.ask"), () => AskRefund(item), "ghost", Icons.Undo));
+            if (item.Refund?.Status != "done")
+                buttons.Children.Add(Ui.Button(I18n.T("mk.download"), async () => { if (await Market.Get(item.ListingId) is { } l) MarketViews.Download(l); else MainWindow.Current?.Toast(I18n.T("err.market.NOT_FOUND"), bad: true); }, "primary", Icons.Download));
             DockPanel.SetDock(buttons, Dock.Right);
             line.Children.Add(buttons);
+            var info = Ui.Col(2, Ui.Text(item.Title, "h3"),
+                Ui.Text(I18n.T("mod.by", ("author", item.Seller)) + " · " + (item.Price == 0 ? I18n.T("mk.free") : Market.Money(item.Price)) + " · " + Ui.Ago(item.Created), "small muted"));
+            if (RefundLine(item) is { } refund) info.Children.Add(refund);
             line.Children.Add(Ui.Row(12,
                 new Border { Width = 40, Height = 40, CornerRadius = new CornerRadius(10), Background = Ui.Res("Surface3"), Child = Ui.Icon(MarketViews.KindIcon(item.Kind), 18) },
-                Ui.Col(2, Ui.Text(item.Title, "h3"),
-                    Ui.Text(I18n.T("mod.by", ("author", item.Seller)) + " · " + (item.Price == 0 ? I18n.T("mk.free") : Market.Money(item.Price)) + " · " + Ui.Ago(item.Created), "small muted"))));
+                info));
             col.Children.Add(Ui.Card(line, 12));
         }
         return Card(I18n.T("acc.s.purchases"), I18n.T("acc.purchases.text"), col);
+    }
+
+    /// <summary>Снимки экрана: «Покупки» с заявками на возврат во всех состояниях.</summary>
+    internal void DemoPurchases()
+    {
+        if (!Program.Screenshot) return;
+        var now = DateTime.UtcNow;
+        Refund R(string lot, string status, string note = "") => new($"r_demo_{lot}", "demo-uid", "Player", lot, "", "", 0, "", status, note, now.AddDays(-1));
+        _purchases =
+        [
+            new("lot-a", "Better Cockpit HUD", "model", "Nova", 24900, now.AddDays(-2)),
+            new("lot-b", "Night Sky Pack", "asset", "Orion", 9900, now.AddDays(-5), R("lot-b", "pending")),
+            new("lot-c", "Faster Cars Script", "script", "Kite", 14900, now.AddDays(-9), R("lot-c", "rejected", "v1.2")),
+            new("lot-d", "Retro Shader", "code", "Pixel", 4900, now.AddDays(-12), R("lot-d", "done")),
+            new("lot-e", "Free Map Marker", "script", "Mapper", 0, now.AddDays(-30)),
+        ];
+        _tried.Add("purchases");
+        _error = null;
+        Build();
+    }
+
+    internal Purchase? FirstPurchase => _purchases?.FirstOrDefault();
+
+    /// <summary>Что с заявкой на возврат: ждёт, деньги вернули или отказали (с пояснением админа).</summary>
+    static Control? RefundLine(Purchase p) => p.Refund switch
+    {
+        { Status: "pending" } => Ui.Text(I18n.T("v30.refund.pending"), "small", color: Ui.Res("Warn"), wrap: true),
+        { Status: "done" } => Ui.Text("✓ " + I18n.T("v30.refund.done"), "small", color: Ui.Res("Good"), wrap: true),
+        { Status: "rejected", Note: { Length: > 0 } note } => Ui.Text(I18n.T("v30.refund.rejected.note", ("note", note)), "small", color: Ui.Res("Bad"), wrap: true),
+        { Status: "rejected" } => Ui.Text(I18n.T("v30.refund.rejected"), "small", color: Ui.Res("Bad"), wrap: true),
+        _ => null,
+    };
+
+    /// <summary>Заявка на возврат: что не так — решение за админом.</summary>
+    internal void AskRefund(Purchase p)
+    {
+        if (MainWindow.Current is not { } w) return;
+        var reason = new TextBox { Watermark = I18n.T("v30.refund.reason"), AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, Height = 96, MaxLength = 500, VerticalContentAlignment = VerticalAlignment.Top };
+        var until = Market.RefundUntil(p) is DateTime d ? I18n.T("v30.refund.until", ("date", d.ToLocalTime().ToString("g", I18n.Culture))) : "";
+        w.Dialog(I18n.T("v30.refund.title"), Ui.Col(10,
+                Ui.Text($"{p.Title} · {Market.Money(p.Price)}", "h3"),
+                Ui.Text(I18n.T("v30.refund.text", ("days", Market.RefundDays)), "muted", wrap: true),
+                Ui.Text(until, "small muted"),
+                reason),
+            Ui.Button(I18n.T("common.cancel"), w.CloseDialog),
+            Ui.Button(I18n.T("v30.refund.send"), () =>
+            {
+                var text = (reason.Text ?? "").Trim();
+                if (text.Length < Market.MinRefundReason) { w.Toast(I18n.T("err.market.REFUND_REASON"), bad: true); return; }
+                w.CloseDialog();
+                _purchases = null;
+                _tried.Remove("purchases");
+                Call(() => Market.RequestRefund(p, text), I18n.T("v30.refund.sent"));
+            }, "primary", Icons.Undo));
     }
 
     // ---------------------------------------------------------------- данные
@@ -335,14 +394,21 @@ public sealed partial class AccountPage : Page
     Control Admin()
     {
         if (_admin is null && !_busy)
-            Load("admin", async () => { _admin = (await Market.PendingTopUps(), await Market.PendingPayouts(), await Market.PlatformWallet()); });
+            Load("admin", async () =>
+            {
+                // 30.0: заявки на возврат; пока их правил нет в базе — просто пустой список.
+                List<Refund> refunds;
+                try { refunds = await Market.PendingRefunds(); } catch (ServiceError) { refunds = []; }
+                _admin = (await Market.PendingTopUps(), await Market.PendingPayouts(), await Market.PlatformWallet(), refunds);
+            });
         var col = Ui.Col(16);
         if (_admin is not { } a) { col.Children.Add(Loading()); return col; }
 
-        var stats = new UniformGrid { Columns = 3 };
+        var stats = new UniformGrid { Columns = 4 };
         stats.Children.Add(Stat(I18n.T("adm.platform"), Market.Money(a.Platform.Balance), Ui.Res("Good")));
         stats.Children.Add(Stat(I18n.T("adm.topups"), a.TopUps.Count.ToString(I18n.Culture)));
         stats.Children.Add(Stat(I18n.T("adm.payouts"), a.Payouts.Count.ToString(I18n.Culture)));
+        stats.Children.Add(Stat(I18n.T("v30.adm.refunds"), a.Refunds.Count.ToString(I18n.Culture)));
         col.Children.Add(stats);
 
         var tops = Ui.Col(6);
@@ -377,6 +443,25 @@ public sealed partial class AccountPage : Page
             outs.Children.Add(Ui.Card(line, 12));
         }
         col.Children.Add(Card(I18n.T("adm.payouts"), I18n.T("adm.payouts.text"), outs));
+
+        var backs = Ui.Col(6);
+        if (a.Refunds.Count == 0) backs.Children.Add(Ui.Text(I18n.T("adm.none"), "muted"));
+        foreach (var r in a.Refunds)
+        {
+            var item = r;
+            var note = new TextBox { Watermark = I18n.T("adm.note"), Width = 200, MaxLength = 300 };
+            var line = new DockPanel();
+            var buttons = Ui.Row(6, note,
+                Ui.Button(I18n.T("v30.adm.refund.ok"), () => Call(() => Market.ResolveRefund(item, true, note.Text ?? ""), I18n.T("adm.done")), "primary", Icons.Undo),
+                Ui.Button(I18n.T("adm.reject"), () => Call(() => Market.ResolveRefund(item, false, note.Text ?? ""), I18n.T("adm.done")), "ghost", Icons.Close));
+            DockPanel.SetDock(buttons, Dock.Right);
+            line.Children.Add(buttons);
+            line.Children.Add(Ui.Col(2, Ui.Text($"{item.Author} · {item.Title} · {Market.Money(item.Price)}", "h3"),
+                Ui.Text("«" + item.Reason + "»", "small", wrap: true),
+                Ui.Text($"{item.Uid} · {Ui.Ago(item.Created)}", "small muted", wrap: true)));
+            backs.Children.Add(Ui.Card(line, 12));
+        }
+        col.Children.Add(Card(I18n.T("v30.adm.refunds"), I18n.T("v30.adm.refunds.text"), backs));
 
         var uid = new TextBox { Watermark = "UID", Width = 300 };
         var sum = new TextBox { Watermark = "100", Width = 120 };
