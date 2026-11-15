@@ -15,8 +15,8 @@ public sealed record Profile(bool Configured, bool SignedIn, string? Uid, string
 /// </summary>
 public static partial class Account
 {
-    const string Identity = "https://identitytoolkit.googleapis.com/v1";
-    const string SecureToken = "https://securetoken.googleapis.com/v1";
+    static string Identity => Firebase.IdentityBase();
+    static string SecureToken => Firebase.SecureTokenBase;
     public const int MinPassword = 8;
     const int MaxName = 32;
 

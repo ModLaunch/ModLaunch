@@ -623,7 +623,7 @@ public static class SelfCheck
 
         // Быстрые проверки функций без сети (те же, что в --selftest).
         foreach (var m in Hooks.Marked<SelfTestAttribute>())
-            await Check($"{m.DeclaringType!.Name}.{m.Name}", () => Task.FromResult(m.Invoke(null, null)?.ToString() ?? ""));
+            await Check($"{m.DeclaringType!.Name}.{m.Name}", () => Task.FromResult(Avalonia.Threading.Dispatcher.UIThread.Invoke(() => m.Invoke(null, null)?.ToString() ?? "")));
 
         Console.WriteLine(failed == 0 ? "ALL OK" : $"{failed} FAILED");
         return failed == 0 ? 0 : 1;

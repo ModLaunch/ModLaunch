@@ -116,7 +116,7 @@ public static class Ledger
             ["orderBy"] = new JsonArray(new JsonObject { ["field"] = new JsonObject { ["fieldPath"] = "seq" }, ["direction"] = "DESCENDING" }),
             ["limit"] = limit,
         };
-        var url = $"https://firestore.googleapis.com/v1/{Firebase.Doc($"wallets/{uid}")}:runQuery?key={Uri.EscapeDataString(Firebase.ApiKey)}";
+        var url = Firebase.DocUrl(Firebase.Doc($"wallets/{uid}"), ":runQuery");
         var rows = await Hub.Call(url, HttpMethod.Post, new JsonObject { ["structuredQuery"] = q }, token);
         return (rows as JsonArray ?? []).Select(r => r?["document"] as JsonObject).OfType<JsonObject>().Select(d =>
         {

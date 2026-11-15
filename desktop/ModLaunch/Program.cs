@@ -42,10 +42,12 @@ public static class Program
         Creator.UnityCompiler.Register();
         // 21.0: кусочки кода (use "Название") — купленные на Рынке и бесплатные.
         Creator.Pieces.Register();
-        if (args.Contains("--selfcheck")) return SelfCheck.Run().GetAwaiter().GetResult();
+        // 31.0: с графикой (без неё часть быстрых проверок падала) — сами проверки в пуле, окно-поток крутим здесь.
+        if (args.Contains("--selfcheck")) { StartHeadless(); var run = Task.Run(SelfCheck.Run); while (!run.IsCompleted) { Dispatcher.UIThread.RunJobs(); Thread.Sleep(10); } return run.GetAwaiter().GetResult(); }
         // 23.1: собрать конструктор в игру (и самопроверку в игре) из командной строки.
         if (args.Contains("--dev-prepare")) { StartHeadless(); return Features.DevMode.Cli(args); }
         if (args.Contains("--selftest")) { Hooks.PrepareSelfTest(); StartHeadless(); return Hooks.SelfTest(); }
+        if (args.Contains("--integration")) { Hooks.PrepareSelfTest(); StartHeadless(); return Integration.Run(); }
         // 27.0: что нашла единая библиотека на этом ПК — для поддержки («у меня не видно игру из Xbox»).
         if (args.Contains("--list-games")) return Games.AllGames.Cli();
         if (args.Contains("--recommend")) return Features.GameRecommend.Cli();

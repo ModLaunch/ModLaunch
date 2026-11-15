@@ -18,17 +18,39 @@ public static class Firebase
     public static readonly string ProjectId;
     public static readonly string ApiKey;
 
+    /// <summary>
+    /// 31.0: локальный эмулятор Firebase для интеграционных проверок (--integration).
+    /// Включается только переменной MODLAUNCH_FIREBASE_EMULATOR=127.0.0.1 (или localhost) и только
+    /// с проектом demo-* — боевой проект через эмулятор не подменить.
+    /// </summary>
+    public static readonly string? Emulator;
+
     static Firebase()
     {
         var json = Resources.Json("reviews.config.json");
         ProjectId = json.Str("projectId") ?? "";
         ApiKey = json.Str("apiKey") ?? "";
+        var emu = Environment.GetEnvironmentVariable("MODLAUNCH_FIREBASE_EMULATOR");
+        var project = Environment.GetEnvironmentVariable("MODLAUNCH_FIREBASE_PROJECT") ?? "demo-modlaunch";
+        if (emu is "127.0.0.1" or "localhost" && project.StartsWith("demo-", StringComparison.Ordinal) && project.Length <= 40)
+        {
+            Emulator = emu;
+            ProjectId = project;
+            ApiKey = "emulator";
+        }
     }
 
     public static bool Configured => ProjectId != "" && ApiKey != "";
     public static string Documents => $"projects/{ProjectId}/databases/(default)/documents";
     public static string Doc(string relative) => $"{Documents}/{relative}";
-    public static string Url(string suffix = "") => $"https://firestore.googleapis.com/v1/{Documents}{suffix}?key={Uri.EscapeDataString(ApiKey)}";
+    /// <summary>Адрес Firestore REST (v1) — боевой или эмулятора.</summary>
+    public static string FirestoreBase => Emulator is { } h ? $"http://{h}:8080/v1" : "https://firestore.googleapis.com/v1";
+    /// <summary>Адрес Identity Toolkit (вход) — v1 или v2.</summary>
+    public static string IdentityBase(string version = "v1") => Emulator is { } h ? $"http://{h}:9099/identitytoolkit.googleapis.com/{version}" : $"https://identitytoolkit.googleapis.com/{version}";
+    public static string SecureTokenBase => Emulator is { } h ? $"http://{h}:9099/securetoken.googleapis.com/v1" : "https://securetoken.googleapis.com/v1";
+    public static string Url(string suffix = "") => $"{FirestoreBase}/{Documents}{suffix}?key={Uri.EscapeDataString(ApiKey)}";
+    /// <summary>Адрес документа по полному имени (projects/…/documents/…) с ключом.</summary>
+    public static string DocUrl(string fullName, string suffix = "") => $"{FirestoreBase}/{fullName}{suffix}?key={Uri.EscapeDataString(ApiKey)}";
 
     /// <summary>Разница часов сервера и наших (по заголовку Date) — для «в сети».</summary>
     public static TimeSpan Skew { get; private set; }

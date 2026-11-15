@@ -21,7 +21,7 @@ public sealed record SecondFactor(string Id, string Name, DateTime? Since);
 /// </summary>
 public static partial class Account
 {
-    const string IdentityV2 = "https://identitytoolkit.googleapis.com/v2";
+    static string IdentityV2 => Firebase.IdentityBase("v2");
 
     static string V2(string path) => $"{IdentityV2}/{path}?key={Uri.EscapeDataString(Firebase.ApiKey)}";
 
