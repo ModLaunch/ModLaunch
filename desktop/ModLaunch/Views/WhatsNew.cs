@@ -12,6 +12,8 @@ public static class WhatsNew
 {
     static readonly (string Icon, string Key, Func<Page>? Open)[] Items =
     [
+        // 30.6
+        (Icons.Search, "new.v30.quickKey", () => new SettingsPage("launch")),
         // 30.5
         (Icons.Layers, "new.v30.tray", null),
         // 30.4: полки на всех ПК, друзья в игре и итог сеанса, экспорт библиотеки.

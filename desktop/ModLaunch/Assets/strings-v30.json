@@ -249,7 +249,8 @@
     "v30.qk.key": "Сочетание",
     "v30.qk.armed": "Работает: {key}",
     "v30.qk.busy": "{key} занято другой программой — выберите другое сочетание.",
-    "v30.qk.space": "Пробел"
+    "v30.qk.space": "Пробел",
+    "new.v30.quickKey": "Быстрый переход из любой программы: Ctrl+Alt+Пробел (или свободное Ctrl+Alt+G) открывает ModLaunch с поиском — набрали игру, Enter, играете."
   },
   "en": {
     "v30.upd.gameRunning": "Close the game first: updating restarts ModLaunch, and it's better not to interrupt your session. The update will wait.",
@@ -501,7 +502,8 @@
     "v30.qk.key": "Shortcut",
     "v30.qk.armed": "Active: {key}",
     "v30.qk.busy": "{key} is taken by another app — pick a different one.",
-    "v30.qk.space": "Space"
+    "v30.qk.space": "Space",
+    "new.v30.quickKey": "Quick jump from any app: Ctrl+Alt+Space (or a free Ctrl+Alt+G) opens ModLaunch with search — type a game, press Enter, play."
   },
   "uk": {
     "v30.upd.gameRunning": "Спершу закрийте гру: оновлення перезапускає ModLaunch, а гру краще не переривати посеред сесії. Оновлення нікуди не дінеться.",
@@ -753,7 +755,8 @@
     "v30.qk.key": "Сполучення",
     "v30.qk.armed": "Працює: {key}",
     "v30.qk.busy": "{key} зайняте іншою програмою — виберіть інше.",
-    "v30.qk.space": "Пробіл"
+    "v30.qk.space": "Пробіл",
+    "new.v30.quickKey": "Швидкий перехід з будь-якої програми: Ctrl+Alt+Пробіл (або вільне Ctrl+Alt+G) відкриває ModLaunch з пошуком — ввели гру, Enter, граєте."
   },
   "es": {
     "v30.upd.gameRunning": "Cierra primero el juego: la actualización reinicia ModLaunch y es mejor no interrumpir la partida. La actualización esperará.",
@@ -1005,7 +1008,8 @@
     "v30.qk.key": "Atajo",
     "v30.qk.armed": "Activo: {key}",
     "v30.qk.busy": "{key} lo usa otro programa: elige otra combinación.",
-    "v30.qk.space": "Espacio"
+    "v30.qk.space": "Espacio",
+    "new.v30.quickKey": "Salto rápido desde cualquier programa: Ctrl+Alt+Espacio (o Ctrl+Alt+G si está libre) abre ModLaunch con búsqueda: escribe un juego, Enter y a jugar."
   },
   "de": {
     "v30.upd.gameRunning": "Schließ zuerst das Spiel: Das Update startet ModLaunch neu, und die Sitzung sollte nicht unterbrochen werden. Das Update wartet.",
@@ -1257,7 +1261,8 @@
     "v30.qk.key": "Kombination",
     "v30.qk.armed": "Aktiv: {key}",
     "v30.qk.busy": "{key} ist von einem anderen Programm belegt – wähle eine andere.",
-    "v30.qk.space": "Leertaste"
+    "v30.qk.space": "Leertaste",
+    "new.v30.quickKey": "Schnellsprung aus jedem Programm: Strg+Alt+Leertaste (oder ein freies Strg+Alt+G) öffnet ModLaunch mit Suche – Spiel tippen, Enter, spielen."
   },
   "fr": {
     "v30.upd.gameRunning": "Fermez d'abord le jeu : la mise à jour redémarre ModLaunch et mieux vaut ne pas interrompre la partie. La mise à jour attendra.",
@@ -1509,7 +1514,8 @@
     "v30.qk.key": "Raccourci",
     "v30.qk.armed": "Actif : {key}",
     "v30.qk.busy": "{key} est pris par un autre programme — choisissez-en un autre.",
-    "v30.qk.space": "Espace"
+    "v30.qk.space": "Espace",
+    "new.v30.quickKey": "Accès rapide depuis n'importe quel programme : Ctrl+Alt+Espace (ou Ctrl+Alt+G s'il est libre) ouvre ModLaunch avec la recherche — tapez un jeu, Entrée, jouez."
   },
   "pt-BR": {
     "v30.upd.gameRunning": "Feche o jogo primeiro: a atualização reinicia o ModLaunch, e é melhor não interromper a sessão. A atualização vai esperar.",
@@ -1761,7 +1767,8 @@
     "v30.qk.key": "Atalho",
     "v30.qk.armed": "Ativo: {key}",
     "v30.qk.busy": "{key} está em uso por outro programa — escolha outro.",
-    "v30.qk.space": "Espaço"
+    "v30.qk.space": "Espaço",
+    "new.v30.quickKey": "Acesso rápido de qualquer programa: Ctrl+Alt+Espaço (ou Ctrl+Alt+G, se livre) abre o ModLaunch com busca — digite o jogo, Enter e jogue."
   },
   "zh-CN": {
     "v30.upd.gameRunning": "请先关闭游戏：更新会重启 ModLaunch，最好不要中途打断游戏。更新会一直等着你。",
@@ -2013,6 +2020,7 @@
     "v30.qk.key": "快捷键",
     "v30.qk.armed": "已生效：{key}",
     "v30.qk.busy": "{key} 已被其他程序占用——请换一个。",
-    "v30.qk.space": "空格"
+    "v30.qk.space": "空格",
+    "new.v30.quickKey": "在任何程序中快速跳转：按 Ctrl+Alt+空格（或空闲的 Ctrl+Alt+G）即可打开带搜索的 ModLaunch——输入游戏名，回车即玩。"
   }
 }
