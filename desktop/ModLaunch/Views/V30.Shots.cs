@@ -217,4 +217,16 @@ public static class V30Shots
         s.Save("v30-17-friends-in-game");
         Social.Friends.DemoView = null;
     }
+
+    /// <summary>MODLAUNCH_SHOTS=V30QuickKey: «Быстрый переход» в настройках запуска.</summary>
+    [DemoShots]
+    static void V30QuickKey(Shots s)
+    {
+        s.Pump(4500);
+        s.Window.Navigate(() => new SettingsPage("launch"));
+        s.Pump(1500);
+        if (s.Window.CurrentPage is SettingsPage p) p.DemoScroll(1480);
+        s.Pump(800);
+        s.Save("v30-18-quick-key");
+    }
 }

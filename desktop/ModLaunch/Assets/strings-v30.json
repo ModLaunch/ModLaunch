@@ -241,7 +241,15 @@
     "v30.tray.recent": "Недавние игры",
     "v30.tray.fav": "Избранное",
     "v30.tray.random": "Случайная игра",
-    "new.v30.tray": "Трей со всеми играми: правый щелчок по значку ModLaunch — недавние игры из всех лаунчеров, избранное, случайная игра и итоги."
+    "new.v30.tray": "Трей со всеми играми: правый щелчок по значку ModLaunch — недавние игры из всех лаунчеров, избранное, случайная игра и итоги.",
+    "v30.qk.title": "Быстрый переход",
+    "v30.qk.lead": "Из любой программы: нажмите сочетание — откроется ModLaunch с быстрым переходом. Наберите название игры и нажмите Enter.",
+    "v30.qk.on": "Сочетание быстрого перехода",
+    "v30.qk.on.hint": "Работает, пока открыт ModLaunch (в том числе в трее).",
+    "v30.qk.key": "Сочетание",
+    "v30.qk.armed": "Работает: {key}",
+    "v30.qk.busy": "{key} занято другой программой — выберите другое сочетание.",
+    "v30.qk.space": "Пробел"
   },
   "en": {
     "v30.upd.gameRunning": "Close the game first: updating restarts ModLaunch, and it's better not to interrupt your session. The update will wait.",
@@ -485,7 +493,15 @@
     "v30.tray.recent": "Recent games",
     "v30.tray.fav": "Favorites",
     "v30.tray.random": "Random game",
-    "new.v30.tray": "Tray with all games: right-click the ModLaunch icon for recent games from every launcher, favorites, a random game and your recap."
+    "new.v30.tray": "Tray with all games: right-click the ModLaunch icon for recent games from every launcher, favorites, a random game and your recap.",
+    "v30.qk.title": "Quick jump",
+    "v30.qk.lead": "From any app: press the combo and ModLaunch opens with quick jump. Type a game's name and press Enter.",
+    "v30.qk.on": "Quick jump shortcut",
+    "v30.qk.on.hint": "Works while ModLaunch is open (including in the tray).",
+    "v30.qk.key": "Shortcut",
+    "v30.qk.armed": "Active: {key}",
+    "v30.qk.busy": "{key} is taken by another app — pick a different one.",
+    "v30.qk.space": "Space"
   },
   "uk": {
     "v30.upd.gameRunning": "Спершу закрийте гру: оновлення перезапускає ModLaunch, а гру краще не переривати посеред сесії. Оновлення нікуди не дінеться.",
@@ -729,7 +745,15 @@
     "v30.tray.recent": "Нещодавні ігри",
     "v30.tray.fav": "Обране",
     "v30.tray.random": "Випадкова гра",
-    "new.v30.tray": "Трей з усіма іграми: правий клік по значку ModLaunch — нещодавні ігри з усіх лаунчерів, обране, випадкова гра й підсумки."
+    "new.v30.tray": "Трей з усіма іграми: правий клік по значку ModLaunch — нещодавні ігри з усіх лаунчерів, обране, випадкова гра й підсумки.",
+    "v30.qk.title": "Швидкий перехід",
+    "v30.qk.lead": "З будь-якої програми: натисніть сполучення — відкриється ModLaunch зі швидким переходом. Введіть назву гри й натисніть Enter.",
+    "v30.qk.on": "Сполучення швидкого переходу",
+    "v30.qk.on.hint": "Працює, поки відкрито ModLaunch (зокрема в треї).",
+    "v30.qk.key": "Сполучення",
+    "v30.qk.armed": "Працює: {key}",
+    "v30.qk.busy": "{key} зайняте іншою програмою — виберіть інше.",
+    "v30.qk.space": "Пробіл"
   },
   "es": {
     "v30.upd.gameRunning": "Cierra primero el juego: la actualización reinicia ModLaunch y es mejor no interrumpir la partida. La actualización esperará.",
@@ -973,7 +997,15 @@
     "v30.tray.recent": "Juegos recientes",
     "v30.tray.fav": "Favoritos",
     "v30.tray.random": "Juego al azar",
-    "new.v30.tray": "Bandeja con todos los juegos: clic derecho en el icono de ModLaunch para juegos recientes de todos los launchers, favoritos, un juego al azar y tu resumen."
+    "new.v30.tray": "Bandeja con todos los juegos: clic derecho en el icono de ModLaunch para juegos recientes de todos los launchers, favoritos, un juego al azar y tu resumen.",
+    "v30.qk.title": "Salto rápido",
+    "v30.qk.lead": "Desde cualquier programa: pulsa la combinación y ModLaunch se abre con el salto rápido. Escribe el nombre de un juego y pulsa Enter.",
+    "v30.qk.on": "Atajo de salto rápido",
+    "v30.qk.on.hint": "Funciona mientras ModLaunch está abierto (también en la bandeja).",
+    "v30.qk.key": "Atajo",
+    "v30.qk.armed": "Activo: {key}",
+    "v30.qk.busy": "{key} lo usa otro programa: elige otra combinación.",
+    "v30.qk.space": "Espacio"
   },
   "de": {
     "v30.upd.gameRunning": "Schließ zuerst das Spiel: Das Update startet ModLaunch neu, und die Sitzung sollte nicht unterbrochen werden. Das Update wartet.",
@@ -1217,7 +1249,15 @@
     "v30.tray.recent": "Zuletzt gespielt",
     "v30.tray.fav": "Favoriten",
     "v30.tray.random": "Zufälliges Spiel",
-    "new.v30.tray": "Infobereich mit allen Spielen: Rechtsklick auf das ModLaunch-Symbol – zuletzt gespielte Spiele aus allen Launchern, Favoriten, Zufallsspiel und Rückblick."
+    "new.v30.tray": "Infobereich mit allen Spielen: Rechtsklick auf das ModLaunch-Symbol – zuletzt gespielte Spiele aus allen Launchern, Favoriten, Zufallsspiel und Rückblick.",
+    "v30.qk.title": "Schnellsprung",
+    "v30.qk.lead": "Aus jedem Programm: Tastenkombination drücken – ModLaunch öffnet sich mit dem Schnellsprung. Spielnamen tippen und Enter drücken.",
+    "v30.qk.on": "Tastenkombination für den Schnellsprung",
+    "v30.qk.on.hint": "Funktioniert, solange ModLaunch läuft (auch im Infobereich).",
+    "v30.qk.key": "Kombination",
+    "v30.qk.armed": "Aktiv: {key}",
+    "v30.qk.busy": "{key} ist von einem anderen Programm belegt – wähle eine andere.",
+    "v30.qk.space": "Leertaste"
   },
   "fr": {
     "v30.upd.gameRunning": "Fermez d'abord le jeu : la mise à jour redémarre ModLaunch et mieux vaut ne pas interrompre la partie. La mise à jour attendra.",
@@ -1461,7 +1501,15 @@
     "v30.tray.recent": "Jeux récents",
     "v30.tray.fav": "Favoris",
     "v30.tray.random": "Jeu au hasard",
-    "new.v30.tray": "Tous les jeux dans la zone de notification : clic droit sur l'icône ModLaunch — jeux récents de tous les launchers, favoris, jeu au hasard et bilan."
+    "new.v30.tray": "Tous les jeux dans la zone de notification : clic droit sur l'icône ModLaunch — jeux récents de tous les launchers, favoris, jeu au hasard et bilan.",
+    "v30.qk.title": "Accès rapide",
+    "v30.qk.lead": "Depuis n'importe quel programme : appuyez sur le raccourci et ModLaunch s'ouvre avec l'accès rapide. Tapez le nom d'un jeu puis Entrée.",
+    "v30.qk.on": "Raccourci d'accès rapide",
+    "v30.qk.on.hint": "Fonctionne tant que ModLaunch est ouvert (y compris dans la zone de notification).",
+    "v30.qk.key": "Raccourci",
+    "v30.qk.armed": "Actif : {key}",
+    "v30.qk.busy": "{key} est pris par un autre programme — choisissez-en un autre.",
+    "v30.qk.space": "Espace"
   },
   "pt-BR": {
     "v30.upd.gameRunning": "Feche o jogo primeiro: a atualização reinicia o ModLaunch, e é melhor não interromper a sessão. A atualização vai esperar.",
@@ -1705,7 +1753,15 @@
     "v30.tray.recent": "Jogos recentes",
     "v30.tray.fav": "Favoritos",
     "v30.tray.random": "Jogo aleatório",
-    "new.v30.tray": "Bandeja com todos os jogos: clique direito no ícone do ModLaunch — jogos recentes de todos os launchers, favoritos, jogo aleatório e resumo."
+    "new.v30.tray": "Bandeja com todos os jogos: clique direito no ícone do ModLaunch — jogos recentes de todos os launchers, favoritos, jogo aleatório e resumo.",
+    "v30.qk.title": "Acesso rápido",
+    "v30.qk.lead": "De qualquer programa: aperte o atalho e o ModLaunch abre com o acesso rápido. Digite o nome do jogo e aperte Enter.",
+    "v30.qk.on": "Atalho de acesso rápido",
+    "v30.qk.on.hint": "Funciona enquanto o ModLaunch estiver aberto (inclusive na bandeja).",
+    "v30.qk.key": "Atalho",
+    "v30.qk.armed": "Ativo: {key}",
+    "v30.qk.busy": "{key} está em uso por outro programa — escolha outro.",
+    "v30.qk.space": "Espaço"
   },
   "zh-CN": {
     "v30.upd.gameRunning": "请先关闭游戏：更新会重启 ModLaunch，最好不要中途打断游戏。更新会一直等着你。",
@@ -1949,6 +2005,14 @@
     "v30.tray.recent": "最近游戏",
     "v30.tray.fav": "收藏",
     "v30.tray.random": "随机游戏",
-    "new.v30.tray": "托盘里的所有游戏：右键点击 ModLaunch 图标——所有启动器的最近游戏、收藏、随机游戏和游戏回顾。"
+    "new.v30.tray": "托盘里的所有游戏：右键点击 ModLaunch 图标——所有启动器的最近游戏、收藏、随机游戏和游戏回顾。",
+    "v30.qk.title": "快速跳转",
+    "v30.qk.lead": "在任何程序中按下快捷键，即可打开 ModLaunch 的快速跳转。输入游戏名称后按 Enter。",
+    "v30.qk.on": "快速跳转快捷键",
+    "v30.qk.on.hint": "只要 ModLaunch 在运行（包括在托盘中）就可用。",
+    "v30.qk.key": "快捷键",
+    "v30.qk.armed": "已生效：{key}",
+    "v30.qk.busy": "{key} 已被其他程序占用——请换一个。",
+    "v30.qk.space": "空格"
   }
 }

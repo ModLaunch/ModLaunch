@@ -392,6 +392,39 @@ public sealed partial class SettingsPage : Page
             Toggle(I18n.T("v30.shot.on"), I18n.T("v30.shot.on.hint"), GameShots.Enabled, v => Settings.Data["gameShots"] = v),
             shotRow));
 
+        // 30.6: быстрый переход из любой программы — своё глобальное сочетание.
+        var quickKey = new ComboBox { Width = 200 };
+        foreach (var k in QuickKey.Keys) quickKey.Items.Add(QuickKey.Display(k));
+        quickKey.SelectedIndex = Array.IndexOf(QuickKey.Keys, QuickKey.Armed ? QuickKey.ArmedKey : QuickKey.Key);
+        var quickState = Ui.Text("", "small", wrap: true);
+        void ShowQuickState()
+        {
+            quickState.Text = !QuickKey.On ? "" : QuickKey.Armed ? "✓ " + I18n.T("v30.qk.armed", ("key", QuickKey.Display(QuickKey.ArmedKey))) : I18n.T("v30.qk.busy", ("key", QuickKey.Display(QuickKey.Key)));
+            quickState.Foreground = QuickKey.Armed ? Ui.Res("Good") : Ui.Res("Warn");
+        }
+        quickKey.SelectionChanged += (_, _) =>
+        {
+            if (quickKey.SelectedIndex < 0) return;
+            Settings.Data["quickKeyCombo"] = QuickKey.Keys[quickKey.SelectedIndex];
+            Settings.Save();
+            MainWindow.Current?.ArmQuickKey();
+            ShowQuickState();
+        };
+        ShowQuickState();
+        var quickRow = new DockPanel();
+        DockPanel.SetDock(quickKey, Dock.Right);
+        quickRow.Children.Add(quickKey);
+        quickRow.Children.Add(Ui.Col(3, Ui.Text(I18n.T("v30.qk.key"), "h3"), quickState));
+        col.Children.Add(Section(I18n.T("v30.qk.title"), I18n.T("v30.qk.lead"),
+            Toggle(I18n.T("v30.qk.on"), I18n.T("v30.qk.on.hint"), QuickKey.On, v =>
+            {
+                Settings.Data["quickKey"] = v;
+                Settings.Save();
+                MainWindow.Current?.ArmQuickKey();
+                ShowQuickState();
+            }),
+            quickRow));
+
         // Параметры запуска по играм.
         var found = AppState.Games.Where(g => g.Status == Detect.Found).ToList();
         var args = new StackPanel { Spacing = 10 };

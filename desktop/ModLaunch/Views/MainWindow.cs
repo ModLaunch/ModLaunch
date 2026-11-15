@@ -185,6 +185,8 @@ public sealed partial class MainWindow : Window
         // 30.4: итог сеанса и для игр из других лаунчеров: сколько играли и сколько сегодня всего.
         Games.AllGames.Started += g => _libSessions[g.Key] = DateTime.UtcNow;
         Games.AllGames.Exited += OnLibraryGameExit;
+        // 30.6: быстрый переход из любой программы (Ctrl+Alt+Пробел по умолчанию).
+        ArmQuickKey();
         // 30.5: меню трея следует за библиотекой и полками (недавние, избранное).
         Games.AllGames.Changed += () => Dispatcher.UIThread.Post(() => { if (_tray is not null) UpdateTray(); });
         Games.Shelves.Changed += () => Dispatcher.UIThread.Post(() => { if (_tray is not null) UpdateTray(); });
@@ -1073,6 +1075,7 @@ public sealed partial class MainWindow : Window
             Hide();
             try { _tray?.Dispose(); _tray = null; } catch { }
             try { Features.Hotkey.Disarm(); } catch { }
+            try { Features.QuickKey.Disarm(); } catch { }
             _ = FinishAndExit();
         };
         // Программа закрылась, пока шла игра «без модов», — возвращаем загрузчик на место.
@@ -1157,6 +1160,22 @@ public sealed partial class MainWindow : Window
     }
 
     readonly Dictionary<string, DateTime> _libSessions = [];
+
+    /// <summary>Занять (или переназначить) сочетание быстрого перехода по настройкам.</summary>
+    public void ArmQuickKey() => Features.QuickKey.Arm(OnQuickKey);
+
+    /// <summary>Нажали сочетание быстрого перехода: показать окно (даже из трея) и открыть палитру.</summary>
+    void OnQuickKey()
+    {
+        // Окно уже впереди и что-то открыто (палитра, диалог) — второе нажатие ничего не ломает.
+        if (IsActive && _overlay.IsVisible) return;
+        Show();
+        if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
+        Activate();
+        Topmost = true;
+        Topmost = false;
+        CommandPalette();
+    }
 
     /// <summary>30.4: «Экспорт библиотеки» — все игры из всех лаунчеров таблицей для Excel.</summary>
     public async void ExportLibrary()
