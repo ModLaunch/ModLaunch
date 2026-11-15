@@ -257,4 +257,18 @@ public static class V30Shots
         s.Pump(1200);
         s.Save("v30-19-shots");
     }
+
+    /// <summary>MODLAUNCH_SHOTS=V30News: «Новости» на странице игры (демо-новости).</summary>
+    [DemoShots]
+    static void V30News(Shots s)
+    {
+        s.Pump(4500);
+        Games.AllGames.Refresh();
+        s.Pump(1500);
+        s.Window.Navigate(() => new AllGamesPage("steam:1245620"));
+        s.Pump(2000);
+        if (s.Window.CurrentPage is AllGamesPage page) page.ScrollDetailTo(560);
+        s.Pump(800);
+        s.Save("v30-20-news");
+    }
 }

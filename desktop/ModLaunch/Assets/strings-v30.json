@@ -254,7 +254,10 @@
     "v30.shots.title": "Снимки экрана",
     "v30.shots.all": "Все снимки",
     "v30.shots.hint": "Снимок во время игры — {key}. Здесь и снимки Steam, и папка Screenshots рядом с игрой.",
-    "new.v30.shotStrip": "Снимки на странице игры: последние снимки экрана любой игры — сделанные в ModLaunch (Ctrl+F12), в Steam и в папке Screenshots игры; щелчок открывает снимок."
+    "new.v30.shotStrip": "Снимки на странице игры: последние снимки экрана любой игры — сделанные в ModLaunch (Ctrl+F12), в Steam и в папке Screenshots игры; щелчок открывает снимок.",
+    "v30.news.title": "Новости",
+    "v30.news.all": "Все новости",
+    "v30.news.loading": "Загружаю новости…"
   },
   "en": {
     "v30.upd.gameRunning": "Close the game first: updating restarts ModLaunch, and it's better not to interrupt your session. The update will wait.",
@@ -511,7 +514,10 @@
     "v30.shots.title": "Screenshots",
     "v30.shots.all": "All screenshots",
     "v30.shots.hint": "Take one in game with {key}. Steam screenshots and the Screenshots folder next to the game show up here too.",
-    "new.v30.shotStrip": "Screenshots on the game page: the latest screenshots of any game — taken in ModLaunch (Ctrl+F12), in Steam or in the game's Screenshots folder; click to open."
+    "new.v30.shotStrip": "Screenshots on the game page: the latest screenshots of any game — taken in ModLaunch (Ctrl+F12), in Steam or in the game's Screenshots folder; click to open.",
+    "v30.news.title": "News",
+    "v30.news.all": "All news",
+    "v30.news.loading": "Loading news…"
   },
   "uk": {
     "v30.upd.gameRunning": "Спершу закрийте гру: оновлення перезапускає ModLaunch, а гру краще не переривати посеред сесії. Оновлення нікуди не дінеться.",
@@ -768,7 +774,10 @@
     "v30.shots.title": "Знімки екрана",
     "v30.shots.all": "Усі знімки",
     "v30.shots.hint": "Знімок під час гри — {key}. Тут і знімки Steam, і папка Screenshots поруч із грою.",
-    "new.v30.shotStrip": "Знімки на сторінці гри: останні знімки екрана будь-якої гри — зроблені в ModLaunch (Ctrl+F12), у Steam і в папці Screenshots гри; клік відкриває знімок."
+    "new.v30.shotStrip": "Знімки на сторінці гри: останні знімки екрана будь-якої гри — зроблені в ModLaunch (Ctrl+F12), у Steam і в папці Screenshots гри; клік відкриває знімок.",
+    "v30.news.title": "Новини",
+    "v30.news.all": "Усі новини",
+    "v30.news.loading": "Завантажую новини…"
   },
   "es": {
     "v30.upd.gameRunning": "Cierra primero el juego: la actualización reinicia ModLaunch y es mejor no interrumpir la partida. La actualización esperará.",
@@ -1025,7 +1034,10 @@
     "v30.shots.title": "Capturas",
     "v30.shots.all": "Todas las capturas",
     "v30.shots.hint": "Haz una en el juego con {key}. Aquí aparecen también las capturas de Steam y la carpeta Screenshots del juego.",
-    "new.v30.shotStrip": "Capturas en la página del juego: las últimas capturas de cualquier juego — hechas en ModLaunch (Ctrl+F12), en Steam o en la carpeta Screenshots del juego; clic para abrir."
+    "new.v30.shotStrip": "Capturas en la página del juego: las últimas capturas de cualquier juego — hechas en ModLaunch (Ctrl+F12), en Steam o en la carpeta Screenshots del juego; clic para abrir.",
+    "v30.news.title": "Noticias",
+    "v30.news.all": "Todas las noticias",
+    "v30.news.loading": "Cargando noticias…"
   },
   "de": {
     "v30.upd.gameRunning": "Schließ zuerst das Spiel: Das Update startet ModLaunch neu, und die Sitzung sollte nicht unterbrochen werden. Das Update wartet.",
@@ -1282,7 +1294,10 @@
     "v30.shots.title": "Screenshots",
     "v30.shots.all": "Alle Screenshots",
     "v30.shots.hint": "Im Spiel mit {key} aufnehmen. Hier erscheinen auch Steam-Screenshots und der Ordner Screenshots neben dem Spiel.",
-    "new.v30.shotStrip": "Screenshots auf der Spielseite: die neuesten Screenshots jedes Spiels – aus ModLaunch (Strg+F12), Steam oder dem Screenshots-Ordner des Spiels; Klick öffnet sie."
+    "new.v30.shotStrip": "Screenshots auf der Spielseite: die neuesten Screenshots jedes Spiels – aus ModLaunch (Strg+F12), Steam oder dem Screenshots-Ordner des Spiels; Klick öffnet sie.",
+    "v30.news.title": "Neuigkeiten",
+    "v30.news.all": "Alle Neuigkeiten",
+    "v30.news.loading": "Lade Neuigkeiten…"
   },
   "fr": {
     "v30.upd.gameRunning": "Fermez d'abord le jeu : la mise à jour redémarre ModLaunch et mieux vaut ne pas interrompre la partie. La mise à jour attendra.",
@@ -1539,7 +1554,10 @@
     "v30.shots.title": "Captures d'écran",
     "v30.shots.all": "Toutes les captures",
     "v30.shots.hint": "En jeu, {key} prend une capture. Les captures Steam et le dossier Screenshots du jeu apparaissent aussi ici.",
-    "new.v30.shotStrip": "Captures sur la page du jeu : les dernières captures de n'importe quel jeu — prises dans ModLaunch (Ctrl+F12), dans Steam ou dans le dossier Screenshots du jeu ; clic pour ouvrir."
+    "new.v30.shotStrip": "Captures sur la page du jeu : les dernières captures de n'importe quel jeu — prises dans ModLaunch (Ctrl+F12), dans Steam ou dans le dossier Screenshots du jeu ; clic pour ouvrir.",
+    "v30.news.title": "Actualités",
+    "v30.news.all": "Toutes les actualités",
+    "v30.news.loading": "Chargement des actualités…"
   },
   "pt-BR": {
     "v30.upd.gameRunning": "Feche o jogo primeiro: a atualização reinicia o ModLaunch, e é melhor não interromper a sessão. A atualização vai esperar.",
@@ -1796,7 +1814,10 @@
     "v30.shots.title": "Capturas de tela",
     "v30.shots.all": "Todas as capturas",
     "v30.shots.hint": "No jogo, {key} tira uma captura. As capturas da Steam e a pasta Screenshots do jogo também aparecem aqui.",
-    "new.v30.shotStrip": "Capturas na página do jogo: as capturas mais recentes de qualquer jogo — feitas no ModLaunch (Ctrl+F12), na Steam ou na pasta Screenshots do jogo; clique para abrir."
+    "new.v30.shotStrip": "Capturas na página do jogo: as capturas mais recentes de qualquer jogo — feitas no ModLaunch (Ctrl+F12), na Steam ou na pasta Screenshots do jogo; clique para abrir.",
+    "v30.news.title": "Notícias",
+    "v30.news.all": "Todas as notícias",
+    "v30.news.loading": "Carregando notícias…"
   },
   "zh-CN": {
     "v30.upd.gameRunning": "请先关闭游戏：更新会重启 ModLaunch，最好不要中途打断游戏。更新会一直等着你。",
@@ -2053,6 +2074,9 @@
     "v30.shots.title": "截图",
     "v30.shots.all": "全部截图",
     "v30.shots.hint": "游戏中按 {key} 截图。Steam 截图和游戏目录下的 Screenshots 文件夹也会显示在这里。",
-    "new.v30.shotStrip": "游戏页面上的截图：任意游戏的最新截图——来自 ModLaunch（Ctrl+F12）、Steam 或游戏的 Screenshots 文件夹；点击即可打开。"
+    "new.v30.shotStrip": "游戏页面上的截图：任意游戏的最新截图——来自 ModLaunch（Ctrl+F12）、Steam 或游戏的 Screenshots 文件夹；点击即可打开。",
+    "v30.news.title": "新闻",
+    "v30.news.all": "全部新闻",
+    "v30.news.loading": "正在加载新闻…"
   }
 }
