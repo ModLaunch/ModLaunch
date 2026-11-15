@@ -34,7 +34,8 @@ public static partial class Updater
 
     public static bool Configured => Manifest is not null || (Repo.Owner != "" && Repo.Repo != "");
     public static string RepoName => $"{Repo.Owner}/{Repo.Repo}";
-    public static bool Available => Latest is not null && Features.Versions.Compare(Latest.Version, Http.Version) > 0;
+    // 31.0: версию, которую откатили после неудачных запусков, снова не предлагаем.
+    public static bool Available => Latest is not null && Features.Versions.Compare(Latest.Version, Http.Version) > 0 && Latest.Version != UpdateGuard.BadVersion;
     public static bool CanInstall => Available && Installer.IsInstalledCopy && Latest?.SetupUrl is not null && OperatingSystem.IsWindows();
     public static bool AutoDownload => Settings.Data.Bool("autoDownloadUpdates", true);
 

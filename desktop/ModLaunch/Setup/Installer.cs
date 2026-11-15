@@ -245,6 +245,9 @@ public static class Installer
             return new Swap(Undo, async () =>
             {
                 if (!hadOld) return;
+                // 31.0: прежний exe — рядом как ModLaunch.exe.prev: если новая версия не запустится, UpdateGuard вернёт его.
+                try { UpdateGuard.KeepPrevious(dir, old, (oldMarker is null ? null : JsonNode.Parse(oldMarker) as JsonObject).Str("version")); }
+                catch (Exception e) { Log("prev not kept: " + e.Message); }
                 try { await Retry(() => File.Delete(old)); } catch { Log("old exe left at " + old); }
             });
         }
@@ -255,7 +258,7 @@ public static class Installer
     static void ClearLeftovers(string dir)
     {
         foreach (var file in Directory.EnumerateFiles(dir))
-            if (System.Text.RegularExpressions.Regex.IsMatch(Path.GetFileName(file), @"^ModLaunch\.exe\.\d+\.(new|old)$", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+            if (System.Text.RegularExpressions.Regex.IsMatch(Path.GetFileName(file), @"^ModLaunch\.exe\.(\d+\.(new|old)|[\d.]+\.bad)$", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
                 try { File.Delete(file); } catch { }
     }
 
@@ -501,8 +504,12 @@ static class InstallerChecks
             if (!File.ReadAllBytes(second.Exe).AsSpan().SequenceEqual(new byte[] { 4, 5, 6, 7 })) throw new Exception("exe not replaced");
             if (!File.Exists(bak) || !File.Exists(own)) throw new Exception("files next to the exe were lost");
             var left = Directory.EnumerateFileSystemEntries(root).Select(Path.GetFileName).Where(n => n is not ("ModLaunch" or "v1.exe" or "v2.exe"))
-                .Concat(Directory.EnumerateFiles(dir).Select(Path.GetFileName).Where(n => n!.StartsWith(Installer.ExeName + ".", StringComparison.OrdinalIgnoreCase))).ToList();
+                .Concat(Directory.EnumerateFiles(dir).Select(Path.GetFileName).Where(n => n!.StartsWith(Installer.ExeName + ".", StringComparison.OrdinalIgnoreCase) && n != UpdateGuard.PrevName)).ToList();
             if (left.Count > 0) throw new Exception("leftovers: " + string.Join(", ", left));
+            // 31.0: прежняя версия — рядом для отката, новая — «на испытании».
+            if (!File.ReadAllBytes(Path.Combine(dir, UpdateGuard.PrevName)).AsSpan().SequenceEqual(new byte[] { 1, 2, 3 }))
+                throw new Exception("previous exe not kept");
+            if (JsonNode.Parse(File.ReadAllText(Path.Combine(dir, Installer.Marker))) is not JsonObject m || !m.Bool("trial")) throw new Exception("update not on trial");
             if (Installer.Inspect(dir) is not (Installer.TargetKind.Ours, var version) || version != Http.Version) throw new Exception("marker not updated");
             return "exe replaced in place while the folder is held open; backups and other files next to it kept, no leftovers";
         }

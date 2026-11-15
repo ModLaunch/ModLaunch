@@ -67,6 +67,8 @@ public static class Program
 
         // Один экземпляр: второй запуск (в том числе по ссылке nxm://) передаёт ссылку первому.
         if (!Features.Nxm.Claim(args)) return 0;
+        // 31.0: новая версия трижды не дожила до «здоровой» минуты — возвращаем прежнюю и выходим.
+        if (ModLaunch.Setup.UpdateGuard.OnStart()) return 0;
         // 11.0: восстановление из бэкапа отложило JSON-файлы до перезапуска — подменяем до первого чтения настроек.
         Features.OneClickBackup.ApplyPending();
         Autostarted = args.Contains("--autostart");
@@ -77,6 +79,8 @@ public static class Program
         // 9.5: настройки и списки модов пишутся на диск в фоне (при выходе — дописываются).
         Core.JsonFile.DeferWrites = true;
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+        // Окно закрыли обычным путём — версия рабочая (быстро открыл и закрыл — не сбой обновления).
+        ModLaunch.Setup.UpdateGuard.MarkHealthy();
         Core.JsonFile.FlushAll();
         // Окно закрыто — выходим сразу, не дожидаясь фоновых загрузок и проверок.
         Environment.Exit(0);
