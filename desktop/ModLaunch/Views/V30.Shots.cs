@@ -134,4 +134,16 @@ public static class V30Shots
         s.Pump(2000);
         s.Save("v30-12-shelves");
     }
+
+    /// <summary>MODLAUNCH_SHOTS=V30Disk: «Место на дисках» для игр из всех лаунчеров.</summary>
+    [DemoShots]
+    static void V30Disk(Shots s)
+    {
+        s.Pump(4500);
+        Games.AllGames.Refresh();
+        s.Pump(1500);
+        s.Window.Navigate(() => new StoragePage());
+        s.Pump(2000);
+        s.Save("v30-13-disk");
+    }
 }

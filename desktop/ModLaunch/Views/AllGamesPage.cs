@@ -146,6 +146,10 @@ public sealed class AllGamesPage : Page
         var forYou = Ui.Button("", () => MainWindow.Current?.Navigate(() => new RecommendPage()), "icon ghost", Icons.Sparkles, I18n.T("v29.rec.title"));
         DockPanel.SetDock(forYou, Dock.Right);
         titleRow.Children.Add(forYou);
+        // 30.2: «Место на дисках» — для игр из всех лаунчеров.
+        var disk = Ui.Button("", () => MainWindow.Current?.Navigate(() => new StoragePage()), "icon ghost", Icons.Folder, I18n.T("v30.disk.title"));
+        DockPanel.SetDock(disk, Dock.Right);
+        titleRow.Children.Add(disk);
         titleRow.Children.Add(Ui.Row(10, Ui.Icon(Icons.Grid, 16, Ui.Res("Muted")), Ui.Text(I18n.T("v27.lib.title"), "h3")));
         var stores = games.Select(g => g.Store).Distinct().Count();
         var head = Ui.Col(10,
@@ -267,7 +271,7 @@ public sealed class AllGamesPage : Page
             DockPanel.SetDock(dot, Dock.Right);
             row.Children.Add(dot);
         }
-        if (_store is not ("steam" or "epic" or "gog" or "xbox" or "ea" or "ubisoft" or "battlenet" or "custom"))
+        if (_store is not ("steam" or "epic" or "gog" or "xbox" or "ea" or "ubisoft" or "battlenet" or "other"))
         {
             DockPanel.SetDock(store, Dock.Right);
             row.Children.Add(store);
@@ -494,7 +498,7 @@ public sealed class AllGamesPage : Page
         return days <= 0 ? I18n.T("v14.steam.today") : days == 1 ? I18n.T("v14.steam.yesterday") : at.ToString(at.Year == DateTime.Today.Year ? "d MMMM" : "d MMMM yyyy", I18n.Culture);
     }
 
-    static string SizeText(long bytes) => bytes >= 1L << 30
+    internal static string SizeText(long bytes) => bytes >= 1L << 30
         ? I18n.T("v12w.size.gb", ("n", (bytes / (double)(1L << 30)).ToString("0.#", I18n.Culture)))
         : GamePage.Size(bytes);
 }
