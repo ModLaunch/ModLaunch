@@ -225,6 +225,10 @@ public static class Integration
     {
         var (_, seller, buyer, lot) = await Shop(10_000);
 
+        // Витрина: покупатель видит лот в общем списке, скрытые чужие — нет.
+        var shelf = await Step("storefront", () => Market.All(force: true));
+        Expect(shelf.Any(l => l.Id == lot.Id), "listing missing on the storefront");
+
         // Без денег купить нельзя.
         try { await Market.Buy(lot); throw new Exception("bought with empty wallet"); }
         catch (ServiceError e) when (e.Code == "NO_MONEY") { }
@@ -310,6 +314,36 @@ public static class Integration
         var wallet = await Market.MyWallet();
         Expect(wallet.Balance == 0, "balance changed: " + wallet);
         return string.Join(", ", checks);
+    }
+
+    [IntegrationTest]
+    static async Task<string> SupportAuthorFlow()
+    {
+        var (_, seller, _, _) = await Shop(10_000);
+        await Step("top-up", () => Market.RequestTopUp(20_000, "ML-TEST-0004"));
+        await SignInAs("admin@example.test");
+        await Step("approve", async () => await Market.ResolveTopUp((await Market.PendingTopUps()).Single(), ok: true));
+
+        // Игрок поддерживает автора 50 ₽ и ModLaunch 30 ₽.
+        await SignInAs("buyer@example.test");
+        try { await Tips.Give(seller, "Автор", Tips.Min - 1, ""); throw new Exception("tip below minimum accepted"); }
+        catch (ServiceError e) when (e.Code == "INVALID") { }
+        await Step("tip author", () => Tips.Give(seller, "Автор", 5_000, "Спасибо за мод!"));
+        await Step("tip platform", () => Tips.Give(Tips.Platform, "ModLaunch", 3_000, ""));
+        var w = await Market.MyWallet();
+        Expect(w.Balance == 12_000 && w.Spent == 8_000, "giver wallet: " + w);
+
+        // Автор забирает поддержку за вычетом комиссии 10 %, один раз.
+        await SignInAs("seller@example.test");
+        var got = await Step("claim tips", () => Tips.Claim());
+        Expect(got.Amount == 4_500 && (await Market.MyWallet()).Balance == 4_500, $"author got {got}");
+        Expect((await Tips.Claim()).Count == 0, "tips claimed twice");
+
+        // Админ забирает долю площадки: 5 ₽ комиссии с автора + 30 ₽ поддержки ModLaunch.
+        await SignInAs("admin@example.test");
+        var fees = await Step("platform fees", async () => await Tips.TakeFees(await Tips.PendingFees()));
+        Expect(fees.Amount == 3_500, $"platform fees {fees}");
+        return "tip 50 ₽ + 30 ₽ to ModLaunch → author gets 45 ₽ once, platform 35 ₽; below-minimum refused";
     }
 
     [IntegrationTest]

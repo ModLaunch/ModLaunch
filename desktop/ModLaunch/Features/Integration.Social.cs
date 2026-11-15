@@ -1,0 +1,169 @@
+using ModLaunch.Core;
+using ModLaunch.Creator;
+using ModLaunch.Features;
+using ModLaunch.Games;
+using ModLaunch.Social;
+
+namespace ModLaunch;
+
+/// <summary>31.0: интеграционные проверки остальных функций с сервером — так, как их проходят люди.</summary>
+public static partial class IntegrationSocial
+{
+    static void Expect(bool ok, string what) { if (!ok) throw new Exception(what); }
+
+    static async Task<T> Step<T>(string name, Func<Task<T>> body)
+    {
+        try { return await body(); }
+        catch (Exception e) when (!e.Message.StartsWith("step ")) { throw new Exception($"step {name}: {(e is ServiceError s ? s.Code + " " : "")}{e.Message}"); }
+    }
+
+    static Task Step(string name, Func<Task> body) => Step(name, async () => { await body(); return 0; });
+
+    static async Task As(string email)
+    {
+        if (Account.SignedIn) Account.SignOut();
+        await Account.SignIn(email, "correct-horse-1");
+    }
+
+    [IntegrationTest]
+    static async Task<string> FriendsAndChat()
+    {
+        var anna = await Integration.NewUser("Анна", "anna@example.test");
+        var code = await Step("my code", () => Friends.MyCode());
+        var boris = await Integration.NewUser("Борис", "boris@example.test");
+        var (status, name) = await Step("add by code", () => Friends.Add(code));
+        Expect(status == "sent" && name == "Анна", $"add: {status} {name}");
+
+        await As("anna@example.test");
+        var view = await Step("refresh", () => Friends.Refresh(force: true));
+        Expect(view.Incoming.Any(r => r.Uid == boris), "request not visible to the receiver");
+        await Step("accept", () => Friends.Accept(boris));
+        view = await Friends.Refresh(force: true);
+        Expect(view.Friends.Any(f => f.Uid == boris), "friend not listed after accept");
+
+        await Step("send", () => Friends.Chat.Send(boris, "Привет! Сыграем в Valheim?"));
+        await Step("invite", () => Friends.Chat.Invite(boris, "steam:892970", "Valheim"));
+
+        await As("boris@example.test");
+        var fresh = await Step("poll", () => Friends.Chat.Poll());
+        var messages = Friends.Chat.Messages(anna);
+        Expect(fresh >= 2 && messages.Count >= 2, $"chat: {fresh} new, {messages.Count} stored");
+        await Step("remove friend", () => Friends.Remove(anna));
+        view = await Friends.Refresh(force: true);
+        Expect(view.Friends.All(f => f.Uid != anna), "friend still listed after removal");
+        return "code → request → accept → chat + game invite delivered → remove";
+    }
+
+    [IntegrationTest]
+    static async Task<string> RefundFlow()
+    {
+        await Integration.Emu.Seed("config/market", new() { ["fee"] = 10L });
+        await Integration.NewUser("Админ", "admin@example.test");
+        await Integration.Emu.Seed("admins/admin@example.test", new() { ["note"] = "integration" });
+        await Integration.NewUser("Автор", "seller@example.test");
+        var file = Path.Combine(Paths.DataDir, "refund-lot.zip");
+        File.WriteAllBytes(file, [0x50, 0x4B, 0x05, 0x06, .. new byte[18]]);
+        var id = await Step("listing", () => Market.Save(new ListingDraft { Title = "Скрипт погоды", Kind = "script", Price = 15_000, File = file }, null));
+        var buyer = await Integration.NewUser("Покупатель", "buyer@example.test");
+        await Market.RequestTopUp(15_000, "ML-TEST-0005");
+        await As("admin@example.test");
+        await Market.ResolveTopUp((await Market.PendingTopUps()).Single(), ok: true);
+        await As("buyer@example.test");
+        var lot = (await Market.Get(id))!;
+        await Step("buy", () => Market.Buy(lot));
+        var purchase = (await Market.Purchases()).Single(p => p.ListingId == id);
+        try { await Market.RequestRefund(purchase, "нет"); throw new Exception("short reason accepted"); }
+        catch (ServiceError e) when (e.Code == "REFUND_REASON") { }
+        await Step("request refund", () => Market.RequestRefund(purchase, "Скрипт не запускается на моей версии игры, проверил дважды."));
+
+        await As("admin@example.test");
+        var pending = await Step("pending refunds", () => Market.PendingRefunds());
+        Expect(pending.Count == 1 && pending[0].Price == 15_000, "refund not visible to admin");
+        await Step("approve refund", () => Market.ResolveRefund(pending[0], ok: true, "ok"));
+
+        await As("buyer@example.test");
+        var w = await Market.MyWallet();
+        Expect(w.Balance == 15_000, "money not returned: " + w);
+        Market.Owned.Clear();
+        try { await Market.Download(lot); throw new Exception("refunded file still downloads"); }
+        catch (ServiceError) { }
+        await As("seller@example.test");
+        Expect((await Market.ClaimSales()).Amount == 0, "seller claimed a refunded sale");
+        return "buy 150 ₽ → short reason refused → refund request → admin approves → money back, file closed, seller gets nothing";
+    }
+
+    [IntegrationTest]
+    static async Task<string> PremiumPurchase()
+    {
+        await Integration.Emu.Seed("config/market", new() { ["fee"] = 10L });
+        await Integration.NewUser("Админ", "admin@example.test");
+        await Integration.Emu.Seed("admins/admin@example.test", new() { ["note"] = "integration" });
+        await Account.RefreshProfile();
+        var file = Path.Combine(Paths.DataDir, "premium.zip");
+        File.WriteAllBytes(file, [0x50, 0x4B, 0x05, 0x06, .. new byte[18]]);
+        var id = await Step("premium listing", () => Market.Save(new ListingDraft { Title = "ModLaunch Premium", Kind = "pack", Price = 29_900, File = file }, null));
+        await Step("set offer", () => Premium.SetOffer(id));
+
+        await Integration.NewUser("Игрок", "player@example.test");
+        await Market.RequestTopUp(30_000, "ML-TEST-0006");
+        await As("admin@example.test");
+        await Market.ResolveTopUp((await Market.PendingTopUps()).Single(), ok: true);
+        await As("player@example.test");
+        Expect(!Premium.Active, "premium active before purchase");
+        var price = await Step("price", () => Premium.CurrentPrice());
+        Expect(price == 29_900, "price " + price);
+        try { await Premium.Buy(price - 100); throw new Exception("bought at a stale price"); }
+        catch (ServiceError e) when (e.Code == "PRICE_CHANGED") { }
+        await Step("buy premium", () => Premium.Buy(price));
+        Expect(Premium.Active, "premium not active after purchase");
+        Expect((await Market.MyWallet()).Balance == 100, "wallet after premium");
+        return "owner sets Premium lot → player tops up → stale price refused → buys 299 ₽ → Premium active";
+    }
+
+    [IntegrationTest]
+    static async Task<string> CuratorsFlow()
+    {
+        await Integration.NewUser("Куратор", "curator@example.test");
+        var me = await Step("save profile", () => Curators.SaveProfile("Куратор", "Пишу про выживание", null));
+        var game = new LibGame("steam:264710", "steam", "Subnautica", null, 264710, true, 0);
+        await Step("save pick", () => Curators.SavePick(game, "yes", "Лучшее подводное выживание.", isNew: true));
+
+        await Integration.NewUser("Читатель", "reader@example.test");
+        var curator = await Step("get", () => Curators.Get(me.Uid)) ?? throw new Exception("curator not found");
+        await Step("follow", () => Curators.Follow(curator));
+        Expect((await Curators.Get(me.Uid))!.Followers == 1, "followers after follow");
+        var picks = await Step("for game", () => Curators.ForGame(GameReviews.Key(game)));
+        Expect(picks.Any(p => p.Pick.Verdict == "yes"), "pick not shown on the game page");
+        await Step("unfollow", () => Curators.Unfollow(me.Uid));
+        Expect((await Curators.Get(me.Uid))!.Followers == 0, "followers after unfollow");
+        return "profile + pick → follow (+1) → pick on game page → unfollow (−1)";
+    }
+
+    [IntegrationTest]
+    static async Task<string> ShareCodeRoundTrip()
+    {
+        await Integration.NewUser("Сборщик", "packer@example.test");
+        var pack = new SharePack("lethal-company", "Lethal Company", "Моя сборка",
+            [new ShareMod("notnotnotswipez-MoreCompany", "MoreCompany", "1.9.1", "thunderstore", true)]);
+        var code = await Step("upload", () => ShareCode.Upload(pack));
+        Expect(code.Length == 8 && !code.StartsWith("ML1-"), "short server code expected, got " + code);
+        Account.SignOut();
+        var back = await Step("fetch", () => ShareCode.Fetch(code));
+        Expect(back.Name == "Моя сборка" && back.Mods.Single().Version == "1.9.1", "pack changed on the way");
+        return $"short code {code} uploaded and read back without an account";
+    }
+
+    [IntegrationTest]
+    static async Task<string> GameReviewRoundTrip()
+    {
+        await Integration.NewUser("Рецензент", "reviewer@example.test");
+        var game = new LibGame("steam:264710", "steam", "Subnautica", null, 264710, true, 0);
+        await Step("submit", () => Reviews.Submit(GameReviews.Key(game), GameReviews.Mod, game.Name, 5, "Шедевр.", "Рецензент", played: true));
+        await Step("sync", () => Reviews.Sync(force: true));
+        Expect(GameReviews.For(game).Any(r => r.Stars == 5), "review not visible after sync");
+        await Step("remove", () => GameReviews.Remove(game));
+        await Reviews.Sync(force: true);
+        Expect(GameReviews.Mine(game) is null, "review still there after remove");
+        return "5★ review saved, visible after sync, removed";
+    }
+}
