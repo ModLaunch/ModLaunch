@@ -118,7 +118,8 @@ public static partial class Actions
             List<ModUpdate> found;
             try
             {
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+                // 31.0: не дольше 10 секунд — сеть «есть, но не отвечает» не держит запуск игры.
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
                 found = await ModUpdates.Check(g, cts.Token);
             }
             catch { found = []; }

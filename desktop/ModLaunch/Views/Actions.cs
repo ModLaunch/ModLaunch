@@ -340,7 +340,8 @@ public static partial class Actions
         // Моды игры сейчас обновляются (например, сами после запуска программы) — игра заняла бы файлы посреди замены.
         if (UpdatingGame(g)) { W.Toast(I18n.T("upd.wait"), bad: true); return; }
         // «Обновлять перед игрой» (Настройки → Обновления): сначала свежие версии модов.
-        if (!vanilla && !skipUpdate && ModUpdates.BeforePlay && !Program.Demo && g.Registry is not null) { _ = UpdateThenPlay(g, animate); return; }
+        // 31.0: без интернета игра запускается сразу — проверку обновлений не ждём.
+        if (!vanilla && !skipUpdate && ModUpdates.BeforePlay && !Program.Demo && !Offline.On && g.Registry is not null) { _ = UpdateThenPlay(g, animate); return; }
         var visible = W.IsVisible && W.WindowState != WindowState.Minimized;
         // 10.0: автопилот перед запуском — включить нужное, выключить дубли (молча, со снимком).
         if (!vanilla && Autopilot.BeforePlay) try { if (Autopilot.QuickFix(g) is > 0 and var n) W.Toast(I18n.T("v10.ap.quick", ("n", n))); } catch { }
