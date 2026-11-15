@@ -267,7 +267,10 @@
     "v30.home.continue": "Продолжить",
     "v30.home.idle": "Давно не запускали",
     "v30.home.empty": "Полок пока нет: поиграйте во что-нибудь, отметьте избранное или создайте коллекцию.",
-    "new.v30.home": "Обзор библиотеки: щелчок по «Все игры» — полки обложек из всех лаунчеров: продолжить, избранное, играю, коллекции, в планах и давно не запускали."
+    "new.v30.home": "Обзор библиотеки: щелчок по «Все игры» — полки обложек из всех лаунчеров: продолжить, избранное, играю, коллекции, в планах и давно не запускали.",
+    "v30.invite.button": "Позвать в игру ({n})",
+    "v30.invite.title": "Сыграть вместе",
+    "v30.invite.lead": "Друзей в сети: {n}. Позовите кого-нибудь — приглашение придёт в чат."
   },
   "en": {
     "v30.upd.gameRunning": "Close the game first: updating restarts ModLaunch, and it's better not to interrupt your session. The update will wait.",
@@ -537,7 +540,10 @@
     "v30.home.continue": "Continue",
     "v30.home.idle": "Not played in a while",
     "v30.home.empty": "No shelves yet: play something, mark favorites or create a collection.",
-    "new.v30.home": "Library overview: click “All games” for cover shelves from every launcher — continue, favorites, playing, collections, backlog and not played in a while."
+    "new.v30.home": "Library overview: click “All games” for cover shelves from every launcher — continue, favorites, playing, collections, backlog and not played in a while.",
+    "v30.invite.button": "Invite to play ({n})",
+    "v30.invite.title": "Play together",
+    "v30.invite.lead": "Friends online: {n}. Invite someone — the invite arrives in chat."
   },
   "uk": {
     "v30.upd.gameRunning": "Спершу закрийте гру: оновлення перезапускає ModLaunch, а гру краще не переривати посеред сесії. Оновлення нікуди не дінеться.",
@@ -807,7 +813,10 @@
     "v30.home.continue": "Продовжити",
     "v30.home.idle": "Давно не запускали",
     "v30.home.empty": "Полиць поки немає: пограйте в щось, позначте обране або створіть колекцію.",
-    "new.v30.home": "Огляд бібліотеки: клік по «Усі ігри» — полиці обкладинок з усіх лаунчерів: продовжити, обране, граю, колекції, у планах і давно не запускали."
+    "new.v30.home": "Огляд бібліотеки: клік по «Усі ігри» — полиці обкладинок з усіх лаунчерів: продовжити, обране, граю, колекції, у планах і давно не запускали.",
+    "v30.invite.button": "Покликати в гру ({n})",
+    "v30.invite.title": "Зіграти разом",
+    "v30.invite.lead": "Друзів у мережі: {n}. Покличте когось — запрошення прийде в чат."
   },
   "es": {
     "v30.upd.gameRunning": "Cierra primero el juego: la actualización reinicia ModLaunch y es mejor no interrumpir la partida. La actualización esperará.",
@@ -1077,7 +1086,10 @@
     "v30.home.continue": "Continuar",
     "v30.home.idle": "Sin jugar hace tiempo",
     "v30.home.empty": "Aún no hay estanterías: juega algo, marca favoritos o crea una colección.",
-    "new.v30.home": "Vista de la biblioteca: clic en «Todos los juegos» para ver estanterías de portadas de todos los launchers: continuar, favoritos, jugando, colecciones, pendientes y sin jugar hace tiempo."
+    "new.v30.home": "Vista de la biblioteca: clic en «Todos los juegos» para ver estanterías de portadas de todos los launchers: continuar, favoritos, jugando, colecciones, pendientes y sin jugar hace tiempo.",
+    "v30.invite.button": "Invitar a jugar ({n})",
+    "v30.invite.title": "Jugar juntos",
+    "v30.invite.lead": "Amigos conectados: {n}. Invita a alguien: la invitación llega por chat."
   },
   "de": {
     "v30.upd.gameRunning": "Schließ zuerst das Spiel: Das Update startet ModLaunch neu, und die Sitzung sollte nicht unterbrochen werden. Das Update wartet.",
@@ -1347,7 +1359,10 @@
     "v30.home.continue": "Weiterspielen",
     "v30.home.idle": "Lange nicht gespielt",
     "v30.home.empty": "Noch keine Regale: spiel etwas, markiere Favoriten oder erstelle eine Sammlung.",
-    "new.v30.home": "Bibliotheksübersicht: Klick auf „Alle Spiele“ zeigt Cover-Regale aus allen Launchern – Weiterspielen, Favoriten, Spiele gerade, Sammlungen, Geplant und lange nicht gespielt."
+    "new.v30.home": "Bibliotheksübersicht: Klick auf „Alle Spiele“ zeigt Cover-Regale aus allen Launchern – Weiterspielen, Favoriten, Spiele gerade, Sammlungen, Geplant und lange nicht gespielt.",
+    "v30.invite.button": "Zum Spielen einladen ({n})",
+    "v30.invite.title": "Zusammen spielen",
+    "v30.invite.lead": "Freunde online: {n}. Lade jemanden ein – die Einladung kommt im Chat an."
   },
   "fr": {
     "v30.upd.gameRunning": "Fermez d'abord le jeu : la mise à jour redémarre ModLaunch et mieux vaut ne pas interrompre la partie. La mise à jour attendra.",
@@ -1617,7 +1632,10 @@
     "v30.home.continue": "Reprendre",
     "v30.home.idle": "Pas lancés depuis longtemps",
     "v30.home.empty": "Pas encore d'étagères : jouez à quelque chose, ajoutez des favoris ou créez une collection.",
-    "new.v30.home": "Vue d'ensemble : cliquez sur « Tous les jeux » pour des étagères de jaquettes de tous les launchers — reprendre, favoris, en cours, collections, à faire et pas lancés depuis longtemps."
+    "new.v30.home": "Vue d'ensemble : cliquez sur « Tous les jeux » pour des étagères de jaquettes de tous les launchers — reprendre, favoris, en cours, collections, à faire et pas lancés depuis longtemps.",
+    "v30.invite.button": "Inviter à jouer ({n})",
+    "v30.invite.title": "Jouer ensemble",
+    "v30.invite.lead": "Amis en ligne : {n}. Invitez quelqu'un — l'invitation arrive dans le chat."
   },
   "pt-BR": {
     "v30.upd.gameRunning": "Feche o jogo primeiro: a atualização reinicia o ModLaunch, e é melhor não interromper a sessão. A atualização vai esperar.",
@@ -1887,7 +1905,10 @@
     "v30.home.continue": "Continuar",
     "v30.home.idle": "Sem jogar há tempos",
     "v30.home.empty": "Ainda não há prateleiras: jogue algo, marque favoritos ou crie uma coleção.",
-    "new.v30.home": "Visão geral da biblioteca: clique em “Todos os jogos” para prateleiras de capas de todos os launchers — continuar, favoritos, jogando, coleções, na fila e sem jogar há tempos."
+    "new.v30.home": "Visão geral da biblioteca: clique em “Todos os jogos” para prateleiras de capas de todos os launchers — continuar, favoritos, jogando, coleções, na fila e sem jogar há tempos.",
+    "v30.invite.button": "Chamar para jogar ({n})",
+    "v30.invite.title": "Jogar junto",
+    "v30.invite.lead": "Amigos online: {n}. Chame alguém — o convite chega pelo chat."
   },
   "zh-CN": {
     "v30.upd.gameRunning": "请先关闭游戏：更新会重启 ModLaunch，最好不要中途打断游戏。更新会一直等着你。",
@@ -2157,6 +2178,9 @@
     "v30.home.continue": "继续玩",
     "v30.home.idle": "很久没玩",
     "v30.home.empty": "还没有书架：先玩点什么、加入收藏或创建一个收藏夹吧。",
-    "new.v30.home": "游戏库概览：点击“所有游戏”即可看到所有启动器的封面书架——继续玩、收藏、正在玩、收藏夹、计划玩和很久没玩。"
+    "new.v30.home": "游戏库概览：点击“所有游戏”即可看到所有启动器的封面书架——继续玩、收藏、正在玩、收藏夹、计划玩和很久没玩。",
+    "v30.invite.button": "邀请一起玩（{n}）",
+    "v30.invite.title": "一起玩",
+    "v30.invite.lead": "在线好友：{n} 位。邀请谁一起玩吧——邀请会发到聊天中。"
   }
 }

@@ -781,9 +781,21 @@ public sealed class AllGamesPage : Page
     static Control? FriendsInGame(LibGame g)
     {
         if (!Social.Account.SignedIn && Social.Friends.DemoView is null) return null;
-        var now = PlayingNow(g, Social.Friends.View().Friends);
-        if (now.Count == 0) return null;
-        var col = Ui.Col(10, Ui.Row(8, Ui.Icon(Icons.Users, 16, Ui.Res("Brand2")), Ui.Text(I18n.T("v30.friends.inGame", ("n", now.Count)), "h3")));
+        var friends = Social.Friends.View().Friends;
+        var now = PlayingNow(g, friends);
+        // 30.11: и позвать в эту игру тех, кто сейчас в сети (но не в ней).
+        var canInvite = friends.Where(f => f.State != "offline" && !now.Contains(f)).ToList();
+        if (now.Count == 0 && canInvite.Count == 0) return null;
+        var invite = Ui.Button(I18n.T("v30.invite.button", ("n", canInvite.Count)), () => { }, "", Icons.Plus);
+        invite.IsEnabled = canInvite.Count > 0;
+        invite.Click += (_, _) => Ctx.Menu(canInvite.Select(f => (object?)Ctx.Item(f.Name, Icons.User, () => _ = Invite(f, g))).ToArray()).ShowAt(invite);
+        invite.VerticalAlignment = VerticalAlignment.Center;
+        var head = new DockPanel();
+        DockPanel.SetDock(invite, Dock.Right);
+        head.Children.Add(invite);
+        head.Children.Add(Ui.Row(8, Ui.Icon(Icons.Users, 16, Ui.Res("Brand2")),
+            Ui.Text(now.Count > 0 ? I18n.T("v30.friends.inGame", ("n", now.Count)) : I18n.T("v30.invite.title"), "h3")));
+        var col = Ui.Col(10, head);
         foreach (var f in now)
         {
             var friend = f;
@@ -796,7 +808,22 @@ public sealed class AllGamesPage : Page
             line.Children.Add(Ui.Row(8, Ui.Dot(Ui.Res("Brand2")), Ui.Text(f.Name, "h3"), Ui.Text(I18n.T("v30.friends.playing") + since, "small muted")));
             col.Children.Add(line);
         }
+        if (now.Count == 0) col.Children.Add(Ui.Text(I18n.T("v30.invite.lead", ("n", canInvite.Count)), "small muted", wrap: true));
         return Ui.Card(col, 18);
+    }
+
+    /// <summary>Приглашение в игру — то же, что «Позвать» в чате: друг увидит его в чате и уведомлениях.</summary>
+    static async Task Invite(Social.Friend f, LibGame g)
+    {
+        try
+        {
+            await Social.Friends.Chat.Invite(f.Uid, Social.GameReviews.Key(g), g.Name);
+            MainWindow.Current?.Toast(I18n.T("v28.chat.invite.sent", ("name", f.Name), ("game", g.Name)));
+        }
+        catch (Exception e)
+        {
+            MainWindow.Current?.Toast(Social.Friends.Chat.Error == "DENIED" ? I18n.T("v28.chat.unavailable") : Social.Friends.Explain(e), bad: true);
+        }
     }
 
     /// <summary>30.3: заметки к игре — пароли от серверов не надо, а вот «где остановился» и коды — да. Видны и в оверлее.</summary>
