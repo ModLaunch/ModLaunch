@@ -41,7 +41,7 @@ public static class Tips
         if (to == uid) throw new ServiceError("OWN");
         await Market.LoadFee(force: true);
         var fee = FeeFor(to, amount);
-        var tid = NewId(uid, DateTime.UtcNow);
+        var tid = NewId(uid, Market.UniqueUtc());
         var text = Hub.Clip(message.Trim(), 300);
         await Ledger.Apply(uid, "tip", -amount, token, uid, tid, to, text == "" ? Hub.Clip(toName, 300) : text, _ =>
         [

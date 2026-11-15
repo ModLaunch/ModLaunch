@@ -533,7 +533,10 @@ service cloud.firestore {
     }
 
     match /market/{id} {
-      allow get, list: if resource.data.status == 'active'
+      // 31.0: чтение несуществующего лота — «не найдено», а не «нет доступа» (проверка имени перед созданием).
+      allow get: if resource == null || resource.data.status == 'active'
+        || (request.auth != null && resource.data.uid == request.auth.uid) || mAdmin();
+      allow list: if resource.data.status == 'active'
         || (request.auth != null && resource.data.uid == request.auth.uid) || mAdmin();
       allow create: if mMember()
         && id.matches('^' + request.auth.uid.lower() + '_[a-z0-9_]{1,60}$')

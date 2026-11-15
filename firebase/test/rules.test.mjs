@@ -1,6 +1,7 @@
 // Проверка правил Firestore на эмуляторе: firebase emulators:exec --only firestore "npm test"
 // (из папки firebase/, см. .github/workflows/rules.yml). Деньги — в копейках.
 import { test, before, after, beforeEach } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
 import { collectionGroup, doc, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp, increment, collection, getDocs, query, where, arrayUnion, arrayRemove, deleteField } from 'firebase/firestore';
@@ -382,6 +383,23 @@ test('лоты: продавец создаёт свой; чужое и «про
   await assertSucceeds(setDoc(doc(db(SELLER), 'market', `${SELLER.uid}_new`), l));
   await assertFails(setDoc(doc(db(OTHER), 'market', `${SELLER.uid}_new2`), l));
   await assertFails(updateDoc(doc(db(OTHER), 'market', LOT), { sales: increment(1) }));
+});
+
+test('лоты (31.0): новый — скрытым, затем куски файла, затем показать; несуществующий читается как «нет»', async () => {
+  // Проверка имени перед созданием: чтение несуществующего лота — не отказ, а «не найдено».
+  const missing = await assertSucceeds(getDoc(doc(db(SELLER), 'market', `${SELLER.uid}_fresh`)));
+  assert.equal(missing.exists(), false);
+  // Кусок файла до лота — нельзя (так раньше и ломалось создание лота с файлом).
+  await assertFails(setDoc(doc(db(SELLER), 'market', `${SELLER.uid}_fresh`, 'files', '0'), { uid: SELLER.uid, data: 'AAAA' }));
+  const l = { ...listing(1000), status: 'hidden', created: serverTimestamp(), updated: serverTimestamp() };
+  await assertSucceeds(setDoc(doc(db(SELLER), 'market', `${SELLER.uid}_fresh`), l));
+  await assertSucceeds(setDoc(doc(db(SELLER), 'market', `${SELLER.uid}_fresh`, 'files', '0'), { uid: SELLER.uid, data: 'AAAA' }));
+  // Пока лот скрыт, покупатель его не видит; после публикации — видит.
+  await assertFails(getDoc(doc(db(BUYER), 'market', `${SELLER.uid}_fresh`)));
+  await assertSucceeds(updateDoc(doc(db(SELLER), 'market', `${SELLER.uid}_fresh`), { status: 'active', updated: serverTimestamp() }));
+  await assertSucceeds(getDoc(doc(db(BUYER), 'market', `${SELLER.uid}_fresh`)));
+  // Чужой не допишет кусок в лот продавца.
+  await assertFails(setDoc(doc(db(OTHER), 'market', `${SELLER.uid}_fresh`, 'files', '1'), { uid: OTHER.uid, data: 'BBBB' }));
 });
 
 // ---------------------------------------------------------------- 11.0: бэкап в облаке и доска серверов

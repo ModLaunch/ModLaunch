@@ -165,7 +165,7 @@ public static partial class Market
                 },
             };
         else q["orderBy"] = new JsonArray(new JsonObject { ["field"] = new JsonObject { ["fieldPath"] = order }, ["direction"] = "DESCENDING" });
-        var url = parent is null ? Firebase.Url(":runQuery") : $"https://firestore.googleapis.com/v1/{Firebase.Doc(parent)}:runQuery?key={Uri.EscapeDataString(Firebase.ApiKey)}";
+        var url = parent is null ? Firebase.Url(":runQuery") : Firebase.DocUrl(Firebase.Doc(parent), ":runQuery");
         var rows = await Hub.Call(url, HttpMethod.Post, new JsonObject { ["structuredQuery"] = q }, token);
         return (rows as JsonArray ?? []).Select(r => r?["document"] as JsonObject).OfType<JsonObject>().ToList();
     }
@@ -452,6 +452,8 @@ public static partial class Market
             }
             chunks = 0;
         }
+        string? text = null;
+        var old = chunks;
         if (d.File is not null)
         {
             var bytes = await File.ReadAllBytesAsync(d.File);
@@ -459,28 +461,8 @@ public static partial class Market
             size = bytes.LongLength;
             sha = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
             fileName = Hub.Clip(Path.GetFileName(d.File), 120);
-            var text = Convert.ToBase64String(bytes);
-            var old = chunks;
+            text = Convert.ToBase64String(bytes);
             chunks = (text.Length + ChunkChars - 1) / ChunkChars;
-            for (var n = 0; n < chunks; n++)
-            {
-                var part = text.Substring(n * ChunkChars, Math.Min(ChunkChars, text.Length - n * ChunkChars));
-                await Hub.Commit([new JsonObject
-                {
-                    ["update"] = new JsonObject
-                    {
-                        ["name"] = Firebase.Doc($"market/{id}/files/{n}"),
-                        ["fields"] = Firebase.ToFields(new Dictionary<string, object?> { ["uid"] = uid, ["data"] = part }),
-                    },
-                }], token);
-                progress?.Report((n + 1.0) / (chunks + 1));
-            }
-            if (old > chunks)
-            {
-                var extra = new JsonArray();
-                for (var n = chunks; n < old; n++) extra.Add(new JsonObject { ["delete"] = Firebase.Doc($"market/{id}/files/{n}") });
-                try { await Hub.Commit(extra, token); } catch { }
-            }
         }
 
         var fields = new Dictionary<string, object?>
@@ -504,21 +486,71 @@ public static partial class Market
             ["fileName"] = fileName,
             ["status"] = d.Hidden ? "hidden" : "active",
         };
-        var main = new JsonObject { ["update"] = new JsonObject { ["name"] = Firebase.Doc($"market/{id}"), ["fields"] = Firebase.ToFields(fields) } };
-        var times = new JsonArray(Hub.ServerTime("updated"));
-        if (existing is null)
+
+        JsonObject Main(bool create, string status)
         {
-            ((JsonObject)main["update"]!["fields"]!)["sales"] = Firebase.ToValue(0L);
-            times.Add(Hub.ServerTime("created"));
-            main["currentDocument"] = new JsonObject { ["exists"] = false };
+            var values = new Dictionary<string, object?>(fields) { ["status"] = status };
+            var main = new JsonObject { ["update"] = new JsonObject { ["name"] = Firebase.Doc($"market/{id}"), ["fields"] = Firebase.ToFields(values) } };
+            var times = new JsonArray(Hub.ServerTime("updated"));
+            if (create)
+            {
+                ((JsonObject)main["update"]!["fields"]!)["sales"] = Firebase.ToValue(0L);
+                times.Add(Hub.ServerTime("created"));
+                main["currentDocument"] = new JsonObject { ["exists"] = false };
+            }
+            else
+            {
+                main["updateMask"] = new JsonObject { ["fieldPaths"] = new JsonArray(values.Keys.Select(k => (JsonNode)k).ToArray()) };
+                main["currentDocument"] = new JsonObject { ["exists"] = true };
+            }
+            main["updateTransforms"] = times;
+            return main;
         }
-        else
+
+        // 31.0: новый лот сначала создаётся скрытым — правила базы пускают куски файла только к
+        // существующему лоту своего автора (раньше куски шли первыми и новый лот с файлом не создавался).
+        // Скрытым он остаётся, пока файл не загружен целиком: купить «пустой» товар нельзя.
+        var created = false;
+        if (existing is null && text is not null)
         {
-            main["updateMask"] = new JsonObject { ["fieldPaths"] = new JsonArray(fields.Keys.Select(k => (JsonNode)k).ToArray()) };
-            main["currentDocument"] = new JsonObject { ["exists"] = true };
+            await Hub.Commit([Main(create: true, status: "hidden")], token);
+            created = true;
         }
-        main["updateTransforms"] = times;
-        await Hub.Commit([main], token);
+        try
+        {
+            if (text is not null)
+            {
+                for (var n = 0; n < chunks; n++)
+                {
+                    var part = text.Substring(n * ChunkChars, Math.Min(ChunkChars, text.Length - n * ChunkChars));
+                    await Hub.Commit([new JsonObject
+                    {
+                        ["update"] = new JsonObject
+                        {
+                            ["name"] = Firebase.Doc($"market/{id}/files/{n}"),
+                            ["fields"] = Firebase.ToFields(new Dictionary<string, object?> { ["uid"] = uid, ["data"] = part }),
+                        },
+                    }], token);
+                    progress?.Report((n + 1.0) / (chunks + 1));
+                }
+                if (old > chunks)
+                {
+                    var extra = new JsonArray();
+                    for (var n = chunks; n < old; n++) extra.Add(new JsonObject { ["delete"] = Firebase.Doc($"market/{id}/files/{n}") });
+                    try { await Hub.Commit(extra, token); } catch { }
+                }
+            }
+            await Hub.Commit([Main(create: existing is null && !created, status: d.Hidden ? "hidden" : "active")], token);
+        }
+        catch when (created)
+        {
+            // Файл не догрузился — убираем недоделанный скрытый лот, чтобы повтор не упёрся в «уже есть».
+            var cleanup = new JsonArray();
+            for (var n = 0; n < chunks; n++) cleanup.Add(new JsonObject { ["delete"] = Firebase.Doc($"market/{id}/files/{n}") });
+            cleanup.Add(new JsonObject { ["delete"] = Firebase.Doc($"market/{id}") });
+            try { await Hub.Commit(cleanup, token); } catch { }
+            throw;
+        }
         progress?.Report(1);
         Invalidate();
         return id;
@@ -597,6 +629,27 @@ public static partial class Market
 
     // ---------------------------------------------------------------- пополнение и выплаты
 
+    static readonly object StampGate = new();
+    static DateTime _lastStamp;
+
+    /// <summary>
+    /// 31.0: время для номера заявки (…_yyyyMMddHHmmss) — строго растёт: две заявки в одну секунду
+    /// раньше получали один номер, и вторую база отклоняла.
+    /// </summary>
+    public static DateTime UniqueUtc()
+    {
+        var now = DateTime.UtcNow;
+        now = new DateTime(now.Ticks - now.Ticks % TimeSpan.TicksPerSecond, DateTimeKind.Utc);
+        lock (StampGate)
+        {
+            if (now <= _lastStamp) now = _lastStamp.AddSeconds(1);
+            _lastStamp = now;
+        }
+        return now;
+    }
+
+    static string Stamp() => UniqueUtc().ToString("yyyyMMddHHmmss", CultureInfo.InvariantCulture);
+
     static JsonObject NewDoc(string path, Dictionary<string, object?> fields) => new()
     {
         ["update"] = new JsonObject { ["name"] = Firebase.Doc(path), ["fields"] = Firebase.ToFields(fields) },
@@ -612,7 +665,7 @@ public static partial class Market
         if (Hub.Clip(method, 300) == "") throw new ServiceError("INVALID");
         var wallet = await Ledger.Read(uid, token);
         if (wallet.Balance < amount) throw new ServiceError("NO_MONEY");
-        var id = $"{uid}_{DateTime.UtcNow:yyyyMMddHHmmss}";
+        var id = $"{uid}_{Stamp()}";
         await Ledger.Apply(uid, "payout", -amount, token, uid, id, extra: _ =>
             [NewDoc($"payouts/{id}", new() { ["uid"] = uid, ["author"] = name, ["amount"] = amount, ["method"] = Hub.Clip(method, 300), ["status"] = "pending", ["note"] = "" })]);
     }
@@ -626,7 +679,7 @@ public static partial class Market
         var (uid, token, name) = await Hub.Member();
         if (amount <= 0 || amount > MaxTopUp || Hub.Clip(reference, 300) == "") throw new ServiceError("INVALID");
         await MyWallet();
-        await Hub.Commit([NewDoc($"topups/{uid}_{DateTime.UtcNow:yyyyMMddHHmmss}",
+        await Hub.Commit([NewDoc($"topups/{uid}_{Stamp()}",
             new() { ["uid"] = uid, ["author"] = name, ["amount"] = amount, ["reference"] = Hub.Clip(reference, 300), ["status"] = "pending" })], token);
     }
 
