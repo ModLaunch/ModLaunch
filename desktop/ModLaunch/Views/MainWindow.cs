@@ -192,6 +192,7 @@ public sealed partial class MainWindow : Window
         Games.Shelves.Changed += () => Dispatcher.UIThread.Post(() => { if (_tray is not null) UpdateTray(); });
         // 28.0: чат друзей — свой ящик фоном раз в две минуты.
         Social.Friends.Chat.Start();
+        DevicesUi.CheckLater();
         // 26.0: уведомления автора (MainWindow.Creator.cs).
         WatchCreator();
 

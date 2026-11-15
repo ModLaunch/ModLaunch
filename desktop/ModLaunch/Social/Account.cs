@@ -219,6 +219,7 @@ public static partial class Account
         if (Slot("anon").Str("uid") == createdUid) { File.Data.Remove("anon"); Live.Remove("anon"); File.Save(); }
         try { await SetName(nick); } catch { }
         try { await SendVerification(); } catch { }
+        try { await Devices.Register(force: true); } catch { }
         Changed?.Invoke();
         return Get();
     }
@@ -228,7 +229,13 @@ public static partial class Account
         var mail = (email ?? "").Trim().ToLowerInvariant();
         if (!EmailRe().IsMatch(mail)) throw new ServiceError("BAD_EMAIL");
         if (string.IsNullOrEmpty(password)) throw new ServiceError("WRONG_LOGIN");
-        var data = await Request(IdentityUrl("accounts:signInWithPassword"), new JsonObject { ["email"] = mail, ["password"] = password, ["returnSecureToken"] = true });
+        // 31.0: после 5 неверных паролей подряд — пауза, растущая вдвое (до 15 минут); сервер режет перебор тоже.
+        if (Devices.LockedFor(mail) is { TotalSeconds: > 0 } wait)
+            throw new ServiceError("LOCKED", Math.Ceiling(wait.TotalSeconds).ToString(System.Globalization.CultureInfo.InvariantCulture));
+        JsonNode data;
+        try { data = await Request(IdentityUrl("accounts:signInWithPassword"), new JsonObject { ["email"] = mail, ["password"] = password, ["returnSecureToken"] = true }); }
+        catch (ServiceError e) when (e.Code is "WRONG_LOGIN" or "TOO_MANY") { Devices.Failed(mail); throw; }
+        Devices.Succeeded(mail);
         // 30.0: у аккаунта включена двухфакторная защита — нужен код из приложения (Account.Mfa.cs).
         if (data.Str("mfaPendingCredential") is not null) NeedSecondFactor(data, mail);
         Pending = null;
@@ -239,6 +246,8 @@ public static partial class Account
             ["verified"] = false,
         });
         try { await RefreshProfile(); } catch { }
+        // 31.0: записать этот ПК в список устройств аккаунта (остальные ПК спросят «это вы?»).
+        try { await Devices.Register(force: true); } catch { }
         Changed?.Invoke();
         return Get();
     }
@@ -274,9 +283,12 @@ public static partial class Account
     /// <summary>Админ — тот, чья почта есть в коллекции admins (читать её может только он сам).</summary>
     static async Task CheckAdmin()
     {
-        if (Slot("user") is not JsonObject user || user.Str("email") is not string email) return;
+        if (Slot("user").Str("email") is not string email) return;
         var (_, idToken) = await Token();
         var reply = await Firebase.Send(Firebase.Url($"/admins/{Uri.EscapeDataString(email)}"), HttpMethod.Get, token: idToken);
+        // 31.0: запись аккаунта берём ПОСЛЕ Token(): обновление токена заменяет её новой копией, и отметка
+        // «админ» в старой терялась — сразу после входа админ не видел своих вкладок до перезапуска.
+        if (Slot("user") is not JsonObject user || user.Str("email") != email) return;
         if (reply.Status == System.Net.HttpStatusCode.OK) user["admin"] = true;
         else if (reply.Status is System.Net.HttpStatusCode.NotFound or System.Net.HttpStatusCode.Forbidden) user["admin"] = false;
         File.Save();
