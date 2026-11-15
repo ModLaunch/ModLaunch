@@ -250,7 +250,10 @@
     "v30.qk.armed": "Работает: {key}",
     "v30.qk.busy": "{key} занято другой программой — выберите другое сочетание.",
     "v30.qk.space": "Пробел",
-    "new.v30.quickKey": "Быстрый переход из любой программы: Ctrl+Alt+Пробел (или свободное Ctrl+Alt+G) открывает ModLaunch с поиском — набрали игру, Enter, играете."
+    "new.v30.quickKey": "Быстрый переход из любой программы: Ctrl+Alt+Пробел (или свободное Ctrl+Alt+G) открывает ModLaunch с поиском — набрали игру, Enter, играете.",
+    "v30.shots.title": "Снимки экрана",
+    "v30.shots.all": "Все снимки",
+    "v30.shots.hint": "Снимок во время игры — {key}. Здесь и снимки Steam, и папка Screenshots рядом с игрой."
   },
   "en": {
     "v30.upd.gameRunning": "Close the game first: updating restarts ModLaunch, and it's better not to interrupt your session. The update will wait.",
@@ -503,7 +506,10 @@
     "v30.qk.armed": "Active: {key}",
     "v30.qk.busy": "{key} is taken by another app — pick a different one.",
     "v30.qk.space": "Space",
-    "new.v30.quickKey": "Quick jump from any app: Ctrl+Alt+Space (or a free Ctrl+Alt+G) opens ModLaunch with search — type a game, press Enter, play."
+    "new.v30.quickKey": "Quick jump from any app: Ctrl+Alt+Space (or a free Ctrl+Alt+G) opens ModLaunch with search — type a game, press Enter, play.",
+    "v30.shots.title": "Screenshots",
+    "v30.shots.all": "All screenshots",
+    "v30.shots.hint": "Take one in game with {key}. Steam screenshots and the Screenshots folder next to the game show up here too."
   },
   "uk": {
     "v30.upd.gameRunning": "Спершу закрийте гру: оновлення перезапускає ModLaunch, а гру краще не переривати посеред сесії. Оновлення нікуди не дінеться.",
@@ -756,7 +762,10 @@
     "v30.qk.armed": "Працює: {key}",
     "v30.qk.busy": "{key} зайняте іншою програмою — виберіть інше.",
     "v30.qk.space": "Пробіл",
-    "new.v30.quickKey": "Швидкий перехід з будь-якої програми: Ctrl+Alt+Пробіл (або вільне Ctrl+Alt+G) відкриває ModLaunch з пошуком — ввели гру, Enter, граєте."
+    "new.v30.quickKey": "Швидкий перехід з будь-якої програми: Ctrl+Alt+Пробіл (або вільне Ctrl+Alt+G) відкриває ModLaunch з пошуком — ввели гру, Enter, граєте.",
+    "v30.shots.title": "Знімки екрана",
+    "v30.shots.all": "Усі знімки",
+    "v30.shots.hint": "Знімок під час гри — {key}. Тут і знімки Steam, і папка Screenshots поруч із грою."
   },
   "es": {
     "v30.upd.gameRunning": "Cierra primero el juego: la actualización reinicia ModLaunch y es mejor no interrumpir la partida. La actualización esperará.",
@@ -1009,7 +1018,10 @@
     "v30.qk.armed": "Activo: {key}",
     "v30.qk.busy": "{key} lo usa otro programa: elige otra combinación.",
     "v30.qk.space": "Espacio",
-    "new.v30.quickKey": "Salto rápido desde cualquier programa: Ctrl+Alt+Espacio (o Ctrl+Alt+G si está libre) abre ModLaunch con búsqueda: escribe un juego, Enter y a jugar."
+    "new.v30.quickKey": "Salto rápido desde cualquier programa: Ctrl+Alt+Espacio (o Ctrl+Alt+G si está libre) abre ModLaunch con búsqueda: escribe un juego, Enter y a jugar.",
+    "v30.shots.title": "Capturas",
+    "v30.shots.all": "Todas las capturas",
+    "v30.shots.hint": "Haz una en el juego con {key}. Aquí aparecen también las capturas de Steam y la carpeta Screenshots del juego."
   },
   "de": {
     "v30.upd.gameRunning": "Schließ zuerst das Spiel: Das Update startet ModLaunch neu, und die Sitzung sollte nicht unterbrochen werden. Das Update wartet.",
@@ -1262,7 +1274,10 @@
     "v30.qk.armed": "Aktiv: {key}",
     "v30.qk.busy": "{key} ist von einem anderen Programm belegt – wähle eine andere.",
     "v30.qk.space": "Leertaste",
-    "new.v30.quickKey": "Schnellsprung aus jedem Programm: Strg+Alt+Leertaste (oder ein freies Strg+Alt+G) öffnet ModLaunch mit Suche – Spiel tippen, Enter, spielen."
+    "new.v30.quickKey": "Schnellsprung aus jedem Programm: Strg+Alt+Leertaste (oder ein freies Strg+Alt+G) öffnet ModLaunch mit Suche – Spiel tippen, Enter, spielen.",
+    "v30.shots.title": "Screenshots",
+    "v30.shots.all": "Alle Screenshots",
+    "v30.shots.hint": "Im Spiel mit {key} aufnehmen. Hier erscheinen auch Steam-Screenshots und der Ordner Screenshots neben dem Spiel."
   },
   "fr": {
     "v30.upd.gameRunning": "Fermez d'abord le jeu : la mise à jour redémarre ModLaunch et mieux vaut ne pas interrompre la partie. La mise à jour attendra.",
@@ -1515,7 +1530,10 @@
     "v30.qk.armed": "Actif : {key}",
     "v30.qk.busy": "{key} est pris par un autre programme — choisissez-en un autre.",
     "v30.qk.space": "Espace",
-    "new.v30.quickKey": "Accès rapide depuis n'importe quel programme : Ctrl+Alt+Espace (ou Ctrl+Alt+G s'il est libre) ouvre ModLaunch avec la recherche — tapez un jeu, Entrée, jouez."
+    "new.v30.quickKey": "Accès rapide depuis n'importe quel programme : Ctrl+Alt+Espace (ou Ctrl+Alt+G s'il est libre) ouvre ModLaunch avec la recherche — tapez un jeu, Entrée, jouez.",
+    "v30.shots.title": "Captures d'écran",
+    "v30.shots.all": "Toutes les captures",
+    "v30.shots.hint": "En jeu, {key} prend une capture. Les captures Steam et le dossier Screenshots du jeu apparaissent aussi ici."
   },
   "pt-BR": {
     "v30.upd.gameRunning": "Feche o jogo primeiro: a atualização reinicia o ModLaunch, e é melhor não interromper a sessão. A atualização vai esperar.",
@@ -1768,7 +1786,10 @@
     "v30.qk.armed": "Ativo: {key}",
     "v30.qk.busy": "{key} está em uso por outro programa — escolha outro.",
     "v30.qk.space": "Espaço",
-    "new.v30.quickKey": "Acesso rápido de qualquer programa: Ctrl+Alt+Espaço (ou Ctrl+Alt+G, se livre) abre o ModLaunch com busca — digite o jogo, Enter e jogue."
+    "new.v30.quickKey": "Acesso rápido de qualquer programa: Ctrl+Alt+Espaço (ou Ctrl+Alt+G, se livre) abre o ModLaunch com busca — digite o jogo, Enter e jogue.",
+    "v30.shots.title": "Capturas de tela",
+    "v30.shots.all": "Todas as capturas",
+    "v30.shots.hint": "No jogo, {key} tira uma captura. As capturas da Steam e a pasta Screenshots do jogo também aparecem aqui."
   },
   "zh-CN": {
     "v30.upd.gameRunning": "请先关闭游戏：更新会重启 ModLaunch，最好不要中途打断游戏。更新会一直等着你。",
@@ -2021,6 +2042,9 @@
     "v30.qk.armed": "已生效：{key}",
     "v30.qk.busy": "{key} 已被其他程序占用——请换一个。",
     "v30.qk.space": "空格",
-    "new.v30.quickKey": "在任何程序中快速跳转：按 Ctrl+Alt+空格（或空闲的 Ctrl+Alt+G）即可打开带搜索的 ModLaunch——输入游戏名，回车即玩。"
+    "new.v30.quickKey": "在任何程序中快速跳转：按 Ctrl+Alt+空格（或空闲的 Ctrl+Alt+G）即可打开带搜索的 ModLaunch——输入游戏名，回车即玩。",
+    "v30.shots.title": "截图",
+    "v30.shots.all": "全部截图",
+    "v30.shots.hint": "游戏中按 {key} 截图。Steam 截图和游戏目录下的 Screenshots 文件夹也会显示在这里。"
   }
 }

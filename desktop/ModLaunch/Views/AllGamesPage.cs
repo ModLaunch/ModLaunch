@@ -537,6 +537,8 @@ public sealed class AllGamesPage : Page
         body.Children.Add(NotesCard(g));
         // 30.4: кто из друзей сейчас в этой игре — написать или позвать.
         if (FriendsInGame(g) is { } friendsCard) body.Children.Add(friendsCard);
+        // 30.7: последние снимки экрана — свои (Ctrl+F12) и Steam.
+        if (ShotsCard(g) is { } shots) body.Children.Add(shots);
         body.Children.Add(new GameReviewsCard(g));
         // 30.0: что пишут об игре кураторы, на которых подписан.
         body.Children.Add(new CuratorPicksCard(g));
@@ -552,6 +554,50 @@ public sealed class AllGamesPage : Page
         if (Program.Screenshot) return;
         try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(uri) { UseShellExecute = true }); }
         catch { MainWindow.Current?.Toast(I18n.T("v27.lib.noLauncher", ("store", Stores.Title(g.Store))), bad: true); }
+    }
+
+    /// <summary>Последние снимки игры полосой: щелчок — открыть снимок, «Все снимки» — папка. Нет снимков — карточки нет.</summary>
+    static Control? ShotsCard(LibGame g)
+    {
+        var folders = ScreenshotGallery.Folders(g);
+        var files = ScreenshotGallery.Find(folders, 7);
+        if (files.Count == 0) return null;
+        var strip = new UniformGrid { Columns = 3 };
+        foreach (var file in files.Take(6))
+        {
+            var path = file;
+            var image = new Image { Stretch = Stretch.UniformToFill };
+            var tile = new Button
+            {
+                Classes = { "ghost" }, Padding = new Thickness(0), Margin = new Thickness(0, 0, 8, 8), Height = 120, HorizontalAlignment = HorizontalAlignment.Stretch,
+                Content = new Border { CornerRadius = new CornerRadius(10), ClipToBounds = true, Background = Ui.Res("Surface3"), Child = image },
+            };
+            ToolTip.SetTip(tile, Path.GetFileName(path) + " · " + Ui.Ago(File.GetLastWriteTimeUtc(path)));
+            tile.Click += (_, _) =>
+            {
+                try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true }); }
+                catch (Exception e) when (e is System.ComponentModel.Win32Exception or FileNotFoundException) { MainWindow.Current?.Toast(e.Message, bad: true); }
+            };
+            strip.Children.Add(tile);
+            _ = Task.Run(() =>
+            {
+                try
+                {
+                    using var s = File.OpenRead(path);
+                    var bmp = Bitmap.DecodeToWidth(s, 360);
+                    Dispatcher.UIThread.Post(() => image.Source = bmp);
+                }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException) { }
+            });
+        }
+        var folder = folders.FirstOrDefault(f => f.StartsWith(GameShots.Root, StringComparison.OrdinalIgnoreCase)) ?? folders[0];
+        var all = Ui.Button(I18n.T("v30.shots.all"), () => Actions.OpenFolder(folder), "ghost", Icons.Folder);
+        all.VerticalAlignment = VerticalAlignment.Center;
+        var head = new DockPanel();
+        DockPanel.SetDock(all, Dock.Right);
+        head.Children.Add(all);
+        head.Children.Add(Ui.Row(8, Ui.Icon(Icons.Image, 16, Ui.Res("Brand2")), Ui.Text(I18n.T("v30.shots.title"), "h3")));
+        return Ui.Card(Ui.Col(10, head, strip, Ui.Text(I18n.T("v30.shots.hint", ("key", Hotkey.Display(Hotkey.ShotKeyOf(Settings.Data.Str("shotKey"))))), "tiny muted", wrap: true)), 18);
     }
 
     /// <summary>Друзья, которые прямо сейчас в этой игре (по ключу игры, номеру игры ModLaunch или по имени).</summary>

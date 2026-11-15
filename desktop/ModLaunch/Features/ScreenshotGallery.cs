@@ -8,10 +8,16 @@ public static class ScreenshotGallery
 {
     static readonly string[] Extensions = [".png", ".jpg", ".jpeg", ".bmp"];
 
-    public static List<string> Folders(GameDef game, string? gamePath)
+    public static List<string> Folders(GameDef game, string? gamePath) => Folders(game.SteamAppId, game.Name, gamePath);
+
+    /// <summary>30.7: то же для любой игры из «Всех игр» (Steam — по номеру, свои снимки — по имени, папка Screenshots рядом с игрой).</summary>
+    public static List<string> Folders(LibGame g) => Folders(g.SteamAppId, g.Name, g.Source?.AltDir ?? g.Dir);
+
+    static List<string> Folders(int steamAppId, string name, string? gamePath)
     {
         var result = new List<string>();
-        foreach (var root in Locator.SteamRoots())
+        // Снимки Steam — только у игр с номером в Steam.
+        foreach (var root in steamAppId > 0 ? Locator.SteamRoots() : Enumerable.Empty<string>())
         {
             try
             {
@@ -19,17 +25,17 @@ public static class ScreenshotGallery
                 if (!Directory.Exists(users)) continue;
                 foreach (var user in Directory.EnumerateDirectories(users))
                 {
-                    var dir = Path.Combine(user, "760", "remote", game.SteamAppId.ToString(), "screenshots");
+                    var dir = Path.Combine(user, "760", "remote", steamAppId.ToString(System.Globalization.CultureInfo.InvariantCulture), "screenshots");
                     if (Directory.Exists(dir)) result.Add(dir);
                 }
             }
             catch { }
         }
         // 30.0: свои снимки ModLaunch (Ctrl+F12 в игре).
-        if (Directory.Exists(GameShots.Folder(game.Name))) result.Add(GameShots.Folder(game.Name));
+        if (Directory.Exists(GameShots.Folder(name))) result.Add(GameShots.Folder(name));
         if (gamePath is not null)
-            foreach (var name in new[] { "Screenshots", "screenshots" })
-                if (Directory.Exists(Path.Combine(gamePath, name))) result.Add(Path.Combine(gamePath, name));
+            foreach (var sub in new[] { "Screenshots", "screenshots" })
+                if (Directory.Exists(Path.Combine(gamePath, sub))) result.Add(Path.Combine(gamePath, sub));
         return result.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
     }
 

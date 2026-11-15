@@ -229,4 +229,32 @@ public static class V30Shots
         s.Pump(800);
         s.Save("v30-18-quick-key");
     }
+
+    /// <summary>
+    /// MODLAUNCH_SHOTS=V30ShotStrip: полоса снимков на странице игры. Картинки — из MODLAUNCH_DEMO_IMAGES в папку Screenshots
+    /// демо-игры (временная папка снимков), в «Изображения» пользователя ничего не пишется.
+    /// </summary>
+    [DemoShots]
+    static void V30ShotStrip(Shots s)
+    {
+        s.Pump(4500);
+        Games.AllGames.Refresh();
+        s.Pump(1500);
+        var temp = Path.GetTempPath();
+        if (Games.AllGames.Current?.FirstOrDefault(g => g.Installed && g.Dir is { } d && d.StartsWith(temp, StringComparison.OrdinalIgnoreCase)) is not { } game) return;
+        var target = Directory.CreateDirectory(Path.Combine(game.Dir!, "Screenshots")).FullName;
+        var i = 0;
+        if (Environment.GetEnvironmentVariable("MODLAUNCH_DEMO_IMAGES") is { } from && Directory.Exists(from))
+            foreach (var file in Directory.EnumerateFiles(from, "*.png").Take(6))
+            {
+                var copy = Path.Combine(target, $"shot-{i++}.png");
+                File.Copy(file, copy, true);
+                File.SetLastWriteTimeUtc(copy, DateTime.UtcNow.AddHours(-i * 5));
+            }
+        s.Window.Navigate(() => new AllGamesPage(game.Key));
+        s.Pump(2500);
+        if (s.Window.CurrentPage is AllGamesPage page) page.ScrollDetailTo(420);
+        s.Pump(1200);
+        s.Save("v30-19-shots");
+    }
 }
