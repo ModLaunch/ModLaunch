@@ -696,6 +696,7 @@ public sealed partial class MainWindow : Window
         commands.Add((I18n.T("v30.disk.title"), Icons.Folder, () => Navigate(() => new StoragePage())));
         commands.Add((I18n.T("v30.recap.title"), Icons.Chart, () => Navigate(() => new RecapPage())));
         commands.Add((I18n.T("bp.open"), Icons.Tv, BigPictureWindow.Open));
+        commands.Add((I18n.T("v30.csv.title"), Icons.Download, ExportLibrary));
         commands.Add((I18n.T("v30.pick.title"), Icons.Sparkles, () =>
         {
             if (Games.Shelves.Current.Pick(Games.AllGames.Current ?? [], g => Games.AllGames.Played(g).Last, new Random(), DateTimeOffset.UtcNow) is { } pick)
@@ -1107,6 +1108,21 @@ public sealed partial class MainWindow : Window
 
     readonly Dictionary<string, DateTime> _libSessions = [];
 
+    /// <summary>30.4: «Экспорт библиотеки» — все игры из всех лаунчеров таблицей для Excel.</summary>
+    public async void ExportLibrary()
+    {
+        if (Games.AllGames.Current is null) await Games.AllGames.Refresh();
+        var games = Games.AllGames.Current ?? [];
+        var file = await Pickers.Save(this, I18n.T("v30.csv.title"), $"modlaunch-library-{DateTime.Now:yyyyMMdd}.csv");
+        if (file is null) return;
+        try
+        {
+            await Games.LibraryExport.Save(file, Games.LibraryExport.Csv(games, Games.Shelves.Current, Games.AllGames.Played));
+            Toast(I18n.T("v30.csv.done", ("n", games.Count)));
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { Toast(I18n.T("v30.csv.fail", ("reason", e.Message)), bad: true); }
+    }
+
     void OnLibraryGameExit(Games.LibGame g)
     {
         if (!_libSessions.Remove(g.Key, out var since)) return;
@@ -1418,12 +1434,16 @@ static class Pickers
     {
         // .r2z (сборка r2modman) — со своим фильтром, иначе Windows допишет «.json»: «Сборка.r2z.json».
         var r2z = suggested.EndsWith(".r2z", StringComparison.OrdinalIgnoreCase);
+        // 30.4: таблица библиотеки — .csv со своим фильтром.
+        var csv = suggested.EndsWith(".csv", StringComparison.OrdinalIgnoreCase);
         var result = await top.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
             Title = title,
             SuggestedFileName = suggested,
-            DefaultExtension = r2z ? "r2z" : "json",
-            FileTypeChoices = [r2z ? new FilePickerFileType("r2modman / Gale") { Patterns = ["*.r2z"] } : new FilePickerFileType(I18n.T("dialog.pack")) { Patterns = ["*.json"] }],
+            DefaultExtension = r2z ? "r2z" : csv ? "csv" : "json",
+            FileTypeChoices = [r2z ? new FilePickerFileType("r2modman / Gale") { Patterns = ["*.r2z"] }
+                : csv ? new FilePickerFileType("CSV (Excel)") { Patterns = ["*.csv"] }
+                : new FilePickerFileType(I18n.T("dialog.pack")) { Patterns = ["*.json"] }],
         });
         return result?.TryGetLocalPath();
     }
