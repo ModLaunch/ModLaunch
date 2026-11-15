@@ -223,22 +223,56 @@ public sealed class BigPictureWindow : Window
             var index = _games.Count + i;
             var g = _lib[i];
             var art = g.SteamAppId > 0 ? HomePage.WebArt(SteamLibrary.Cover(g.SteamAppId), GameDef.SteamArt(g.SteamAppId), g.Name, 400) : HomePage.WebArt("", null, g.Name, 400);
+            // 30.12: избранное — звёздочкой на обложке.
+            var cover = new Panel();
+            cover.Children.Add(art);
+            if (Shelves.Current.IsFavorite(g.Key))
+                cover.Children.Add(new Border
+                {
+                    HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(8),
+                    Width = 28, Height = 28, CornerRadius = new CornerRadius(14), Background = new SolidColorBrush(Color.FromArgb(170, 0, 0, 0)),
+                    Child = new TextBlock { Text = "★", FontSize = 15, Foreground = Ui.Res("Warn"), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
+                });
             var card = new Button
             {
                 Classes = { "bp-cover" }, Padding = new Thickness(0), Width = 180, Height = 270,
-                Content = new Border { CornerRadius = new CornerRadius(12), ClipToBounds = true, Child = art },
+                Content = new Border { CornerRadius = new CornerRadius(12), ClipToBounds = true, Child = cover },
             };
             card.Click += (_, _) => { if (_game == index) Activate(0); else { _zone = Zone.Games; Select(index); } };
             _carousel.Children.Add(card);
         }
     }
 
-    /// <summary>Установленные игры из всех лаунчеров, которых нет среди игр ModLaunch: недавние — первыми.</summary>
+    /// <summary>Установленные игры из всех лаунчеров, которых нет среди игр ModLaunch, в порядке полок.</summary>
     List<LibGame> LibraryOnly()
     {
         var managed = _games.Select(g => g.Def.Id).ToHashSet();
-        return (AllGames.Current ?? []).Where(g => g.Installed && (g.ManagedId is null || !managed.Contains(g.ManagedId)))
-            .OrderByDescending(g => AllGames.Played(g).Last).ThenBy(g => g.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
+        return Arrange((AllGames.Current ?? []).Where(g => g.Installed && (g.ManagedId is null || !managed.Contains(g.ManagedId))),
+            Shelves.Current, g => AllGames.Played(g).Last).ToList();
+    }
+
+    /// <summary>
+    /// 30.12: порядок для дивана — как полки «Всех игр»: избранное, потом «Играю», потом недавние; скрытые не показываем.
+    /// </summary>
+    internal static IEnumerable<LibGame> Arrange(IEnumerable<LibGame> games, Shelves shelves, Func<LibGame, long> last) =>
+        games.Where(g => !shelves.IsHidden(g.Key))
+            .OrderByDescending(g => shelves.IsFavorite(g.Key))
+            .ThenByDescending(g => shelves.StatusOf(g.Key) == "playing")
+            .ThenByDescending(last)
+            .ThenBy(g => g.Name, StringComparer.CurrentCultureIgnoreCase);
+
+    [SelfTest]
+    static string BigPictureFollowsShelves()
+    {
+        var s = new Shelves(new System.Text.Json.Nodes.JsonObject());
+        LibGame G(string key) => new(key, "steam", key, null, 1, true, 0);
+        var last = new Dictionary<string, long> { ["a"] = 100, ["b"] = 300, ["c"] = 200, ["d"] = 400, ["e"] = 500 };
+        s.ToggleFavorite("c");
+        s.SetStatus("a", "playing");
+        s.ToggleHidden("e");
+        var order = string.Join(",", Arrange([G("a"), G("b"), G("c"), G("d"), G("e")], s, g => last[g.Key]).Select(g => g.Key));
+        if (order != "c,a,d,b") throw new Exception(order);
+        return "favorites, then Playing, then recent; hidden games left out";
     }
 
     // ---------------------------------------------------------------- выбор игры

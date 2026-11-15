@@ -304,4 +304,24 @@ public static class V30Shots
         s.Pump(3000);
         s.Save("v30-22-home");
     }
+
+    /// <summary>MODLAUNCH_SHOTS=V30BigPicture: Big Picture — избранное первым и со звёздочкой.</summary>
+    [DemoShots]
+    static void V30BigPicture(Shots s)
+    {
+        s.Pump(4500);
+        Games.AllGames.Refresh();
+        s.Pump(2000);
+        var shelves = Games.Shelves.Current;
+        foreach (var key in new[] { "epic:Hades", "steam:892970" }) if (!shelves.IsFavorite(key)) shelves.ToggleFavorite(key);
+        var big = new BigPictureWindow(windowed: true);
+        big.Show();
+        s.Pump(1500);
+        big.DemoSelectLibrary();
+        s.Pump(2500);
+        Avalonia.Headless.HeadlessWindowExtensions.CaptureRenderedFrame(big)?.Save(Path.Combine(s.OutDir, "v30-23-bigpicture-shelves.png"));
+        Console.WriteLine("saved v30-23-bigpicture-shelves");
+        big.Close();
+        s.Pump(500);
+    }
 }
