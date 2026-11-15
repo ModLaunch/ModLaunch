@@ -12,6 +12,8 @@ public static class WhatsNew
 {
     static readonly (string Icon, string Key, Func<Page>? Open)[] Items =
     [
+        // 30.5
+        (Icons.Layers, "new.v30.tray", null),
         // 30.4: полки на всех ПК, друзья в игре и итог сеанса, экспорт библиотеки.
         (Icons.Cloud, "new.v30.sync", () => new AllGamesPage()),
         (Icons.Users, "new.v30.friendsGame", () => new AllGamesPage()),

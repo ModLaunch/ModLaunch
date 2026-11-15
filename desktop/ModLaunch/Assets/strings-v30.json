@@ -20,7 +20,7 @@
     "v30.ach.dialog": "{game} · достижения {got} из {n}",
     "v30.ovl.total": "Всего: {time} · {store}",
     "v30.ovl.shot": "Снимок экрана",
-    "new.v30.subtitle": "Статус прохождения, заметки, ярлыки игр, быстрый переход, полки, место на дисках и итоги",
+    "new.v30.subtitle": "Трей с играми всех лаунчеров, синхронизация полок, друзья в игре, экспорт и итоги",
     "new.v30.shots": "Снимок экрана в игре: Ctrl+F12 сохраняет окно игры в «Изображения\\ModLaunch», снимки видны в галерее игры. В играх Steam F12 остаётся за Steam.",
     "new.v30.achievements": "Достижения Steam: на странице игры во «Всех играх» — сколько получено, последние и полный список. Читается из файлов Steam на этом ПК, без сети.",
     "new.v30.overlay": "Оверлей для всех игр: игры из Epic, GOG, Xbox и других лаунчеров тоже получают оверлей, снимки экрана и статус «в игре» для друзей.",
@@ -240,7 +240,8 @@
     "new.v30.export": "Экспорт библиотеки: все игры из всех лаунчеров таблицей для Excel — часы, статус, коллекции, заметки.",
     "v30.tray.recent": "Недавние игры",
     "v30.tray.fav": "Избранное",
-    "v30.tray.random": "Случайная игра"
+    "v30.tray.random": "Случайная игра",
+    "new.v30.tray": "Трей со всеми играми: правый щелчок по значку ModLaunch — недавние игры из всех лаунчеров, избранное, случайная игра и итоги."
   },
   "en": {
     "v30.upd.gameRunning": "Close the game first: updating restarts ModLaunch, and it's better not to interrupt your session. The update will wait.",
@@ -263,7 +264,7 @@
     "v30.ach.dialog": "{game} · achievements {got} of {n}",
     "v30.ovl.total": "Total: {time} · {store}",
     "v30.ovl.shot": "Screenshot",
-    "new.v30.subtitle": "Completion status, notes, game shortcuts, quick jump, shelves, disk space and recap",
+    "new.v30.subtitle": "Tray with games from every launcher, shelf sync, friends in game, export and recap",
     "new.v30.shots": "In-game screenshot: Ctrl+F12 saves the game window to Pictures\\ModLaunch, and screenshots show up in the game's gallery. In Steam games F12 stays Steam's.",
     "new.v30.achievements": "Steam achievements: the game page in All games shows how many are unlocked, the latest ones and the full list. Read from Steam's files on this PC, no network.",
     "new.v30.overlay": "Overlay for every game: games from Epic, GOG, Xbox and other launchers also get the overlay, screenshots and a “playing” status for friends.",
@@ -483,7 +484,8 @@
     "new.v30.export": "Library export: every game from every launcher as an Excel sheet — hours, status, collections, notes.",
     "v30.tray.recent": "Recent games",
     "v30.tray.fav": "Favorites",
-    "v30.tray.random": "Random game"
+    "v30.tray.random": "Random game",
+    "new.v30.tray": "Tray with all games: right-click the ModLaunch icon for recent games from every launcher, favorites, a random game and your recap."
   },
   "uk": {
     "v30.upd.gameRunning": "Спершу закрийте гру: оновлення перезапускає ModLaunch, а гру краще не переривати посеред сесії. Оновлення нікуди не дінеться.",
@@ -506,7 +508,7 @@
     "v30.ach.dialog": "{game} · досягнення {got} з {n}",
     "v30.ovl.total": "Усього: {time} · {store}",
     "v30.ovl.shot": "Знімок екрана",
-    "new.v30.subtitle": "Статус проходження, нотатки, ярлики ігор, швидкий перехід, полиці, місце на дисках і підсумки",
+    "new.v30.subtitle": "Трей з іграми всіх лаунчерів, синхронізація полиць, друзі в грі, експорт і підсумки",
     "new.v30.shots": "Знімок екрана в грі: Ctrl+F12 зберігає вікно гри в «Зображення\\ModLaunch», знімки видно в галереї гри. В іграх Steam F12 лишається за Steam.",
     "new.v30.achievements": "Досягнення Steam: на сторінці гри в «Усіх іграх» — скільки отримано, останні й повний список. Читається з файлів Steam на цьому ПК, без мережі.",
     "new.v30.overlay": "Оверлей для всіх ігор: ігри з Epic, GOG, Xbox та інших лаунчерів теж отримують оверлей, знімки екрана й статус «у грі» для друзів.",
@@ -726,7 +728,8 @@
     "new.v30.export": "Експорт бібліотеки: усі ігри з усіх лаунчерів таблицею для Excel — години, статус, колекції, нотатки.",
     "v30.tray.recent": "Нещодавні ігри",
     "v30.tray.fav": "Обране",
-    "v30.tray.random": "Випадкова гра"
+    "v30.tray.random": "Випадкова гра",
+    "new.v30.tray": "Трей з усіма іграми: правий клік по значку ModLaunch — нещодавні ігри з усіх лаунчерів, обране, випадкова гра й підсумки."
   },
   "es": {
     "v30.upd.gameRunning": "Cierra primero el juego: la actualización reinicia ModLaunch y es mejor no interrumpir la partida. La actualización esperará.",
@@ -749,7 +752,7 @@
     "v30.ach.dialog": "{game} · logros {got} de {n}",
     "v30.ovl.total": "Total: {time} · {store}",
     "v30.ovl.shot": "Captura",
-    "new.v30.subtitle": "Estado, notas, accesos directos, salto rápido, estanterías, espacio en disco y resumen",
+    "new.v30.subtitle": "Bandeja con juegos de todos los launchers, sincronización, amigos en el juego, exportación y resumen",
     "new.v30.shots": "Captura en el juego: Ctrl+F12 guarda la ventana del juego en Imágenes\\ModLaunch y las capturas aparecen en la galería del juego. En juegos de Steam, F12 sigue siendo de Steam.",
     "new.v30.achievements": "Logros de Steam: la página del juego en Todos los juegos muestra cuántos llevas, los últimos y la lista completa. Se leen de los archivos de Steam de este PC, sin red.",
     "new.v30.overlay": "Overlay para todos los juegos: los juegos de Epic, GOG, Xbox y otros launchers también tienen overlay, capturas y el estado «jugando» para tus amigos.",
@@ -969,7 +972,8 @@
     "new.v30.export": "Exportar biblioteca: todos los juegos de todos los launchers en una hoja de Excel: horas, estado, colecciones, notas.",
     "v30.tray.recent": "Juegos recientes",
     "v30.tray.fav": "Favoritos",
-    "v30.tray.random": "Juego al azar"
+    "v30.tray.random": "Juego al azar",
+    "new.v30.tray": "Bandeja con todos los juegos: clic derecho en el icono de ModLaunch para juegos recientes de todos los launchers, favoritos, un juego al azar y tu resumen."
   },
   "de": {
     "v30.upd.gameRunning": "Schließ zuerst das Spiel: Das Update startet ModLaunch neu, und die Sitzung sollte nicht unterbrochen werden. Das Update wartet.",
@@ -992,7 +996,7 @@
     "v30.ach.dialog": "{game} · Erfolge {got} von {n}",
     "v30.ovl.total": "Gesamt: {time} · {store}",
     "v30.ovl.shot": "Screenshot",
-    "new.v30.subtitle": "Spielstatus, Notizen, Spielverknüpfungen, Schnellsprung, Regale, Speicherplatz und Rückblick",
+    "new.v30.subtitle": "Infobereich mit Spielen aller Launcher, Regal-Sync, Freunde im Spiel, Export und Rückblick",
     "new.v30.shots": "Screenshot im Spiel: Strg+F12 speichert das Spielfenster unter Bilder\\ModLaunch, die Screenshots erscheinen in der Galerie des Spiels. In Steam-Spielen bleibt F12 bei Steam.",
     "new.v30.achievements": "Steam-Erfolge: Die Spielseite unter „Alle Spiele“ zeigt, wie viele freigeschaltet sind, die neuesten und die ganze Liste. Gelesen aus den Steam-Dateien dieses PCs, ohne Netz.",
     "new.v30.overlay": "Overlay für alle Spiele: Spiele aus Epic, GOG, Xbox und anderen Launchern bekommen ebenfalls Overlay, Screenshots und den Status „spielt“ für Freunde.",
@@ -1212,7 +1216,8 @@
     "new.v30.export": "Bibliothek exportieren: alle Spiele aus allen Launchern als Excel-Tabelle – Stunden, Status, Sammlungen, Notizen.",
     "v30.tray.recent": "Zuletzt gespielt",
     "v30.tray.fav": "Favoriten",
-    "v30.tray.random": "Zufälliges Spiel"
+    "v30.tray.random": "Zufälliges Spiel",
+    "new.v30.tray": "Infobereich mit allen Spielen: Rechtsklick auf das ModLaunch-Symbol – zuletzt gespielte Spiele aus allen Launchern, Favoriten, Zufallsspiel und Rückblick."
   },
   "fr": {
     "v30.upd.gameRunning": "Fermez d'abord le jeu : la mise à jour redémarre ModLaunch et mieux vaut ne pas interrompre la partie. La mise à jour attendra.",
@@ -1235,7 +1240,7 @@
     "v30.ach.dialog": "{game} · succès {got} sur {n}",
     "v30.ovl.total": "Total : {time} · {store}",
     "v30.ovl.shot": "Capture d'écran",
-    "new.v30.subtitle": "Statut, notes, raccourcis de jeux, accès rapide, étagères, espace disque et bilan",
+    "new.v30.subtitle": "Zone de notification avec les jeux de tous les launchers, synchro, amis en jeu, export et bilan",
     "new.v30.shots": "Capture en jeu : Ctrl+F12 enregistre la fenêtre du jeu dans Images\\ModLaunch, et les captures apparaissent dans la galerie du jeu. Dans les jeux Steam, F12 reste à Steam.",
     "new.v30.achievements": "Succès Steam : la page du jeu dans Tous les jeux affiche combien sont débloqués, les derniers et la liste complète. Lus dans les fichiers Steam de ce PC, sans réseau.",
     "new.v30.overlay": "Overlay pour tous les jeux : les jeux d'Epic, GOG, Xbox et d'autres launchers ont aussi l'overlay, les captures et le statut « en jeu » pour les amis.",
@@ -1455,7 +1460,8 @@
     "new.v30.export": "Export de la bibliothèque : tous les jeux de tous les launchers dans un tableau Excel — heures, statut, collections, notes.",
     "v30.tray.recent": "Jeux récents",
     "v30.tray.fav": "Favoris",
-    "v30.tray.random": "Jeu au hasard"
+    "v30.tray.random": "Jeu au hasard",
+    "new.v30.tray": "Tous les jeux dans la zone de notification : clic droit sur l'icône ModLaunch — jeux récents de tous les launchers, favoris, jeu au hasard et bilan."
   },
   "pt-BR": {
     "v30.upd.gameRunning": "Feche o jogo primeiro: a atualização reinicia o ModLaunch, e é melhor não interromper a sessão. A atualização vai esperar.",
@@ -1478,7 +1484,7 @@
     "v30.ach.dialog": "{game} · conquistas {got} de {n}",
     "v30.ovl.total": "Total: {time} · {store}",
     "v30.ovl.shot": "Captura de tela",
-    "new.v30.subtitle": "Status, notas, atalhos de jogos, acesso rápido, prateleiras, espaço em disco e resumo",
+    "new.v30.subtitle": "Bandeja com jogos de todos os launchers, sincronização, amigos no jogo, exportação e resumo",
     "new.v30.shots": "Captura no jogo: Ctrl+F12 salva a janela do jogo em Imagens\\ModLaunch, e as capturas aparecem na galeria do jogo. Nos jogos da Steam, F12 continua da Steam.",
     "new.v30.achievements": "Conquistas da Steam: a página do jogo em Todos os jogos mostra quantas foram desbloqueadas, as últimas e a lista completa. Lidas dos arquivos da Steam neste PC, sem rede.",
     "new.v30.overlay": "Overlay para todos os jogos: jogos da Epic, GOG, Xbox e outros launchers também ganham overlay, capturas e o status “jogando” para os amigos.",
@@ -1698,7 +1704,8 @@
     "new.v30.export": "Exportar biblioteca: todos os jogos de todos os launchers em uma planilha do Excel — horas, status, coleções, notas.",
     "v30.tray.recent": "Jogos recentes",
     "v30.tray.fav": "Favoritos",
-    "v30.tray.random": "Jogo aleatório"
+    "v30.tray.random": "Jogo aleatório",
+    "new.v30.tray": "Bandeja com todos os jogos: clique direito no ícone do ModLaunch — jogos recentes de todos os launchers, favoritos, jogo aleatório e resumo."
   },
   "zh-CN": {
     "v30.upd.gameRunning": "请先关闭游戏：更新会重启 ModLaunch，最好不要中途打断游戏。更新会一直等着你。",
@@ -1721,7 +1728,7 @@
     "v30.ach.dialog": "{game} · 成就 {got} / {n}",
     "v30.ovl.total": "总计：{time} · {store}",
     "v30.ovl.shot": "截图",
-    "new.v30.subtitle": "游玩状态、笔记、游戏快捷方式、快速跳转、书架、磁盘空间和回顾",
+    "new.v30.subtitle": "托盘显示所有启动器的游戏、书架同步、好友在玩、导出和回顾",
     "new.v30.shots": "游戏内截图：Ctrl+F12 把游戏窗口保存到“图片\\ModLaunch”，截图会出现在游戏图库中。在 Steam 游戏中 F12 仍归 Steam。",
     "new.v30.achievements": "Steam 成就：“全部游戏”的游戏页面显示已解锁数量、最近解锁和完整列表。直接读取本机 Steam 文件，无需联网。",
     "new.v30.overlay": "所有游戏的覆盖层：来自 Epic、GOG、Xbox 等启动器的游戏也有覆盖层、截图，并向好友显示“正在游戏”。",
@@ -1941,6 +1948,7 @@
     "new.v30.export": "导出游戏库：将所有启动器的全部游戏导出为 Excel 表格——时长、状态、收藏夹、笔记。",
     "v30.tray.recent": "最近游戏",
     "v30.tray.fav": "收藏",
-    "v30.tray.random": "随机游戏"
+    "v30.tray.random": "随机游戏",
+    "new.v30.tray": "托盘里的所有游戏：右键点击 ModLaunch 图标——所有启动器的最近游戏、收藏、随机游戏和游戏回顾。"
   }
 }
