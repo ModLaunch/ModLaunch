@@ -12,6 +12,8 @@ public static class WhatsNew
 {
     static readonly (string Icon, string Key, Func<Page>? Open)[] Items =
     [
+        // 30.7
+        (Icons.Image, "new.v30.shotStrip", () => new AllGamesPage()),
         // 30.6
         (Icons.Search, "new.v30.quickKey", () => new SettingsPage("launch")),
         // 30.5
