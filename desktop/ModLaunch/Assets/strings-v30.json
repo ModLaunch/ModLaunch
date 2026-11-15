@@ -20,7 +20,7 @@
     "v30.ach.dialog": "{game} · достижения {got} из {n}",
     "v30.ovl.total": "Всего: {time} · {store}",
     "v30.ovl.shot": "Снимок экрана",
-    "new.v30.subtitle": "Кураторы, возврат покупок, двухфакторная защита, снимки экрана в игре и достижения Steam",
+    "new.v30.subtitle": "Полки и коллекции в библиотеке, место на дисках, итоги игрового времени, кураторы и возвраты",
     "new.v30.shots": "Снимок экрана в игре: Ctrl+F12 сохраняет окно игры в «Изображения\\ModLaunch», снимки видны в галерее игры. В играх Steam F12 остаётся за Steam.",
     "new.v30.achievements": "Достижения Steam: на странице игры во «Всех играх» — сколько получено, последние и полный список. Читается из файлов Steam на этом ПК, без сети.",
     "new.v30.overlay": "Оверлей для всех игр: игры из Epic, GOG, Xbox и других лаунчеров тоже получают оверлей, снимки экрана и статус «в игре» для друзей.",
@@ -194,7 +194,10 @@
     "v30.recap.weekday": "Чаще всего вы играете в этот день недели: {day}",
     "v30.recap.perDay": "В среднем {time} в день, когда вы играли",
     "v30.recap.share": "«{name}» — {pct}% всего времени",
-    "v30.recap.note": "Неделя, месяц и год — из журнала по дням (с версии 30.2, хранится три года на этом ПК). «Всё время» — общие часы: у игр Steam — по данным Steam, у остальных — по учёту ModLaunch."
+    "v30.recap.note": "Неделя, месяц и год — из журнала по дням (с версии 30.2, хранится три года на этом ПК). «Всё время» — общие часы: у игр Steam — по данным Steam, у остальных — по учёту ModLaunch.",
+    "new.v30.shelves": "Полки в библиотеке: избранное, скрытые игры и свои коллекции из игр любых лаунчеров, плюс порядок списка — по имени, недавние, наиграно, размер.",
+    "new.v30.disk": "Место на дисках: сколько занимают игры из всех лаунчеров, что давно не запускали и сколько можно освободить.",
+    "new.v30.recap": "Итоги: сколько и во что вы играли за неделю, месяц и год — по всем лаунчерам, с графиком по дням."
   },
   "en": {
     "v30.upd.gameRunning": "Close the game first: updating restarts ModLaunch, and it's better not to interrupt your session. The update will wait.",
@@ -217,7 +220,7 @@
     "v30.ach.dialog": "{game} · achievements {got} of {n}",
     "v30.ovl.total": "Total: {time} · {store}",
     "v30.ovl.shot": "Screenshot",
-    "new.v30.subtitle": "Curators, purchase refunds, two-factor protection, in-game screenshots and Steam achievements",
+    "new.v30.subtitle": "Library shelves and collections, disk space, play time recap, curators and refunds",
     "new.v30.shots": "In-game screenshot: Ctrl+F12 saves the game window to Pictures\\ModLaunch, and screenshots show up in the game's gallery. In Steam games F12 stays Steam's.",
     "new.v30.achievements": "Steam achievements: the game page in All games shows how many are unlocked, the latest ones and the full list. Read from Steam's files on this PC, no network.",
     "new.v30.overlay": "Overlay for every game: games from Epic, GOG, Xbox and other launchers also get the overlay, screenshots and a “playing” status for friends.",
@@ -391,7 +394,10 @@
     "v30.recap.weekday": "The day of the week you play most: {day}",
     "v30.recap.perDay": "On average {time} on days you played",
     "v30.recap.share": "“{name}” — {pct}% of all your time",
-    "v30.recap.note": "Week, month and year come from the daily log (since 30.2, kept for three years on this PC). All time uses total hours: Steam's own numbers for Steam games, ModLaunch's tracking for the rest."
+    "v30.recap.note": "Week, month and year come from the daily log (since 30.2, kept for three years on this PC). All time uses total hours: Steam's own numbers for Steam games, ModLaunch's tracking for the rest.",
+    "new.v30.shelves": "Library shelves: favorites, hidden games and your own collections mixing games from any launcher, plus list order — by name, recent, most played, size.",
+    "new.v30.disk": "Disk space: how much games from every launcher take, what you haven't launched in ages and how much you can free up.",
+    "new.v30.recap": "Recap: how much and what you played this week, month and year — across all launchers, with a chart by day."
   },
   "uk": {
     "v30.upd.gameRunning": "Спершу закрийте гру: оновлення перезапускає ModLaunch, а гру краще не переривати посеред сесії. Оновлення нікуди не дінеться.",
@@ -414,7 +420,7 @@
     "v30.ach.dialog": "{game} · досягнення {got} з {n}",
     "v30.ovl.total": "Усього: {time} · {store}",
     "v30.ovl.shot": "Знімок екрана",
-    "new.v30.subtitle": "Куратори, повернення покупок, двофакторний захист, знімки екрана в грі та досягнення Steam",
+    "new.v30.subtitle": "Полиці й колекції в бібліотеці, місце на дисках, підсумки ігрового часу, куратори та повернення",
     "new.v30.shots": "Знімок екрана в грі: Ctrl+F12 зберігає вікно гри в «Зображення\\ModLaunch», знімки видно в галереї гри. В іграх Steam F12 лишається за Steam.",
     "new.v30.achievements": "Досягнення Steam: на сторінці гри в «Усіх іграх» — скільки отримано, останні й повний список. Читається з файлів Steam на цьому ПК, без мережі.",
     "new.v30.overlay": "Оверлей для всіх ігор: ігри з Epic, GOG, Xbox та інших лаунчерів теж отримують оверлей, знімки екрана й статус «у грі» для друзів.",
@@ -588,7 +594,10 @@
     "v30.recap.weekday": "Найчастіше ви граєте в цей день тижня: {day}",
     "v30.recap.perDay": "У середньому {time} у день, коли ви грали",
     "v30.recap.share": "«{name}» — {pct}% усього часу",
-    "v30.recap.note": "Тиждень, місяць і рік — із журналу по днях (з версії 30.2, зберігається три роки на цьому ПК). «Увесь час» — загальні години: для ігор Steam — за даними Steam, для решти — за обліком ModLaunch."
+    "v30.recap.note": "Тиждень, місяць і рік — із журналу по днях (з версії 30.2, зберігається три роки на цьому ПК). «Увесь час» — загальні години: для ігор Steam — за даними Steam, для решти — за обліком ModLaunch.",
+    "new.v30.shelves": "Полиці в бібліотеці: обране, приховані ігри та власні колекції з ігор будь-яких лаунчерів, а ще порядок списку — за назвою, нещодавні, награно, розмір.",
+    "new.v30.disk": "Місце на дисках: скільки займають ігри з усіх лаунчерів, що давно не запускали і скільки можна звільнити.",
+    "new.v30.recap": "Підсумки: скільки й у що ви грали за тиждень, місяць і рік — за всіма лаунчерами, з графіком по днях."
   },
   "es": {
     "v30.upd.gameRunning": "Cierra primero el juego: la actualización reinicia ModLaunch y es mejor no interrumpir la partida. La actualización esperará.",
@@ -611,7 +620,7 @@
     "v30.ach.dialog": "{game} · logros {got} de {n}",
     "v30.ovl.total": "Total: {time} · {store}",
     "v30.ovl.shot": "Captura",
-    "new.v30.subtitle": "Curadores, reembolsos, verificación en dos pasos, capturas en el juego y logros de Steam",
+    "new.v30.subtitle": "Estanterías y colecciones, espacio en disco, resumen de juego, curadores y reembolsos",
     "new.v30.shots": "Captura en el juego: Ctrl+F12 guarda la ventana del juego en Imágenes\\ModLaunch y las capturas aparecen en la galería del juego. En juegos de Steam, F12 sigue siendo de Steam.",
     "new.v30.achievements": "Logros de Steam: la página del juego en Todos los juegos muestra cuántos llevas, los últimos y la lista completa. Se leen de los archivos de Steam de este PC, sin red.",
     "new.v30.overlay": "Overlay para todos los juegos: los juegos de Epic, GOG, Xbox y otros launchers también tienen overlay, capturas y el estado «jugando» para tus amigos.",
@@ -785,7 +794,10 @@
     "v30.recap.weekday": "El día de la semana en que más juegas: {day}",
     "v30.recap.perDay": "De media, {time} los días que jugaste",
     "v30.recap.share": "«{name}»: el {pct}% de todo tu tiempo",
-    "v30.recap.note": "Semana, mes y año salen del registro diario (desde la 30.2, se guarda tres años en este PC). «Todo» usa las horas totales: las de Steam para juegos de Steam y el registro de ModLaunch para el resto."
+    "v30.recap.note": "Semana, mes y año salen del registro diario (desde la 30.2, se guarda tres años en este PC). «Todo» usa las horas totales: las de Steam para juegos de Steam y el registro de ModLaunch para el resto.",
+    "new.v30.shelves": "Estanterías en la biblioteca: favoritos, juegos ocultos y colecciones propias con juegos de cualquier launcher, además del orden de la lista: nombre, recientes, más jugados, tamaño.",
+    "new.v30.disk": "Espacio en disco: cuánto ocupan los juegos de todos los launchers, cuáles no abres desde hace tiempo y cuánto puedes liberar.",
+    "new.v30.recap": "Resumen: cuánto y a qué jugaste esta semana, este mes y este año, en todos los launchers, con gráfico por días."
   },
   "de": {
     "v30.upd.gameRunning": "Schließ zuerst das Spiel: Das Update startet ModLaunch neu, und die Sitzung sollte nicht unterbrochen werden. Das Update wartet.",
@@ -808,7 +820,7 @@
     "v30.ach.dialog": "{game} · Erfolge {got} von {n}",
     "v30.ovl.total": "Gesamt: {time} · {store}",
     "v30.ovl.shot": "Screenshot",
-    "new.v30.subtitle": "Kuratoren, Erstattungen, Zwei-Faktor-Absicherung, Screenshots im Spiel und Steam-Erfolge",
+    "new.v30.subtitle": "Regale und Sammlungen, Speicherplatz, Spielzeit-Rückblick, Kuratoren und Erstattungen",
     "new.v30.shots": "Screenshot im Spiel: Strg+F12 speichert das Spielfenster unter Bilder\\ModLaunch, die Screenshots erscheinen in der Galerie des Spiels. In Steam-Spielen bleibt F12 bei Steam.",
     "new.v30.achievements": "Steam-Erfolge: Die Spielseite unter „Alle Spiele“ zeigt, wie viele freigeschaltet sind, die neuesten und die ganze Liste. Gelesen aus den Steam-Dateien dieses PCs, ohne Netz.",
     "new.v30.overlay": "Overlay für alle Spiele: Spiele aus Epic, GOG, Xbox und anderen Launchern bekommen ebenfalls Overlay, Screenshots und den Status „spielt“ für Freunde.",
@@ -982,7 +994,10 @@
     "v30.recap.weekday": "An diesem Wochentag spielst du am meisten: {day}",
     "v30.recap.perDay": "Im Schnitt {time} an Tagen, an denen du gespielt hast",
     "v30.recap.share": "„{name}“ – {pct} % deiner gesamten Zeit",
-    "v30.recap.note": "Woche, Monat und Jahr stammen aus dem Tagesprotokoll (seit 30.2, drei Jahre auf diesem PC gespeichert). „Gesamt“ nutzt die Gesamtstunden: bei Steam-Spielen die von Steam, sonst die Erfassung von ModLaunch."
+    "v30.recap.note": "Woche, Monat und Jahr stammen aus dem Tagesprotokoll (seit 30.2, drei Jahre auf diesem PC gespeichert). „Gesamt“ nutzt die Gesamtstunden: bei Steam-Spielen die von Steam, sonst die Erfassung von ModLaunch.",
+    "new.v30.shelves": "Regale in der Bibliothek: Favoriten, ausgeblendete Spiele und eigene Sammlungen mit Spielen aus jedem Launcher, dazu die Reihenfolge – Name, zuletzt gespielt, meistgespielt, Größe.",
+    "new.v30.disk": "Speicherplatz: wie viel Spiele aus allen Launchern belegen, was du lange nicht gestartet hast und wie viel du freimachen kannst.",
+    "new.v30.recap": "Rückblick: wie viel und was du diese Woche, diesen Monat und dieses Jahr gespielt hast – über alle Launcher, mit Tagesdiagramm."
   },
   "fr": {
     "v30.upd.gameRunning": "Fermez d'abord le jeu : la mise à jour redémarre ModLaunch et mieux vaut ne pas interrompre la partie. La mise à jour attendra.",
@@ -1005,7 +1020,7 @@
     "v30.ach.dialog": "{game} · succès {got} sur {n}",
     "v30.ovl.total": "Total : {time} · {store}",
     "v30.ovl.shot": "Capture d'écran",
-    "new.v30.subtitle": "Curateurs, remboursements, double authentification, captures en jeu et succès Steam",
+    "new.v30.subtitle": "Étagères et collections, espace disque, bilan du temps de jeu, curateurs et remboursements",
     "new.v30.shots": "Capture en jeu : Ctrl+F12 enregistre la fenêtre du jeu dans Images\\ModLaunch, et les captures apparaissent dans la galerie du jeu. Dans les jeux Steam, F12 reste à Steam.",
     "new.v30.achievements": "Succès Steam : la page du jeu dans Tous les jeux affiche combien sont débloqués, les derniers et la liste complète. Lus dans les fichiers Steam de ce PC, sans réseau.",
     "new.v30.overlay": "Overlay pour tous les jeux : les jeux d'Epic, GOG, Xbox et d'autres launchers ont aussi l'overlay, les captures et le statut « en jeu » pour les amis.",
@@ -1179,7 +1194,10 @@
     "v30.recap.weekday": "Le jour de la semaine où vous jouez le plus : {day}",
     "v30.recap.perDay": "En moyenne {time} les jours où vous avez joué",
     "v30.recap.share": "« {name} » — {pct} % de votre temps",
-    "v30.recap.note": "Semaine, mois et année viennent du journal quotidien (depuis la 30.2, conservé trois ans sur ce PC). « Depuis toujours » utilise les heures totales : celles de Steam pour les jeux Steam, le suivi de ModLaunch pour les autres."
+    "v30.recap.note": "Semaine, mois et année viennent du journal quotidien (depuis la 30.2, conservé trois ans sur ce PC). « Depuis toujours » utilise les heures totales : celles de Steam pour les jeux Steam, le suivi de ModLaunch pour les autres.",
+    "new.v30.shelves": "Étagères dans la bibliothèque : favoris, jeux masqués et vos collections avec des jeux de n'importe quel launcher, plus l'ordre de la liste — nom, récents, les plus joués, taille.",
+    "new.v30.disk": "Espace disque : la place prise par les jeux de tous les launchers, ceux que vous n'avez pas lancés depuis longtemps et ce que vous pouvez libérer.",
+    "new.v30.recap": "Bilan : combien et à quoi vous avez joué cette semaine, ce mois et cette année — tous launchers confondus, avec un graphique par jour."
   },
   "pt-BR": {
     "v30.upd.gameRunning": "Feche o jogo primeiro: a atualização reinicia o ModLaunch, e é melhor não interromper a sessão. A atualização vai esperar.",
@@ -1202,7 +1220,7 @@
     "v30.ach.dialog": "{game} · conquistas {got} de {n}",
     "v30.ovl.total": "Total: {time} · {store}",
     "v30.ovl.shot": "Captura de tela",
-    "new.v30.subtitle": "Curadores, reembolsos, verificação em duas etapas, capturas no jogo e conquistas da Steam",
+    "new.v30.subtitle": "Prateleiras e coleções, espaço em disco, resumo do tempo de jogo, curadores e reembolsos",
     "new.v30.shots": "Captura no jogo: Ctrl+F12 salva a janela do jogo em Imagens\\ModLaunch, e as capturas aparecem na galeria do jogo. Nos jogos da Steam, F12 continua da Steam.",
     "new.v30.achievements": "Conquistas da Steam: a página do jogo em Todos os jogos mostra quantas foram desbloqueadas, as últimas e a lista completa. Lidas dos arquivos da Steam neste PC, sem rede.",
     "new.v30.overlay": "Overlay para todos os jogos: jogos da Epic, GOG, Xbox e outros launchers também ganham overlay, capturas e o status “jogando” para os amigos.",
@@ -1376,7 +1394,10 @@
     "v30.recap.weekday": "O dia da semana em que você mais joga: {day}",
     "v30.recap.perDay": "Em média {time} nos dias em que você jogou",
     "v30.recap.share": "“{name}” — {pct}% de todo o seu tempo",
-    "v30.recap.note": "Semana, mês e ano vêm do registro diário (desde a 30.2, guardado por três anos neste PC). “Desde sempre” usa as horas totais: as da Steam para jogos da Steam e o registro do ModLaunch para os demais."
+    "v30.recap.note": "Semana, mês e ano vêm do registro diário (desde a 30.2, guardado por três anos neste PC). “Desde sempre” usa as horas totais: as da Steam para jogos da Steam e o registro do ModLaunch para os demais.",
+    "new.v30.shelves": "Prateleiras na biblioteca: favoritos, jogos ocultos e suas coleções com jogos de qualquer launcher, além da ordem da lista — nome, recentes, mais jogados, tamanho.",
+    "new.v30.disk": "Espaço em disco: quanto ocupam os jogos de todos os launchers, o que você não abre há tempos e quanto dá para liberar.",
+    "new.v30.recap": "Resumo: quanto e o que você jogou na semana, no mês e no ano — em todos os launchers, com gráfico por dia."
   },
   "zh-CN": {
     "v30.upd.gameRunning": "请先关闭游戏：更新会重启 ModLaunch，最好不要中途打断游戏。更新会一直等着你。",
@@ -1399,7 +1420,7 @@
     "v30.ach.dialog": "{game} · 成就 {got} / {n}",
     "v30.ovl.total": "总计：{time} · {store}",
     "v30.ovl.shot": "截图",
-    "new.v30.subtitle": "鉴赏家、购买退款、两步验证、游戏内截图和 Steam 成就",
+    "new.v30.subtitle": "库书架与收藏夹、磁盘空间、游戏时长回顾、鉴赏家和退款",
     "new.v30.shots": "游戏内截图：Ctrl+F12 把游戏窗口保存到“图片\\ModLaunch”，截图会出现在游戏图库中。在 Steam 游戏中 F12 仍归 Steam。",
     "new.v30.achievements": "Steam 成就：“全部游戏”的游戏页面显示已解锁数量、最近解锁和完整列表。直接读取本机 Steam 文件，无需联网。",
     "new.v30.overlay": "所有游戏的覆盖层：来自 Epic、GOG、Xbox 等启动器的游戏也有覆盖层、截图，并向好友显示“正在游戏”。",
@@ -1573,6 +1594,9 @@
     "v30.recap.weekday": "你最常在这一天玩游戏：{day}",
     "v30.recap.perDay": "游玩当天平均 {time}",
     "v30.recap.share": "“{name}”占全部时间的 {pct}%",
-    "v30.recap.note": "本周、本月和今年来自按天记录（自 30.2 起，在本机保存三年）。“全部”使用累计时长：Steam 游戏取 Steam 的数据，其余取 ModLaunch 的统计。"
+    "v30.recap.note": "本周、本月和今年来自按天记录（自 30.2 起，在本机保存三年）。“全部”使用累计时长：Steam 游戏取 Steam 的数据，其余取 ModLaunch 的统计。",
+    "new.v30.shelves": "库书架：收藏、隐藏游戏，以及可混合任意启动器游戏的自定义收藏夹，还能按名称、最近、游玩最多、大小排序。",
+    "new.v30.disk": "磁盘空间：所有启动器的游戏占用多少、哪些很久没玩、能释放多少空间。",
+    "new.v30.recap": "游戏回顾：本周、本月、今年玩了多久、玩了什么——涵盖所有启动器，并有按天图表。"
   }
 }
