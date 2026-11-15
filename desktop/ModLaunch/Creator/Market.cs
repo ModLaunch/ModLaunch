@@ -179,7 +179,8 @@ public static partial class Market
         if (!force && _cache is not null && DateTime.UtcNow - _cachedAt < TimeSpan.FromMinutes(1)) return _cache;
         // 31.0: только активные — правила базы не пускают запрос, который может вернуть чужие скрытые лоты
         // (без фильтра витрина была пустой у всех, кроме админа). Индекс status+updated — firebase/firestore.indexes.json.
-        _cache = (await Query("market", "status", "active", order: "updated", sorted: true)).Select(FromDoc).Where(l => l.Active).ToList();
+        try { await Safety.Refresh(); } catch { }
+        _cache = (await Query("market", "status", "active", order: "updated", sorted: true)).Select(FromDoc).Where(l => l.Active && !Safety.IsDown("listing", l.Id)).ToList();
         _cachedAt = DateTime.UtcNow;
         return _cache;
     }
@@ -458,6 +459,8 @@ public static partial class Market
         var old = chunks;
         if (d.File is not null)
         {
+            // 31.0: перед выставлением — чёрный список и Защитник Windows.
+            await Features.VirusScan.BeforePublish(d.File);
             var bytes = await File.ReadAllBytesAsync(d.File);
             if (bytes.LongLength > MaxFile) throw new ServiceError("FILE_TOO_BIG");
             size = bytes.LongLength;
@@ -600,6 +603,8 @@ public static partial class Market
         var dir = Directory.CreateDirectory(Path.Combine(Paths.DownloadsTemp, "market")).FullName;
         var file = Path.Combine(dir, Regex.Replace(l.FileName is { Length: > 0 } f ? f : $"{Projects.PackageName(l.Title)}.zip", @"[^\w.\-]+", "_").TrimStart('.'));
         await File.WriteAllBytesAsync(file, ms.ToArray());
+        // 31.0: файл от другого человека — перед тем как отдать его в установку, проверяем.
+        await Features.VirusScan.BeforeInstall(file, "market:" + l.Id);
         return file;
     }
 

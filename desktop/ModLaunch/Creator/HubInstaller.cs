@@ -13,7 +13,10 @@ public static class HubInstaller
         var meta = new JsonObject { ["url"] = null, ["icon"] = mod.Images.FirstOrDefault() };
         if (mod.IsPackage)
         {
+            // 31.0: снятое админом не ставится; файл от автора — через чёрный список и Защитник Windows.
+            if (Social.Safety.IsDown("creation", mod.Id)) throw new InvalidOperationException(I18n.T("v31.safe.down"));
             var zip = await Hub.Download(mod, version, progress, ct);
+            await Features.VirusScan.BeforeInstall(zip, "hub:" + mod.Id, ct);
             try
             {
                 if (registry.Has(mod.Id)) registry.Remove(mod.Id);

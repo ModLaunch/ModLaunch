@@ -77,7 +77,8 @@ public static partial class Hub
         // 9.5: кошелёк изменился с момента чтения (условие updateTime) — повторим с новым состоянием.
         if (reason.Contains("FAILED_PRECONDITION") || reason.Contains("ABORTED")) throw new ServiceError("PRECONDITION", reason);
         if (reason.Contains("ALREADY_EXISTS") || status == 409) throw new ServiceError("EXISTS", reason);
-        if (status == 403 || reason.Contains("PERMISSION_DENIED")) throw new ServiceError("DENIED", reason);
+        // На эмуляторе (только проверки) — с телом запроса, чтобы было видно, что именно отклонили правила.
+        if (status == 403 || reason.Contains("PERMISSION_DENIED")) throw new ServiceError("DENIED", Firebase.Emulator is null ? reason : reason + " | " + body?.ToJsonString());
         throw new ServiceError("SERVER", reason);
     }
 
@@ -139,7 +140,9 @@ public static partial class Hub
         try
         {
             var rows = await Call(Firebase.Url(":runQuery"), HttpMethod.Post, new JsonObject { ["structuredQuery"] = query }, null);
-            _cache = (rows as JsonArray ?? []).Select(r => r?["document"] as JsonObject).OfType<JsonObject>().Select(FromDoc).ToList();
+            // 31.0: снятое админом (вирус, жалоба правообладателя) из каталога пропадает у всех.
+            try { await Social.Safety.Refresh(); } catch { }
+            _cache = (rows as JsonArray ?? []).Select(r => r?["document"] as JsonObject).OfType<JsonObject>().Select(FromDoc).Where(m => !Social.Safety.IsDown("creation", m.Id)).ToList();
             _cachedAt = DateTime.UtcNow;
             LastError = null;
             CheckFollowed(_cache);
@@ -373,6 +376,8 @@ public static partial class Hub
         var chunks = 0;
         if (d.Archive is not null)
         {
+            // 31.0: перед публикацией — чёрный список и Защитник Windows: опасное в Hub не уйдёт.
+            await Features.VirusScan.BeforePublish(d.Archive, ct);
             var bytes = await File.ReadAllBytesAsync(d.Archive, ct);
             if (bytes.LongLength > MaxFile) throw new ServiceError("FILE_TOO_BIG");
             size = bytes.LongLength;

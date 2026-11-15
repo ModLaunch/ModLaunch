@@ -183,6 +183,9 @@ public static partial class Installer
     public static JsonObject InstallArchive(ModRegistry registry, string archivePath, JsonObject meta)
     {
         var game = registry.Game;
+        // 31.0: файл из чёрного списка ModLaunch (вирус, снят админом) не ставится ни из какого источника.
+        if (Social.Safety.BlockedCount > 0 && Social.Safety.IsBlocked(Social.Safety.Sha256(archivePath)))
+            throw new InvalidOperationException(I18n.T("v31.scan.blocked"));
         // BepInEx: patchers/, monomod/, config/ и core/ — не в plugins (см. BepInExLayout).
         var parts = game.Loader == LoaderKind.Bepinex ? BepInExLayout.Find(Archive.Files(archivePath)).Where(p => p.Kind != "plugins").ToList() : [];
         Func<string, bool>? skip = parts.Count > 0 ? entry => BepInExLayout.Inside(entry, parts) : null;

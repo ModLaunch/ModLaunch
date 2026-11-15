@@ -68,6 +68,7 @@ public static class IndieGames
                 d.File = null;
             }
             else d.File = buildFile;
+            if (d.File is null) await Features.VirusScan.BeforePublish(buildFile);
         }
         else if (existing is null) throw new ServiceError("NO_FILE");
 
@@ -130,6 +131,8 @@ public static class IndieGames
             var link = await Link(l);
             // Отпечаток сверяет загрузчик: подменённый на сервере файл не встанет.
             file = await Http.Download(link.Url, Safe(link.FileName is { Length: > 0 } n ? n : Slug(l.Title) + ".zip"), progress, link.Sha256 is { Length: 64 } sha ? sha : null, ct);
+            // 31.0: сборка по ссылке разработчика — тоже через проверку (файлы из базы проверяет Market.Download).
+            await Features.VirusScan.BeforeInstall(file, "indie:" + l.Id, ct);
         }
         var dir = FolderFor(l);
         await Task.Run(() => Unpack(file, dir), ct);
