@@ -20,7 +20,7 @@
     "v30.ach.dialog": "{game} · достижения {got} из {n}",
     "v30.ovl.total": "Всего: {time} · {store}",
     "v30.ovl.shot": "Снимок экрана",
-    "new.v30.subtitle": "Снимки экрана в игре, достижения Steam, оверлей для всех игр и исправления",
+    "new.v30.subtitle": "Кураторы, возврат покупок, двухфакторная защита, снимки экрана в игре и достижения Steam",
     "new.v30.shots": "Снимок экрана в игре: Ctrl+F12 сохраняет окно игры в «Изображения\\ModLaunch», снимки видны в галерее игры. В играх Steam F12 остаётся за Steam.",
     "new.v30.achievements": "Достижения Steam: на странице игры во «Всех играх» — сколько получено, последние и полный список. Читается из файлов Steam на этом ПК, без сети.",
     "new.v30.overlay": "Оверлей для всех игр: игры из Epic, GOG, Xbox и других лаунчеров тоже получают оверлей, снимки экрана и статус «в игре» для друзей.",
@@ -117,7 +117,10 @@
     "v30.cur.off": "Кураторы временно недоступны — попробуйте позже.",
     "v30.cur.own": "Это ваша страница — подписываться на себя не нужно.",
     "v30.cur.tooMany": "Подписаться можно не больше чем на {n} кураторов — отпишитесь от кого-нибудь.",
-    "v30.cur.noName": "Напишите имя куратора."
+    "v30.cur.noName": "Напишите имя куратора.",
+    "new.v30.curators": "Кураторы: подписывайтесь на людей, которые пишут об играх, — их мнение видно на странице игры. Можно завести и свою страницу куратора.",
+    "new.v30.refunds": "Возврат покупок: платную покупку в маркете можно вернуть в течение 14 дней — заявку рассматривает администратор, деньги возвращаются в кошелёк.",
+    "new.v30.mfa": "Двухфакторная защита: в «Аккаунт → Безопасность» можно подключить приложение-аутентификатор — без кода с телефона в аккаунт не войти."
   },
   "en": {
     "v30.upd.gameRunning": "Close the game first: updating restarts ModLaunch, and it's better not to interrupt your session. The update will wait.",
@@ -140,7 +143,7 @@
     "v30.ach.dialog": "{game} · achievements {got} of {n}",
     "v30.ovl.total": "Total: {time} · {store}",
     "v30.ovl.shot": "Screenshot",
-    "new.v30.subtitle": "In-game screenshots, Steam achievements, overlay for every game and fixes",
+    "new.v30.subtitle": "Curators, purchase refunds, two-factor protection, in-game screenshots and Steam achievements",
     "new.v30.shots": "In-game screenshot: Ctrl+F12 saves the game window to Pictures\\ModLaunch, and screenshots show up in the game's gallery. In Steam games F12 stays Steam's.",
     "new.v30.achievements": "Steam achievements: the game page in All games shows how many are unlocked, the latest ones and the full list. Read from Steam's files on this PC, no network.",
     "new.v30.overlay": "Overlay for every game: games from Epic, GOG, Xbox and other launchers also get the overlay, screenshots and a “playing” status for friends.",
@@ -237,7 +240,10 @@
     "v30.cur.off": "Curators are temporarily unavailable — try again later.",
     "v30.cur.own": "That's your own page — no need to follow yourself.",
     "v30.cur.tooMany": "You can follow up to {n} curators — unfollow someone first.",
-    "v30.cur.noName": "Enter a curator name."
+    "v30.cur.noName": "Enter a curator name.",
+    "new.v30.curators": "Curators: follow people who write about games — their take shows up on the game's page. You can run your own curator page too.",
+    "new.v30.refunds": "Refunds: a paid market purchase can be returned within 14 days — an admin reviews the request and the money goes back to your wallet.",
+    "new.v30.mfa": "Two-factor protection: connect an authenticator app in Account → Security — nobody signs in without the code from your phone."
   },
   "uk": {
     "v30.upd.gameRunning": "Спершу закрийте гру: оновлення перезапускає ModLaunch, а гру краще не переривати посеред сесії. Оновлення нікуди не дінеться.",
@@ -260,7 +266,7 @@
     "v30.ach.dialog": "{game} · досягнення {got} з {n}",
     "v30.ovl.total": "Усього: {time} · {store}",
     "v30.ovl.shot": "Знімок екрана",
-    "new.v30.subtitle": "Знімки екрана в грі, досягнення Steam, оверлей для всіх ігор і виправлення",
+    "new.v30.subtitle": "Куратори, повернення покупок, двофакторний захист, знімки екрана в грі та досягнення Steam",
     "new.v30.shots": "Знімок екрана в грі: Ctrl+F12 зберігає вікно гри в «Зображення\\ModLaunch», знімки видно в галереї гри. В іграх Steam F12 лишається за Steam.",
     "new.v30.achievements": "Досягнення Steam: на сторінці гри в «Усіх іграх» — скільки отримано, останні й повний список. Читається з файлів Steam на цьому ПК, без мережі.",
     "new.v30.overlay": "Оверлей для всіх ігор: ігри з Epic, GOG, Xbox та інших лаунчерів теж отримують оверлей, знімки екрана й статус «у грі» для друзів.",
@@ -357,7 +363,10 @@
     "v30.cur.off": "Куратори тимчасово недоступні — спробуйте пізніше.",
     "v30.cur.own": "Це ваша сторінка — підписуватися на себе не потрібно.",
     "v30.cur.tooMany": "Підписатися можна не більше ніж на {n} кураторів — відпишіться від когось.",
-    "v30.cur.noName": "Напишіть ім'я куратора."
+    "v30.cur.noName": "Напишіть ім'я куратора.",
+    "new.v30.curators": "Куратори: підписуйтеся на людей, які пишуть про ігри, — їхня думка видна на сторінці гри. Можна завести й власну сторінку куратора.",
+    "new.v30.refunds": "Повернення покупок: платну покупку в маркеті можна повернути протягом 14 днів — заявку розглядає адміністратор, гроші повертаються в гаманець.",
+    "new.v30.mfa": "Двофакторний захист: в «Акаунт → Безпека» можна підключити застосунок-автентифікатор — без коду з телефона до акаунта не увійти."
   },
   "es": {
     "v30.upd.gameRunning": "Cierra primero el juego: la actualización reinicia ModLaunch y es mejor no interrumpir la partida. La actualización esperará.",
@@ -380,7 +389,7 @@
     "v30.ach.dialog": "{game} · logros {got} de {n}",
     "v30.ovl.total": "Total: {time} · {store}",
     "v30.ovl.shot": "Captura",
-    "new.v30.subtitle": "Capturas en el juego, logros de Steam, overlay para todos los juegos y correcciones",
+    "new.v30.subtitle": "Curadores, reembolsos, verificación en dos pasos, capturas en el juego y logros de Steam",
     "new.v30.shots": "Captura en el juego: Ctrl+F12 guarda la ventana del juego en Imágenes\\ModLaunch y las capturas aparecen en la galería del juego. En juegos de Steam, F12 sigue siendo de Steam.",
     "new.v30.achievements": "Logros de Steam: la página del juego en Todos los juegos muestra cuántos llevas, los últimos y la lista completa. Se leen de los archivos de Steam de este PC, sin red.",
     "new.v30.overlay": "Overlay para todos los juegos: los juegos de Epic, GOG, Xbox y otros launchers también tienen overlay, capturas y el estado «jugando» para tus amigos.",
@@ -477,7 +486,10 @@
     "v30.cur.off": "Los curadores no están disponibles por ahora; inténtalo más tarde.",
     "v30.cur.own": "Es tu propia página: no hace falta seguirte.",
     "v30.cur.tooMany": "Puedes seguir hasta {n} curadores: deja de seguir a alguien primero.",
-    "v30.cur.noName": "Escribe un nombre de curador."
+    "v30.cur.noName": "Escribe un nombre de curador.",
+    "new.v30.curators": "Curadores: sigue a quienes escriben sobre juegos y verás su opinión en la página del juego. También puedes tener tu propia página de curador.",
+    "new.v30.refunds": "Reembolsos: una compra de pago en el mercado se puede devolver en 14 días; un administrador revisa la solicitud y el dinero vuelve a tu monedero.",
+    "new.v30.mfa": "Verificación en dos pasos: conecta una app de autenticación en Cuenta → Seguridad; nadie entra sin el código de tu móvil."
   },
   "de": {
     "v30.upd.gameRunning": "Schließ zuerst das Spiel: Das Update startet ModLaunch neu, und die Sitzung sollte nicht unterbrochen werden. Das Update wartet.",
@@ -500,7 +512,7 @@
     "v30.ach.dialog": "{game} · Erfolge {got} von {n}",
     "v30.ovl.total": "Gesamt: {time} · {store}",
     "v30.ovl.shot": "Screenshot",
-    "new.v30.subtitle": "Screenshots im Spiel, Steam-Erfolge, Overlay für alle Spiele und Korrekturen",
+    "new.v30.subtitle": "Kuratoren, Erstattungen, Zwei-Faktor-Absicherung, Screenshots im Spiel und Steam-Erfolge",
     "new.v30.shots": "Screenshot im Spiel: Strg+F12 speichert das Spielfenster unter Bilder\\ModLaunch, die Screenshots erscheinen in der Galerie des Spiels. In Steam-Spielen bleibt F12 bei Steam.",
     "new.v30.achievements": "Steam-Erfolge: Die Spielseite unter „Alle Spiele“ zeigt, wie viele freigeschaltet sind, die neuesten und die ganze Liste. Gelesen aus den Steam-Dateien dieses PCs, ohne Netz.",
     "new.v30.overlay": "Overlay für alle Spiele: Spiele aus Epic, GOG, Xbox und anderen Launchern bekommen ebenfalls Overlay, Screenshots und den Status „spielt“ für Freunde.",
@@ -597,7 +609,10 @@
     "v30.cur.off": "Kuratoren sind vorübergehend nicht verfügbar – versuch es später erneut.",
     "v30.cur.own": "Das ist deine eigene Seite – dir selbst musst du nicht folgen.",
     "v30.cur.tooMany": "Du kannst bis zu {n} Kuratoren folgen – entfolge zuerst jemandem.",
-    "v30.cur.noName": "Gib einen Kuratorennamen ein."
+    "v30.cur.noName": "Gib einen Kuratorennamen ein.",
+    "new.v30.curators": "Kuratoren: Folge Leuten, die über Spiele schreiben – ihre Meinung steht auf der Spielseite. Du kannst auch eine eigene Kuratorenseite führen.",
+    "new.v30.refunds": "Erstattungen: Ein bezahlter Marktkauf lässt sich 14 Tage lang zurückgeben – ein Admin prüft die Anfrage, das Geld geht zurück in die Geldbörse.",
+    "new.v30.mfa": "Zwei-Faktor-Absicherung: Verbinde unter Konto → Sicherheit eine Authenticator-App – ohne den Code vom Handy kommt niemand ins Konto."
   },
   "fr": {
     "v30.upd.gameRunning": "Fermez d'abord le jeu : la mise à jour redémarre ModLaunch et mieux vaut ne pas interrompre la partie. La mise à jour attendra.",
@@ -620,7 +635,7 @@
     "v30.ach.dialog": "{game} · succès {got} sur {n}",
     "v30.ovl.total": "Total : {time} · {store}",
     "v30.ovl.shot": "Capture d'écran",
-    "new.v30.subtitle": "Captures en jeu, succès Steam, overlay pour tous les jeux et corrections",
+    "new.v30.subtitle": "Curateurs, remboursements, double authentification, captures en jeu et succès Steam",
     "new.v30.shots": "Capture en jeu : Ctrl+F12 enregistre la fenêtre du jeu dans Images\\ModLaunch, et les captures apparaissent dans la galerie du jeu. Dans les jeux Steam, F12 reste à Steam.",
     "new.v30.achievements": "Succès Steam : la page du jeu dans Tous les jeux affiche combien sont débloqués, les derniers et la liste complète. Lus dans les fichiers Steam de ce PC, sans réseau.",
     "new.v30.overlay": "Overlay pour tous les jeux : les jeux d'Epic, GOG, Xbox et d'autres launchers ont aussi l'overlay, les captures et le statut « en jeu » pour les amis.",
@@ -717,7 +732,10 @@
     "v30.cur.off": "Les curateurs sont temporairement indisponibles — réessayez plus tard.",
     "v30.cur.own": "C'est votre propre page — inutile de vous suivre.",
     "v30.cur.tooMany": "Vous pouvez suivre jusqu'à {n} curateurs — désabonnez-vous de quelqu'un d'abord.",
-    "v30.cur.noName": "Saisissez un nom de curateur."
+    "v30.cur.noName": "Saisissez un nom de curateur.",
+    "new.v30.curators": "Curateurs : suivez des personnes qui écrivent sur les jeux — leur avis s'affiche sur la page du jeu. Vous pouvez aussi tenir votre propre page.",
+    "new.v30.refunds": "Remboursements : un achat payant du marché peut être retourné sous 14 jours — un administrateur examine la demande et l'argent revient au portefeuille.",
+    "new.v30.mfa": "Double authentification : connectez une application d'authentification dans Compte → Sécurité — personne n'entre sans le code de votre téléphone."
   },
   "pt-BR": {
     "v30.upd.gameRunning": "Feche o jogo primeiro: a atualização reinicia o ModLaunch, e é melhor não interromper a sessão. A atualização vai esperar.",
@@ -740,7 +758,7 @@
     "v30.ach.dialog": "{game} · conquistas {got} de {n}",
     "v30.ovl.total": "Total: {time} · {store}",
     "v30.ovl.shot": "Captura de tela",
-    "new.v30.subtitle": "Capturas no jogo, conquistas da Steam, overlay para todos os jogos e correções",
+    "new.v30.subtitle": "Curadores, reembolsos, verificação em duas etapas, capturas no jogo e conquistas da Steam",
     "new.v30.shots": "Captura no jogo: Ctrl+F12 salva a janela do jogo em Imagens\\ModLaunch, e as capturas aparecem na galeria do jogo. Nos jogos da Steam, F12 continua da Steam.",
     "new.v30.achievements": "Conquistas da Steam: a página do jogo em Todos os jogos mostra quantas foram desbloqueadas, as últimas e a lista completa. Lidas dos arquivos da Steam neste PC, sem rede.",
     "new.v30.overlay": "Overlay para todos os jogos: jogos da Epic, GOG, Xbox e outros launchers também ganham overlay, capturas e o status “jogando” para os amigos.",
@@ -837,7 +855,10 @@
     "v30.cur.off": "Curadores estão temporariamente indisponíveis — tente mais tarde.",
     "v30.cur.own": "É a sua própria página — não precisa seguir a si mesmo.",
     "v30.cur.tooMany": "Você pode seguir até {n} curadores — deixe de seguir alguém antes.",
-    "v30.cur.noName": "Digite um nome de curador."
+    "v30.cur.noName": "Digite um nome de curador.",
+    "new.v30.curators": "Curadores: siga quem escreve sobre jogos — a opinião aparece na página do jogo. Você também pode ter sua própria página de curador.",
+    "new.v30.refunds": "Reembolsos: uma compra paga no mercado pode ser devolvida em até 14 dias — um administrador analisa o pedido e o dinheiro volta para a carteira.",
+    "new.v30.mfa": "Verificação em duas etapas: conecte um app autenticador em Conta → Segurança — ninguém entra sem o código do seu celular."
   },
   "zh-CN": {
     "v30.upd.gameRunning": "请先关闭游戏：更新会重启 ModLaunch，最好不要中途打断游戏。更新会一直等着你。",
@@ -860,7 +881,7 @@
     "v30.ach.dialog": "{game} · 成就 {got} / {n}",
     "v30.ovl.total": "总计：{time} · {store}",
     "v30.ovl.shot": "截图",
-    "new.v30.subtitle": "游戏内截图、Steam 成就、所有游戏的覆盖层以及修复",
+    "new.v30.subtitle": "鉴赏家、购买退款、两步验证、游戏内截图和 Steam 成就",
     "new.v30.shots": "游戏内截图：Ctrl+F12 把游戏窗口保存到“图片\\ModLaunch”，截图会出现在游戏图库中。在 Steam 游戏中 F12 仍归 Steam。",
     "new.v30.achievements": "Steam 成就：“全部游戏”的游戏页面显示已解锁数量、最近解锁和完整列表。直接读取本机 Steam 文件，无需联网。",
     "new.v30.overlay": "所有游戏的覆盖层：来自 Epic、GOG、Xbox 等启动器的游戏也有覆盖层、截图，并向好友显示“正在游戏”。",
@@ -957,6 +978,9 @@
     "v30.cur.off": "鉴赏家功能暂时不可用——请稍后再试。",
     "v30.cur.own": "这是你自己的页面——无需关注自己。",
     "v30.cur.tooMany": "最多可关注 {n} 位鉴赏家——请先取消关注一些人。",
-    "v30.cur.noName": "请输入鉴赏家名称。"
+    "v30.cur.noName": "请输入鉴赏家名称。",
+    "new.v30.curators": "鉴赏家：关注撰写游戏评价的人——他们的看法会显示在游戏页面上。你也可以创建自己的鉴赏家页面。",
+    "new.v30.refunds": "购买退款：市场中的付费购买可在 14 天内退回——由管理员审核申请，钱会退回钱包。",
+    "new.v30.mfa": "两步验证：在“账号 → 安全”中连接身份验证器应用——没有手机上的验证码，谁也登录不了。"
   }
 }

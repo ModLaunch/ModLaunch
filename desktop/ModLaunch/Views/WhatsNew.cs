@@ -12,6 +12,10 @@ public static class WhatsNew
 {
     static readonly (string Icon, string Key, Func<Page>? Open)[] Items =
     [
+        // 30.1: кураторы, возврат покупок, двухфакторная защита.
+        (Icons.Users, "new.v30.curators", () => new CuratorsPage()),
+        (Icons.Undo, "new.v30.refunds", () => new AccountPage("purchases")),
+        (Icons.Shield, "new.v30.mfa", () => new AccountPage("security")),
         // 30.0: долги из аудита — снимки экрана, достижения Steam, оверлей для всех игр, исправления.
         (Icons.Image, "new.v30.shots", () => new SettingsPage("launch")),
         (Icons.Trophy, "new.v30.achievements", () => new AllGamesPage()),
