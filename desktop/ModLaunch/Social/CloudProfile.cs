@@ -81,6 +81,8 @@ public static class CloudProfile
             ["at"] = now,
             ["devices"] = devices,
             ["profile"] = MergeProfile(cloud?["profile"] as JsonObject, Settings.Data.Obj("profile")),
+            // 30.4: полки библиотеки «Все игры» — избранное, коллекции, статусы, скрытые, заметки (свежая версия побеждает).
+            ["library"] = Games.Shelves.Newer(cloud?["library"], Games.Shelves.Current.Snapshot()),
             ["style"] = Configs.Capture(I18n.T("v10.cloud.styleName", ("pc", Environment.MachineName))),
         };
     }
@@ -157,6 +159,9 @@ public static class CloudProfile
         // 11.0: часы по сборкам с других ПК — те, которых здесь ещё нет (новый ПК, переустановка).
         foreach (var (id, node) in cloud["devices"] as JsonObject ?? [])
             if (id != DeviceId && node?["builds"] is JsonObject builds) Features.BuildTime.Adopt(builds);
+        // 30.4: полки, отредактированные на другом ПК позже, чем здесь.
+        // Полки читает окно — подменяем их в потоке окна, а не посреди отрисовки.
+        if (cloud["library"] is JsonObject library) Avalonia.Threading.Dispatcher.UIThread.Post(() => Games.Shelves.Current.Adopt(library));
         if (cloud["profile"] is not JsonObject p) return;
         Settings.Data["profile"] = MergeProfile(p, Settings.Data.Obj("profile"));
         Settings.Save();

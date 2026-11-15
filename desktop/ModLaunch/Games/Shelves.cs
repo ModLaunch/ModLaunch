@@ -31,8 +31,33 @@ public sealed class Shelves
 
     void Save()
     {
+        // 30.4: время правки — по нему облачный профиль решает, чья библиотека свежее (этого ПК или другого).
+        _data["at"] = DateTime.UtcNow.ToString("o");
         if (Store.IsValueCreated && ReferenceEquals(this, Store.Value.Shelves)) Store.Value.File.Save();
         Changed?.Invoke();
+    }
+
+    // ---------------------------------------------------------------- 30.4: синхронизация между ПК
+
+    static DateTime At(JsonNode? lib) =>
+        DateTime.TryParse(lib?["at"]?.GetValue<string>(), null, System.Globalization.DateTimeStyles.RoundtripKind, out var t) ? t.ToUniversalTime() : DateTime.MinValue;
+
+    /// <summary>Полки для облака: копия всего, что есть (избранное, скрытые, коллекции, статусы, заметки, порядок).</summary>
+    public JsonObject Snapshot() => (JsonObject)_data.DeepClone();
+
+    /// <summary>Какую библиотеку класть в облако: более свежую из облачной и этой.</summary>
+    public static JsonObject Newer(JsonNode? cloud, JsonObject local) =>
+        cloud is JsonObject c && At(c) > At(local) ? (JsonObject)c.DeepClone() : local;
+
+    /// <summary>Взять полки из облака, если там свежее (правили на другом ПК). true — взяли.</summary>
+    public bool Adopt(JsonObject cloud)
+    {
+        if (At(cloud) <= At(_data)) return false;
+        foreach (var key in _data.Select(kv => kv.Key).ToList()) _data.Remove(key);
+        foreach (var (key, value) in cloud) _data[key] = value?.DeepClone();
+        if (Store.IsValueCreated && ReferenceEquals(this, Store.Value.Shelves)) Store.Value.File.Save();
+        Changed?.Invoke();
+        return true;
     }
 
     JsonArray List(string name)
@@ -180,6 +205,7 @@ public sealed class Shelves
         }
         if (_data["notes"] is not JsonObject notes) { notes = new JsonObject(); _data["notes"] = notes; }
         if (string.IsNullOrWhiteSpace(text)) notes.Remove(g.Key); else notes[g.Key] = text;
+        _data["at"] = DateTime.UtcNow.ToString("o");
         if (Store.IsValueCreated && ReferenceEquals(this, Store.Value.Shelves)) Store.Value.File.Save();
     }
 
@@ -270,6 +296,16 @@ public sealed class Shelves
         var picks = Enumerable.Range(0, 200).Select(i => st.Pick([a, b, c], g => stats[g.Key].Item1, new Random(i), now: DateTimeOffset.FromUnixTimeSeconds(10_000_000))?.Key).ToList();
         if (picks.Contains("steam:1") || picks.Contains(null) || !picks.Contains("steam:2") || !picks.Contains("epic:c")) throw new Exception("pick skips done games");
         if (st.Pick([a], g => 0, new Random(1), DateTimeOffset.UtcNow) is not null) throw new Exception("nothing to pick");
-        return "favorites, hidden, collections, status, random pick and four sort orders";
+        // Синхронизация: свежая библиотека побеждает, старая не затирает новую.
+        var pc1 = new Shelves(new JsonObject());
+        pc1.ToggleFavorite("steam:1");
+        var older = pc1.Snapshot();
+        Thread.Sleep(5);
+        var pc2 = new Shelves(new JsonObject());
+        pc2.Create("Coop");
+        if (!pc1.Adopt(pc2.Snapshot()) || pc1.IsFavorite("steam:1") || pc1.Collections.Single() != "Coop") throw new Exception("adopt newer");
+        if (pc1.Adopt(older) || pc1.Collections.Count != 1) throw new Exception("older must not win");
+        if (!Newer(older, pc1.Snapshot()).ContainsKey("collections") || Newer(pc1.Snapshot(), new Shelves(new JsonObject()).Snapshot()).Count == 0) throw new Exception("newer for cloud");
+        return "favorites, hidden, collections, status, random pick, sync between PCs and four sort orders";
     }
 }
