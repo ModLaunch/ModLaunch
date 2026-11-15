@@ -12,6 +12,10 @@ public static class WhatsNew
 {
     static readonly (string Icon, string Key, Func<Page>? Open)[] Items =
     [
+        // 30.4: полки на всех ПК, друзья в игре и итог сеанса, экспорт библиотеки.
+        (Icons.Cloud, "new.v30.sync", () => new AllGamesPage()),
+        (Icons.Users, "new.v30.friendsGame", () => new AllGamesPage()),
+        (Icons.Download, "new.v30.export", null),
         // 30.3: статус и случайная игра, заметки и ярлыки, быстрый переход.
         (Icons.Flag, "new.v30.status", () => new AllGamesPage()),
         (Icons.Edit, "new.v30.notes", () => new AllGamesPage()),
