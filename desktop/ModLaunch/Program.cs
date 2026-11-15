@@ -50,6 +50,7 @@ public static class Program
         if (args.Contains("--list-games")) return Games.AllGames.Cli();
         if (args.Contains("--recommend")) return Features.GameRecommend.Cli();
         if (args.Contains("--news")) return Features.GameNews.Cli(args);
+        if (args.Contains("--similar")) return Features.GameRecommend.SimilarCli(args);
         var shot = Array.IndexOf(args, "--screenshot");
         if (shot >= 0 && shot + 1 < args.Length) return Screenshots(args[shot + 1], args.Contains("--only"));
 

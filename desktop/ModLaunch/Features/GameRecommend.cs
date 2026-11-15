@@ -230,6 +230,46 @@ public static class GameRecommend
         finally { Gate.Release(); }
     }
 
+    /// <summary>
+    /// 30.13: «Похожие игры» для одной игры — её теги SteamSpy, списки двух-трёх главных тегов и тот же рейтинг,
+    /// что у «Для вас». Уже имеющиеся игры и эту саму не предлагаем.
+    /// </summary>
+    public static async Task<List<GamePick>> Similar(int appId, string name, int max = 6, CancellationToken ct = default)
+    {
+        if (appId <= 0) return [];
+        if (Program.Demo || Program.Screenshot) return Demo().Where(p => p.AppId != appId).Take(max).Select(p => p with { Because = name }).ToList();
+        await Gate.WaitAsync(ct);
+        try
+        {
+            var seed = new Seed(appId, name, 60);
+            var tagged = new List<(Seed, Dictionary<string, long>)> { (seed, await TagsOf(appId, ct)) };
+            if (tagged[0].Item2.Count == 0) return [];
+            var taste = Taste(tagged);
+            var lists = new Dictionary<string, List<(int, string, long, long, long, int)>>();
+            foreach (var tag in ChooseTags(taste, tagged).Take(3))
+                lists[tag] = ParseList(await ListOf(tag, ct));
+            Cache.Save();
+            var skip = Owned();
+            skip.Add(appId);
+            return Rank(taste, lists, tagged, skip, max);
+        }
+        finally { Gate.Release(); }
+    }
+
+    /// <summary>--similar &lt;номер в Steam&gt;: похожие игры текстом (проверка без окна).</summary>
+    public static int SimilarCli(string[] args)
+    {
+        var at = Array.IndexOf(args, "--similar");
+        if (at < 0 || at + 1 >= args.Length || !int.TryParse(args[at + 1], out var appId)) { Console.WriteLine("usage: --similar <steam app id>"); return 2; }
+        try
+        {
+            foreach (var p in Similar(appId, "#" + appId).GetAwaiter().GetResult())
+                Console.WriteLine($"{p.AppId,8} {p.Score,3}% {p.Reviews,8} {p.Name}  [{string.Join(", ", p.Tags)}]");
+            return 0;
+        }
+        catch (Exception e) { Console.WriteLine("error: " + e.Message); return 1; }
+    }
+
     /// <summary>--recommend: что подобралось бы на этом ПК (для поддержки и проверки).</summary>
     public static int Cli()
     {

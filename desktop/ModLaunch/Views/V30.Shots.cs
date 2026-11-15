@@ -324,4 +324,18 @@ public static class V30Shots
         big.Close();
         s.Pump(500);
     }
+
+    /// <summary>MODLAUNCH_SHOTS=V30Similar: «Похожие игры» на странице игры (демо-подборка).</summary>
+    [DemoShots]
+    static void V30Similar(Shots s)
+    {
+        s.Pump(4500);
+        Games.AllGames.Refresh();
+        s.Pump(1500);
+        s.Window.Navigate(() => new AllGamesPage("steam:1245620"));
+        s.Pump(2500);
+        if (s.Window.CurrentPage is AllGamesPage page) page.ScrollDetailTo(930);
+        s.Pump(1500);
+        s.Save("v30-24-similar");
+    }
 }

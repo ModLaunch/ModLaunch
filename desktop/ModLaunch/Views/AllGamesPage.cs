@@ -614,6 +614,8 @@ public sealed class AllGamesPage : Page
         if (FriendsInGame(g) is { } friendsCard) body.Children.Add(friendsCard);
         // 30.8: новости игры — официальные объявления из Steam (и для игр других лаунчеров, если номер известен).
         if (g.SteamAppId > 0) body.Children.Add(new NewsCard(g.SteamAppId));
+        // 30.13: похожие игры — по тегам игроков (как «Для вас»), с «В желаемое».
+        if (g.SteamAppId > 0) body.Children.Add(new SimilarCard(g.SteamAppId, NameOf(g)));
         // 30.7: последние снимки экрана — свои (Ctrl+F12) и Steam.
         if (ShotsCard(g) is { } shots) body.Children.Add(shots);
         body.Children.Add(new GameReviewsCard(g));
