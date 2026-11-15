@@ -271,7 +271,8 @@
     "v30.invite.button": "Позвать в игру ({n})",
     "v30.invite.title": "Сыграть вместе",
     "v30.invite.lead": "Друзей в сети: {n}. Позовите кого-нибудь — приглашение придёт в чат.",
-    "new.v30.invite": "Позвать в игру: на странице любой игры — кнопка «Позвать в игру» для друзей в сети; приглашение придёт им в чат."
+    "new.v30.invite": "Позвать в игру: на странице любой игры — кнопка «Позвать в игру» для друзей в сети; приглашение придёт им в чат.",
+    "new.v30.bpShelves": "Big Picture по полкам: избранное — первым и со звёздочкой, потом «Играю» и недавние; скрытые игры на диване не показываются."
   },
   "en": {
     "v30.upd.gameRunning": "Close the game first: updating restarts ModLaunch, and it's better not to interrupt your session. The update will wait.",
@@ -545,7 +546,8 @@
     "v30.invite.button": "Invite to play ({n})",
     "v30.invite.title": "Play together",
     "v30.invite.lead": "Friends online: {n}. Invite someone — the invite arrives in chat.",
-    "new.v30.invite": "Invite to play: any game's page has an Invite to play button for friends who are online; the invite arrives in their chat."
+    "new.v30.invite": "Invite to play: any game's page has an Invite to play button for friends who are online; the invite arrives in their chat.",
+    "new.v30.bpShelves": "Big Picture follows your shelves: favorites first with a star, then Playing and recent; hidden games stay off the couch."
   },
   "uk": {
     "v30.upd.gameRunning": "Спершу закрийте гру: оновлення перезапускає ModLaunch, а гру краще не переривати посеред сесії. Оновлення нікуди не дінеться.",
@@ -819,7 +821,8 @@
     "v30.invite.button": "Покликати в гру ({n})",
     "v30.invite.title": "Зіграти разом",
     "v30.invite.lead": "Друзів у мережі: {n}. Покличте когось — запрошення прийде в чат.",
-    "new.v30.invite": "Покликати в гру: на сторінці будь-якої гри — кнопка «Покликати в гру» для друзів у мережі; запрошення прийде їм у чат."
+    "new.v30.invite": "Покликати в гру: на сторінці будь-якої гри — кнопка «Покликати в гру» для друзів у мережі; запрошення прийде їм у чат.",
+    "new.v30.bpShelves": "Big Picture за полицями: обране — першим і з зірочкою, потім «Граю» й нещодавні; приховані ігри на дивані не показуються."
   },
   "es": {
     "v30.upd.gameRunning": "Cierra primero el juego: la actualización reinicia ModLaunch y es mejor no interrumpir la partida. La actualización esperará.",
@@ -1093,7 +1096,8 @@
     "v30.invite.button": "Invitar a jugar ({n})",
     "v30.invite.title": "Jugar juntos",
     "v30.invite.lead": "Amigos conectados: {n}. Invita a alguien: la invitación llega por chat.",
-    "new.v30.invite": "Invitar a jugar: la página de cualquier juego tiene un botón para invitar a amigos conectados; la invitación les llega por chat."
+    "new.v30.invite": "Invitar a jugar: la página de cualquier juego tiene un botón para invitar a amigos conectados; la invitación les llega por chat.",
+    "new.v30.bpShelves": "Big Picture sigue tus estanterías: favoritos primero y con estrella, luego Jugando y recientes; los ocultos no aparecen en el sofá."
   },
   "de": {
     "v30.upd.gameRunning": "Schließ zuerst das Spiel: Das Update startet ModLaunch neu, und die Sitzung sollte nicht unterbrochen werden. Das Update wartet.",
@@ -1367,7 +1371,8 @@
     "v30.invite.button": "Zum Spielen einladen ({n})",
     "v30.invite.title": "Zusammen spielen",
     "v30.invite.lead": "Freunde online: {n}. Lade jemanden ein – die Einladung kommt im Chat an.",
-    "new.v30.invite": "Zum Spielen einladen: Jede Spielseite hat einen Knopf, um Freunde online einzuladen; die Einladung kommt in ihrem Chat an."
+    "new.v30.invite": "Zum Spielen einladen: Jede Spielseite hat einen Knopf, um Freunde online einzuladen; die Einladung kommt in ihrem Chat an.",
+    "new.v30.bpShelves": "Big Picture folgt deinen Regalen: Favoriten zuerst mit Stern, dann „Spiele gerade“ und zuletzt gespielt; ausgeblendete Spiele bleiben weg."
   },
   "fr": {
     "v30.upd.gameRunning": "Fermez d'abord le jeu : la mise à jour redémarre ModLaunch et mieux vaut ne pas interrompre la partie. La mise à jour attendra.",
@@ -1641,7 +1646,8 @@
     "v30.invite.button": "Inviter à jouer ({n})",
     "v30.invite.title": "Jouer ensemble",
     "v30.invite.lead": "Amis en ligne : {n}. Invitez quelqu'un — l'invitation arrive dans le chat.",
-    "new.v30.invite": "Inviter à jouer : la page de chaque jeu a un bouton pour inviter les amis en ligne ; l'invitation arrive dans leur chat."
+    "new.v30.invite": "Inviter à jouer : la page de chaque jeu a un bouton pour inviter les amis en ligne ; l'invitation arrive dans leur chat.",
+    "new.v30.bpShelves": "Big Picture suit vos étagères : favoris en premier avec une étoile, puis En cours et récents ; les jeux masqués restent cachés."
   },
   "pt-BR": {
     "v30.upd.gameRunning": "Feche o jogo primeiro: a atualização reinicia o ModLaunch, e é melhor não interromper a sessão. A atualização vai esperar.",
@@ -1915,7 +1921,8 @@
     "v30.invite.button": "Chamar para jogar ({n})",
     "v30.invite.title": "Jogar junto",
     "v30.invite.lead": "Amigos online: {n}. Chame alguém — o convite chega pelo chat.",
-    "new.v30.invite": "Chamar para jogar: a página de qualquer jogo tem um botão para chamar amigos online; o convite chega no chat deles."
+    "new.v30.invite": "Chamar para jogar: a página de qualquer jogo tem um botão para chamar amigos online; o convite chega no chat deles.",
+    "new.v30.bpShelves": "Big Picture segue suas prateleiras: favoritos primeiro e com estrela, depois Jogando e recentes; jogos ocultos não aparecem no sofá."
   },
   "zh-CN": {
     "v30.upd.gameRunning": "请先关闭游戏：更新会重启 ModLaunch，最好不要中途打断游戏。更新会一直等着你。",
@@ -2189,6 +2196,7 @@
     "v30.invite.button": "邀请一起玩（{n}）",
     "v30.invite.title": "一起玩",
     "v30.invite.lead": "在线好友：{n} 位。邀请谁一起玩吧——邀请会发到聊天中。",
-    "new.v30.invite": "邀请一起玩：任何游戏页面都有“邀请一起玩”按钮，可邀请在线好友；邀请会发到他们的聊天中。"
+    "new.v30.invite": "邀请一起玩：任何游戏页面都有“邀请一起玩”按钮，可邀请在线好友；邀请会发到他们的聊天中。",
+    "new.v30.bpShelves": "大屏幕模式按书架排列：收藏优先并带星标，其次是正在玩和最近玩过；隐藏的游戏不会显示。"
   }
 }
