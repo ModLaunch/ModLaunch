@@ -283,17 +283,10 @@ public sealed partial class ModPage
         return Ui.Card(col, 22);
     }
 
+    /// <summary>31.0: жалоба на мод Hub — общее окно с причиной из списка (вирус, авторские права, украденный мод…).</summary>
     void Report()
     {
-        var w = MainWindow.Current!;
-        var reason = new TextBox { Watermark = I18n.T("hub.report.hint"), AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 80, MaxLength = 500 };
-        w.Dialog(I18n.T("hub.report"), Ui.Col(8, Ui.Text(I18n.T("hub.report.text"), "muted", wrap: true), reason),
-            Ui.Button(I18n.T("common.cancel"), w.CloseDialog),
-            Ui.Button(I18n.T("hub.report.send"), async () =>
-            {
-                if (_hubMod is null) return;
-                try { await Hub.Report(_hubMod, reason.Text ?? ""); w.CloseDialog(); w.Toast(I18n.T("hub.report.done")); }
-                catch (Exception e) { w.CloseDialog(); w.Toast(Social.Firebase.Explain("creator", e), bad: true); }
-            }, "primary", Icons.Flag));
+        if (_hubMod is null) return;
+        ReportUi.Show("creation", _hubMod.Id, _hubMod.Uid, _hubMod.Name);
     }
 }

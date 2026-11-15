@@ -80,6 +80,8 @@ public sealed partial class AccountPage : Page
         // 14.0 → 20.0: комиссия площадки — доход владельца, место ей здесь, а не на рынке.
         if (Account.Owner && p.SignedIn) sections.Add(("commission", "v14.mk.tab.commission", Icons.Percent));
         if (p.Admin) sections.Add(("admin", "acc.s.admin", Icons.Shield));
+        // 31.0: очередь жалоб, снятия (DMCA), блокировки и чёрный список файлов.
+        if (p.Admin) sections.Add(("moderation", "v31.mod.tab", Icons.Flag));
         // Снимки экрана: «Заработок» на примере, без входа.
         var demo = Program.Screenshot && _tab is "earnings" or "premium";
         if (!p.SignedIn && !demo && _tab != "premium") _tab = "profile";
@@ -114,6 +116,7 @@ public sealed partial class AccountPage : Page
             "commission" when Account.Owner => new CommissionPanel(),
             "data" => DataTab(p),
             "admin" when p.Admin => Admin(),
+            "moderation" when p.Admin => new ModerationPanel(),
             _ => Profile(p),
         };
         if (_error is not null) body = Ui.Col(16, Ui.Card(Ui.Col(10, Ui.Text(_error, "", color: Ui.Res("Bad"), wrap: true), Ui.Button(I18n.T("cr.refresh"), () => { Reset(); Build(); }, "", Icons.Refresh)), 18), body);
@@ -248,6 +251,8 @@ public sealed partial class AccountPage : Page
             Ui.Button(I18n.T("acc.password.send"), () => Call(() => Account.ResetPassword(p.Email), I18n.T("acc.password.sent", ("email", p.Email ?? "")), reload: false), "", Icons.Key)));
         // 30.0: двухфакторная защита (код из приложения-аутентификатора).
         col.Children.Add(MfaUi.Card(p));
+        // 31.0: устройства, с которых входили, и «это вы?» для новых.
+        col.Children.Add(DevicesUi.Card());
         col.Children.Add(Card(I18n.T("acc.session"), I18n.T("acc.session.text"),
             Ui.Row(10,
                 Ui.Button(I18n.T("acc.session.refresh"), () => Call(async () => { await Account.RefreshProfile(); }, I18n.T("acc.session.ok"), reload: false), "", Icons.Refresh),

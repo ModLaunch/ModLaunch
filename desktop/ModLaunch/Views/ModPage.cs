@@ -300,6 +300,8 @@ public sealed partial class ModPage : Page
             if (r.Mine) title.Children.Add(ModRow.Tag(I18n.T("rev.mine"), Ui.Res("BrandSoft"), Ui.Res("Brand2")));
             var when = Ui.Ago(r.Updated ?? r.Created) + (r.Updated is not null && r.Created is not null && r.Updated - r.Created > TimeSpan.FromMinutes(1) ? " · " + I18n.T("rev.edited") : "");
             title.Children.Add(Ui.Text(when, "small muted"));
+            // 31.0: пожаловаться на отзыв (оскорбления, спам) — в очередь модерации.
+            if (!r.Mine && !admin) title.Children.Add(ReportUi.Button("review", r.Id, r.Id.Split('_')[0], r.Name + " · " + mod.Name, iconOnly: true));
             foreach (var c in title.Children) c.VerticalAlignment = VerticalAlignment.Center;
             var body = Ui.Col(6, title);
             if (r.Text != "") body.Children.Add(new SelectableTextBlock { Text = r.Text, TextWrapping = TextWrapping.Wrap, Foreground = Ui.Res("Muted") });

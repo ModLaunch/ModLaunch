@@ -18,8 +18,12 @@ service cloud.firestore {
     // ── Друзья ModHub 2.1 ────────────────────────────────────────────────
 
     // Друзья — только у аккаунта с почтой (не у безымянной записи).
+    // 31.0: заблокированный админом (bans/{uid}) не пишет ничего: ни моды, ни лоты, ни сообщения, ни отзывы.
+    function notBanned() {
+      return request.auth != null && !exists(/databases/$(database)/documents/bans/$(request.auth.uid));
+    }
     function friendsMember() {
-      return request.auth != null && request.auth.token.get('email', '') != '';
+      return request.auth != null && request.auth.token.get('email', '') != '' && notBanned();
     }
     function friendsName(value) {
       return value is string && value.size() > 0 && value.size() <= 32;
@@ -156,10 +160,14 @@ service cloud.firestore {
     // reports — жалобы: создать может любой, читает только владелец проекта.
 
     function hubMember() {
-      return request.auth != null && request.auth.token.get('email', '') != '';
+      return request.auth != null && request.auth.token.get('email', '') != '' && notBanned();
     }
     function hubText(value, max) {
       return value is string && value.size() <= max;
+    }
+    // 31.0: снятое админом (жалоба правообладателя, вирус, нарушение) автор заново не выложит — только удалит.
+    function hubTakenDown(id) {
+      return exists(/databases/$(database)/documents/takedowns/$('creation_' + id));
     }
     function hubDoc(id) {
       return /databases/$(database)/documents/creations/$(id);
@@ -203,7 +211,7 @@ service cloud.firestore {
 
     match /creations/{id} {
       allow get, list: if true;
-      allow create: if hubMember()
+      allow create: if hubMember() && !hubTakenDown(id)
         && id.matches('^' + request.auth.uid.lower() + '_[a-z0-9_]{1,60}$')
         && hubValid(request.resource.data)
         && request.resource.data.likes == 0
@@ -212,7 +220,7 @@ service cloud.firestore {
         && request.resource.data.created == request.time;
       allow update: if
         // Автор меняет карточку; счётчики и дата создания не трогаются.
-        (hubMember()
+        (hubMember() && !hubTakenDown(id)
           && resource.data.uid == request.auth.uid
           && hubValid(request.resource.data)
           && request.resource.data.created == resource.data.created
@@ -290,12 +298,67 @@ service cloud.firestore {
       allow delete: if hubMember() && resource.data.uid == request.auth.uid;
     }
 
+    // Жалобы. До 31.0 — только на мод Hub (creation, uid, reason). С 31.0 — на мод, лот, отзыв, комментарий
+    // и человека: {kind}_{target}__{uid}, причина из списка, статус ведёт админ (очередь «Модерация»).
     match /reports/{report} {
-      allow create: if request.auth != null
+      allow create: if request.auth != null && notBanned()
         && report.matches('^.+__' + request.auth.uid + '$')
-        && request.resource.data.keys().hasOnly(['creation', 'uid', 'reason', 'created'])
         && request.resource.data.uid == request.auth.uid
-        && hubText(request.resource.data.reason, 500);
+        && ((request.resource.data.keys().hasOnly(['creation', 'uid', 'reason', 'created'])
+            && hubText(request.resource.data.reason, 500))
+          || (request.resource.data.keys().hasOnly(['kind', 'target', 'owner', 'title', 'reason', 'text', 'uid', 'status', 'created'])
+            && request.resource.data.kind in ['creation', 'listing', 'review', 'user', 'comment']
+            && report == request.resource.data.kind + '_' + request.resource.data.target + '__' + request.auth.uid
+            && hubText(request.resource.data.target, 160) && request.resource.data.target.size() > 0
+            && hubText(request.resource.data.owner, 128) && hubText(request.resource.data.title, 120)
+            && request.resource.data.reason in ['malware', 'copyright', 'stolen', 'abuse', 'spam', 'adult', 'cheat', 'scam', 'other']
+            && hubText(request.resource.data.text, 1000)
+            && request.resource.data.status == 'open'
+            && request.resource.data.created == request.time));
+      allow get, list, delete: if mAdmin();
+      allow update: if mAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'action', 'note', 'by', 'resolved'])
+        && request.resource.data.status in ['open', 'resolved', 'dismissed']
+        && hubText(request.resource.data.get('note', ''), 500) && hubText(request.resource.data.get('action', ''), 40)
+        && request.resource.data.get('by', request.auth.uid) == request.auth.uid;
+    }
+
+    // 31.0: снятия админом: creation_<id> / listing_<id> (вирус, жалоба правообладателя, нарушение правил).
+    // Читают все — программа прячет снятое и не ставит его файлы; писать — только админ.
+    match /takedowns/{id} {
+      allow get, list: if true;
+      allow create, update: if mAdmin()
+        && id.matches('^(creation|listing)_[A-Za-z0-9_]{1,140}$')
+        && request.resource.data.keys().hasOnly(['kind', 'target', 'reason', 'note', 'sha256', 'title', 'owner', 'by', 'at'])
+        && request.resource.data.kind in ['creation', 'listing'] && id == request.resource.data.kind + '_' + request.resource.data.target
+        && request.resource.data.reason in ['copyright', 'malware', 'rules', 'scam', 'other']
+        && hubText(request.resource.data.note, 500) && hubText(request.resource.data.sha256, 64)
+        && hubText(request.resource.data.title, 120) && hubText(request.resource.data.owner, 128)
+        && request.resource.data.by == request.auth.uid && request.resource.data.at == request.time;
+      allow delete: if mAdmin();
+    }
+
+    // 31.0: блокировка человека админом. Свою запись человек видит (программа объяснит, почему он не может писать).
+    match /bans/{uid} {
+      allow get: if request.auth != null && (request.auth.uid == uid || mAdmin());
+      allow list, delete: if mAdmin();
+      allow create, update: if mAdmin() && uid != request.auth.uid
+        && request.resource.data.keys().hasOnly(['note', 'name', 'by', 'at'])
+        && hubText(request.resource.data.note, 500) && hubText(request.resource.data.get('name', ''), 32)
+        && request.resource.data.by == request.auth.uid && request.resource.data.at == request.time;
+    }
+
+    // 31.0: устройства, с которых входили в аккаунт. Новое устройство — предупреждение на остальных
+    // («Это вы?»), а сервер (functions) пишет письмо. Видит и меняет только хозяин аккаунта.
+    match /devices/{uid}/list/{device} {
+      allow get, list, delete: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if friendsMember() && request.auth.uid == uid
+        && device.matches('^[A-Za-z0-9_-]{8,64}$')
+        && request.resource.data.keys().hasOnly(['name', 'os', 'app', 'first', 'last', 'ack'])
+        && hubText(request.resource.data.name, 64) && hubText(request.resource.data.os, 64) && hubText(request.resource.data.app, 20)
+        && request.resource.data.ack is bool
+        && request.resource.data.last == request.time
+        && (resource == null ? request.resource.data.first == request.time : request.resource.data.first == resource.data.first);
     }
     // ── конец правил ModLaunch Hub ───────────────────────────────────────
 
@@ -329,7 +392,7 @@ service cloud.firestore {
 
     match /reviews/{id} {
       allow get, list: if true;
-      allow create: if request.auth != null
+      allow create: if request.auth != null && notBanned()
         && id == request.auth.uid + '_' + request.resource.data.key
         && rValid(request.resource.data)
         && !('moderated' in request.resource.data)
@@ -386,10 +449,12 @@ service cloud.firestore {
         && request.auth.token.get('email_verified', false) == true
         && exists(/databases/$(database)/documents/admins/$(request.auth.token.get('email', '-')));
     }
-    function mMember() { return request.auth != null && request.auth.token.get('email', '') != ''; }
+    function mMember() { return request.auth != null && request.auth.token.get('email', '') != '' && notBanned(); }
     function mText(v, max) { return v is string && v.size() <= max; }
     function mOnly(keys) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys); }
     function mListing(id) { return get(/databases/$(database)/documents/market/$(id)).data; }
+    // 31.0: лот снят админом (вирус, жалоба правообладателя) — не купить и не скачать (продавцу и админу — можно).
+    function mTakenDown(id) { return exists(/databases/$(database)/documents/takedowns/$('listing_' + id)); }
     function mSale(id, buyer) { return /databases/$(database)/documents/market/$(id)/sales/$(buyer); }
     function mNewSale(id, buyer) { return existsAfter(mSale(id, buyer)) && !exists(mSale(id, buyer)); }
     function mWallet(uid) { return /databases/$(database)/documents/wallets/$(uid); }
@@ -556,7 +621,8 @@ service cloud.firestore {
         // 30.0: деньги за покупку вернули — файл больше не открыть.
         allow get: if request.auth != null
           && (mListing(id).uid == request.auth.uid
-            || (exists(mSale(id, request.auth.uid)) && get(mSale(id, request.auth.uid)).data.get('refunded', false) == false));
+            || (exists(mSale(id, request.auth.uid)) && get(mSale(id, request.auth.uid)).data.get('refunded', false) == false && !mTakenDown(id))
+            || mAdmin());
         allow create, update: if mMember() && mListing(id).uid == request.auth.uid
           && request.resource.data.uid == request.auth.uid && request.resource.data.data is string;
         allow delete: if request.auth != null && mListing(id).uid == request.auth.uid;
@@ -568,7 +634,7 @@ service cloud.firestore {
         // Покупка: цена из лота, комиссия по формуле; платный лот — только вместе со
         // списанием (запись «purchase» в журнале покупателя на ту же сумму).
         allow create: if mMember() && buyer == request.auth.uid
-          && mListing(id).status == 'active' && mListing(id).uid != buyer
+          && mListing(id).status == 'active' && mListing(id).uid != buyer && !mTakenDown(id)
           && request.resource.data.keys().hasOnly(['buyerName', 'seller', 'title', 'price', 'fee', 'claimed', 'created'])
           && request.resource.data.price == mListing(id).price
           && request.resource.data.fee == math.floor(request.resource.data.price * mFee() / 100)
@@ -613,6 +679,11 @@ service cloud.firestore {
     // 14.0: настройки рынка. Читают все (приложение считает комиссию), пишет админ.
     match /config/{name} {
       allow get: if true;
+      // 31.0: чёрный список файлов (sha256) — программа не ставит такие моды ни из какого источника.
+      allow create, update: if mAdmin() && name == 'blocklist'
+        && request.resource.data.keys().hasOnly(['hashes', 'updated', 'by'])
+        && request.resource.data.hashes is list && request.resource.data.hashes.size() <= 5000
+        && request.resource.data.updated == request.time && request.resource.data.by == request.auth.uid;
       allow create, update: if mAdmin() && name == 'market'
         && request.resource.data.keys().hasOnly(['fee', 'updated', 'by', 'pay', 'premium', 'premiumAll'])
         && (!('fee' in request.resource.data)

@@ -886,3 +886,77 @@ test('кураторы: подписка — ровно +1 вместе со с�
   await raw(async (d) => { c = (await getDoc(doc(d, 'curators', SELLER.uid))).data(); });
   if (c.followers !== 1) throw new Error(JSON.stringify(c));
 });
+
+// ---------------------------------------------------------------- 31.0: жалобы, снятия, баны, чёрный список, устройства
+
+const report = (who, kind, target, over = {}) => setDoc(doc(db(who), 'reports', `${kind}_${target}__${who.uid}`), {
+  kind, target, owner: SELLER.uid, title: 'Lot', reason: 'malware', text: 'Defender нашёл троян', uid: who.uid, status: 'open',
+  created: serverTimestamp(), ...over,
+});
+const takedown = (who, kind, target, over = {}) => setDoc(doc(db(who), 'takedowns', `${kind}_${target}`), {
+  kind, target, reason: 'malware', note: 'VirusTotal 12/70', sha256: SHA, title: 'Lot', owner: SELLER.uid, by: who.uid,
+  at: serverTimestamp(), ...over,
+});
+
+test('жалобы: пишет любой вошедший, читает и закрывает только админ; чужое имя и левая причина — отказ', async () => {
+  await assertSucceeds(report(BUYER, 'listing', LOT));
+  await assertSucceeds(report(BUYER, 'user', SELLER.uid, { reason: 'abuse' }));
+  await assertSucceeds(setDoc(doc(anon('anon1'), 'reports', 'mod1__anon1'), { creation: 'mod1', uid: 'anon1', reason: 'старый формат', created: serverTimestamp() }));
+  await assertFails(report(BUYER, 'listing', LOT, { reason: 'просто так' }));
+  await assertFails(report(BUYER, 'listing', FREE, { status: 'resolved' }));
+  await assertFails(setDoc(doc(db(BUYER), 'reports', `listing_${LOT}__${OTHER.uid}`), { kind: 'listing', target: LOT, owner: '', title: '', reason: 'spam', text: '', uid: OTHER.uid, status: 'open', created: serverTimestamp() }));
+  await assertFails(getDoc(doc(db(BUYER), 'reports', `listing_${LOT}__${BUYER.uid}`)));
+  await assertFails(getDocs(collection(db(SELLER), 'reports')));
+  await assertSucceeds(getDocs(query(collection(db(ADMIN), 'reports'), where('status', '==', 'open'))));
+  await assertSucceeds(updateDoc(doc(db(ADMIN), 'reports', `listing_${LOT}__${BUYER.uid}`), { status: 'resolved', action: 'takedown', note: 'снято', by: ADMIN.uid, resolved: serverTimestamp() }));
+  await assertFails(updateDoc(doc(db(ADMIN), 'reports', `user_${SELLER.uid}__${BUYER.uid}`), { reason: 'spam' }));
+});
+
+test('снятия: только админ; снятый лот не купить и не скачать, снятый мод автор заново не выложит', async () => {
+  await assertFails(takedown(SELLER, 'listing', LOT));
+  await assertSucceeds(takedown(ADMIN, 'listing', LOT));
+  await assertSucceeds(getDoc(doc(anon('x1'), 'takedowns', `listing_${LOT}`)));
+  await raw(async (d) => setDoc(doc(d, 'takedowns', `listing_${FREE}`), { kind: 'listing', target: FREE, reason: 'rules', note: '', sha256: '', title: '', owner: SELLER.uid, by: ADMIN.uid, at: new Date() }));
+  const bdb = db(BUYER);
+  const b = writeBatch(bdb);
+  b.set(doc(bdb, 'market', FREE, 'sales', BUYER.uid), { buyerName: 'B', seller: SELLER.uid, title: 'Lot', price: 0, fee: 0, claimed: true, created: serverTimestamp() });
+  b.update(doc(bdb, 'market', FREE), { sales: increment(1) });
+  await assertFails(b.commit());
+  await raw(async (d) => setDoc(doc(d, 'takedowns', 'creation_seller1_mod'), { kind: 'creation', target: 'seller1_mod', reason: 'copyright', note: 'DMCA', sha256: '', title: 'Mod', owner: SELLER.uid, by: ADMIN.uid, at: new Date() }));
+  await assertFails(setDoc(doc(db(SELLER), 'creations', 'seller1_mod'), {
+    uid: SELLER.uid, author: 'Seller', name: 'Mod', summary: '', description: '', game: 'subnautica', version: '1.0.0', kind: 'package', code: '',
+    tags: [], images: [], size: 0, sha256: '', chunks: 0, fileName: '', changelog: '', app: '', likes: 0, downloads: 0, comments: 0,
+    created: serverTimestamp(), updated: serverTimestamp(),
+  }));
+  await assertSucceeds(deleteDoc(doc(db(ADMIN), 'takedowns', `listing_${LOT}`)));
+});
+
+test('бан: админ блокирует — человек не пишет моды, лоты, отзывы и жалобы; себя забанить нельзя', async () => {
+  await assertFails(setDoc(doc(db(BUYER), 'bans', SELLER.uid), { note: 'x', by: BUYER.uid, at: serverTimestamp() }));
+  await assertFails(setDoc(doc(db(ADMIN), 'bans', ADMIN.uid), { note: 'x', by: ADMIN.uid, at: serverTimestamp() }));
+  await assertSucceeds(setDoc(doc(db(ADMIN), 'bans', SELLER.uid), { note: 'мошенничество', name: 'Seller', by: ADMIN.uid, at: serverTimestamp() }));
+  const l = { ...listing(1000), created: serverTimestamp(), updated: serverTimestamp() };
+  await assertFails(setDoc(doc(db(SELLER), 'market', `${SELLER.uid}_after_ban`), l));
+  await assertFails(report(SELLER, 'listing', LOT));
+  await assertSucceeds(getDoc(doc(db(SELLER), 'bans', SELLER.uid)));
+  await assertFails(getDoc(doc(db(BUYER), 'bans', SELLER.uid)));
+  await assertSucceeds(deleteDoc(doc(db(ADMIN), 'bans', SELLER.uid)));
+  await assertSucceeds(setDoc(doc(db(SELLER), 'market', `${SELLER.uid}_after_ban`), l));
+});
+
+test('чёрный список файлов: читают все, пишет только админ, без лишних полей', async () => {
+  await assertFails(setDoc(doc(db(SELLER), 'config', 'blocklist'), { hashes: [SHA], updated: serverTimestamp(), by: SELLER.uid }));
+  await assertSucceeds(setDoc(doc(db(ADMIN), 'config', 'blocklist'), { hashes: [SHA], updated: serverTimestamp(), by: ADMIN.uid }));
+  await assertSucceeds(getDoc(doc(anon('x2'), 'config', 'blocklist')));
+  await assertFails(setDoc(doc(db(ADMIN), 'config', 'blocklist'), { hashes: [SHA], extra: 1, updated: serverTimestamp(), by: ADMIN.uid }));
+});
+
+test('устройства: свои видит и отмечает только хозяин; first не подделать', async () => {
+  const dev = (who, owner, id, over = {}) => setDoc(doc(db(who), 'devices', owner, 'list', id), { name: 'PC-1', os: 'Windows 11', app: '31.0.0', first: serverTimestamp(), last: serverTimestamp(), ack: false, ...over });
+  await assertSucceeds(dev(BUYER, BUYER.uid, 'device_aaaa1111'));
+  await assertFails(dev(OTHER, BUYER.uid, 'device_bbbb2222'));
+  await assertFails(getDocs(collection(db(OTHER), 'devices', BUYER.uid, 'list')));
+  await assertSucceeds(getDocs(collection(db(BUYER), 'devices', BUYER.uid, 'list')));
+  await assertFails(dev(BUYER, BUYER.uid, 'device_cccc3333', { first: new Date(2020, 1, 1) }));
+  await assertSucceeds(updateDoc(doc(db(BUYER), 'devices', BUYER.uid, 'list', 'device_aaaa1111'), { ack: true, last: serverTimestamp() }));
+});

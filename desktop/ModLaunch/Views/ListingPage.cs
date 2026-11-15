@@ -254,6 +254,8 @@ public sealed class ListingPage : Page
             : new TextBlock { Text = MarketViews.PriceText(l), FontFamily = Look.Display, FontSize = 22, FontWeight = FontWeight.Bold, Foreground = l.Free ? Ui.Res("Good") : Ui.Res("Text") };
         price.VerticalAlignment = VerticalAlignment.Center;
         var right = Ui.Row(12, wish, price, main);
+        // 31.0: пожаловаться на лот (вирус, украденный мод, мошенничество) — не на свой.
+        if (!l.Mine) right.Children.Insert(0, ReportUi.Button("listing", l.Id, l.Uid, l.Title, iconOnly: true));
         right.VerticalAlignment = VerticalAlignment.Center;
         var words = Ui.Col(4, heading, note);
         words.VerticalAlignment = VerticalAlignment.Center;
@@ -322,7 +324,7 @@ public sealed class ListingPage : Page
         var who = Ui.Row(12, Ui.Thumb(null, a.Name, 48, 24, person: true), Ui.Col(2, Ui.Text(a.Name, "h3"), Ui.Text(I18n.T("v93.mk.author.stats", ("n", a.Items), ("sales", I18n.Compact(a.Sales))), "small muted")));
         var link = new Border { Background = Brushes.Transparent, Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand), Child = who };
         StoreKit.OnClick(link, () => MainWindow.Current?.Navigate(() => new AuthorPage(a.Uid, a.Name)));
-        return new Border { Classes = { "card" }, Padding = new Thickness(16), Child = Ui.Col(12, HubLook.Label(I18n.T("v93.mk.author"), Ui.Res("Text"), 11), link, MarketPage.FollowButton(a.Uid, a.Name)) };
+        return new Border { Classes = { "card" }, Padding = new Thickness(16), Child = Ui.Col(12, HubLook.Label(I18n.T("v93.mk.author"), Ui.Res("Text"), 11), link, Ui.Row(8, MarketPage.FollowButton(a.Uid, a.Name), l.Mine ? new Panel() : ReportUi.Button("user", a.Uid, a.Uid, a.Name, iconOnly: true))) };
     }
 
     static Control Similar(Listing l)
