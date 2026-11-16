@@ -96,6 +96,12 @@ public static class IndieGames
     public static string FolderFor(Listing l) => Path.Combine(Root, Slug(l.Title));
 
     /// <summary>Игра уже стоит из ModLaunch (папка с exe на месте) — её свой id в библиотеке.</summary>
+    /// <summary>31.0: какая версия игры стоит (из записи об установке) и вышла ли новее.</summary>
+    public static string? InstalledVersion(Listing l) => Settings.Data["indie"]?[l.Id]?.Str("version");
+
+    public static bool UpdateAvailable(Listing l) =>
+        Installed(l) is not null && InstalledVersion(l) is { } v && Features.Versions.Compare(l.Version, v) > 0;
+
     public static GameState? Installed(Listing l)
     {
         var id = Settings.Data["indie"]?[l.Id]?.Str("game");

@@ -191,7 +191,10 @@ public static class MarketViews
         // 29.0: инди-игра — не файл, а игра в библиотеке: «Установить», потом «Играть».
         if (l.Kind == Creator.IndieGames.Kind)
             return Creator.IndieGames.Installed(l) is { } installed
-                ? Ui.Button(I18n.T("games.play"), () => { before?.Invoke(); Actions.Play(installed); }, "primary", Icons.Play)
+                // 31.0: разработчик выложил новую сборку — «Обновить до 1.2.0» (прежняя заменяется, только если новая распаковалась).
+                ? Creator.IndieGames.UpdateAvailable(l)
+                    ? Ui.Button(I18n.T("v31.indie.update", ("version", l.Version)), () => { before?.Invoke(); IndiePage.Install(l); }, "primary", Icons.Refresh)
+                    : Ui.Button(I18n.T("games.play"), () => { before?.Invoke(); Actions.Play(installed); }, "primary", Icons.Play)
                 : Ui.Button(I18n.T("v29.indie.install"), () => { before?.Invoke(); IndiePage.Install(l); }, "primary", Icons.Download);
         if (!Moderation.Sealed(l)) return Ui.Button(I18n.T("mk.download"), () => { before?.Invoke(); Download(l); }, "primary", Icons.Download);
         if (Features.Inject.Get("mk_" + l.Id) is not null)

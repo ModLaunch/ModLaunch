@@ -278,7 +278,8 @@
     "err.store.REFUND_REASON": "Опишите причину хотя бы парой слов.",
     "err.store.REFUND_LATE": "Прошло больше 14 дней с оплаты — напишите на support@modlaunchapp.com.",
     "err.store.REFUND_EXISTS": "Заявка на возврат уже отправлена.",
-    "err.store.TIP_FINAL": "Поддержка автора не возвращается."
+    "err.store.TIP_FINAL": "Поддержка автора не возвращается.",
+    "v31.indie.update": "Обновить до {version}"
   },
   "en": {
     "v31.rep.title": "Report",
@@ -559,7 +560,8 @@
     "err.store.REFUND_REASON": "Describe the reason in a few words.",
     "err.store.REFUND_LATE": "More than 14 days since payment — write to support@modlaunchapp.com.",
     "err.store.REFUND_EXISTS": "A refund request was already sent.",
-    "err.store.TIP_FINAL": "Tips can’t be refunded."
+    "err.store.TIP_FINAL": "Tips can’t be refunded.",
+    "v31.indie.update": "Update to {version}"
   },
   "uk": {
     "v31.rep.title": "Поскаржитися",
@@ -840,7 +842,8 @@
     "err.store.REFUND_REASON": "Опишіть причину хоча б кількома словами.",
     "err.store.REFUND_LATE": "Минуло понад 14 днів — напишіть на support@modlaunchapp.com.",
     "err.store.REFUND_EXISTS": "Заявку на повернення вже надіслано.",
-    "err.store.TIP_FINAL": "Підтримка автора не повертається."
+    "err.store.TIP_FINAL": "Підтримка автора не повертається.",
+    "v31.indie.update": "Оновити до {version}"
   },
   "es": {
     "v31.rep.title": "Denunciar",
@@ -1121,7 +1124,8 @@
     "err.store.REFUND_REASON": "Describe el motivo en pocas palabras.",
     "err.store.REFUND_LATE": "Han pasado más de 14 días; escribe a support@modlaunchapp.com.",
     "err.store.REFUND_EXISTS": "Ya enviaste una solicitud.",
-    "err.store.TIP_FINAL": "Los apoyos no se reembolsan."
+    "err.store.TIP_FINAL": "Los apoyos no se reembolsan.",
+    "v31.indie.update": "Actualizar a {version}"
   },
   "de": {
     "v31.rep.title": "Melden",
@@ -1402,7 +1406,8 @@
     "err.store.REFUND_REASON": "Beschreibe den Grund kurz.",
     "err.store.REFUND_LATE": "Mehr als 14 Tage seit Zahlung – schreib an support@modlaunchapp.com.",
     "err.store.REFUND_EXISTS": "Eine Anfrage wurde bereits gesendet.",
-    "err.store.TIP_FINAL": "Spenden werden nicht erstattet."
+    "err.store.TIP_FINAL": "Spenden werden nicht erstattet.",
+    "v31.indie.update": "Auf {version} aktualisieren"
   },
   "fr": {
     "v31.rep.title": "Signaler",
@@ -1683,7 +1688,8 @@
     "err.store.REFUND_REASON": "Décrivez le motif en quelques mots.",
     "err.store.REFUND_LATE": "Plus de 14 jours depuis le paiement — écrivez à support@modlaunchapp.com.",
     "err.store.REFUND_EXISTS": "Une demande a déjà été envoyée.",
-    "err.store.TIP_FINAL": "Les soutiens ne sont pas remboursables."
+    "err.store.TIP_FINAL": "Les soutiens ne sont pas remboursables.",
+    "v31.indie.update": "Mettre à jour vers {version}"
   },
   "pt-BR": {
     "v31.rep.title": "Denunciar",
@@ -1964,7 +1970,8 @@
     "err.store.REFUND_REASON": "Descreva o motivo em poucas palavras.",
     "err.store.REFUND_LATE": "Mais de 14 dias desde o pagamento — escreva para support@modlaunchapp.com.",
     "err.store.REFUND_EXISTS": "Um pedido já foi enviado.",
-    "err.store.TIP_FINAL": "Apoios não são reembolsáveis."
+    "err.store.TIP_FINAL": "Apoios não são reembolsáveis.",
+    "v31.indie.update": "Atualizar para {version}"
   },
   "zh-CN": {
     "v31.rep.title": "举报",
@@ -2245,6 +2252,7 @@
     "err.store.REFUND_REASON": "请简要说明原因。",
     "err.store.REFUND_LATE": "已超过 14 天，请发邮件至 support@modlaunchapp.com。",
     "err.store.REFUND_EXISTS": "已提交过退款申请。",
-    "err.store.TIP_FINAL": "打赏不可退款。"
+    "err.store.TIP_FINAL": "打赏不可退款。",
+    "v31.indie.update": "更新到 {version}"
   }
 }
