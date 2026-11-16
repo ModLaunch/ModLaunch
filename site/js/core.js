@@ -146,7 +146,7 @@ function verNewer(a, b) {
 /** Свой сервер обновлений: update.json рядом с сайтом (его же читает программа). Нет файла — null. */
 async function ownManifest() {
   try {
-    const r = await fetch('update.json', { cache: 'no-cache' });
+    const r = await fetch(new URL('/update.json', location.href).href.replace(/^file:.*/, 'update.json'), { cache: 'no-cache' });
     if (!r.ok) return null;
     const m = await r.json();
     if (!/^\d+\.\d+\.\d+$/.test(m.version || '') || !/^https:\/\/[^\s"'<>]+\/ModLaunch-Setup-[\d.]+\.exe$/i.test(m.url || '')) return null;

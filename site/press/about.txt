@@ -1,0 +1,39 @@
+ModLaunch — пресс-кит / press kit
+https://modlaunchapp.com · press@modlaunchapp.com
+
+=== RU ===
+
+Коротко
+ModLaunch собирает игры из Steam, Epic, GOG, Xbox и других лаунчеров в одну библиотеку и ставит моды в один клик —
+с откатом, если что-то сломалось. Внутри — магазин инди-игр, друзья и чат, облачные сохранения и студия для
+создания модов.
+
+Подробнее
+ModLaunch находит установленные игры сам, показывает моды из Thunderstore, Nexus Mods и Modrinth, ставит их вместе
+с зависимостями и загрузчиками, хранит профили сборок и умеет откатить мод к прошлой версии. «Доктор вылетов»
+объясняет, что сломалось, и предлагает исправление. Независимые разработчики продают в ModLaunch свои игры по
+региональным ценам с комиссией площадки до 29 %; авторы модов получают поддержку от игроков. Каждый выложенный файл
+проверяется на вирусы.
+
+Факты
+Платформа: Windows 10 / 11 · Цена: бесплатно (магазин и Premium — по желанию)
+Языки: русский, английский, украинский, испанский, немецкий, французский, португальский (BR), китайский
+Разработчик: ООО «____», Минск, Беларусь
+
+=== EN ===
+
+In short
+ModLaunch gathers games from Steam, Epic, GOG, Xbox and other launchers into one library and installs mods in one
+click — with a rollback if something breaks. It also has an indie game store, friends and chat, cloud saves and a
+mod-making studio.
+
+In more detail
+ModLaunch finds installed games by itself, shows mods from Thunderstore, Nexus Mods and Modrinth, installs them with
+dependencies and loaders, keeps setup profiles and can roll a mod back. The crash doctor explains what broke and
+offers a fix. Independent developers sell their games in ModLaunch with regional prices and a platform fee of at
+most 29%; mod authors get support from players. Every uploaded file is scanned for malware.
+
+Facts
+Platform: Windows 10 / 11 · Price: free (store and Premium optional)
+Languages: Russian, English, Ukrainian, Spanish, German, French, Portuguese (BR), Chinese
+Developer: "____" LLC, Minsk, Belarus

@@ -127,6 +127,13 @@ Object.assign(EN, {
   'final.title': 'All your games are waiting',
   'final.p': 'One installer, about 150 MB. ModLaunch finds your games by itself — all that’s left is to pick what to play.',
   'final.zip': 'Portable version (zip)',
+  'final.waitlist': 'The game store opens in waves — join the waitlist',
+  'foot.download': 'Download',
+  'foot.press': 'Press kit',
+  'foot.terms': 'Terms',
+  'foot.privacy': 'Privacy',
+  'foot.refunds': 'Refunds',
+  'foot.rights': 'Rights holders',
 });
 
 // Подписи разделов, которых нет в разметке (в разметке — только первый).

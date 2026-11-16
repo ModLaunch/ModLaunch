@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ModLaunch — Оплата прошла</title>
+    <meta name="description" content="Оплата прошла" />
+    <meta name="theme-color" content="#17171a" />
+    <link rel="canonical" href="https://modlaunchapp.com/pay/success.html" />
+    <meta property="og:site_name" content="ModLaunch" />
+    <meta property="og:title" content="ModLaunch — Оплата прошла" />
+    <meta property="og:description" content="Оплата прошла" />
+    <meta property="og:image" content="https://modlaunchapp.com/img/og.jpg" />
+    <link rel="icon" href="../img/logo.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=Unbounded:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="../style.css" />
+    <link rel="stylesheet" href="../pages.css" />
+  </head>
+  <body>
+    <header class="nav" id="nav">
+      <div class="wrap nav__in">
+        <a class="brand" href=".././" aria-label="ModLaunch"><span class="mark" aria-hidden="true"><svg viewBox="-1.5 -1.5 27 27"><path d="M4.3 4.3 19.7 19.7M19.7 4.3 4.3 19.7" stroke="#7a62d6" stroke-width="1.6"/><circle cx="4.3" cy="4.3" r="3" fill="#cbbcff"/><circle cx="19.7" cy="4.3" r="3" fill="#f2c25c"/><circle cx="4.3" cy="19.7" r="3" fill="#8f73ff"/><circle cx="19.7" cy="19.7" r="3" fill="#cbbcff"/><circle cx="12" cy="12" r="5.6" fill="#fff"/><circle cx="12" cy="12" r="2.6" fill="#7c5cff"/></svg></span><span>ModLaunch</span></a>
+        <nav class="nav__links" aria-label="Разделы">
+          <a href=".././#platform" data-t="nav.platform">Платформа</a>
+          <a href=".././#mods" data-t="nav.mods">Моды</a>
+          <a href="../hub.html" data-t="nav.hub">Hub</a>
+          <a href="../waitlist.html" data-t="nav.waitlist">Лист ожидания</a>
+          <a href="../press.html" data-t="nav.press">Пресс-кит</a>
+        </nav>
+        <div class="nav__end">
+          <button class="icon-btn" id="theme" type="button" aria-label="Тема"><svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+          <button class="lang" id="lang" type="button" aria-label="Language">EN</button>
+          <a class="btn btn--sm btn--primary" href="../download.html" data-t="nav.download">Скачать</a>
+          <button class="icon-btn burger" id="burger" type="button" aria-label="Меню" aria-expanded="false"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+        </div>
+      </div>
+    </header>
+    <main class="page wrap">
+      <section class="hero-mini"><h1 data-t="pay.ok">Оплата прошла</h1><p class="lead" data-t="pay.okText">Вернитесь в ModLaunch — покупка появится сама в течение минуты. Чек — в разделе Аккаунт → Покупки.</p><p class="small mono" id="pid"></p></section>
+    </main>
+    <footer class="foot">
+      <div class="wrap foot__in">
+        <span>© 2026 ModLaunch</span>
+        <a href="../download.html" data-t="nav.download">Скачать</a>
+        <a href="../press.html" data-t="nav.press">Пресс-кит</a>
+        <a href="../legal/terms.html" data-t="foot.terms">Соглашение</a>
+        <a href="../legal/privacy.html" data-t="foot.privacy">Конфиденциальность</a>
+        <a href="../legal/refunds.html" data-t="foot.refunds">Возврат денег</a>
+        <a href="../legal/rightsholders.html" data-t="foot.rights">Правообладателям</a>
+        <a href="mailto:support@modlaunchapp.com">support@modlaunchapp.com</a>
+        <span class="foot__note" data-t="foot.note">Официальный сайт ModLaunch&nbsp;— modlaunchapp.com. ModLaunch не связан с Valve, Epic Games, GOG, Mojang, Microsoft и издателями игр; названия и обложки игр принадлежат их владельцам.</span>
+      </div>
+    </footer>
+    <script src="../js/core.js"></script>
+    <script>
+      Object.assign(EN, {"nav.waitlist":"Waitlist","nav.press":"Press kit","foot.terms":"Terms","foot.privacy":"Privacy","foot.refunds":"Refunds","foot.rights":"Rights holders","pay.ok":"Payment complete","pay.okText":"Go back to ModLaunch — your purchase appears within a minute. The receipt is in Account → Purchases."});
+      applyLang();
+      const p = new URLSearchParams(location.search).get('p');
+      if (p && /^p_\d+_[0-9a-f]{12}$/.test(p)) document.getElementById('pid').textContent = p;
+    </script>
+  </body>
+</html>

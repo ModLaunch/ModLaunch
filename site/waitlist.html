@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Лист ожидания ModLaunch</title>
+    <meta name="description" content="Запишитесь — пришлём приглашение в день открытия магазина ModLaunch." />
+    <meta name="theme-color" content="#17171a" />
+    <link rel="canonical" href="https://modlaunchapp.com/waitlist.html" />
+    <meta property="og:site_name" content="ModLaunch" />
+    <meta property="og:title" content="Лист ожидания ModLaunch" />
+    <meta property="og:description" content="Запишитесь — пришлём приглашение в день открытия магазина ModLaunch." />
+    <meta property="og:image" content="https://modlaunchapp.com/img/og.jpg" />
+    <link rel="icon" href="img/logo.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=Unbounded:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="pages.css" />
+  </head>
+  <body>
+    <header class="nav" id="nav">
+      <div class="wrap nav__in">
+        <a class="brand" href="./" aria-label="ModLaunch"><span class="mark" aria-hidden="true"><svg viewBox="-1.5 -1.5 27 27"><path d="M4.3 4.3 19.7 19.7M19.7 4.3 4.3 19.7" stroke="#7a62d6" stroke-width="1.6"/><circle cx="4.3" cy="4.3" r="3" fill="#cbbcff"/><circle cx="19.7" cy="4.3" r="3" fill="#f2c25c"/><circle cx="4.3" cy="19.7" r="3" fill="#8f73ff"/><circle cx="19.7" cy="19.7" r="3" fill="#cbbcff"/><circle cx="12" cy="12" r="5.6" fill="#fff"/><circle cx="12" cy="12" r="2.6" fill="#7c5cff"/></svg></span><span>ModLaunch</span></a>
+        <nav class="nav__links" aria-label="Разделы">
+          <a href="./#platform" data-t="nav.platform">Платформа</a>
+          <a href="./#mods" data-t="nav.mods">Моды</a>
+          <a href="hub.html" data-t="nav.hub">Hub</a>
+          <a href="waitlist.html" data-t="nav.waitlist">Лист ожидания</a>
+          <a href="press.html" data-t="nav.press">Пресс-кит</a>
+        </nav>
+        <div class="nav__end">
+          <button class="icon-btn" id="theme" type="button" aria-label="Тема"><svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+          <button class="lang" id="lang" type="button" aria-label="Language">EN</button>
+          <a class="btn btn--sm btn--primary" href="download.html" data-t="nav.download">Скачать</a>
+          <button class="icon-btn burger" id="burger" type="button" aria-label="Меню" aria-expanded="false"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+        </div>
+      </div>
+    </header>
+    <main class="page wrap">
+      <section class="hero-mini">
+        <h1 data-t="wl.title">Лист ожидания</h1>
+        <p class="lead" data-t="wl.lead">Магазин игр ModLaunch откроется для всех волнами. Оставьте почту — пришлём приглашение в первой волне.</p>
+        <p class="ok" id="ok" hidden data-t="wl.confirmed">Почта подтверждена — вы в листе ожидания. Приглашение придёт на неё.</p>
+        <p class="bad" id="badlink" hidden data-t="wl.badLink">Ссылка устарела или неверна. Запишитесь ещё раз.</p>
+        <form class="wl" id="wl" novalidate>
+          <input type="email" id="email" required maxlength="254" autocomplete="email" data-tp="wl.email" placeholder="ваша@почта.ru" />
+          <button class="btn btn--primary" type="submit" data-t="wl.send">Записаться</button>
+        </form>
+        <label class="small consent"><input type="checkbox" id="agree" /> <span data-t="wl.agree">Согласен(на) на обработку почты для приглашения (<a href="legal/privacy.html">политика</a>). Отписаться можно в любой момент.</span></label>
+        <p class="small" id="status" role="status"></p>
+      </section>
+    </main>
+    <footer class="foot">
+      <div class="wrap foot__in">
+        <span>© 2026 ModLaunch</span>
+        <a href="download.html" data-t="nav.download">Скачать</a>
+        <a href="press.html" data-t="nav.press">Пресс-кит</a>
+        <a href="legal/terms.html" data-t="foot.terms">Соглашение</a>
+        <a href="legal/privacy.html" data-t="foot.privacy">Конфиденциальность</a>
+        <a href="legal/refunds.html" data-t="foot.refunds">Возврат денег</a>
+        <a href="legal/rightsholders.html" data-t="foot.rights">Правообладателям</a>
+        <a href="mailto:support@modlaunchapp.com">support@modlaunchapp.com</a>
+        <span class="foot__note" data-t="foot.note">Официальный сайт ModLaunch&nbsp;— modlaunchapp.com. ModLaunch не связан с Valve, Epic Games, GOG, Mojang, Microsoft и издателями игр; названия и обложки игр принадлежат их владельцам.</span>
+      </div>
+    </footer>
+    <script src="js/core.js"></script>
+    <script>
+      Object.assign(EN, {"nav.waitlist":"Waitlist","nav.press":"Press kit","foot.terms":"Terms","foot.privacy":"Privacy","foot.refunds":"Refunds","foot.rights":"Rights holders","wl.title":"Waitlist","wl.lead":"The ModLaunch game store opens in waves. Leave your e-mail and we’ll send an invite in the first wave.","wl.confirmed":"E-mail confirmed — you’re on the waitlist. The invite will come to this address.","wl.badLink":"The link is outdated or invalid. Please sign up again.","wl.email":"your@email.com","wl.send":"Join","wl.agree":"I agree to the processing of my e-mail for the invite (<a href=\"legal/privacy.html\">policy</a>). Unsubscribe any time.","wl.sent":"Almost done! Check your inbox and click the confirmation link.","wl.bad":"Check the e-mail address.","wl.need":"Please tick the consent box.","wl.fail":"Couldn’t sign up right now — try again later."});
+      applyLang();
+      const q = new URLSearchParams(location.search);
+      if (q.get('ok')) document.getElementById('ok').hidden = false;
+      if (q.get('bad')) document.getElementById('badlink').hidden = false;
+      const say = (k, ruText) => { document.getElementById('status').textContent = lang === 'en' ? EN[k] : ruText; };
+      document.getElementById('wl').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('email').value.trim();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return say('wl.bad', 'Проверьте адрес почты.');
+        if (!document.getElementById('agree').checked) return say('wl.need', 'Отметьте согласие.');
+        try {
+          const r = await fetch('https://europe-west1-modhub-reviews.cloudfunctions.net/waitlistSignup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, lang, source: q.get('src') || 'site' }) });
+          if (!r.ok) throw new Error(r.status);
+          say('wl.sent', 'Почти готово! Проверьте почту и нажмите ссылку в письме.');
+        } catch { say('wl.fail', 'Сейчас записаться не получилось — попробуйте позже.'); }
+      });
+    </script>
+  </body>
+</html>
