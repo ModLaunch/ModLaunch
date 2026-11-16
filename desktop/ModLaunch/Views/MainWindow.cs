@@ -196,6 +196,7 @@ public sealed partial class MainWindow : Window
         ModLaunch.Setup.UpdateGuard.StartHealthTimer();
         CrashUi.CheckLater();
         StoreUi.CheckGiftsLater();
+        WelcomeUi.CheckLater();
         // 26.0: уведомления автора (MainWindow.Creator.cs).
         WatchCreator();
 
