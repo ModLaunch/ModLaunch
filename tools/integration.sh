@@ -37,4 +37,8 @@ if [ "$mode" = "e2e" ]; then
   exec $fb emulators:exec --project demo-modlaunch --only auth,firestore,functions "node ../server/functions/test/e2e.mjs"
 fi
 export DOTNET_ROLL_FORWARD=Major MODLAUNCH_FIREBASE_EMULATOR=127.0.0.1 MODLAUNCH_FIREBASE_PROJECT=demo-modlaunch
-exec $fb emulators:exec --project demo-modlaunch --only firestore,auth "\"$exe\" --integration"
+# С эмулятором функций: проверки магазина «программа ↔ сервер» (WEBPAY в тестовом режиме).
+(cd ../server/functions && [ -d node_modules ] || npm ci --no-audit --no-fund >/dev/null)
+[ -f ../server/functions/.secret.local ] || cp ../server/functions/test/e2e.secret.local ../server/functions/.secret.local
+export FUNCTIONS_DISCOVERY_TIMEOUT=120
+exec $fb emulators:exec --project demo-modlaunch --only firestore,auth,functions "\"$exe\" --integration"
