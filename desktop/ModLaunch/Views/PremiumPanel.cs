@@ -40,7 +40,8 @@ public sealed class PremiumPanel : UserControl
 
     void Render()
     {
-        var col = Ui.Col(18, Hero(), Ui.Text(I18n.T("v25.prem.free"), "muted", wrap: true), Perks(), Preview(), Stats());
+        // 31.0: подписка картой (месяц или год) — рядом с покупкой с баланса.
+        var col = Ui.Col(18, Hero(), StoreUi.PremiumCard(Render), Ui.Text(I18n.T("v25.prem.free"), "muted", wrap: true), Perks(), Preview(), Stats());
         Content = col;
     }
 

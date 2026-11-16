@@ -99,6 +99,9 @@ public static class Firebase
         IEnumerable<string> list => new JsonObject { ["arrayValue"] = new JsonObject { ["values"] = new JsonArray(list.Select(x => ToValue(x)).ToArray()) } },
         // 13.0: словарь строк (имена участников команды) — mapValue.
         IDictionary<string, string> map => new JsonObject { ["mapValue"] = new JsonObject { ["fields"] = ToFields(map.ToDictionary(kv => kv.Key, kv => (object?)kv.Value)) } },
+        // 31.0: вложенные словари (цены по валютам, скидка) и время (срок скидки).
+        IDictionary<string, object?> nested => new JsonObject { ["mapValue"] = new JsonObject { ["fields"] = ToFields(nested) } },
+        DateTime dt => new JsonObject { ["timestampValue"] = dt.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ", System.Globalization.CultureInfo.InvariantCulture) },
         _ => new JsonObject { ["stringValue"] = value.ToString() },
     };
 

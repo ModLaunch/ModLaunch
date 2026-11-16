@@ -51,7 +51,12 @@ public static class Premium
     /// Без входа и на чужом аккаунте Premium нет — отметка в настройках привязана к uid покупателя.
     /// </summary>
     public static bool Active => _demo ?? (Account.SignedIn && Account.Get() is var me
-        && (me.Admin || State.Str("listing") is { Length: > 0 } && me.Uid is { } uid && State.Str("uid") == uid));
+        && (me.Admin || State.Str("listing") is { Length: > 0 } && me.Uid is { } uid && State.Str("uid") == uid
+            // 31.0: подписка, оплаченная картой (premium/{uid}.until на сервере), пока не истекла.
+            || CardUntil is { } until && until > DateTime.UtcNow));
+
+    /// <summary>31.0: до какого числа действует подписка, оплаченная картой (для этого аккаунта).</summary>
+    public static DateTime? CardUntil => Settings.Data.Obj("premiumCard") is var c && c.Str("uid") == Account.Uid && DateTime.TryParse(c.Str("until"), null, System.Globalization.DateTimeStyles.RoundtripKind, out var u) ? u : null;
 
     public static DateTime? Since => DateTime.TryParse(State.Str("since"), null, System.Globalization.DateTimeStyles.RoundtripKind, out var d) ? d : null;
 
@@ -93,6 +98,17 @@ public static class Premium
     public static async Task Refresh()
     {
         if (Program.Demo || !Account.SignedIn || Account.Get().Uid is not { } uid) return;
+        // 31.0: подписка картой — срок с сервера (запоминаем: без сети Premium не пропадает до конца срока).
+        try
+        {
+            if (await Store.PremiumUntil() is { } until)
+            {
+                Settings.Data["premiumCard"] = new JsonObject { ["uid"] = uid, ["until"] = until.ToString("o") };
+                Settings.Save();
+                OnUi(() => Changed?.Invoke());
+            }
+        }
+        catch { }
         await PayMethods.Load();
         // Свой запомненный лот, нынешний лот Premium и все прежние: купленный когда-то Premium — навсегда.
         var ids = new List<string>();

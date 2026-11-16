@@ -11,7 +11,8 @@ namespace ModLaunch.Creator;
 public sealed record Listing(
     string Id, string Uid, string Author, string Title, string Summary, string Description, string Kind, string Game,
     long Price, string License, string Version, string Preview, List<string> Tags, List<string> Images,
-    long Size, string Sha256, int Chunks, string FileName, string Status, long Sales, DateTime? Created, DateTime? Updated)
+    long Size, string Sha256, int Chunks, string FileName, string Status, long Sales, DateTime? Created, DateTime? Updated,
+    Dictionary<string, long>? Prices = null, int SalePercent = 0, DateTime? SaleUntil = null)
 {
     public bool Mine => Account.SignedIn && Account.Uid == Uid;
     public bool Free => Price == 0;
@@ -47,6 +48,10 @@ public sealed class ListingDraft
     public List<string> Tags = [];
     public List<string> Images = [];
     public bool Hidden;
+    /// <summary>31.0: цены для оплаты картой по валютам (копейки) и скидка со сроком.</summary>
+    public Dictionary<string, long>? Prices;
+    public int SalePercent;
+    public DateTime? SaleUntil;
     /// <summary>Файл товара (null — оставить прежний).</summary>
     public string? File;
 }
@@ -144,10 +149,21 @@ public static partial class Market
             name[(name.LastIndexOf('/') + 1)..], f.S("uid"), f.S("author"), f.S("title"), f.S("summary"), f.S("description"),
             f.S("kind"), f.S("game"), f.L("price"), f.S("license"), f.S("version"), f.S("preview"), f.A("tags"), f.A("images").Where(u => Ads.HttpsUrl(u) is not null).Take(6).ToList(),
             f.L("size"), f.S("sha256"), (int)f.L("chunks"), f.S("fileName"), f.S("status"), f.L("sales"),
-            Firebase.Time(f.S("created")), Firebase.Time(f.S("updated")));
+            Firebase.Time(f.S("created")), Firebase.Time(f.S("updated")), PricesOf(f), SaleOf(f).Percent, SaleOf(f).Until);
     }
 
     static string Id(JsonObject doc) { var n = doc.Str("name") ?? ""; return n[(n.LastIndexOf('/') + 1)..]; }
+
+    /// <summary>31.0: цены для оплаты картой по валютам (копейки).</summary>
+    static Dictionary<string, long>? PricesOf(Dictionary<string, object?> f) =>
+        f.TryGetValue("prices", out var v) && v is Dictionary<string, object?> m
+            ? m.Where(kv => kv.Value is long p && p > 0 && Store.Currencies.Contains(kv.Key)).ToDictionary(kv => kv.Key, kv => (long)kv.Value!)
+            : null;
+
+    /// <summary>31.0: скидка со сроком (процент 1–90).</summary>
+    static (int Percent, DateTime? Until) SaleOf(Dictionary<string, object?> f) =>
+        f.TryGetValue("sale", out var v) && v is Dictionary<string, object?> s && s.L("percent") is > 0 and <= 90 and var pct
+            ? ((int)pct, Firebase.Time(s.S("until"))) : (0, null);
 
     static async Task<List<JsonObject>> Query(string collection, string? field, object? value, string? parent = null, string order = "created", int limit = 300, string? token = null, bool sorted = false)
     {
@@ -491,6 +507,9 @@ public static partial class Market
             ["fileName"] = fileName,
             ["status"] = d.Hidden ? "hidden" : "active",
         };
+
+        if (d.Prices is { Count: > 0 } prices) fields["prices"] = prices.Where(kv => Store.Currencies.Contains(kv.Key) && kv.Value > 0).ToDictionary(kv => kv.Key, kv => (object?)kv.Value);
+        if (d.SalePercent is > 0 and <= 90 && d.SaleUntil is { } saleUntil) fields["sale"] = new Dictionary<string, object?> { ["percent"] = (long)d.SalePercent, ["until"] = saleUntil };
 
         JsonObject Main(bool create, string status)
         {

@@ -116,7 +116,9 @@ public static class TipUi
             message,
             note,
             balance);
+        // 31.0: поддержать картой (в своей валюте) — без пополнения баланса ModLaunch.
+        var card = Ui.Button(I18n.T("v31.store.tip.card"), () => { w.CloseDialog(); StoreUi.TipByCard(to, platform ? "ModLaunch" : toName); }, "", Icons.Bag);
         w.Dialog(platform ? I18n.T("v27.tip.platform.title") : I18n.T("v27.tip.author.title", ("name", toName)), body,
-            Ui.Button(I18n.T("common.cancel"), w.CloseDialog), send);
+            Ui.Button(I18n.T("common.cancel"), w.CloseDialog), card, send);
     }
 }

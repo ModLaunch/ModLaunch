@@ -254,6 +254,13 @@ public sealed class ListingPage : Page
             : new TextBlock { Text = MarketViews.PriceText(l), FontFamily = Look.Display, FontSize = 22, FontWeight = FontWeight.Bold, Foreground = l.Free ? Ui.Res("Good") : Ui.Res("Text") };
         price.VerticalAlignment = VerticalAlignment.Center;
         var right = Ui.Row(12, wish, price, main);
+        // 31.0: оплата картой в валюте человека (BYN, RUB, USD, EUR) — цена по региону, скидка, «Подарить».
+        if (!Owned && !l.Mine && Store.CardSale(l))
+        {
+            void Again() { _owned = null; Market.Invalidate(); Market.Owned.Clear(); _ = Load(); }
+            right = Ui.Row(12, wish, StoreUi.CurrencyPicker(Build), StoreUi.PriceTag(l, Store.Currency), StoreUi.BuyButtons(l, Again));
+            note.Text = I18n.T("v31.store.cardNote");
+        }
         // 31.0: пожаловаться на лот (вирус, украденный мод, мошенничество) — не на свой.
         if (!l.Mine) right.Children.Insert(0, ReportUi.Button("listing", l.Id, l.Uid, l.Title, iconOnly: true));
         right.VerticalAlignment = VerticalAlignment.Center;
