@@ -293,7 +293,13 @@
     "v31.welcome.ready": "Готово: «{mod}» установлен. Если что-то пойдёт не так — его можно откатить в один клик.",
     "v31.welcome.play": "Играть в {game}",
     "v31.welcome.more": "Ещё моды",
-    "v31.welcome.skip": "Пропустить"
+    "v31.welcome.skip": "Пропустить",
+    "v31.adm.wave": "Приглашения из листа ожидания",
+    "v31.adm.wave.text": "Письмо со ссылкой на скачивание следующим N подтвердившим почту (по порядку записи). В день релиза — волнами: 5 000, затем по 10 000 в час, если сервер спокоен.",
+    "v31.adm.wave.go": "Пригласить",
+    "v31.adm.wave.bad": "Число от 1 до 10 000.",
+    "v31.adm.wave.done": "Отправлено приглашений: {n}. Лист ожидания пройден.",
+    "v31.adm.wave.more": "Отправлено приглашений: {n}. В листе ещё есть люди."
   },
   "en": {
     "v31.rep.title": "Report",
@@ -589,7 +595,13 @@
     "v31.welcome.ready": "Done: “{mod}” is installed. If anything goes wrong, roll it back in one click.",
     "v31.welcome.play": "Play {game}",
     "v31.welcome.more": "More mods",
-    "v31.welcome.skip": "Skip"
+    "v31.welcome.skip": "Skip",
+    "v31.adm.wave": "Waitlist invites",
+    "v31.adm.wave.text": "Sends the download link to the next N confirmed sign-ups (in order). On launch day go in waves: 5,000, then 10,000 an hour if the server is calm.",
+    "v31.adm.wave.go": "Invite",
+    "v31.adm.wave.bad": "A number from 1 to 10,000.",
+    "v31.adm.wave.done": "Invites sent: {n}. The waitlist is done.",
+    "v31.adm.wave.more": "Invites sent: {n}. More people are waiting."
   },
   "uk": {
     "v31.rep.title": "Поскаржитися",
@@ -885,7 +897,13 @@
     "v31.welcome.ready": "Готово: «{mod}» встановлено. Якщо щось піде не так — його можна відкотити одним кліком.",
     "v31.welcome.play": "Грати в {game}",
     "v31.welcome.more": "Ще моди",
-    "v31.welcome.skip": "Пропустити"
+    "v31.welcome.skip": "Пропустити",
+    "v31.adm.wave": "Запрошення з листа очікування",
+    "v31.adm.wave.text": "Лист із посиланням на завантаження наступним N, хто підтвердив пошту. У день релізу — хвилями.",
+    "v31.adm.wave.go": "Запросити",
+    "v31.adm.wave.bad": "Число від 1 до 10 000.",
+    "v31.adm.wave.done": "Надіслано запрошень: {n}. Лист очікування пройдено.",
+    "v31.adm.wave.more": "Надіслано запрошень: {n}. У листі ще є люди."
   },
   "es": {
     "v31.rep.title": "Denunciar",
@@ -1181,7 +1199,13 @@
     "v31.welcome.ready": "Listo: «{mod}» instalado. Si algo falla, puedes revertirlo con un clic.",
     "v31.welcome.play": "Jugar a {game}",
     "v31.welcome.more": "Más mods",
-    "v31.welcome.skip": "Omitir"
+    "v31.welcome.skip": "Omitir",
+    "v31.adm.wave": "Invitaciones de la lista de espera",
+    "v31.adm.wave.text": "Envía el enlace de descarga a los siguientes N confirmados. El día del lanzamiento, por oleadas.",
+    "v31.adm.wave.go": "Invitar",
+    "v31.adm.wave.bad": "Un número del 1 al 10 000.",
+    "v31.adm.wave.done": "Invitaciones enviadas: {n}. Lista completada.",
+    "v31.adm.wave.more": "Invitaciones enviadas: {n}. Quedan más."
   },
   "de": {
     "v31.rep.title": "Melden",
@@ -1477,7 +1501,13 @@
     "v31.welcome.ready": "Fertig: „{mod}“ ist installiert. Geht etwas schief, mit einem Klick zurücksetzen.",
     "v31.welcome.play": "{game} spielen",
     "v31.welcome.more": "Mehr Mods",
-    "v31.welcome.skip": "Überspringen"
+    "v31.welcome.skip": "Überspringen",
+    "v31.adm.wave": "Einladungen von der Warteliste",
+    "v31.adm.wave.text": "Sendet den Download-Link an die nächsten N Bestätigten. Am Starttag in Wellen.",
+    "v31.adm.wave.go": "Einladen",
+    "v31.adm.wave.bad": "Eine Zahl von 1 bis 10.000.",
+    "v31.adm.wave.done": "Einladungen gesendet: {n}. Warteliste abgearbeitet.",
+    "v31.adm.wave.more": "Einladungen gesendet: {n}. Weitere warten."
   },
   "fr": {
     "v31.rep.title": "Signaler",
@@ -1773,7 +1803,13 @@
     "v31.welcome.ready": "C’est fait : « {mod} » est installé. En cas de souci, revenez en arrière en un clic.",
     "v31.welcome.play": "Jouer à {game}",
     "v31.welcome.more": "Plus de mods",
-    "v31.welcome.skip": "Passer"
+    "v31.welcome.skip": "Passer",
+    "v31.adm.wave": "Invitations de la liste d’attente",
+    "v31.adm.wave.text": "Envoie le lien aux N inscrits confirmés suivants. Le jour J, par vagues.",
+    "v31.adm.wave.go": "Inviter",
+    "v31.adm.wave.bad": "Un nombre de 1 à 10 000.",
+    "v31.adm.wave.done": "Invitations envoyées : {n}. Liste terminée.",
+    "v31.adm.wave.more": "Invitations envoyées : {n}. D’autres attendent."
   },
   "pt-BR": {
     "v31.rep.title": "Denunciar",
@@ -2069,7 +2105,13 @@
     "v31.welcome.ready": "Pronto: “{mod}” instalado. Se algo der errado, reverta com um clique.",
     "v31.welcome.play": "Jogar {game}",
     "v31.welcome.more": "Mais mods",
-    "v31.welcome.skip": "Pular"
+    "v31.welcome.skip": "Pular",
+    "v31.adm.wave": "Convites da lista de espera",
+    "v31.adm.wave.text": "Envia o link aos próximos N confirmados. No lançamento, em ondas.",
+    "v31.adm.wave.go": "Convidar",
+    "v31.adm.wave.bad": "Um número de 1 a 10.000.",
+    "v31.adm.wave.done": "Convites enviados: {n}. Lista concluída.",
+    "v31.adm.wave.more": "Convites enviados: {n}. Há mais pessoas."
   },
   "zh-CN": {
     "v31.rep.title": "举报",
@@ -2365,6 +2407,12 @@
     "v31.welcome.ready": "完成：「{mod}」已安装。出现问题可一键回滚。",
     "v31.welcome.play": "开始游戏：{game}",
     "v31.welcome.more": "更多模组",
-    "v31.welcome.skip": "跳过"
+    "v31.welcome.skip": "跳过",
+    "v31.adm.wave": "候补名单邀请",
+    "v31.adm.wave.text": "向接下来 N 位已确认邮箱的用户发送下载链接。发布当天请分批发送。",
+    "v31.adm.wave.go": "邀请",
+    "v31.adm.wave.bad": "请输入 1–10000 的数字。",
+    "v31.adm.wave.done": "已发送邀请 {n} 封，候补名单已全部邀请。",
+    "v31.adm.wave.more": "已发送邀请 {n} 封，名单中还有人。"
   }
 }

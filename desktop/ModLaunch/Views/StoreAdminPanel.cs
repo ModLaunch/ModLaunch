@@ -142,6 +142,19 @@ public sealed class StoreAdminPanel : UserControl
         }
         col.Children.Add(Ui.Card(Ui.Col(10, Ui.Text(I18n.T("v31.adm.refundAsks"), "h3"), Ui.Text(I18n.T("v31.adm.refundAsks.text"), "small muted", wrap: true), askList), 22));
 
+        // ---- лист ожидания: приглашения волнами (день релиза — без пиковой нагрузки)
+        var waveSize = new TextBox { Width = 120, Text = "5000" };
+        col.Children.Add(Ui.Card(Ui.Col(10, Ui.Text(I18n.T("v31.adm.wave"), "h3"), Ui.Text(I18n.T("v31.adm.wave.text"), "small muted", wrap: true),
+            Ui.Row(8, waveSize, Ui.Button(I18n.T("v31.adm.wave.go"), () =>
+            {
+                if (!int.TryParse(waveSize.Text, out var n) || n is < 1 or > 10000) { MainWindow.Current?.Toast(I18n.T("v31.adm.wave.bad"), bad: true); return; }
+                Act(async () =>
+                {
+                    var (sent, more) = await Store.InviteWave(n);
+                    Dispatcher.UIThread.Post(() => MainWindow.Current?.Toast(I18n.T(more ? "v31.adm.wave.more" : "v31.adm.wave.done", ("n", sent))));
+                }, I18n.T("adm.done"));
+            }, "primary", Icons.Megaphone))), 22));
+
         // ---- возврат по номеру платежа
         var pid = new TextBox { Watermark = "p_1794757111015_fe4bfac09cec", Width = 320 };
         var reason = new TextBox { Watermark = I18n.T("v31.adm.refund.reason"), Width = 300, MaxLength = 300 };

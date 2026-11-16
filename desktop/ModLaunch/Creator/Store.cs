@@ -303,6 +303,13 @@ public static class Store
 
     public static Task RejectRefund(string pid, string note) => Call("rejectRefund", new JsonObject { ["pid"] = pid, ["note"] = note });
 
+    /// <summary>Админ: пригласить следующую волну из листа ожидания (по порядку записи). Возвращает, сколько писем ушло.</summary>
+    public static async Task<(int Sent, bool More)> InviteWave(int size)
+    {
+        var r = await Call("inviteWave", new JsonObject { ["size"] = size });
+        return (r?["sent"]?.GetValue<int>() ?? 0, r?["left"]?.GetValue<bool>() ?? false);
+    }
+
     public sealed record RefundAsk(string Pid, string Uid, string Title, long Amount, string Currency, string Type, string Reason, string Status, DateTime? Created);
 
     static RefundAsk AskOf(JsonObject d)
