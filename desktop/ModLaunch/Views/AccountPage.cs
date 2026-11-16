@@ -84,6 +84,8 @@ public sealed partial class AccountPage : Page
         if (p.Admin) sections.Add(("moderation", "v31.mod.tab", Icons.Flag));
         // 31.0: сбои программы у людей (отчёты с согласия).
         if (p.Admin) sections.Add(("crashes", "v31.crash.tab", Icons.Bug));
+        // 31.0: магазин с оплатой картой — настройки, выплаты разработчикам, возвраты.
+        if (p.Admin) sections.Add(("store", "v31.adm.store.tab", Icons.Bag));
         // Снимки экрана: «Заработок» на примере, без входа.
         var demo = Program.Screenshot && _tab is "earnings" or "premium";
         if (!p.SignedIn && !demo && _tab != "premium") _tab = "profile";
@@ -120,6 +122,7 @@ public sealed partial class AccountPage : Page
             "admin" when p.Admin => Admin(),
             "moderation" when p.Admin => new ModerationPanel(),
             "crashes" when p.Admin => new CrashesPanel(),
+            "store" when p.Admin => new StoreAdminPanel(),
             _ => Profile(p),
         };
         if (_error is not null) body = Ui.Col(16, Ui.Card(Ui.Col(10, Ui.Text(_error, "", color: Ui.Res("Bad"), wrap: true), Ui.Button(I18n.T("cr.refresh"), () => { Reset(); Build(); }, "", Icons.Refresh)), 18), body);
@@ -311,7 +314,8 @@ public sealed partial class AccountPage : Page
                 info));
             col.Children.Add(Ui.Card(line, 12));
         }
-        return Card(I18n.T("acc.s.purchases"), I18n.T("acc.purchases.text"), col);
+        // 31.0: оплаты картой (игры, подарки, премиум, поддержка) с чеками и «Активировать ключ».
+        return Ui.Col(16, StoreUi.PaymentsCard(), Card(I18n.T("acc.s.purchases"), I18n.T("acc.purchases.text"), col));
     }
 
     /// <summary>Снимки экрана: «Покупки» с заявками на возврат во всех состояниях.</summary>

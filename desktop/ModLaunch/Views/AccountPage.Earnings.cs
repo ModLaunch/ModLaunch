@@ -113,6 +113,8 @@ public sealed partial class AccountPage
         Grid.SetColumn(right, 1);
         pair.Children.Add(right);
         col.Children.Add(pair);
+        // 31.0: оплаты картой (игры, подарки, поддержка) — по валютам, с выплатами.
+        if (!Program.Screenshot) col.Children.Add(DeveloperUi.EarningsCard());
         col.Children.Add(Ui.Row(10,
             Ui.Button(I18n.T("cr.refresh"), ReloadEarn, "ghost", Icons.Refresh),
             Ui.Text(I18n.T("v20.acc.fee", ("fee", Market.FeePercent)), "small muted")));

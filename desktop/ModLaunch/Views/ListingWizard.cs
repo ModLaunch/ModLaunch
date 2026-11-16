@@ -68,6 +68,8 @@ public static class ListingWizard
         var license = l?.License ?? "personal";
         string? file = null;
         var chosen = new HashSet<string>(l?.Tags ?? []);
+        // 31.0: цены для оплаты картой по регионам (BYN, RUB, USD, EUR) и скидка со сроком.
+        var cardPrices = new CardPricesEditor(l);
 
         // ---- живое превью: та же карточка, что на витрине
         var previewHost = new Border { Width = 268 };
@@ -218,6 +220,7 @@ public static class ListingWizard
         var step3 = Ui.Col(14,
             Field(I18n.T("mk.f.price", ("cur", Market.Currency)), Ui.Col(8, Ui.Row(10, price, new TextBlock { Text = Market.Currency, Foreground = Ui.Res("Muted"), VerticalAlignment = VerticalAlignment.Center }), presets)),
             youGet,
+            Field(I18n.T("v31.seller.prices"), cardPrices.View),
             Field(I18n.T("mk.f.license"), licenses),
             Field(I18n.T("hub.f.version"), version, I18n.T("lw.version.hint")),
             hidden);
@@ -288,11 +291,14 @@ public static class ListingWizard
             try
             {
                 var p = Market.ParseMoney(price.Text)!.Value;
+                var (cardPriceList, salePct, saleUntil, priceError) = cardPrices.Read();
+                if (priceError is not null) { MainWindow.Current?.Toast(priceError, bad: true); nextButton.IsEnabled = back.IsEnabled = true; return; }
                 var d = new ListingDraft
                 {
                     Title = title.Text ?? "", Summary = summary.Text ?? "", Description = description.Text ?? "",
                     Kind = kind, License = license, Game = gameIds[Math.Max(0, game.SelectedIndex)], Price = p, Version = (version.Text ?? "").Trim(),
                     Preview = preview.Text ?? "", Tags = [.. chosen], Hidden = hidden.IsChecked == true, File = file,
+                    Prices = cardPriceList, SalePercent = salePct, SaleUntil = saleUntil,
                     Images = (images.Text ?? "").Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList(),
                 };
                 // 11.0: файл проходит автомодерацию до загрузки. Код, скрипт и сборка продаются инжектом:

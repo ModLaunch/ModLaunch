@@ -122,10 +122,13 @@ public sealed class IndiePage : Page
             {
                 var ll = l;
                 var edit = Ui.Button(I18n.T("v29.indie.update"), () => Publish(ll), "", Icons.Upload);
-                mine.Children.Add(MarketTiles.Row(l, right: Ui.Row(8, Ui.Text(I18n.T("v29.indie.sales", ("n", l.Sales)), "small muted"), edit)));
+                // 31.0: ключи для раздачи (пресса, блогеры, конкурсы).
+                var keys = Ui.Button(I18n.T("v31.seller.keys"), () => DeveloperUi.Keys(ll), "ghost", Icons.Key);
+                mine.Children.Add(MarketTiles.Row(l, right: Ui.Row(8, Ui.Text(I18n.T("v29.indie.sales", ("n", l.Sales)), "small muted"), keys, edit)));
             }
         else mine.Children.Add(Ui.Text(I18n.T("v29.indie.mine.none"), "muted"));
-        return Ui.Col(16, compare, steps, Ui.Card(mine, 22));
+        // 31.0: заработок с оплат картой по валютам и выплаты.
+        return Ui.Col(16, compare, steps, Ui.Card(mine, 22), DeveloperUi.EarningsCard());
     }
 
     // ---------------------------------------------------------------- публикация
@@ -141,6 +144,8 @@ public sealed class IndiePage : Page
         var version = new TextBox { Text = existing?.Version ?? "1.0.0", Watermark = "1.0.0", Width = 120, HorizontalAlignment = HorizontalAlignment.Left };
         var images = new TextBox { Text = string.Join("\n", existing?.Images ?? []), Watermark = I18n.T("v29.indie.f.images"), AcceptsReturn = true, MinHeight = 60 };
         var url = new TextBox { Watermark = I18n.T("v29.indie.f.url") };
+        // 31.0: цены для оплаты картой по регионам и скидка.
+        var cardPrices = new CardPricesEditor(existing);
         var genres = new HashSet<string>(existing?.Tags ?? []);
         var genreRow = new WrapPanel();
         void RenderGenres()
@@ -181,10 +186,12 @@ public sealed class IndiePage : Page
             var money = string.IsNullOrWhiteSpace(price.Text) ? 0 : Market.ParseMoney(price.Text);
             if (money is null) { error.Text = I18n.T("v29.indie.e.price"); return; }
             if ((title.Text ?? "").Trim() == "") { error.Text = I18n.T("v29.indie.e.title"); return; }
+            var (prices, salePct, saleUntil, priceError) = cardPrices.Read();
+            if (priceError is not null) { error.Text = priceError; return; }
             var d = new ListingDraft
             {
                 Title = title.Text ?? "", Summary = summary.Text ?? "", Description = description.Text ?? "", Game = "windows", Price = money.Value,
-                Version = (version.Text ?? "").Trim(), Tags = [.. genres],
+                Version = (version.Text ?? "").Trim(), Tags = [.. genres], Prices = prices, SalePercent = salePct, SaleUntil = saleUntil,
                 Images = (images.Text ?? "").Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList(),
             };
             send!.IsEnabled = false;
@@ -213,6 +220,7 @@ public sealed class IndiePage : Page
             title, summary, description,
             Ui.Text(I18n.T("v29.indie.f.genres"), "small"), genreRow,
             Ui.Row(10, price, version),
+            Ui.Text(I18n.T("v31.seller.prices"), "small"), cardPrices.View,
             images,
             Ui.Text(I18n.T("v29.indie.f.build"), "h3"), Ui.Row(10, pick), buildText, url,
             progress, error);
