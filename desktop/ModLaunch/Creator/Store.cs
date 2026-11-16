@@ -292,6 +292,44 @@ public static class Store
     public static Task ResolvePayout(string id, bool paid, string note) =>
         Call("resolvePayout", new JsonObject { ["id"] = id, ["paid"] = paid, ["note"] = note });
 
+    // ---------------------------------------------------------------- возвраты оплат картой (14 дней)
+
+    public const int RefundDays = 14;
+
+    /// <summary>Можно ли просить возврат: оплачено, не поддержка автора, не старше 14 дней.</summary>
+    public static bool CanAskRefund(CardPayment p) => p.Status == "paid" && p.Type != "tip" && p.PaidAt is { } at && DateTime.UtcNow - at < TimeSpan.FromDays(RefundDays);
+
+    public static Task AskRefund(string pid, string reason) => Call("requestRefund", new JsonObject { ["pid"] = pid, ["reason"] = reason });
+
+    public static Task RejectRefund(string pid, string note) => Call("rejectRefund", new JsonObject { ["pid"] = pid, ["note"] = note });
+
+    public sealed record RefundAsk(string Pid, string Uid, string Title, long Amount, string Currency, string Type, string Reason, string Status, DateTime? Created);
+
+    static RefundAsk AskOf(JsonObject d)
+    {
+        var name = d.Str("name") ?? "";
+        var f = Firebase.FromFields(d["fields"] as JsonObject);
+        return new RefundAsk(name[(name.LastIndexOf('/') + 1)..], f.S("uid"), f.S("title"), f.L("amount"), f.S("currency"), f.S("type"), f.S("reason"), f.S("status"), Firebase.Time(f.S("created")));
+    }
+
+    /// <summary>Свои заявки на возврат (по номеру оплаты).</summary>
+    public static async Task<Dictionary<string, RefundAsk>> MyRefundAsks() =>
+        (await Mine("refundRequests", "uid")).Select(AskOf).ToDictionary(a => a.Pid);
+
+    /// <summary>Админ: заявки, ждущие решения.</summary>
+    public static async Task<List<RefundAsk>> PendingRefundAsks()
+    {
+        var (_, token) = await Account.Token();
+        var q = new JsonObject
+        {
+            ["from"] = new JsonArray(new JsonObject { ["collectionId"] = "refundRequests" }),
+            ["where"] = new JsonObject { ["fieldFilter"] = new JsonObject { ["field"] = new JsonObject { ["fieldPath"] = "status" }, ["op"] = "EQUAL", ["value"] = Firebase.ToValue("pending") } },
+            ["limit"] = 200,
+        };
+        var rows = await Hub.Call(Firebase.Url(":runQuery"), HttpMethod.Post, new JsonObject { ["structuredQuery"] = q }, token);
+        return (rows as JsonArray ?? []).Select(r => r?["document"] as JsonObject).OfType<JsonObject>().Select(AskOf).OrderBy(a => a.Created).ToList();
+    }
+
     public static string Explain(Exception e) => Firebase.Explain("store", e);
 
     // ---------------------------------------------------------------- настройки магазина (config/store)

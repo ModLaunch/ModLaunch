@@ -1079,6 +1079,10 @@ service cloud.firestore {
     match /payoutRequests/{id} {
       allow get, list: if request.auth != null && (resource.data.uid == request.auth.uid || mAdmin());
     }
+    // Заявки покупателей на возврат оплаты картой: пишет сервер, видят покупатель и админ.
+    match /refundRequests/{pid} {
+      allow get, list: if request.auth != null && (resource.data.uid == request.auth.uid || mAdmin());
+    }
     match /scans/{sha} {
       allow get, list: if mAdmin();
     }

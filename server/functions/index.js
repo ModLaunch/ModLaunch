@@ -260,3 +260,15 @@ export const inviteWave = onCall({ secrets: [SMTP_URL] }, async (req) => {
   }
   return { sent, left: next.size === size };
 });
+
+// ---------------------------------------------------------------- заявки покупателей на возврат
+
+export const requestRefund = onCall(async (req) => {
+  const user = needUser(req);
+  try { return { result: await store.requestRefund(db, user.uid, String(req.data?.pid ?? ''), req.data?.reason) }; } catch (e) { fail(e); }
+});
+
+export const rejectRefund = onCall(async (req) => {
+  const admin = await needAdmin(req);
+  try { return { result: await store.rejectRefund(db, admin.uid, String(req.data?.pid ?? ''), req.data?.note) }; } catch (e) { fail(e); }
+});

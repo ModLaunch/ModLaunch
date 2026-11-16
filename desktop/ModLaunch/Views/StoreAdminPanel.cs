@@ -16,6 +16,7 @@ public sealed class StoreAdminPanel : UserControl
 {
     Store.StoreConfig? _cfg;
     List<(string Id, string Uid, string Currency, long Amount, string Details, DateTime? Created)>? _payouts;
+    List<Store.RefundAsk>? _asks;
     string? _error;
     bool _busy;
 
@@ -27,7 +28,7 @@ public sealed class StoreAdminPanel : UserControl
 
     async Task Load()
     {
-        try { _cfg = await Store.Config(force: true); _payouts = await Store.PendingPayouts(); _error = null; }
+        try { _cfg = await Store.Config(force: true); _payouts = await Store.PendingPayouts(); _asks = await Store.PendingRefundAsks(); _error = null; }
         catch (Exception e) { _error = Store.Explain(e); }
         Dispatcher.UIThread.Post(Render);
     }
@@ -120,6 +121,26 @@ public sealed class StoreAdminPanel : UserControl
             outs.Children.Add(Ui.Card(line, 12));
         }
         col.Children.Add(Ui.Card(Ui.Col(10, Ui.Text(I18n.T("v31.adm.payouts"), "h3"), Ui.Text(I18n.T("v31.adm.payouts.text"), "small muted", wrap: true), outs), 22));
+
+        // ---- заявки покупателей на возврат (14 дней)
+        var askList = Ui.Col(6);
+        if (_asks is not { Count: > 0 }) askList.Children.Add(Ui.Text(I18n.T("adm.none"), "muted"));
+        foreach (var a in _asks ?? [])
+        {
+            var item = a;
+            var note = new TextBox { Watermark = I18n.T("adm.note"), Width = 200, MaxLength = 300 };
+            var line = new DockPanel();
+            var buttons = Ui.Row(6, note,
+                Ui.Button(I18n.T("v30.adm.refund.ok"), () => Act(() => Store.Refund(item.Pid, note.Text is { Length: > 0 } n ? n : item.Reason), I18n.T("v31.adm.refund.done")), "primary", Icons.Undo),
+                Ui.Button(I18n.T("adm.reject"), () => Act(() => Store.RejectRefund(item.Pid, note.Text ?? ""), I18n.T("adm.done")), "ghost", Icons.Close));
+            DockPanel.SetDock(buttons, Dock.Right);
+            line.Children.Add(buttons);
+            line.Children.Add(Ui.Col(2, Ui.Text($"{item.Title} · {Store.Money(item.Amount, item.Currency)}", "h3"),
+                Ui.Text("«" + item.Reason + "»", "small", wrap: true),
+                new SelectableTextBlock { Text = $"{item.Pid} · {item.Uid} · {Ui.Ago(item.Created)}", Foreground = Ui.Res("Muted"), FontSize = 12 }));
+            askList.Children.Add(Ui.Card(line, 12));
+        }
+        col.Children.Add(Ui.Card(Ui.Col(10, Ui.Text(I18n.T("v31.adm.refundAsks"), "h3"), Ui.Text(I18n.T("v31.adm.refundAsks.text"), "small muted", wrap: true), askList), 22));
 
         // ---- возврат по номеру платежа
         var pid = new TextBox { Watermark = "p_1794757111015_fe4bfac09cec", Width = 320 };

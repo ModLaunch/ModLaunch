@@ -170,3 +170,24 @@ test('VirusTotal: опасный файл снимается сам — снят
   const unknown = async () => new Response('{}', { status: 404 });
   assert.equal(await scanItem(db, 'key', { kind: 'creation', id: 'u_mod', sha256: 'b'.repeat(64), title: 'Mod', owner: 'u' }, unknown), 'queued');
 });
+
+test('заявка на возврат: только своя оплаченная покупка, до 14 дней, не поддержка; возврат закрывает заявку', { skip: !emulated }, async () => {
+  const o = await store.createPayment(db, BUYER, { type: 'game', target: 'dev1_game', currency: 'BYN' }, { provider: 'bepaid' });
+  await assert.rejects(store.requestRefund(db, BUYER.uid, o.pid, 'Не запускается на моём ПК'), (e) => e.code === 'NOT_PAID');
+  await paid(o.pid);
+  await assert.rejects(store.requestRefund(db, BUYER.uid, o.pid, 'нет'), (e) => e.code === 'REFUND_REASON');
+  await assert.rejects(store.requestRefund(db, 'stranger', o.pid, 'Не запускается на моём ПК'), (e) => e.code === 'NOT_FOUND');
+  await assert.rejects(store.requestRefund(db, BUYER.uid, o.pid, 'Не запускается на моём ПК', new Date(Date.now() + 15 * 86_400_000)), (e) => e.code === 'REFUND_LATE');
+  assert.equal(await store.requestRefund(db, BUYER.uid, o.pid, 'Не запускается на моём ПК'), 'pending');
+  await assert.rejects(store.requestRefund(db, BUYER.uid, o.pid, 'Ещё раз прошу'), (e) => e.code === 'REFUND_EXISTS');
+  await store.markRefunded(db, o.pid, { refundUid: 'r-9', reason: 'одобрено', by: 'admin1' });
+  assert.equal((await db.doc(`refundRequests/${o.pid}`).get()).data().status, 'refunded');
+  const tip = await store.createPayment(db, BUYER, { type: 'tip', target: DEV, currency: 'BYN', amount: 1000 }, { provider: 'bepaid' });
+  await paid(tip.pid);
+  await assert.rejects(store.requestRefund(db, BUYER.uid, tip.pid, 'Передумал поддерживать'), (e) => e.code === 'TIP_FINAL');
+  const o2 = await store.createPayment(db, BUYER, { type: 'game', target: 'dev1_game', currency: 'BYN' }, { provider: 'bepaid' });
+  await paid(o2.pid);
+  await store.requestRefund(db, BUYER.uid, o2.pid, 'Не тот жанр, ошибся');
+  assert.equal(await store.rejectRefund(db, 'admin1', o2.pid, 'играли 20 часов'), 'rejected');
+  await assert.rejects(store.rejectRefund(db, 'admin1', o2.pid, ''), (e) => e.code === 'ALREADY');
+});

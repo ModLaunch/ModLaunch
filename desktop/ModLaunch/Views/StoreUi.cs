@@ -143,8 +143,10 @@ public static class StoreUi
         _ = Task.Run(async () =>
         {
             List<CardPayment>? list = null;
+            Dictionary<string, Store.RefundAsk> asks = [];
             string? error = null;
             try { list = await Store.MyPayments(); } catch (Exception e) { error = Store.Explain(e); }
+            try { asks = await Store.MyRefundAsks(); } catch { }
             Dispatcher.UIThread.Post(() =>
             {
                 body.Children.Clear();
@@ -165,6 +167,11 @@ public static class StoreUi
                             }
                             catch (Exception e) { MainWindow.Current?.Toast(Store.Explain(e), bad: true); }
                         }, "ghost", Icons.List));
+                    // 31.0: возврат в течение 14 дней — заявка, решение принимает модератор.
+                    if (asks.TryGetValue(item.Id, out var ask))
+                        buttons.Children.Add(HubLook.Badge(I18n.T("v31.store.refund.status." + ask.Status), ask.Status == "rejected" ? "accent" : ""));
+                    else if (Store.CanAskRefund(item))
+                        buttons.Children.Add(Ui.Button(I18n.T("v31.store.refund"), () => AskRefund(item), "ghost", Icons.Undo));
                     DockPanel.SetDock(buttons, Dock.Right);
                     line.Children.Add(buttons);
                     var status = HubLook.Badge(I18n.T("v31.store.status." + item.Status), item.Status switch { "paid" => "good", "created" => "", _ => "accent" });
@@ -176,6 +183,25 @@ public static class StoreUi
             });
         });
         return card;
+    }
+
+    static void AskRefund(CardPayment p)
+    {
+        var w = MainWindow.Current;
+        if (w is null) return;
+        var reason = new TextBox { Watermark = I18n.T("v31.store.refund.reason"), MaxLength = 500, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 70 };
+        w.Dialog(I18n.T("v31.store.refund.title", ("title", p.Title)), Ui.Col(10, Ui.Text(I18n.T("v31.store.refund.text"), "muted", wrap: true), reason),
+            Ui.Button(I18n.T("common.cancel"), w.CloseDialog),
+            Ui.Button(I18n.T("v31.store.refund.send"), async () =>
+            {
+                try
+                {
+                    await Store.AskRefund(p.Id, reason.Text ?? "");
+                    w.CloseDialog();
+                    w.Toast(I18n.T("v31.store.refund.sent"));
+                }
+                catch (Exception e) { w.Toast(Store.Explain(e), bad: true); }
+            }, "primary", Icons.Undo));
     }
 
     /// <summary>«Активировать ключ»: игра от разработчика (пресса, конкурс) — в библиотеку.</summary>

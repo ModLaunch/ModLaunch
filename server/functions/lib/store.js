@@ -173,8 +173,12 @@ export async function markRefunded(db, pid, { refundUid, reason, by, now = new D
     if (p.status !== 'paid') throw new StoreError('NOT_PAID');
     const premiumRef = db.doc(`premium/${p.uid}`);
     const premium = p.type === 'premium' ? await tx.get(premiumRef) : null;
+    const requestRef = db.doc(`refundRequests/${pid}`);
+    const request = await tx.get(requestRef);
     const at = Timestamp.fromDate(now);
     tx.update(ref, { status: 'refunded', refundedAt: at, refundUid: clip(refundUid, 120), refundReason: clip(reason, 300), refundedBy: by });
+    // Заявка покупателя (если была) закрывается этой же записью.
+    if (request?.exists) tx.update(requestRef, { status: 'refunded', resolvedBy: by, resolvedAt: at });
     tx.update(db.doc(`receipts/${pid}`), { refunded: true, refundedAt: at });
     if (p.type === 'game' || p.type === 'gift') {
       const owner = p.giftTo ?? p.uid;
@@ -269,4 +273,36 @@ export async function resolvePayout(db, adminUid, id, paid, note, now = new Date
     tx.set(db.doc(`earnings/${r.uid}`), { totals: { [r.currency]: { pending: FieldValue.increment(-r.amount), ...(paid ? { paid: FieldValue.increment(r.amount) } : {}) } } }, { merge: true });
     return paid ? 'paid' : 'rejected';
   });
+}
+
+// ---------------------------------------------------------------- заявка покупателя на возврат
+
+export const REFUND_DAYS = 14;
+
+/** Покупатель просит вернуть деньги: своя оплата, оплачена, не старше 14 дней, не поддержка автора. */
+export async function requestRefund(db, uid, pid, reason, now = new Date()) {
+  const text = clip(reason, 500).trim();
+  if (text.length < 5) throw new StoreError('REFUND_REASON');
+  const p = (await db.doc(`payments/${pid}`).get()).data();
+  if (!p || p.uid !== uid) throw new StoreError('NOT_FOUND');
+  if (p.status !== 'paid') throw new StoreError('NOT_PAID');
+  if (p.type === 'tip') throw new StoreError('TIP_FINAL');
+  const paidAt = p.paidAt?.toDate?.() ?? new Date(0);
+  if (now - paidAt > REFUND_DAYS * 86_400_000) throw new StoreError('REFUND_LATE');
+  const ref = db.doc(`refundRequests/${pid}`);
+  await db.runTransaction(async (tx) => {
+    if ((await tx.get(ref)).exists) throw new StoreError('REFUND_EXISTS');
+    tx.set(ref, { uid, pid, title: p.title, amount: p.amount, currency: p.currency, type: p.type, reason: text, status: 'pending', created: Timestamp.fromDate(now) });
+  });
+  return 'pending';
+}
+
+/** Админ: отказ по заявке (одобрение — через refundPayment, он же закрывает заявку). */
+export async function rejectRefund(db, adminUid, pid, note, now = new Date()) {
+  const ref = db.doc(`refundRequests/${pid}`);
+  const r = (await ref.get()).data();
+  if (!r) throw new StoreError('NOT_FOUND');
+  if (r.status !== 'pending') throw new StoreError('ALREADY');
+  await ref.update({ status: 'rejected', note: clip(note, 300), resolvedBy: adminUid, resolvedAt: Timestamp.fromDate(now) });
+  return 'rejected';
 }
