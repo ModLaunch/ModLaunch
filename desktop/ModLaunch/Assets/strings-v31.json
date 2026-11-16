@@ -299,7 +299,12 @@
     "v31.adm.wave.go": "Пригласить",
     "v31.adm.wave.bad": "Число от 1 до 10 000.",
     "v31.adm.wave.done": "Отправлено приглашений: {n}. Лист ожидания пройден.",
-    "v31.adm.wave.more": "Отправлено приглашений: {n}. В листе ещё есть люди."
+    "v31.adm.wave.more": "Отправлено приглашений: {n}. В листе ещё есть люди.",
+    "new.v31.store": "Магазин с оплатой картой: игры инди-разработчиков по ценам в вашей валюте (BYN, RUB, USD, EUR), скидки, подарки друзьям, ключи и чеки; возврат денег — в течение 14 дней.",
+    "new.v31.safety": "Безопасность: моды и товары проверяются Защитником Windows и по чёрному списку перед публикацией и установкой; кнопка «Пожаловаться» на моды, товары, отзывы и людей.",
+    "new.v31.account": "Защита аккаунта: список устройств и вопрос «Это вы?» при входе с нового ПК; после нескольких неверных паролей — пауза.",
+    "new.v31.reliability": "Надёжность: если новая версия не запустится, ModLaunch сам вернёт прежнюю; отчёты о сбоях — только с вашего согласия и без личных данных.",
+    "new.v31.welcome": "Первый запуск: ModLaunch показывает найденные игры и самые популярные моды — первый мод ставится в один клик."
   },
   "en": {
     "v31.rep.title": "Report",
@@ -601,7 +606,12 @@
     "v31.adm.wave.go": "Invite",
     "v31.adm.wave.bad": "A number from 1 to 10,000.",
     "v31.adm.wave.done": "Invites sent: {n}. The waitlist is done.",
-    "v31.adm.wave.more": "Invites sent: {n}. More people are waiting."
+    "v31.adm.wave.more": "Invites sent: {n}. More people are waiting.",
+    "new.v31.store": "Card payments in the store: indie games priced in your currency (BYN, RUB, USD, EUR), discounts, gifts for friends, keys and receipts; refunds within 14 days.",
+    "new.v31.safety": "Safety: mods and items are checked by Windows Defender and a blocklist before publishing and installing; a Report button on mods, items, reviews and people.",
+    "new.v31.account": "Account protection: a device list and “Was it you?” when someone signs in from a new PC; a pause after several wrong passwords.",
+    "new.v31.reliability": "Reliability: if a new version fails to start, ModLaunch rolls back by itself; crash reports only with your consent and without personal data.",
+    "new.v31.welcome": "First run: ModLaunch shows the games it found and the most popular mods — your first mod installs in one click."
   },
   "uk": {
     "v31.rep.title": "Поскаржитися",
@@ -903,7 +913,12 @@
     "v31.adm.wave.go": "Запросити",
     "v31.adm.wave.bad": "Число від 1 до 10 000.",
     "v31.adm.wave.done": "Надіслано запрошень: {n}. Лист очікування пройдено.",
-    "v31.adm.wave.more": "Надіслано запрошень: {n}. У листі ще є люди."
+    "v31.adm.wave.more": "Надіслано запрошень: {n}. У листі ще є люди.",
+    "new.v31.store": "Магазин з оплатою карткою: інді-ігри за цінами у вашій валюті (BYN, RUB, USD, EUR), знижки, подарунки друзям, ключі й чеки; повернення — протягом 14 днів.",
+    "new.v31.safety": "Безпека: моди й товари перевіряються Захисником Windows і чорним списком перед публікацією та встановленням; кнопка «Поскаржитися».",
+    "new.v31.account": "Захист акаунта: список пристроїв і питання «Це ви?» при вході з нового ПК; пауза після кількох неправильних паролів.",
+    "new.v31.reliability": "Надійність: якщо нова версія не запуститься, ModLaunch сам поверне попередню; звіти про збої — лише з вашої згоди.",
+    "new.v31.welcome": "Перший запуск: ModLaunch показує знайдені ігри та найпопулярніші моди — перший мод ставиться одним кліком."
   },
   "es": {
     "v31.rep.title": "Denunciar",
@@ -1205,7 +1220,12 @@
     "v31.adm.wave.go": "Invitar",
     "v31.adm.wave.bad": "Un número del 1 al 10 000.",
     "v31.adm.wave.done": "Invitaciones enviadas: {n}. Lista completada.",
-    "v31.adm.wave.more": "Invitaciones enviadas: {n}. Quedan más."
+    "v31.adm.wave.more": "Invitaciones enviadas: {n}. Quedan más.",
+    "new.v31.store": "Pago con tarjeta en la tienda: juegos indie en tu moneda (BYN, RUB, USD, EUR), descuentos, regalos, claves y recibos; reembolsos en 14 días.",
+    "new.v31.safety": "Seguridad: Windows Defender y una lista negra revisan mods y artículos antes de publicar e instalar; botón Denunciar.",
+    "new.v31.account": "Protección de la cuenta: lista de dispositivos y «¿Has sido tú?» al entrar desde otro PC; pausa tras varias contraseñas erróneas.",
+    "new.v31.reliability": "Fiabilidad: si una versión nueva no arranca, ModLaunch vuelve sola a la anterior; informes de fallos solo con tu permiso.",
+    "new.v31.welcome": "Primer inicio: ModLaunch muestra los juegos encontrados y los mods más populares; el primero se instala con un clic."
   },
   "de": {
     "v31.rep.title": "Melden",
@@ -1507,7 +1527,12 @@
     "v31.adm.wave.go": "Einladen",
     "v31.adm.wave.bad": "Eine Zahl von 1 bis 10.000.",
     "v31.adm.wave.done": "Einladungen gesendet: {n}. Warteliste abgearbeitet.",
-    "v31.adm.wave.more": "Einladungen gesendet: {n}. Weitere warten."
+    "v31.adm.wave.more": "Einladungen gesendet: {n}. Weitere warten.",
+    "new.v31.store": "Kartenzahlung im Shop: Indie-Spiele in deiner Währung (BYN, RUB, USD, EUR), Rabatte, Geschenke, Schlüssel und Belege; Erstattung innerhalb von 14 Tagen.",
+    "new.v31.safety": "Sicherheit: Mods und Artikel werden vor Veröffentlichung und Installation von Windows Defender und einer Sperrliste geprüft; Melden-Knopf.",
+    "new.v31.account": "Kontoschutz: Geräteliste und „Warst du das?“ bei Anmeldung von einem neuen PC; Pause nach mehreren falschen Passwörtern.",
+    "new.v31.reliability": "Zuverlässigkeit: Startet eine neue Version nicht, kehrt ModLaunch selbst zur alten zurück; Absturzberichte nur mit Zustimmung.",
+    "new.v31.welcome": "Erster Start: ModLaunch zeigt gefundene Spiele und die beliebtesten Mods – der erste Mod mit einem Klick."
   },
   "fr": {
     "v31.rep.title": "Signaler",
@@ -1809,7 +1834,12 @@
     "v31.adm.wave.go": "Inviter",
     "v31.adm.wave.bad": "Un nombre de 1 à 10 000.",
     "v31.adm.wave.done": "Invitations envoyées : {n}. Liste terminée.",
-    "v31.adm.wave.more": "Invitations envoyées : {n}. D’autres attendent."
+    "v31.adm.wave.more": "Invitations envoyées : {n}. D’autres attendent.",
+    "new.v31.store": "Paiement par carte dans la boutique : jeux indé dans votre devise (BYN, RUB, USD, EUR), remises, cadeaux, clés et reçus ; remboursement sous 14 jours.",
+    "new.v31.safety": "Sécurité : Windows Defender et une liste noire vérifient mods et articles avant publication et installation ; bouton Signaler.",
+    "new.v31.account": "Protection du compte : liste des appareils et « C’était vous ? » lors d’une connexion depuis un nouveau PC ; pause après plusieurs mots de passe erronés.",
+    "new.v31.reliability": "Fiabilité : si une nouvelle version ne démarre pas, ModLaunch revient seul à la précédente ; rapports de plantage seulement avec votre accord.",
+    "new.v31.welcome": "Premier lancement : ModLaunch montre les jeux trouvés et les mods les plus populaires — le premier s’installe en un clic."
   },
   "pt-BR": {
     "v31.rep.title": "Denunciar",
@@ -2111,7 +2141,12 @@
     "v31.adm.wave.go": "Convidar",
     "v31.adm.wave.bad": "Um número de 1 a 10.000.",
     "v31.adm.wave.done": "Convites enviados: {n}. Lista concluída.",
-    "v31.adm.wave.more": "Convites enviados: {n}. Há mais pessoas."
+    "v31.adm.wave.more": "Convites enviados: {n}. Há mais pessoas.",
+    "new.v31.store": "Pagamento com cartão na loja: jogos indie na sua moeda (BYN, RUB, USD, EUR), descontos, presentes, chaves e recibos; reembolso em 14 dias.",
+    "new.v31.safety": "Segurança: Windows Defender e uma lista de bloqueio verificam mods e itens antes de publicar e instalar; botão Denunciar.",
+    "new.v31.account": "Proteção da conta: lista de dispositivos e “Foi você?” em acesso de outro PC; pausa após várias senhas erradas.",
+    "new.v31.reliability": "Confiabilidade: se a nova versão não abrir, o ModLaunch volta sozinho à anterior; relatórios de falhas só com seu consentimento.",
+    "new.v31.welcome": "Primeira execução: o ModLaunch mostra os jogos encontrados e os mods mais populares — o primeiro instala com um clique."
   },
   "zh-CN": {
     "v31.rep.title": "举报",
@@ -2413,6 +2448,11 @@
     "v31.adm.wave.go": "邀请",
     "v31.adm.wave.bad": "请输入 1–10000 的数字。",
     "v31.adm.wave.done": "已发送邀请 {n} 封，候补名单已全部邀请。",
-    "v31.adm.wave.more": "已发送邀请 {n} 封，名单中还有人。"
+    "v31.adm.wave.more": "已发送邀请 {n} 封，名单中还有人。",
+    "new.v31.store": "商店支持银行卡支付：独立游戏以你的货币定价（BYN、RUB、USD、EUR），支持折扣、赠送好友、密钥与收据；14 天内可退款。",
+    "new.v31.safety": "安全：发布和安装前由 Windows Defender 和黑名单检查模组与商品；新增“举报”按钮。",
+    "new.v31.account": "账号保护：设备列表，新电脑登录时询问“是你吗？”；多次输错密码后会暂停登录。",
+    "new.v31.reliability": "可靠性：新版本无法启动时 ModLaunch 会自动回滚；崩溃报告仅在你同意后发送且不含个人信息。",
+    "new.v31.welcome": "首次启动：ModLaunch 展示找到的游戏和最热门的模组——一键安装第一个模组。"
   }
 }
